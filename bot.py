@@ -73,8 +73,7 @@ async def purge(context):
     if (context.message.author.id != PECHS_ID):
         deleted = await client.purge_from(context.message.channel, limit=100, check=is_me)
         await client.send_message(context.message.channel, 'Deleted {} message(s)'.format(len(deleted)))
-    else:
-        await client.send_message(context.message.channel, "fuck off")
+
 
 
 @client.event
