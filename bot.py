@@ -1,13 +1,18 @@
 import random
 import asyncio
 import aiohttp
+import discord
+import time
+from pytz import timezone
+import pytz
 from discord import Game
+from discord import message
 from discord.ext.commands import Bot
 
-import config
-
 BOT_PREFIX = ("?", "!")
-TOKEN = config.secret_token  # Get at discordapp.com/developers/applications/me
+
+PECHS_ID = '178700066091958273'
+JOHNYS_ID = '214037134477230080'
 
 client = Bot(command_prefix=BOT_PREFIX)
 
@@ -26,26 +31,53 @@ async def eight_ball(context):
     ]
     await client.say(random.choice(possible_responses) + ", " + context.message.author.mention)
 
+@client.event
+async def on_message_delete(message):
+    if (message.author.id == PECHS_ID):
+        time_posted = message.timestamp
+        time_posted_utc = time_posted.replace(tzinfo=timezone('UTC'))
+        time_posted_est = time_posted_utc.astimezone(timezone('US/Eastern'))
+        em = discord.Embed(title=time_posted_est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xffff00)
+        em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
+        await client.send_message(message.channel, embed=em)
+
+@client.event
+async def on_message_edit(before, after):
+    if (before.author.id == PECHS_ID):
+        time_posted = after.timestamp
+        time_posted_utc = time_posted.replace(tzinfo=timezone('UTC'))
+        time_posted_est = time_posted_utc.astimezone(timezone('US/Eastern'))
+        em = discord.Embed(title=time_posted_est.strftime("%Y-%m-%d %I:%M %p"), description='"'+before.content + '" ➡ "' + after.content+'"', colour=0xffff00)
+        em.set_author(name=after.author.display_name, icon_url=before.author.avatar_url)
+        await client.send_message(before.channel, embed=em)
+
+
 
 @client.command()
 async def square(number):
     squared_value = int(number) * int(number)
     await client.say(str(number) + " squared is " + str(squared_value))
 
+def is_me(m):
+    return m.author == client.user
+
+@client.command(name='purge',
+                description="Deletes the bot's spam.",
+                brief="Delete spam.",
+                aliases=[],
+                pass_context=True)
+async def purge(context):
+    if (context.message.author.id != PECHS_ID):
+        deleted = await client.purge_from(context.message.channel, limit=100, check=is_me)
+        await client.send_message(context.message.channel, 'Deleted {} message(s)'.format(len(deleted)))
+    else:
+        await client.send_message(context.message.channel, "fuck off")
+
 
 @client.event
 async def on_ready():
-    await client.change_presence(game=Game(name="with humans"))
+    await client.change_presence(game=Game(name="PECH IS BOOSTED"))
     print("Logged in as " + client.user.name)
-
-
-@client.command()
-async def bitcoin():
-    url = 'https://api.coindesk.com/v1/bpi/currentprice/BTC.json'
-    async with aiohttp.ClientSession() as session:  # Async HTTP request
-        raw_response = await session.get(url)
-        response = await raw_response.json(content_type='application/javascript')
-        await client.say("Bitcoin price is: $" + response['bpi']['USD']['rate'])
 
 
 async def list_servers():
