@@ -4,8 +4,10 @@ import aiohttp
 from discord import Game
 from discord.ext.commands import Bot
 
+import config
+
 BOT_PREFIX = ("?", "!")
-TOKEN = "XXXXSECRETTOKENXXX"  # Get at discordapp.com/developers/applications/me
+TOKEN = config.secret_token  # Get at discordapp.com/developers/applications/me
 
 client = Bot(command_prefix=BOT_PREFIX)
 
