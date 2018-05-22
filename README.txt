@@ -1,2 +1,2 @@
-johny is pretty gr8
+johny is alright
 and peach mom gay
