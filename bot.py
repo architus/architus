@@ -9,7 +9,10 @@ from discord import Game
 from discord import message
 from discord.ext.commands import Bot
 
+import config
+
 BOT_PREFIX = ("?", "!")
+TOKEN = config.secret_token
 
 PECHS_ID = '178700066091958273'
 JOHNYS_ID = '214037134477230080'
