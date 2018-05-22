@@ -1,2 +1,2 @@
-johny is an autist
+johny is alright
 and peach mom gay
