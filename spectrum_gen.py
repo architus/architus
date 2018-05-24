@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 
 def generate(x, y, names):
 
+    plt.axes()
     plt.text(-11.5,0, 'Toxic', horizontalalignment='right',
             verticalalignment='center',
             fontsize='20', color='blue',

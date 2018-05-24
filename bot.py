@@ -25,7 +25,7 @@ karma_dict = {}
 AUT_EMOJI = "🅱"
 NORM_EMOJI = "reee"
 NICE_EMOJI = "❤"
-TOXIC_EMOJI = "pech"
+TOXIC_EMOJI = "poggers"#"pech"
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -65,7 +65,7 @@ async def on_message_edit(before, after):
 @client.event
 async def on_reaction_add(reaction, user):
     author = reaction.message.author
-    if (author != user and user != client.user):
+    if (author == user and user != client.user):
         if (author not in karma_dict):
             karma_dict[author] = [0,0,0,0]
         if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
@@ -116,7 +116,7 @@ async def remove(context):
     for member in context.message.mentions:
         if (member in karma_dict):
             karma_dict.pop(member)
-            await client.send_message(context.message.channel, context.message.author.mention + " has been removed")
+            await client.send_message(context.message.channel, member.mention + " has been removed")
 
 @client.command()
 async def square(number):
@@ -129,19 +129,19 @@ def is_me(m):
 def get_autism_percent(m):
     if (karma_dict[m][0] + karma_dict[m][1] == 0):
         return 0
-    return ((karma_dict[m][0]) / (karma_dict[m][0] + karma_dict[m][1])) * 100
+    return ((karma_dict[m][0] - karma_dict[m][1]) / (karma_dict[m][0] + karma_dict[m][1])) * 100
 def get_normie_percent(m):
     if (karma_dict[m][0] + karma_dict[m][1] == 0):
         return 0
-    return ((karma_dict[m][1]) / (karma_dict[m][1] + karma_dict[m][0])) * 100
+    return ((karma_dict[m][1] - karma_dict[m][0]) / (karma_dict[m][1] + karma_dict[m][0])) * 100
 def get_nice_percent(m):
     if (karma_dict[m][2] + karma_dict[m][3] == 0):
         return 0
-    return ((karma_dict[m][2]) / (karma_dict[m][2] + karma_dict[m][3])) * 100
+    return ((karma_dict[m][2] - karma_dict[m][3]) / (karma_dict[m][2] + karma_dict[m][3])) * 100
 def get_toxc_percent(m):
     if (karma_dict[m][2] + karma_dict[m][3] == 0):
         return 0
-    return ((karma_dict[m][3]) / (karma_dict[m][3] + karma_dict[m][2])) * 100
+    return ((karma_dict[m][3] - karma_dict[m][2]) / (karma_dict[m][3] + karma_dict[m][2])) * 100
 
 @client.command(name='spectrum',
         description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie.",
@@ -149,12 +149,24 @@ def get_toxc_percent(m):
                 aliases=[],
                 pass_context=True)
 async def spectrum(context):
+    client.send_typing(context.message.channel)
     x = []
     y = []
     names = []
     for member in karma_dict:
-        x.append(get_nice_percent(member) / 10)
-        y.append(get_autism_percent(member) / 10)
+        toxic = get_toxc_percent(member)
+        nice = get_nice_percent(member)
+        aut = get_autism_percent(member)
+        norm = get_normie_percent(member)
+        if (toxic > nice):
+            x.append(-1*(toxic) / 10)
+        else:
+            x.append(nice / 10)
+        if (norm > aut):
+            x.append(-1*(norm) / 10)
+        else:
+            y.append(aut / 10)
+        #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
         names.append(member.display_name)
     spectrum_gen.generate(x, y, names)
     with open('res/foo.png', 'rb') as f:
