@@ -163,7 +163,7 @@ async def spectrum(context):
         else:
             x.append(nice / 10)
         if (norm > aut):
-            x.append(-1*(norm) / 10)
+            y.append(-1*(norm) / 10)
         else:
             y.append(aut / 10)
         #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
