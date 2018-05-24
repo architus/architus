@@ -6,8 +6,13 @@ import matplotlib.pyplot as plt
 
 def generate(x, y, names):
 
-    plt.axes()
-    plt.text(-11.5,0, 'Toxic', horizontalalignment='right',
+    #plt.axis('off')
+    fig, ax = plt.subplots()
+    ax.tick_params(axis='both',
+    which='both', bottom=False, left=False,
+    top=False, labelbottom=False,
+    labelleft=False, labelright=False)
+    plt.text(-11,0, 'Toxic', horizontalalignment='right',
             verticalalignment='center',
             fontsize='20', color='blue',
             rotation='vertical')
@@ -22,8 +27,10 @@ def generate(x, y, names):
             verticalalignment='center',
             fontsize='20', color='blue')
 
-    plt.plot(x, y, 'ro')
+    ax.plot(x, y, 'ro')
     plt.axis([-10, 10, -10, 10])
+    ax.axhline(y=0, color='k')
+    ax.axvline(x=0, color='k')
     for i in range(len(names)):
         offset = list(range(-20,-10)) + list(range(10,20))
         xoff = random.choice(offset) / 10

@@ -39,6 +39,8 @@ async def eight_ball(context):
         'Too hard to tell',
         'It is quite possible',
         'Definitely',
+        'Yep.',
+        'Possibly.'
     ]
     await client.say(random.choice(possible_responses) + ", " + context.message.author.mention)
 
@@ -65,9 +67,20 @@ async def on_message_edit(before, after):
 @client.event
 async def on_reaction_add(reaction, user):
     author = reaction.message.author
+    for e in reaction.message.embeds:
+        author_name, author_avatar = '',''
+        try:
+            author_name = e['author']['name']
+            author_avatar = e['author']['icon_url']
+        except:
+            pass # not the type of embed we were expecting
+        real_author = find_member(author_name, author_avatar, reaction.message.channel.server)
+        if (real_author != None):
+            author = real_author
+
     if (author != user and author != client.user):
         if (author not in karma_dict):
-            karma_dict[author] = [0,0,0,0]
+            karma_dict[author] = [3,3,3,3]
         if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
             karma_dict[author][0] += 1
         elif (str(reaction.emoji) == NORM_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NORM_EMOJI)):
@@ -80,9 +93,18 @@ async def on_reaction_add(reaction, user):
 @client.event
 async def on_reaction_remove(reaction, user):
     author = reaction.message.author
+    for e in reaction.message.embeds:
+        try:
+            author_name = e['author']['name']
+            author_avatar = e['author']['icon_url']
+        except:
+            pass
+        real_author = find_member(author_name, author_avatar, reaction.message.channel.server)
+        if (real_author != None):
+            author = real_author
     if (author != user and author != client.user):
         if (author not in karma_dict):
-            karma_dict[author] = [0,0,0,0]
+            karma_dict[author] = [3,3,3,3]
         if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
             karma_dict[author][0] -= 1
         elif (str(reaction.emoji) == NORM_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NORM_EMOJI)):
@@ -100,11 +122,13 @@ async def on_reaction_remove(reaction, user):
                 pass_context=True)
 async def check(context):
     for member in context.message.mentions:
+        if (member == client.user):
+            await client.send_message(context.message.channel, "Leave me out of this, " + context.message.author.mention)
         if (member not in karma_dict):
-            karma_dict[member] = [0,0,0,0]
+            karma_dict[member] = [3,3,3,3]
         response = member.display_name + " is "
-        response += (str(get_autism_percent(member)) + "% autistic" if (get_autism_percent(member) >= get_normie_percent(member)) else str(get_normie_percent(member)) + "% normie")
-        response += " and " + (str(get_toxc_percent(member)) + "% toxic." if (get_toxc_percent(member) >= get_nice_percent(member)) else str(get_nice_percent(member)) + "% nice.")
+        response += ("{:3.1f}% autistic".format(get_autism_percent(member)) if (get_autism_percent(member) >= get_normie_percent(member)) else "{:3.1f}% normie".format(get_normie_percent(member)))
+        response += " and " + ("{:3.1f}% toxic.".format(get_toxc_percent(member)) if (get_toxc_percent(member) >= get_nice_percent(member)) else "{:3.1f}% nice.".format(get_nice_percent(member)))
         await client.send_message(context.message.channel, response)
 
 @client.command(name='remove',
@@ -122,6 +146,12 @@ async def remove(context):
 async def square(number):
     squared_value = int(number) * int(number)
     await client.say(str(number) + " squared is " + str(squared_value))
+
+def find_member(name, icon, server):
+    for m in server.members:
+        if (name == m.display_name and icon == m.avatar_url):
+            return m
+    return None
 
 def is_me(m):
     return m.author == client.user
