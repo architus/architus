@@ -25,7 +25,7 @@ karma_dict = {}
 AUT_EMOJI = "🅱"
 NORM_EMOJI = "reee"
 NICE_EMOJI = "❤"
-TOXIC_EMOJI = "poggers"#"pech"
+TOXIC_EMOJI = "pech"
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -65,7 +65,7 @@ async def on_message_edit(before, after):
 @client.event
 async def on_reaction_add(reaction, user):
     author = reaction.message.author
-    if (author == user and user != client.user):
+    if (author != user and user != client.user):
         if (author not in karma_dict):
             karma_dict[author] = [0,0,0,0]
         if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
