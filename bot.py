@@ -22,7 +22,7 @@ client = Bot(command_prefix=BOT_PREFIX)
 
 karma_dict = {}
 
-AUT_EMOJI = "🅱️"
+AUT_EMOJI = "🅱"
 NORM_EMOJI = "reee"
 NICE_EMOJI = "❤"
 TOXIC_EMOJI = "pech"
@@ -129,19 +129,19 @@ def is_me(m):
 def get_autism_percent(m):
     if (karma_dict[m][0] + karma_dict[m][1] == 0):
         return 0
-    return ((karma_dict[m][0] - karma_dict[m][1]) / (karma_dict[m][0] + karma_dict[m][1])) * 100
+    return ((karma_dict[m][0]) / (karma_dict[m][0] + karma_dict[m][1])) * 100
 def get_normie_percent(m):
     if (karma_dict[m][0] + karma_dict[m][1] == 0):
         return 0
-    return ((karma_dict[m][1] - karma_dict[m][0]) / (karma_dict[m][1] + karma_dict[m][0])) * 100
+    return ((karma_dict[m][1]) / (karma_dict[m][1] + karma_dict[m][0])) * 100
 def get_nice_percent(m):
     if (karma_dict[m][2] + karma_dict[m][3] == 0):
         return 0
-    return ((karma_dict[m][2] - karma_dict[m][3]) / (karma_dict[m][2] + karma_dict[m][3])) * 100
+    return ((karma_dict[m][2]) / (karma_dict[m][2] + karma_dict[m][3])) * 100
 def get_toxc_percent(m):
     if (karma_dict[m][2] + karma_dict[m][3] == 0):
         return 0
-    return ((karma_dict[m][3] - karma_dict[m][2]) / (karma_dict[m][3] + karma_dict[m][2])) * 100
+    return ((karma_dict[m][3]) / (karma_dict[m][3] + karma_dict[m][2])) * 100
 
 @client.command(name='spectrum',
         description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie.",
