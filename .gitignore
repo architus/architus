@@ -1,2 +1,4 @@
 .venv/*
 .secret_token
+*.pkl
+__py*
