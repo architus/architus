@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import random
 import asyncio
 import aiohttp
@@ -78,9 +81,9 @@ async def on_reaction_add(reaction, user):
         if (real_author != None):
             author = real_author
 
-    if (author != user and author != client.user):
+    if ((author != user or user.id == JOHNYS_ID) and author != client.user):
         if (author not in karma_dict):
-            karma_dict[author] = [3,3,3,3]
+            karma_dict[author] = [2,2,2,2]
         if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
             karma_dict[author][0] += 1
         elif (str(reaction.emoji) == NORM_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NORM_EMOJI)):
@@ -102,9 +105,9 @@ async def on_reaction_remove(reaction, user):
         real_author = find_member(author_name, author_avatar, reaction.message.channel.server)
         if (real_author != None):
             author = real_author
-    if (author != user and author != client.user):
+    if ((author != user or user.id == JOHNYS_ID) and author != client.user):
         if (author not in karma_dict):
-            karma_dict[author] = [3,3,3,3]
+            karma_dict[author] = [2,2,2,2]
         if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
             karma_dict[author][0] -= 1
         elif (str(reaction.emoji) == NORM_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NORM_EMOJI)):
@@ -124,12 +127,23 @@ async def check(context):
     for member in context.message.mentions:
         if (member == client.user):
             await client.send_message(context.message.channel, "Leave me out of this, " + context.message.author.mention)
+            return
         if (member not in karma_dict):
-            karma_dict[member] = [3,3,3,3]
+            karma_dict[member] = [2,2,2,2]
         response = member.display_name + " is "
         response += ("{:3.1f}% autistic".format(get_autism_percent(member)) if (get_autism_percent(member) >= get_normie_percent(member)) else "{:3.1f}% normie".format(get_normie_percent(member)))
         response += " and " + ("{:3.1f}% toxic.".format(get_toxc_percent(member)) if (get_toxc_percent(member) >= get_nice_percent(member)) else "{:3.1f}% nice.".format(get_nice_percent(member)))
         await client.send_message(context.message.channel, response)
+
+@client.command(pass_context=True)
+async def test(context):
+    x = [1, -3, 5, 7, -8, 3, -5, -7]
+    y = [-1, 2, -7, 5, 1, 0, 4, -6]
+    names = ['p🅱ch', 'johny', 'test', 'raines', 'hello', 'hi', 'owo', 'I hate sand']
+    spectrum_gen.generate(x, y, names)
+    with open('res/foo.png', 'rb') as f:
+        await client.send_file(context.message.channel, f, content="Here you go, " + context.message.author.mention)
+
 
 @client.command(name='remove',
                 description="Remove user from the spectrum",
@@ -158,7 +172,7 @@ def is_me(m):
 
 def get_autism_percent(m):
     if (karma_dict[m][0] + karma_dict[m][1] == 0):
-        return 0
+        return 
     return ((karma_dict[m][0] - karma_dict[m][1]) / (karma_dict[m][0] + karma_dict[m][1])) * 100
 def get_normie_percent(m):
     if (karma_dict[m][0] + karma_dict[m][1] == 0):
