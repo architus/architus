@@ -12,16 +12,17 @@ from discord import Game
 from discord import message
 from discord.ext.commands import Bot
 
-import config
+from config import secret_token, session
+from models import User
+
 import spectrum_gen
 
 BOT_PREFIX = ("?", "!")
-TOKEN = config.secret_token
+TOKEN = secret_token
 
 PECHS_ID = '178700066091958273'
 JOHNYS_ID = '214037134477230080'
-
-client = Bot(command_prefix=BOT_PREFIX)
+MATTS_ID = '168722115447488512'
 
 karma_dict = {}
 
@@ -29,6 +30,8 @@ AUT_EMOJI = "🅱"
 NORM_EMOJI = "reee"
 NICE_EMOJI = "❤"
 TOXIC_EMOJI = "pech"
+
+client = Bot(command_prefix=BOT_PREFIX)
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -67,6 +70,16 @@ async def on_message_edit(before, after):
         em.set_author(name=after.author.display_name, icon_url=before.author.avatar_url)
         await client.send_message(before.channel, embed=em)
 
+def update_user(disc_id):
+    new_data = {
+            'aut_score': karma_dict[disc_id][0],
+            'norm_score': karma_dict[disc_id][1],
+            'nice_score': karma_dict[disc_id][2],
+            'toxic_score': karma_dict[disc_id][3]
+            }
+    session.query(User).filter_by(discord_id = disc_id).update(new_data)
+    session.commit()
+
 @client.event
 async def on_reaction_add(reaction, user):
     author = reaction.message.author
@@ -81,17 +94,22 @@ async def on_reaction_add(reaction, user):
         if (real_author != None):
             author = real_author
 
-    if ((author != user or user.id == JOHNYS_ID) and author != client.user):
-        if (author not in karma_dict):
-            karma_dict[author] = [2,2,2,2]
+    if ((author != user or user.id == JOHNYS_ID or user.id == MATTS_ID) and author != client.user):
+        if (author.id not in karma_dict):
+            karma_dict[author.id] = [2,2,2,2]
+            new_user = User(author.id, karma_dict[author.id])
+            session.add(new_user)
+
         if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
-            karma_dict[author][0] += 1
+            karma_dict[author.id][0] += 1
         elif (str(reaction.emoji) == NORM_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NORM_EMOJI)):
-            karma_dict[author][1] += 1
+            karma_dict[author.id][1] += 1
         elif (str(reaction.emoji) == NICE_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NICE_EMOJI)):
-            karma_dict[author][2] += 1
+            karma_dict[author.id][2] += 1
         elif (str(reaction.emoji) == TOXIC_EMOJI or (reaction.custom_emoji and reaction.emoji.name == TOXIC_EMOJI)):
-            karma_dict[author][3] += 1
+            karma_dict[author.id][3] += 1
+
+        update_user(author.id)
 
 @client.event
 async def on_reaction_remove(reaction, user):
@@ -106,16 +124,20 @@ async def on_reaction_remove(reaction, user):
         if (real_author != None):
             author = real_author
     if ((author != user or user.id == JOHNYS_ID) and author != client.user):
-        if (author not in karma_dict):
-            karma_dict[author] = [2,2,2,2]
+        if (author.id not in karma_dict):
+            karma_dict[author.id] = [2,2,2,2]
+            new_user = User(author.id, karma_dict[author.id])
+            session.add(new_user)
         if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
-            karma_dict[author][0] -= 1
+            karma_dict[author.id][0] -= 1
         elif (str(reaction.emoji) == NORM_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NORM_EMOJI)):
-            karma_dict[author][1] -= 1
+            karma_dict[author.id][1] -= 1
         elif (str(reaction.emoji) == NICE_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NICE_EMOJI)):
-            karma_dict[author][2] -= 1
+            karma_dict[author.id][2] -= 1
         elif (str(reaction.emoji) == TOXIC_EMOJI or (reaction.custom_emoji and reaction.emoji.name == TOXIC_EMOJI)):
-            karma_dict[author][3] -= 1
+            karma_dict[author.id][3] -= 1
+
+        update_user(author.id)
 
 
 @client.command(name='check',
@@ -128,11 +150,13 @@ async def check(context):
         if (member == client.user):
             await client.send_message(context.message.channel, "Leave me out of this, " + context.message.author.mention)
             return
-        if (member not in karma_dict):
-            karma_dict[member] = [2,2,2,2]
+        if (member.id not in karma_dict):
+            karma_dict[member.id] = [2,2,2,2]
+            new_user = User(member.id, karma_dict[member.id])
+            session.add(new_user)
         response = member.display_name + " is "
-        response += ("{:3.1f}% autistic".format(get_autism_percent(member)) if (get_autism_percent(member) >= get_normie_percent(member)) else "{:3.1f}% normie".format(get_normie_percent(member)))
-        response += " and " + ("{:3.1f}% toxic.".format(get_toxc_percent(member)) if (get_toxc_percent(member) >= get_nice_percent(member)) else "{:3.1f}% nice.".format(get_nice_percent(member)))
+        response += ("{:3.1f}% autistic".format(get_autism_percent(member.id)) if (get_autism_percent(member.id) >= get_normie_percent(member.id)) else "{:3.1f}% normie".format(get_normie_percent(member.id)))
+        response += " and " + ("{:3.1f}% toxic.".format(get_toxc_percent(member.id)) if (get_toxc_percent(member.id) >= get_nice_percent(member.id)) else "{:3.1f}% nice.".format(get_nice_percent(member.id)))
         await client.send_message(context.message.channel, response)
 
 @client.command(pass_context=True)
@@ -152,8 +176,8 @@ async def test(context):
                 pass_context=True)
 async def remove(context):
     for member in context.message.mentions:
-        if (member in karma_dict):
-            karma_dict.pop(member)
+        if (member.id in karma_dict):
+            karma_dict.pop(member.id)
             await client.send_message(context.message.channel, member.mention + " has been removed")
 
 @client.command()
@@ -164,6 +188,12 @@ async def square(number):
 def find_member(name, icon, server):
     for m in server.members:
         if (name == m.display_name and icon == m.avatar_url):
+            return m
+    return None
+
+def find_by_id(mem_id, server):
+    for m in server.members:
+        if (mem_id == m.id):
             return m
     return None
 
@@ -197,11 +227,11 @@ async def spectrum(context):
     x = []
     y = []
     names = []
-    for member in karma_dict:
-        toxic = get_toxc_percent(member)
-        nice = get_nice_percent(member)
-        aut = get_autism_percent(member)
-        norm = get_normie_percent(member)
+    for mem_id in karma_dict:
+        toxic = get_toxc_percent(mem_id)
+        nice = get_nice_percent(mem_id)
+        aut = get_autism_percent(mem_id)
+        norm = get_normie_percent(mem_id)
         if (toxic > nice):
             x.append(-1*(toxic) / 10)
         else:
@@ -211,7 +241,9 @@ async def spectrum(context):
         else:
             y.append(aut / 10)
         #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
-        names.append(member.display_name)
+        member = find_by_id(mem_id, context.message.channel.server)
+        if (member is not None) :
+            names.append(member.display_name)
     spectrum_gen.generate(x, y, names)
     with open('res/foo.png', 'rb') as f:
         await client.send_file(context.message.channel, f, content="Here you go, " + context.message.author.mention)
@@ -232,11 +264,14 @@ async def purge(context):
 @client.event
 async def on_ready():
     await client.change_presence(game=Game(name="With Server Perms"))
-    try:
-        karma_dict = load_karma()
-    except:
-        print("could not load previous reactions")
+    # try:
+    #     karma_dict = load_karma()
+    # except:
+    #     print("could not load previous reactions")
     print("Logged in as " + client.user.name)
+    users = session.query(User).all()
+    for user in users:
+        karma_dict[user.discord_id] = user.as_entry()
 
 def save_karma(karma):
     with open('data/karma.pkl', 'wb') as f:

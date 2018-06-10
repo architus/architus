@@ -1,4 +1,6 @@
 aiohttp
 discord
-pytz
 matplotlib
+pytz
+psycopg2-binary
+sqlalchemy
