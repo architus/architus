@@ -52,7 +52,8 @@ async def eight_ball(context):
 
 @client.event
 async def on_message_delete(message):
-    if (message.author.id == PECHS_ID):
+    # if (message.author.id == PECHS_ID):
+    if not is_me(message):
         time_posted = message.timestamp
         time_posted_utc = time_posted.replace(tzinfo=timezone('UTC'))
         time_posted_est = time_posted_utc.astimezone(timezone('US/Eastern'))
@@ -60,15 +61,16 @@ async def on_message_delete(message):
         em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
         await client.send_message(message.channel, embed=em)
 
-@client.event
-async def on_message_edit(before, after):
-    if (before.author.id == PECHS_ID):
-        time_posted = after.timestamp
-        time_posted_utc = time_posted.replace(tzinfo=timezone('UTC'))
-        time_posted_est = time_posted_utc.astimezone(timezone('US/Eastern'))
-        em = discord.Embed(title=time_posted_est.strftime("%Y-%m-%d %I:%M %p"), description='"'+before.content + '" ➡ "' + after.content+'"', colour=0xffff00)
-        em.set_author(name=after.author.display_name, icon_url=before.author.avatar_url)
-        await client.send_message(before.channel, embed=em)
+# @client.event
+# async def on_message_edit(before, after):
+#     # if (before.author.id == PECHS_ID):
+#     if not is_me(before): 
+#         time_posted = after.timestamp
+#         time_posted_utc = time_posted.replace(tzinfo=timezone('UTC'))
+#         time_posted_est = time_posted_utc.astimezone(timezone('US/Eastern'))
+#         em = discord.Embed(title=time_posted_est.strftime("%Y-%m-%d %I:%M %p"), description='"'+before.content + '" ➡ "' + after.content+'"', colour=0xffff00)
+#         em.set_author(name=after.author.display_name, icon_url=before.author.avatar_url)
+#         await client.send_message(before.channel, embed=em)
 
 def update_user(disc_id):
     new_data = {
