@@ -1,6 +1,6 @@
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, ForeignKey, Integer, BigInteger, Float
-from config import session
+from src.config import session
 
 Base = declarative_base()
 

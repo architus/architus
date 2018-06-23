@@ -12,6 +12,7 @@ try:
     db_pass = lines[2]
 
 except Exception as e:
+    print(e)
     print('error reading .secret_token, make it you aut')
 
 try:

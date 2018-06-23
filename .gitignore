@@ -3,3 +3,4 @@
 *.pkl
 __py*
 *png
+*pyc

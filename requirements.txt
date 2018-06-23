@@ -1,6 +1,0 @@
-aiohttp
-discord
-matplotlib
-pytz
-psycopg2-binary
-sqlalchemy

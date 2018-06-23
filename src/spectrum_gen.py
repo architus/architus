@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 def generate(x, y, names):
 
     #plt.axis('off')
-    font = matplotlib.font_manager.FontProperties(fname='fonts/NotoSansSymbols-Regular.ttf',
+    font = matplotlib.font_manager.FontProperties(fname='res/fonts/NotoSansSymbols-Regular.ttf',
                                    style='normal', size=16)
 
     marker = itertools.cycle(('+', 'o', '*', '8', 's', 'p', 'H', 'D', 'v', '^', '<', '>', '1')) 

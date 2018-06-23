@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import random
+import re
 import asyncio
 import aiohttp
 import discord
@@ -12,10 +13,9 @@ from discord import Game
 from discord import message
 from discord.ext.commands import Bot
 
-from config import secret_token, session
-from models import User
-
-import spectrum_gen
+from src.config import secret_token, session
+from src.models import User
+import src.spectrum_gen as spectrum_gen
 
 BOT_PREFIX = ("?", "!")
 TOKEN = secret_token
@@ -261,7 +261,32 @@ async def purge(context):
         deleted = await client.purge_from(context.message.channel, limit=100, check=is_me)
         await client.send_message(context.message.channel, 'Deleted {} message(s)'.format(len(deleted)))
 
+@client.command(pass_context=True)
+async def testthing(context):
+    em = discord.Embed(title='My Embed Title', description='My Embed Content.', colour=0xDEADBF)
+    em.set_author(name='Someone', icon_url=client.user.default_avatar_url)
+    num = int(re.search(r'\d+', context.message.content).group())
+    val = re.findall(r'[A-Za-z ]+', context.message.content)
 
+    for i in range(num):
+        em.add_field(name="hello", value='`\n'+val[1]+'`', inline=True)
+    await client.send_message(context.message.channel, embed=em)
+
+@client.command(pass_context=True)
+async def log(context):
+    msgs = []
+    em = discord.Embed(title='My Embed Title', description='My Embed Content.', colour=0xDEADBF)
+    em.set_author(name='Someone', icon_url=client.user.default_avatar_url)
+    async for message in client.logs_from(context.message.channel, limit=25):
+        msgs.append(message)
+        #msg = re.sub('[\n]', '\n\t', message.content)
+        #msgs = msgs + "%s: %s\n" % (message.author.display_name, msg)
+    for message in reversed(msgs):
+        em.add_field(name=message.author.display_name, value=message.content, inline=True)
+    #msgs = re.sub('[`]', '', msgs)
+    #msgs = (msgs[:1992] + '..') if len(msgs) > 1992 else msgs
+    #await client.send_message(context.message.channel, "```" +msgs+ "```")
+    await client.send_message(context.message.channel, embed=em)
 
 @client.event
 async def on_ready():
