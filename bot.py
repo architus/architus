@@ -5,6 +5,7 @@ import random
 import re
 import asyncio
 import aiohttp
+from collections import deque
 import discord
 import time
 from pytz import timezone
@@ -14,6 +15,8 @@ from discord import message
 from discord.ext.commands import Bot
 
 from src.config import secret_token, session
+from src.smart_message import smart_message
+from src.list_embed import list_embed
 from src.models import User
 import src.spectrum_gen as spectrum_gen
 
@@ -25,13 +28,17 @@ JOHNYS_ID = '214037134477230080'
 MATTS_ID = '168722115447488512'
 
 karma_dict = {}
+tracked_messages = deque([], maxlen=20)
 
 AUT_EMOJI = "🅱"
 NORM_EMOJI = "reee"
 NICE_EMOJI = "❤"
 TOXIC_EMOJI = "pech"
+EDIT_EMOJI = "pencil"
+
 
 client = Bot(command_prefix=BOT_PREFIX)
+
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -61,8 +68,15 @@ async def on_message_delete(message):
         em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
         await client.send_message(message.channel, embed=em)
 
-# @client.event
-# async def on_message_edit(before, after):
+@client.event
+async def on_message_edit(before, after):
+    for sm in tracked_messages:
+        if (add_edit(before, after)):
+            return
+    sm = smart_message(before)
+    sm.add_edit(before, after)
+    tracked_messages.append(sm)
+    
 #     # if (before.author.id == PECHS_ID):
 #     if not is_me(before): 
 #         time_posted = after.timestamp
@@ -110,7 +124,9 @@ async def on_reaction_add(reaction, user):
             karma_dict[author.id][2] += 1
         elif (str(reaction.emoji) == TOXIC_EMOJI or (reaction.custom_emoji and reaction.emoji.name == TOXIC_EMOJI)):
             karma_dict[author.id][3] += 1
-
+        elif (str(reaction.emoji) == EDIT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == EDIT_EMOJI)):
+            print("hello")
+            edit_popup(reaction.message)
         update_user(author.id)
 
 @client.event
@@ -275,38 +291,42 @@ async def testthing(context):
 @client.command(pass_context=True)
 async def log(context):
     msgs = []
-    em = discord.Embed(title='My Embed Title', description='My Embed Content.', colour=0xDEADBF)
-    em.set_author(name='Someone', icon_url=client.user.default_avatar_url)
-    async for message in client.logs_from(context.message.channel, limit=25):
-        msgs.append(message)
-        #msg = re.sub('[\n]', '\n\t', message.content)
-        #msgs = msgs + "%s: %s\n" % (message.author.display_name, msg)
+    do_filter = bool(context.message.mentions)
+    try:
+        num = int(re.search(r'\d+', context.message.content).group())
+    except:
+        num = 0
+    num = 25 if num == 0 or num > 25 else num
+    author = client.user
+
+    em = discord.Embed(title='Last %s messages' % (str(num)), description='My Embed Content.', colour=0x5998ff)
+    if (do_filter):
+        author = context.message.mentions[0]
+    lembed = list_embed('Last %s messages' % (str(num)), 'here you go', author)
+    async for message in client.logs_from(context.message.channel, limit=1000):
+        if (not do_filter or message.author == context.message.mentions[0]):
+            msgs.append(message)
+        if (len(msgs) >= num):
+            break
     for message in reversed(msgs):
-        em.add_field(name=message.author.display_name, value=message.content, inline=True)
-    #msgs = re.sub('[`]', '', msgs)
-    #msgs = (msgs[:1992] + '..') if len(msgs) > 1992 else msgs
-    #await client.send_message(context.message.channel, "```" +msgs+ "```")
-    await client.send_message(context.message.channel, embed=em)
+        lembed.add(author.display_name, message.content)
+    await client.send_message(context.message.channel, embed=lembed.get_embed())
 
 @client.event
 async def on_ready():
     await client.change_presence(game=Game(name="With Server Perms"))
-    # try:
-    #     karma_dict = load_karma()
-    # except:
-    #     print("could not load previous reactions")
     print("Logged in as " + client.user.name)
     users = session.query(User).all()
     for user in users:
         karma_dict[user.discord_id] = user.as_entry()
 
-def save_karma(karma):
-    with open('data/karma.pkl', 'wb') as f:
-        pickle.dump(karma, f, pickle.HIGHEST_PROTOCOL)
-
-def load_karma():
-    with open('data/karma.pkl', 'rb') as f:
-        return pickle.load(f)
+async def edit_popup(message):
+    print(message.content)
+    for sm in tracked_messages:
+        if (message.id == sm.peek().id):
+            if (not sm.has_popup()):
+                lem = sm.add_popup()
+                await client.send_message(message.channel, embed=lem)
 
 
 async def list_servers():
@@ -315,10 +335,6 @@ async def list_servers():
         print("Current servers:")
         for server in client.servers:
             print(server.name)
-            try:
-                save_karma(karma_dict)
-            except:
-                print("could not save reaction data")
         await asyncio.sleep(600)
 
 
