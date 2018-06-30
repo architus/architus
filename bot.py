@@ -34,7 +34,7 @@ AUT_EMOJI = "🅱"
 NORM_EMOJI = "reee"
 NICE_EMOJI = "❤"
 TOXIC_EMOJI = "pech"
-EDIT_EMOJI = "pencil"
+EDIT_EMOJI = "📝"
 
 
 client = Bot(command_prefix=BOT_PREFIX)
@@ -61,31 +61,24 @@ async def eight_ball(context):
 async def on_message_delete(message):
     # if (message.author.id == PECHS_ID):
     if not is_me(message):
-        time_posted = message.timestamp
-        time_posted_utc = time_posted.replace(tzinfo=timezone('UTC'))
-        time_posted_est = time_posted_utc.astimezone(timezone('US/Eastern'))
-        em = discord.Embed(title=time_posted_est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xffff00)
+        est = get_datetime(message.timestamp)
+        em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xff002a)
         em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
-        await client.send_message(message.channel, embed=em)
+        del_msg = await client.send_message(message.channel, embed=em)
+        for sm in tracked_messages:
+            if (sm.peek().id == message.id):
+                sm.embed = del_msg
 
 @client.event
 async def on_message_edit(before, after):
     for sm in tracked_messages:
-        if (add_edit(before, after)):
+        if (sm.add_edit(before, after)):
+            await edit_popup(before)
             return
     sm = smart_message(before)
     sm.add_edit(before, after)
     tracked_messages.append(sm)
     
-#     # if (before.author.id == PECHS_ID):
-#     if not is_me(before): 
-#         time_posted = after.timestamp
-#         time_posted_utc = time_posted.replace(tzinfo=timezone('UTC'))
-#         time_posted_est = time_posted_utc.astimezone(timezone('US/Eastern'))
-#         em = discord.Embed(title=time_posted_est.strftime("%Y-%m-%d %I:%M %p"), description='"'+before.content + '" ➡ "' + after.content+'"', colour=0xffff00)
-#         em.set_author(name=after.author.display_name, icon_url=before.author.avatar_url)
-#         await client.send_message(before.channel, embed=em)
-
 def update_user(disc_id):
     new_data = {
             'aut_score': karma_dict[disc_id][0],
@@ -125,8 +118,7 @@ async def on_reaction_add(reaction, user):
         elif (str(reaction.emoji) == TOXIC_EMOJI or (reaction.custom_emoji and reaction.emoji.name == TOXIC_EMOJI)):
             karma_dict[author.id][3] += 1
         elif (str(reaction.emoji) == EDIT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == EDIT_EMOJI)):
-            print("hello")
-            edit_popup(reaction.message)
+            await add_popup(reaction.message)
         update_user(author.id)
 
 @client.event
@@ -154,6 +146,11 @@ async def on_reaction_remove(reaction, user):
             karma_dict[author.id][2] -= 1
         elif (str(reaction.emoji) == TOXIC_EMOJI or (reaction.custom_emoji and reaction.emoji.name == TOXIC_EMOJI)):
             karma_dict[author.id][3] -= 1
+        elif (str(reaction.emoji) == EDIT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == EDIT_EMOJI)):
+            for react in reaction.message.reactions:
+                if (str(reaction.emoji) == EDIT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == EDIT_EMOJI)):
+                    return
+            await delete_popup(reaction.message)
 
         update_user(author.id)
 
@@ -214,6 +211,11 @@ def find_by_id(mem_id, server):
         if (mem_id == m.id):
             return m
     return None
+
+def get_datetime(timestamp):
+    utc = timestamp.replace(tzinfo=timezone('UTC'))
+    est = utc.astimezone(timezone('US/Eastern'))
+    return est
 
 def is_me(m):
     return m.author == client.user
@@ -321,12 +323,30 @@ async def on_ready():
         karma_dict[user.discord_id] = user.as_entry()
 
 async def edit_popup(message):
-    print(message.content)
     for sm in tracked_messages:
-        if (message.id == sm.peek().id):
+        if (message.id == sm.peek().id or (sm.embed != None and message.id == sm.embed.id)):
+            if (not sm.has_popup()):
+                return
+            else:
+                lem = sm.add_popup()
+                await client.edit_message(sm.popup, embed=lem)
+async def add_popup(message):
+    for sm in tracked_messages:
+        if (message.id == sm.peek().id or (sm.embed != None and message.id == sm.embed.id)):
             if (not sm.has_popup()):
                 lem = sm.add_popup()
-                await client.send_message(message.channel, embed=lem)
+                popup = await client.send_message(message.channel, embed=lem)
+                sm.popup = popup
+            else:
+                await edit_popup(message)
+
+async def delete_popup(message):
+    for sm in tracked_messages:
+        if (message.id == sm.peek().id):
+            if (sm.has_popup()):
+                await client.delete_message(sm.popup)
+                sm.popup = None
+
 
 
 async def list_servers():

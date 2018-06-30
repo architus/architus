@@ -8,7 +8,6 @@ class list_embed:
 
     def add(self, title, body):
         self.list_items.append((title, body))
-        print (self.list_items)
     
     
     def get_embed(self):
