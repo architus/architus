@@ -18,6 +18,7 @@ from src.config import secret_token, session
 from src.smart_message import smart_message
 from src.list_embed import list_embed
 from src.models import User
+from src.smart_player import smart_player
 import src.spectrum_gen as spectrum_gen
 
 BOT_PREFIX = ("?", "!")
@@ -38,7 +39,72 @@ EDIT_EMOJI = "📝"
 
 
 client = Bot(command_prefix=BOT_PREFIX)
+player = smart_player()
 
+
+@client.command(name='join',
+                description="Joins the caller's voice channel",
+                brief="joins voice.",
+                pass_context=True)
+async def join(context):
+    if not (player.is_connected()):
+        voice = await client.join_voice_channel(context.message.author.voice.voice_channel)
+        player.voice = voice
+    else:
+        player.voice.move_to(context.message.author.voice.voice_channel)
+
+@client.command(name='skip',
+                description="Skip current song",
+                brief="skip song",
+                pass_context=True)
+async def skip(context):
+    player.skip()
+    asyncio.sleep(2)
+    await client.send_message(context.message.channel, "Now playing: " + player.name)
+
+@client.command(name='pause',
+                description="Pauses current song",
+                brief="pause song",
+                aliases=['stop'],
+                pass_context=True)
+async def pause(context):
+    player.pause()
+
+@client.command(name='resume',
+                description="Resume current song",
+                brief="resume song",
+                pass_context=True)
+async def resume(context):
+    player.resume()
+
+@client.command(name='play',
+                description="!play [encounter|boss|exploration|town]",
+                brief="play some dnd music",
+                pass_context=True)
+async def play(context):
+    if not discord.opus.is_loaded():
+        discord.opus.load_opus('res/libopus.so')
+    if not (player.is_connected()):
+        voice = await client.join_voice_channel(context.message.author.voice.voice_channel)
+        player.voice = voice
+    else:
+        player.voice.move_to(context.message.author.voice.voice_channel)
+
+    arg = context.message.content.split(' ')
+    if (len(arg) == 2):
+        if ('playlist' in arg[1]):
+            await client.send_message(context.message.channel, "Shuffling playlist...")
+        elif ('track' in arg[1]):
+            await client.send_message(context.message.channel, "Playing Song...")
+        elif ('youtu' in arg[1]):
+            await client.send_message(context.message.channel, "Playing youtube...")
+        else:
+            player.play(arg[1])
+            await client.send_message(context.message.channel, "Now playing: " + player.name)
+    else:
+        await client.send_message(context.message.channel, "Play what, " + context.message.author.mention + "?")
+
+    #await client.play_audio(f)
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -185,10 +251,10 @@ async def test(context):
 
 
 @client.command(name='remove',
-                description="Remove user from the spectrum",
-                brief="Remove user from the spectrum",
-                aliases=[],
-                pass_context=True)
+        description="Remove user from the spectrum",
+        brief="Remove user from the spectrum",
+        aliases=[],
+        pass_context=True)
 async def remove(context):
     for member in context.message.mentions:
         if (member.id in karma_dict):
@@ -280,17 +346,6 @@ async def purge(context):
         await client.send_message(context.message.channel, 'Deleted {} message(s)'.format(len(deleted)))
 
 @client.command(pass_context=True)
-async def testthing(context):
-    em = discord.Embed(title='My Embed Title', description='My Embed Content.', colour=0xDEADBF)
-    em.set_author(name='Someone', icon_url=client.user.default_avatar_url)
-    num = int(re.search(r'\d+', context.message.content).group())
-    val = re.findall(r'[A-Za-z ]+', context.message.content)
-
-    for i in range(num):
-        em.add_field(name="hello", value='`\n'+val[1]+'`', inline=True)
-    await client.send_message(context.message.channel, embed=em)
-
-@client.command(pass_context=True)
 async def log(context):
     msgs = []
     do_filter = bool(context.message.mentions)
@@ -316,7 +371,7 @@ async def log(context):
 
 @client.event
 async def on_ready():
-    await client.change_presence(game=Game(name="With Server Perms"))
+    await client.change_presence(game=Game(name="not spotify apparently"))
     print("Logged in as " + client.user.name)
     users = session.query(User).all()
     for user in users:
