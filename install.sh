@@ -25,6 +25,6 @@ python3 -m venv .venv
 source "./.venv/bin/activate"
 for i in "${requirements[@]}"
 do
-    pip install -r requirements.txt
+    pip install "$i"
 done
 deactivate
