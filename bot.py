@@ -58,9 +58,8 @@ async def join(context):
                 brief="skip song",
                 pass_context=True)
 async def skip(context):
-    player.skip()
-    asyncio.sleep(2)
-    await client.send_message(context.message.channel, "Now playing: " + player.name)
+    name = await player.skip()
+    await client.send_message(context.message.channel, "Now playing: " + name)
 
 @client.command(name='pause',
                 description="Pauses current song",
@@ -70,16 +69,39 @@ async def skip(context):
 async def pause(context):
     player.pause()
 
+@client.command(name='clear',
+                description="Remove all songs from queue.",
+                brief="clear queue",
+                pass_context=True)
+async def clear(context):
+    await client.send_message(context.message.channel, "Removed %d songs from queue." % len(player.q))
+    player.clearq()
+
 @client.command(name='resume',
                 description="Resume current song",
                 brief="resume song",
                 pass_context=True)
 async def resume(context):
     player.resume()
+@client.command(name='add',
+                description="Add a song to queue",
+                brief="Add song",
+                pass_context=True)
+async def add(context):
+    arg = context.message.content.split(' ')
+    if (arg != '!add'):
+        if ('youtu' in arg[1]):
+            player.add_youtube_track(arg[1])
+        else:
+            del arg[0]
+            url = player.get_youtube_url(' '.join(arg))
+            await client.send_message(context.message.channel, "Added: " + url)
+            player.add_youtube_track(url)
+
 
 @client.command(name='play',
-                description="!play [encounter|boss|exploration|town]",
-                brief="play some dnd music",
+                description="!play [thing from youtube or spotify]",
+                brief="play tunes",
                 pass_context=True)
 async def play(context):
     if not discord.opus.is_loaded():
@@ -91,18 +113,29 @@ async def play(context):
         player.voice.move_to(context.message.author.voice.voice_channel)
 
     arg = context.message.content.split(' ')
-    if (len(arg) == 2):
-        if ('playlist' in arg[1]):
-            await client.send_message(context.message.channel, "Shuffling playlist...")
-        elif ('track' in arg[1]):
-            await client.send_message(context.message.channel, "Playing Song...")
+    if (len(arg) > 1):
+        if ('/playlist/' in arg[1]):
+            await client.send_message(context.message.channel, "Queuing playlists is coming soon.")
+        elif ('/track/' in arg[1]):
+            await client.send_message(context.message.channel, "Playing spotify is coming soon.")
         elif ('youtu' in arg[1]):
-            await client.send_message(context.message.channel, "Playing youtube...")
+            player.add_youtube_track_now(arg[1])
+            name = await player.play()
+            await client.send_message(context.message.channel, "Playing %s" % name)
+        elif ('town' in arg[1] or 'encounter' in arg[1] or 'boss' in arg[1] or 'exploration' in arg[1]):
+            await client.send_message(context.message.channel, "Queuing playlists is coming soon.")
         else:
-            player.play(arg[1])
-            await client.send_message(context.message.channel, "Now playing: " + player.name)
+            del arg[0]
+            url = player.get_youtube_url(' '.join(arg))
+            player.add_youtube_track(url)
+            name = await player.play()
+            await client.send_message(context.message.channel, "Now playing: " + url)
     else:
-        await client.send_message(context.message.channel, "Play what, " + context.message.author.mention + "?")
+        if (len(player.q) == 0):
+            await client.send_message(context.message.channel, "Play what, " + context.message.author.mention + "?")
+        else:
+            await player.play()
+            await client.send_message(context.message.channel, "Now playing: " + name)
 
     #await client.play_audio(f)
 

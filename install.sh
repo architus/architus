@@ -1,4 +1,5 @@
 #!/bin/bash
+sudo apt-get install ffmpeg
 
 declare -a requirements=(
     aiohttp
@@ -7,6 +8,17 @@ declare -a requirements=(
     pytz
     psycopg2-binary
     sqlalchemy
+    pathlib
+    youtube_dl
+    pafy
+    spotipy
+    mutagen
+    beautifulsoup4
+    unicode-slugify
+    titlecase
+    logzero
+    lyricwikia
+    PyYAML
 )
 
 python3 -m venv .venv
