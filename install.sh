@@ -14,11 +14,13 @@ declare -a requirements=(
     spotipy
     mutagen
     beautifulsoup4
+    bs4
     unicode-slugify
     titlecase
     logzero
     lyricwikia
     PyYAML
+    lxml
 )
 
 python3 -m venv .venv

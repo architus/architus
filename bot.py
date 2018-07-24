@@ -27,6 +27,19 @@ TOKEN = secret_token
 PECHS_ID = '178700066091958273'
 JOHNYS_ID = '214037134477230080'
 MATTS_ID = '168722115447488512'
+SIMONS_ID = '103027947786473472'
+MONKEYS_ID = '189528269547110400'
+
+ADMINS = [JOHNYS_ID, MATTS_ID, SIMONS_ID, MONKEYS_ID]
+
+ROLES_DICT = {
+    "black santa" : "🎅🏿",
+    "whale" : "🐋",
+    "fox" : "🦊",
+    "pink" : "pink",
+}
+
+DEFAULT_ROLE = 'Admin'
 
 karma_dict = {}
 tracked_messages = deque([], maxlen=20)
@@ -159,7 +172,7 @@ async def eight_ball(context):
 @client.event
 async def on_message_delete(message):
     # if (message.author.id == PECHS_ID):
-    if not is_me(message):
+    if not is_me(message) and message.author.id not in ADMINS:
         est = get_datetime(message.timestamp)
         em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xff002a)
         em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
@@ -374,9 +387,56 @@ async def spectrum(context):
                 aliases=[],
                 pass_context=True)
 async def purge(context):
-    if (context.message.author.id != PECHS_ID):
+    if (context.message.author.id in ADMINS):
         deleted = await client.purge_from(context.message.channel, limit=100, check=is_me)
         await client.send_message(context.message.channel, 'Deleted {} message(s)'.format(len(deleted)))
+    else:
+        await client.send_message(context.message.channel, 'You do not have permission to use this command, %s.' % context.message.author.mention)
+
+@client.event
+async def on_member_join(member):
+    try:
+        await client.add_roles(member, next(filter(lambda role: role.name == DEFAULT_ROLE, member.server.role_hierarchy)))
+    except:
+        print("could not add %s to %s" % (member.display_name, DEFAULT_ROLE))
+
+@client.command(name='role',
+                description="Assign yourself a role.",
+                brief="Assign a role.",
+                pass_context=True)
+async def role(context):
+    arg = context.message.content.split(' ')
+    member = context.message.author
+    if (len(arg) < 2):
+        requested_role = 'list'
+    else:
+        del arg[0]
+        requested_role = ' '.join(arg)
+
+    if (requested_role == 'list'):
+        lembed = list_embed('Available Roles', '`!role [role]`', client.user)
+        roles = "Available roles:\n"
+        for roletag, rolename in ROLES_DICT.items():
+            lembed.add(rolename, roletag)
+        await client.send_message(context.message.channel, embed=lembed.get_embed())
+    elif (requested_role.lower() in (name.lower() for name in ROLES_DICT)):
+        filtered = filter(lambda role: role.name == ROLES_DICT[requested_role], member.server.role_hierarchy)
+        action = 'added'
+        prep = 'to'
+        try:
+            role = next(filtered)
+            if (role in member.roles):
+                await client.remove_roles(member, role)
+                action = 'Removed'
+                prep = 'from'
+            else:
+                await client.add_roles(member, role)
+        except:
+            await client.send_message(context.message.channel, "Could not add %s to %s." % (context.message.author.mention, requested_role))
+        else:
+            await client.send_message(context.message.channel, "%s %s %s %s." % (action, context.message.author.mention, prep, requested_role))
+    else:
+        await client.send_message(context.message.channel, "I don't know that role, %s" % context.message.author.mention)
 
 @client.command(pass_context=True)
 async def log(context):
