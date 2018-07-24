@@ -37,6 +37,7 @@ ROLES_DICT = {
     "whale" : "🐋",
     "fox" : "🦊",
     "pink" : "pink",
+    "back on top soon" : "🔙🔛🔝🔜"
 }
 
 DEFAULT_ROLE = 'Admin'
@@ -421,7 +422,7 @@ async def role(context):
         await client.send_message(context.message.channel, embed=lembed.get_embed())
     elif (requested_role.lower() in (name.lower() for name in ROLES_DICT)):
         filtered = filter(lambda role: role.name == ROLES_DICT[requested_role], member.server.role_hierarchy)
-        action = 'added'
+        action = 'Added'
         prep = 'to'
         try:
             role = next(filtered)
@@ -464,7 +465,7 @@ async def log(context):
 
 @client.event
 async def on_ready():
-    await client.change_presence(game=Game(name="not spotify apparently"))
+    await client.change_presence(game=Game(name="with roles"))
     print("Logged in as " + client.user.name)
     users = session.query(User).all()
     for user in users:
