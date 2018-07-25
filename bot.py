@@ -102,6 +102,7 @@ async def resume(context):
                 brief="Add song",
                 pass_context=True)
 async def add(context):
+    await client.send_typing(context.message.channel)
     arg = context.message.content.split(' ')
     if (arg != '!add'):
         if ('youtu' in arg[1]):
@@ -118,6 +119,7 @@ async def add(context):
                 brief="play tunes",
                 pass_context=True)
 async def play(context):
+    await client.send_typing(context.message.channel)
     if not discord.opus.is_loaded():
         discord.opus.load_opus('res/libopus.so')
     if not (player.is_connected()):
@@ -173,7 +175,7 @@ async def eight_ball(context):
 @client.event
 async def on_message_delete(message):
     # if (message.author.id == PECHS_ID):
-    if not is_me(message) and message.author.id not in ADMINS:
+    if not is_me(message):# and message.author.id not in ADMINS:
         est = get_datetime(message.timestamp)
         em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xff002a)
         em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
@@ -274,6 +276,7 @@ async def on_reaction_remove(reaction, user):
                 aliases=[],
                 pass_context=True)
 async def check(context):
+    await client.send_typing(context.message.channel)
     for member in context.message.mentions:
         if (member == client.user):
             await client.send_message(context.message.channel, "Leave me out of this, " + context.message.author.mention)
@@ -356,7 +359,7 @@ def get_toxc_percent(m):
                 aliases=[],
                 pass_context=True)
 async def spectrum(context):
-    client.send_typing(context.message.channel)
+    await client.send_typing(context.message.channel)
     x = []
     y = []
     names = []
@@ -388,6 +391,7 @@ async def spectrum(context):
                 aliases=[],
                 pass_context=True)
 async def purge(context):
+    await client.send_typing(context.message.channel)
     if (context.message.author.id in ADMINS):
         deleted = await client.purge_from(context.message.channel, limit=100, check=is_me)
         await client.send_message(context.message.channel, 'Deleted {} message(s)'.format(len(deleted)))
@@ -406,6 +410,7 @@ async def on_member_join(member):
                 brief="Assign a role.",
                 pass_context=True)
 async def role(context):
+    await client.send_typing(context.message.channel)
     arg = context.message.content.split(' ')
     member = context.message.author
     if (len(arg) < 2):
@@ -441,6 +446,7 @@ async def role(context):
 
 @client.command(pass_context=True)
 async def log(context):
+    await client.send_typing(context.message.channel)
     msgs = []
     do_filter = bool(context.message.mentions)
     try:
