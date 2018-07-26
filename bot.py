@@ -54,6 +54,7 @@ EDIT_EMOJI = "📝"
 
 players = {}
 client = Bot(command_prefix=BOT_PREFIX)
+#client.remove_command('help')
 
 
 #@client.command(name='join',
@@ -367,7 +368,7 @@ def get_toxc_percent(m):
     return ((karma_dict[m][3] - karma_dict[m][2]) / (karma_dict[m][3] + karma_dict[m][2])) * 100
 
 @client.command(name='spectrum',
-        description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie.",
+                description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie.",
                 brief="Check if autistic.",
                 aliases=[],
                 pass_context=True)
@@ -377,22 +378,22 @@ async def spectrum(context):
     y = []
     names = []
     for mem_id in karma_dict:
-        toxic = get_toxc_percent(mem_id)
-        nice = get_nice_percent(mem_id)
-        aut = get_autism_percent(mem_id)
-        norm = get_normie_percent(mem_id)
-        if (toxic > nice):
-            x.append(-1*(toxic) / 10)
-        else:
-            x.append(nice / 10)
-        if (norm > aut):
-            y.append(-1*(norm) / 10)
-        else:
-            y.append(aut / 10)
-        #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
         member = find_by_id(mem_id, context.message.channel.server)
         if (member is not None) :
             names.append(member.display_name)
+            toxic = get_toxc_percent(mem_id)
+            nice = get_nice_percent(mem_id)
+            aut = get_autism_percent(mem_id)
+            norm = get_normie_percent(mem_id)
+            if (toxic > nice):
+                x.append(-1*(toxic) / 10)
+            else:
+                x.append(nice / 10)
+            if (norm > aut):
+                y.append(-1*(norm) / 10)
+            else:
+                y.append(aut / 10)
+        #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
     spectrum_gen.generate(x, y, names)
     with open('res/foo.png', 'rb') as f:
         await client.send_file(context.message.channel, f, content="Here you go, " + context.message.author.mention)
