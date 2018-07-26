@@ -52,9 +52,8 @@ NICE_EMOJI = "❤"
 TOXIC_EMOJI = "pech"
 EDIT_EMOJI = "📝"
 
-
+players = {}
 client = Bot(command_prefix=BOT_PREFIX)
-player = smart_player()
 
 
 @client.command(name='join',
@@ -62,6 +61,7 @@ player = smart_player()
                 brief="joins voice.",
                 pass_context=True)
 async def join(context):
+    player = players[context.message.channel.server.id]
     if not (player.is_connected()):
         voice = await client.join_voice_channel(context.message.author.voice.voice_channel)
         player.voice = voice
@@ -73,6 +73,7 @@ async def join(context):
                 brief="skip song",
                 pass_context=True)
 async def skip(context):
+    player = players[context.message.channel.server.id]
     name = await player.skip()
     await client.send_message(context.message.channel, "Now playing: " + name)
 
@@ -82,6 +83,7 @@ async def skip(context):
                 aliases=['stop'],
                 pass_context=True)
 async def pause(context):
+    player = players[context.message.channel.server.id]
     player.pause()
 
 @client.command(name='clear',
@@ -89,6 +91,7 @@ async def pause(context):
                 brief="clear queue",
                 pass_context=True)
 async def clear(context):
+    player = players[context.message.channel.server.id]
     await client.send_message(context.message.channel, "Removed %d songs from queue." % len(player.q))
     player.clearq()
 
@@ -97,6 +100,7 @@ async def clear(context):
                 brief="resume song",
                 pass_context=True)
 async def resume(context):
+    player = players[context.message.channel.server.id]
     player.resume()
 @client.command(name='add',
                 description="Add a song to queue",
@@ -104,13 +108,16 @@ async def resume(context):
                 pass_context=True)
 async def add(context):
     await client.send_typing(context.message.channel)
+    player = players[context.message.channel.server.id]
     arg = context.message.content.split(' ')
     if (arg != '!add'):
         if ('youtu' in arg[1]):
             player.add_youtube_track(arg[1])
         else:
             del arg[0]
+            print(' '.join(arg))
             url = player.get_youtube_url(' '.join(arg))
+            print(url)
             await client.send_message(context.message.channel, "Added: " + url)
             player.add_youtube_track(url)
 
@@ -120,6 +127,7 @@ async def add(context):
                 brief="play tunes",
                 pass_context=True)
 async def play(context):
+    player = players[context.message.channel.server.id]
     await client.send_typing(context.message.channel)
     if not discord.opus.is_loaded():
         discord.opus.load_opus('res/libopus.so')
@@ -172,6 +180,10 @@ async def eight_ball(context):
         'Possibly.'
     ]
     await client.say(random.choice(possible_responses) + ", " + context.message.author.mention)
+
+@client.event
+async def on_server_join(server):
+    players[server.id] = smart_player()
 
 @client.event
 async def on_message_delete(message):
@@ -507,6 +519,10 @@ async def delete_popup(message):
 
 async def list_servers():
     await client.wait_until_ready()
+    for server in client.servers:
+        player = smart_player()
+        players[server.id] = smart_player()
+
     while not client.is_closed:
         print("Current servers:")
         for server in client.servers:

@@ -73,7 +73,7 @@ class smart_player:
         soup = BeautifulSoup(html, 'lxml')
         for video in soup.findAll(attrs={'class':'yt-uix-tile-link'}):
             if ('googleadservices' not in video['href']):
-                return 'https://www.youtube.com' + soup.findAll(attrs={'class':'yt-uix-tile-link'})[0]['href']
+                return 'https://www.youtube.com' + video['href']
         return ''
         
 
