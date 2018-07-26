@@ -37,7 +37,8 @@ ROLES_DICT = {
     "whale" : "🐋",
     "fox" : "🦊",
     "pink" : "pink",
-    "back on top soon" : "🔙🔛🔝🔜"
+    "back on top soon" : "🔙🔛🔝🔜",
+    "nsfw" : "nsfw"
 }
 
 DEFAULT_ROLE = 'Admin'
