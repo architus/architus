@@ -56,17 +56,17 @@ players = {}
 client = Bot(command_prefix=BOT_PREFIX)
 
 
-@client.command(name='join',
-                description="Joins the caller's voice channel",
-                brief="joins voice.",
-                pass_context=True)
-async def join(context):
-    player = players[context.message.channel.server.id]
-    if not (player.is_connected()):
-        voice = await client.join_voice_channel(context.message.author.voice.voice_channel)
-        player.voice = voice
-    else:
-        player.voice.move_to(context.message.author.voice.voice_channel)
+#@client.command(name='join',
+#                description="Joins the caller's voice channel",
+#                brief="joins voice.",
+#                pass_context=True)
+#async def join(context):
+#    player = players[context.message.channel.server.id]
+#    if not (player.is_connected()):
+#        voice = await client.join_voice_channel(context.message.author.voice.voice_channel)
+#        player.voice = voice
+#    else:
+#        player.voice.move_to(context.message.author.voice.voice_channel)
 
 @client.command(name='skip',
                 description="Skip current song",
@@ -421,6 +421,7 @@ async def on_member_join(member):
 @client.command(name='role',
                 description="Assign yourself a role.",
                 brief="Assign a role.",
+                aliases=['join'],
                 pass_context=True)
 async def role(context):
     await client.send_typing(context.message.channel)
