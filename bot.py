@@ -12,6 +12,7 @@ from pytz import timezone
 import pytz
 from discord import Game
 from discord import message
+from discord.ext import commands
 from discord.ext.commands import Bot
 
 from src.config import secret_token, session
@@ -73,10 +74,16 @@ client = Bot(command_prefix=BOT_PREFIX)
                 description="Skip current song",
                 brief="skip song",
                 pass_context=True)
+@commands.cooldown(1, 1, commands.BucketType.server)
 async def skip(context):
     player = players[context.message.channel.server.id]
     name = await player.skip()
-    await client.send_message(context.message.channel, "Now playing: " + name)
+    if (name):
+        await client.send_message(context.message.channel, "Now playing: " + name)
+    else:
+        await client.send_message(context.message.channel, "No songs left. nice job. bye.")
+        if (player.is_connected()):
+            await player.voice.disconnect()
 
 @client.command(name='pause',
                 description="Pauses current song",
@@ -103,30 +110,22 @@ async def clear(context):
 async def resume(context):
     player = players[context.message.channel.server.id]
     player.resume()
-@client.command(name='add',
+@client.command(name='adde',
                 description="Add a song to queue",
                 brief="Add song",
                 pass_context=True)
-async def add(context):
-    await client.send_typing(context.message.channel)
-    player = players[context.message.channel.server.id]
-    arg = context.message.content.split(' ')
-    if (arg != '!add'):
-        if ('youtu' in arg[1]):
-            player.add_youtube_track(arg[1])
-        else:
-            del arg[0]
-            print(' '.join(arg))
-            url = player.get_youtube_url(' '.join(arg))
-            print(url)
-            await client.send_message(context.message.channel, "Added: " + url)
-            player.add_youtube_track(url)
+@commands.cooldown(1, 5, commands.BucketType.server)
+async def adde(context):
+    #await client.send_typing(context.message.channel)
+    await client.send_message(context.message.channel, '')
 
 
 @client.command(name='play',
-                description="!play [thing from youtube or spotify]",
+                description="![play|add] [url|search]",
                 brief="play tunes",
+                aliases=['add'],
                 pass_context=True)
+@commands.cooldown(1, 2, commands.BucketType.server)
 async def play(context):
     player = players[context.message.channel.server.id]
     await client.send_typing(context.message.channel)
@@ -139,29 +138,59 @@ async def play(context):
         player.voice.move_to(context.message.author.voice.voice_channel)
 
     arg = context.message.content.split(' ')
+    add = arg[0] == '!add'
+    message = ''
     if (len(arg) > 1):
         if ('/playlist/' in arg[1]):
-            await client.send_message(context.message.channel, "Queuing playlists is coming soon.")
+            name = await player.add_spotify_playlist(arg[1])
+            message = "Queuing \"" + name[0] + "\"."
+            del name[0]
+            player.add_spotify_track(name[1])
+            await player.play()
+            for track in name:
+                print(track)
+                player.add_spotify_track(track)
         elif ('/track/' in arg[1]):
-            await client.send_message(context.message.channel, "Playing spotify is coming soon.")
+            if (add):
+                name = player.add_spotify_track(arg[1]);
+                if (name):
+                    message = 'Added: ' + name
+            else:
+                player.add_spotify_track_now(arg[1]);
+                name = await player.play()
+                if (name):
+                    message = "Now playing: " + name
         elif ('youtu' in arg[1]):
-            player.add_youtube_track_now(arg[1])
-            name = await player.play()
-            await client.send_message(context.message.channel, "Playing %s" % name)
+            if (add):
+                player.add_youtube_track(arg[1])
+                message = 'Added'
+            else:
+                player.add_youtube_track_now(arg[1])
+                name = await player.play()
+                if (name):
+                    message = "Playing " + name
         elif ('town' in arg[1] or 'encounter' in arg[1] or 'boss' in arg[1] or 'exploration' in arg[1]):
-            await client.send_message(context.message.channel, "Queuing playlists is coming soon.")
+            message = "Queuing playlists is coming soon"
         else:
             del arg[0]
             url = player.get_youtube_url(' '.join(arg))
-            player.add_youtube_track(url)
-            name = await player.play()
-            await client.send_message(context.message.channel, "Now playing: " + url)
+            if (add):
+                player.add_youtube_track(url)
+                message = "Added: " + url
+            else:
+                player.add_youtube_track_now(url)
+                name = await player.play()
+                if (name):
+                    message = "Now Playing: " + url
     else:
         if (len(player.q) == 0):
-            await client.send_message(context.message.channel, "Play what, " + context.message.author.mention + "?")
+            message = "Play what, " + context.message.author.mention + "?"
         else:
-            await player.play()
-            await client.send_message(context.message.channel, "Now playing: " + name)
+            name = await player.play()
+            if (name):
+                message = "Now playing: " + name
+
+    await client.send_message(context.message.channel, message)
 
     #await client.play_audio(f)
 
@@ -306,6 +335,17 @@ async def check(context):
 
 @client.command(pass_context=True)
 async def test(context):
+    emojis = client.get_all_emojis()
+    for emoji in emojis:
+        if (emoji.name == 'reee'):
+            NORM_EMOJI_OBJ = str(emoji)
+        elif (emoji.name == 'pech'):
+            TOXIC_EMOJI_OBJ = str(emoji)
+
+    await client.send_message(context.message.channel, context.message.channel.id)
+    await client.send_message(context.message.channel, next(client.get_all_emojis()))
+    await client.send_message(context.message.channel, NORM_EMOJI_OBJ)
+
     x = [1, -3, 5, 7, -8, 3, -5, -7]
     y = [-1, 2, -7, 5, 1, 0, 4, -6]
     names = ['p🅱ch', 'johny', 'test', 'raines', 'hello', 'hi', 'owo', 'I hate sand']
@@ -367,11 +407,13 @@ def get_toxc_percent(m):
         return 0
     return ((karma_dict[m][3] - karma_dict[m][2]) / (karma_dict[m][3] + karma_dict[m][2])) * 100
 
+
 @client.command(name='spectrum',
-                description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie.",
+                description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
                 brief="Check if autistic.",
                 aliases=[],
                 pass_context=True)
+@commands.cooldown(1, 5, commands.BucketType.server)
 async def spectrum(context):
     await client.send_typing(context.message.channel)
     x = []
@@ -404,6 +446,7 @@ async def spectrum(context):
                 brief="Delete spam.",
                 aliases=[],
                 pass_context=True)
+@commands.cooldown(1, 5, commands.BucketType.server)
 async def purge(context):
     await client.send_typing(context.message.channel)
     if (context.message.author.id in ADMINS):
@@ -486,9 +529,14 @@ async def log(context):
 
 @client.event
 async def on_ready():
-    await client.change_presence(game=Game(name="with roles"))
+    for server in client.servers:
+        #player = smart_player()
+        players[server.id] = smart_player(client)
+
     print("Logged in as " + client.user.name)
     users = session.query(User).all()
+    await client.change_presence(game=Game(name="spotify again"))
+
     for user in users:
         karma_dict[user.discord_id] = user.as_entry()
 
@@ -521,10 +569,6 @@ async def delete_popup(message):
 
 async def list_servers():
     await client.wait_until_ready()
-    for server in client.servers:
-        player = smart_player()
-        players[server.id] = smart_player()
-
     while not client.is_closed:
         print("Current servers:")
         for server in client.servers:

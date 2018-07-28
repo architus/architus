@@ -1,8 +1,10 @@
 import os, random
+import discord
 #from queue import Queue
 from collections import deque
-#import src.spotify_tools
+import src.spotify_tools as spotify_tools
 import urllib
+import asyncio
 #import urllib2
 from bs4 import BeautifulSoup
 
@@ -14,7 +16,8 @@ BOSS_PATH=MUSIC_PATH+"Boss"
 ENCOUNTER_PATH=MUSIC_PATH+"Encounter"
 
 class smart_player:
-    def __init__(self):
+    def __init__(self, client):
+        self.client = client
         self.q = deque()
         self.player = None
         self.voice = None
@@ -22,15 +25,22 @@ class smart_player:
         self.goAgane = False
         self.name = ''
 
-    async def play(self):
+    async def play(self, isManual=True):
         if (self.voice == None or len(self.q) == 0):
             return ''
+        if (self.player and self.player.is_playing()):
+            return await self.skip()
         self.stop()
-        self.player = await self.voice.create_ytdl_player(self.q.pop())
-        print (self.player.error)
+        try:
+            self.player = await self.voice.create_ytdl_player(self.q.pop(), after=self.agane)
+            self.player.start()
+            self.name = self.player.title
+            return self.player.title
+        except:
+            print("couldn't create player")
+            print (self.player.error)
+        return ''
         #self.player.volume = 0.15
-        self.player.start()
-        return self.player.title
 
 
     #def play(self, setting):
@@ -56,12 +66,57 @@ class smart_player:
     #    self.player.volume = 0.15
     #    self.player.start()
     #    self.goAgane = True
+    async def add_spotify_playlist(self, url):
+        urls = []
+        data = spotify_tools.fetch_playlist(url)
+        urls.append(data['name'])
+        tracks = data['tracks']
+        while True:
+            for item in tracks['items']:
+                if 'track' in item:
+                    track = item['track']
+                else:
+                    track = item
+                try:
+                    track_url = track['external_urls']['spotify']
+                    #log.debug(track_url)
+                    print(track_url)
+                    urls.append(track_url)
+                    #self.add_spotify_track(track_url)
+                    #track_urls.append(track_url)
+                except KeyError:
+                    pass
+                    #log.warning(u'Skipping track {0} by {1} (local only?)'.format(
+                    #track['name'], track['artists'][0]['name']))
+            # 1 page = 50 results
+            # check if there are more pages
+            if tracks['next']:
+                tracks = spotify.next(tracks)
+            else:
+                break
+
+        return urls
+        #utubeurl = self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
+        #self.add_youtube_track(utubeurl)
+        #return name
 
     def add_spotify_track(self, url):
-        print(url)
-        #data = spotify_tools.generate_metadata(url)
+        data = spotify_tools.generate_metadata(url)
+        name = data['name']
+        utubeurl = self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
+        self.add_youtube_track(utubeurl)
+        return name
+
+    def add_spotify_track_now(self, url):
+        data = spotify_tools.generate_metadata(url)
+        name = data['name']
+        utubeurl = self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
+        self.add_youtube_track_now(utubeurl)
+        return name
+
     def add_youtube_track(self, url):
         self.q.append(url)
+
     def add_youtube_track_now(self, url):
         self.q.appendleft(url)
 
@@ -105,6 +160,8 @@ class smart_player:
         if (self.player == None):
             return
         self.player.stop()
+        if (len(self.q) < 1):
+            self.voice.disconnect()
 
     def pause(self):
         if (self.player == None):
@@ -117,8 +174,15 @@ class smart_player:
     async def skip(self):
         if (self.player == None):
             return
+        old_name = self.name
         self.stop()
-        return await self.play()
+        if (len(self.q) < 1):
+            self.voice.disconnect()
+            return ''
+        #while (old_name == self.name):
+        asyncio.sleep(3)
+        return self.name
+        #return await self.play()
     def clearq(self):
         self.q.clear()
 
@@ -126,5 +190,16 @@ class smart_player:
         return self.voice != None and self.voice.is_connected()
 
     def agane(self):
-        if (self.goAgane):
-            self.play(self.setting)
+        print("hi")
+        if (len(self.q) < 1):
+            self.voice.disconnect()
+        #coro = self.client.send_message(self.client.get_channel('436189230390050830'), 'Song is done!')
+        coro = self.play()
+        fut = discord.compat.run_coroutine_threadsafe(coro, self.client.loop)
+        try:
+            fut.result()
+        except:
+            print('error')
+            # an error happened sending the message
+            pass
+        #await self.play()

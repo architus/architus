@@ -85,34 +85,34 @@ def write_user_playlist(username, text_file=None):
     return write_playlist(playlist, text_file)
 
 
-def get_playlists(username):
-    """ Fetch user playlists when using the -u option. """
-    playlists = spotify.user_playlists(username)
-    links = []
-    check = 1
-
-    while True:
-        for playlist in playlists['items']:
-            # in rare cases, playlists may not be found, so playlists['next']
-            # is None. Skip these. Also see Issue #91.
-            if playlist['name'] is not None:
-                #log.info(u'{0:>5}. {1:<30}  ({2} tracks)'.format(
-                    check, playlist['name'],
-                    playlist['tracks']['total']))
-                playlist_url = playlist['external_urls']['spotify']
-                #log.debug(playlist_url)
-                links.append(playlist_url)
-                check += 1
-        if playlists['next']:
-            playlists = spotify.next(playlists)
-        else:
-            break
-
-    return links
-
-
+#def get_playlists(username):
+#    """ Fetch user playlists when using the -u option. """
+#    playlists = spotify.user_playlists(username)
+#    links = []
+#    check = 1
+#
+#    while True:
+#        for playlist in playlists['items']:
+#            # in rare cases, playlists may not be found, so playlists['next']
+#            # is None. Skip these. Also see Issue #91.
+#            if playlist['name'] is not None:
+#                #log.info(u'{0:>5}. {1:<30}  ({2} tracks)'.format(
+#                    check, playlist['name'],
+#                    playlist['tracks']['total']))
+#                playlist_url = playlist['external_urls']['spotify']
+#                #log.debug(playlist_url)
+#                links.append(playlist_url)
+#                check += 1
+#        if playlists['next']:
+#            playlists = spotify.next(playlists)
+#        else:
+#            break
+#
+#    return links
+#
+#
 def fetch_playlist(playlist):
-    splits = internals.get_splits(playlist)
+    splits = get_splits(playlist)
     try:
         username = splits[-3]
     except IndexError:
@@ -130,53 +130,60 @@ def fetch_playlist(playlist):
 
     return results
 
-
-def write_playlist(playlist_url, text_file=None):
-    playlist = fetch_playlist(playlist_url)
-    tracks = playlist['tracks']
-    if not text_file:
-        text_file = u'{0}.txt'.format(slugify(playlist['name'], ok='-_()[]{}'))
-    return write_tracks(tracks, text_file)
-
-
-def fetch_album(album):
-    splits = internals.get_splits(album)
-    album_id = splits[-1]
-    album = spotify.album(album_id)
-    return album
-
-
-def write_album(album_url, text_file=None):
-    album = fetch_album(album_url)
-    tracks = spotify.album_tracks(album['id'])
-    if not text_file:
-        text_file = u'{0}.txt'.format(slugify(album['name'], ok='-_()[]{}'))
-    return write_tracks(tracks, text_file)
-
-
-def write_tracks(tracks, text_file):
-    #log.info(u'Writing {0} tracks to {1}'.format(
-               tracks['total'], text_file))
-    track_urls = []
-    with open(text_file, 'a') as file_out:
-        while True:
-            for item in tracks['items']:
-                if 'track' in item:
-                    track = item['track']
-                else:
-                    track = item
-                try:
-                    track_url = track['external_urls']['spotify']
-                    #log.debug(track_url)
-                    file_out.write(track_url + '\n')
-                    track_urls.append(track_url)
-                except KeyError:
-                    #log.warning(u'Skipping track {0} by {1} (local only?)'.format(
-                        track['name'], track['artists'][0]['name']))
-            # 1 page = 50 results
-            # check if there are more pages
-            if tracks['next']:
-                tracks = spotify.next(tracks)
-            else:
-                break
-    return track_urls
+def get_splits(url):
+    if '/' in url:
+        if url.endswith('/'):
+            url = url[:-1]
+        splits = url.split('/')
+    else:
+        splits = url.split(':')
+    return splits
+#def write_playlist(playlist_url, text_file=None):
+#    playlist = fetch_playlist(playlist_url)
+#    tracks = playlist['tracks']
+#    if not text_file:
+#        text_file = u'{0}.txt'.format(slugify(playlist['name'], ok='-_()[]{}'))
+#    return write_tracks(tracks, text_file)
+#
+#
+#def fetch_album(album):
+#    splits = internals.get_splits(album)
+#    album_id = splits[-1]
+#    album = spotify.album(album_id)
+#    return album
+#
+#
+#def write_album(album_url, text_file=None):
+#    album = fetch_album(album_url)
+#    tracks = spotify.album_tracks(album['id'])
+#    if not text_file:
+#        text_file = u'{0}.txt'.format(slugify(album['name'], ok='-_()[]{}'))
+#    return write_tracks(tracks, text_file)
+#
+#
+#def write_tracks(tracks, text_file):
+#    #log.info(u'Writing {0} tracks to {1}'.format(
+#               tracks['total'], text_file))
+#    track_urls = []
+#    with open(text_file, 'a') as file_out:
+#        while True:
+#            for item in tracks['items']:
+#                if 'track' in item:
+#                    track = item['track']
+#                else:
+#                    track = item
+#                try:
+#                    track_url = track['external_urls']['spotify']
+#                    #log.debug(track_url)
+#                    file_out.write(track_url + '\n')
+#                    track_urls.append(track_url)
+#                except KeyError:
+#                    #log.warning(u'Skipping track {0} by {1} (local only?)'.format(
+#                        track['name'], track['artists'][0]['name']))
+#            # 1 page = 50 results
+#            # check if there are more pages
+#            if tracks['next']:
+#                tracks = spotify.next(tracks)
+#            else:
+#                break
+#    return track_urls
