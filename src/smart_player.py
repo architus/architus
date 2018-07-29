@@ -100,27 +100,27 @@ class smart_player:
         #self.add_youtube_track(utubeurl)
         #return name
 
-    def add_spotify_track(self, url):
+    async def add_spotify_track(self, url):
         data = spotify_tools.generate_metadata(url)
         name = data['name']
-        utubeurl = self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
-        self.add_youtube_track(utubeurl)
+        utubeurl = await self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
+        await self.add_youtube_track(utubeurl)
         return name
 
-    def add_spotify_track_now(self, url):
+    async def add_spotify_track_now(self, url):
         data = spotify_tools.generate_metadata(url)
         name = data['name']
-        utubeurl = self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
+        utubeurl = await self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
         self.add_youtube_track_now(utubeurl)
         return name
 
-    def add_youtube_track(self, url):
+    async def add_youtube_track(self, url):
         self.q.append(url)
 
-    def add_youtube_track_now(self, url):
+    async def add_youtube_track_now(self, url):
         self.q.appendleft(url)
 
-    def get_youtube_url(self, search):
+    async def get_youtube_url(self, search):
         query = urllib.parse.quote(search)
         url = "https://www.youtube.com/results?search_query=" + query
         response = urllib.request.urlopen(url)

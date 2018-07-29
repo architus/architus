@@ -145,27 +145,27 @@ async def play(context):
             name = await player.add_spotify_playlist(arg[1])
             message = "Queuing \"" + name[0] + "\"."
             del name[0]
-            player.add_spotify_track(name[1])
+            await player.add_spotify_track(name[1])
             await player.play()
             for track in name:
                 print(track)
-                player.add_spotify_track(track)
+                await player.add_spotify_track(track)
         elif ('/track/' in arg[1]):
             if (add):
-                name = player.add_spotify_track(arg[1]);
+                name = await player.add_spotify_track(arg[1]);
                 if (name):
                     message = 'Added: ' + name
             else:
-                player.add_spotify_track_now(arg[1]);
+                await player.add_spotify_track_now(arg[1]);
                 name = await player.play()
                 if (name):
                     message = "Now playing: " + name
         elif ('youtu' in arg[1]):
             if (add):
-                player.add_youtube_track(arg[1])
+                await player.add_youtube_track(arg[1])
                 message = 'Added'
             else:
-                player.add_youtube_track_now(arg[1])
+                await player.add_youtube_track_now(arg[1])
                 name = await player.play()
                 if (name):
                     message = "Playing " + name
@@ -173,12 +173,12 @@ async def play(context):
             message = "Queuing playlists is coming soon"
         else:
             del arg[0]
-            url = player.get_youtube_url(' '.join(arg))
+            url = await player.get_youtube_url(' '.join(arg))
             if (add):
-                player.add_youtube_track(url)
+                await player.add_youtube_track(url)
                 message = "Added: " + url
             else:
-                player.add_youtube_track_now(url)
+                await player.add_youtube_track_now(url)
                 name = await player.play()
                 if (name):
                     message = "Now Playing: " + url
