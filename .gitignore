@@ -1,5 +1,5 @@
 .venv/*
-.secret_token
+*.secret_token
 *.pkl
 __py*
 *png

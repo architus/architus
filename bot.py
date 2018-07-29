@@ -142,43 +142,44 @@ async def play(context):
     message = ''
     if (len(arg) > 1):
         if ('/playlist/' in arg[1]):
-            name = await player.add_spotify_playlist(arg[1])
-            message = "Queuing \"" + name[0] + "\"."
-            del name[0]
-            await player.add_spotify_track(name[1])
-            await player.play()
-            for track in name:
-                print(track)
-                await player.add_spotify_track(track)
+            urls = await player.add_spotify_playlist(arg[1])
+            message = "Queuing \"" + urls[0] + "\"."
+            del urls[0]
+            await player.add_url(urls[0])
+            name = await player.play()
+            for track in urls:
+                await player.add_url(track)
+            if (name):
+                message += "\nPlaying: " + name
         elif ('/track/' in arg[1]):
             if (add):
-                name = await player.add_spotify_track(arg[1]);
+                name = await player.add_url(arg[1]);
                 if (name):
                     message = 'Added: ' + name
             else:
-                await player.add_spotify_track_now(arg[1]);
+                await player.add_url_now(arg[1]);
                 name = await player.play()
                 if (name):
                     message = "Now playing: " + name
         elif ('youtu' in arg[1]):
             if (add):
-                await player.add_youtube_track(arg[1])
+                await player.add_url(arg[1])
                 message = 'Added'
             else:
-                await player.add_youtube_track_now(arg[1])
+                await player.add_url_now(arg[1])
                 name = await player.play()
                 if (name):
                     message = "Playing " + name
         elif ('town' in arg[1] or 'encounter' in arg[1] or 'boss' in arg[1] or 'exploration' in arg[1]):
-            message = "Queuing playlists is coming soon"
+            message = "Please pass in the url of the playlist."
         else:
             del arg[0]
             url = await player.get_youtube_url(' '.join(arg))
             if (add):
-                await player.add_youtube_track(url)
+                await player.add_url(url)
                 message = "Added: " + url
             else:
-                await player.add_youtube_track_now(url)
+                await player.add_url_now(url)
                 name = await player.play()
                 if (name):
                     message = "Now Playing: " + url

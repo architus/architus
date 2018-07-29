@@ -31,14 +31,24 @@ class smart_player:
         if (self.player and self.player.is_playing()):
             return await self.skip()
         self.stop()
+        self.name = ''
+        url = self.q.pop()
+        if ('spotify' in url):
+            url = await self.spotify_to_youtube(url)
+            self.name = url['name']
+            url = url['url']
+        print("starting " + url)
         try:
-            self.player = await self.voice.create_ytdl_player(self.q.pop(), after=self.agane)
+            self.player = await self.voice.create_ytdl_player(url, after=self.agane)
             self.player.start()
-            self.name = self.player.title
-            return self.player.title
-        except:
+            if not self.name:
+                self.name = self.player.title
+            return self.name
+        except Exception as e:
             print("couldn't create player")
-            print (self.player.error)
+            print(e)
+            if (self.player):
+                print(self.player.error)
         return ''
         #self.player.volume = 0.15
 
@@ -80,7 +90,7 @@ class smart_player:
                 try:
                     track_url = track['external_urls']['spotify']
                     #log.debug(track_url)
-                    print(track_url)
+                    #print(track_url)
                     urls.append(track_url)
                     #self.add_spotify_track(track_url)
                     #track_urls.append(track_url)
@@ -100,24 +110,17 @@ class smart_player:
         #self.add_youtube_track(utubeurl)
         #return name
 
-    async def add_spotify_track(self, url):
+    async def spotify_to_youtube(self, url):
+        info = {}
         data = spotify_tools.generate_metadata(url)
-        name = data['name']
-        utubeurl = await self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
-        await self.add_youtube_track(utubeurl)
-        return name
+        info['name'] = data['name']
+        info['url'] = await self.get_youtube_url("%s - %s" % (info['name'], data['artists'][0]['name']))
+        return info
 
-    async def add_spotify_track_now(self, url):
-        data = spotify_tools.generate_metadata(url)
-        name = data['name']
-        utubeurl = await self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
-        self.add_youtube_track_now(utubeurl)
-        return name
-
-    async def add_youtube_track(self, url):
+    async def add_url(self, url):
         self.q.append(url)
 
-    async def add_youtube_track_now(self, url):
+    async def add_url_now(self, url):
         self.q.appendleft(url)
 
     async def get_youtube_url(self, search):
@@ -180,7 +183,7 @@ class smart_player:
             self.voice.disconnect()
             return ''
         #while (old_name == self.name):
-        asyncio.sleep(3)
+        await asyncio.sleep(2)
         return self.name
         #return await self.play()
     def clearq(self):
@@ -190,7 +193,6 @@ class smart_player:
         return self.voice != None and self.voice.is_connected()
 
     def agane(self):
-        print("hi")
         if (len(self.q) < 1):
             self.voice.disconnect()
         #coro = self.client.send_message(self.client.get_channel('436189230390050830'), 'Song is done!')
