@@ -12,7 +12,7 @@ def generate(x, y, names):
     font = matplotlib.font_manager.FontProperties(fname='res/fonts/NotoSansSymbols-Regular.ttf',
                                    style='normal', size=16)
 
-    marker = itertools.cycle(('+', 'o', '*', '8', 's', 'p', 'H', 'D', 'v', '^', '<', '>', '1')) 
+    marker = itertools.cycle(('+', 'o', '*', '8', 's', 'p', 'H', 'D', 'v', '^', '<', '>', '1', '2', '3', '4', 'h', 'd', 'P', 'x', 'X')) 
     fig, ax = plt.subplots()
     #ax.set_facecolor('#23272A')
     #ax.set_facecolor('white')
