@@ -18,7 +18,7 @@ from discord.ext.commands import Bot
 from src.config import secret_token, session
 from src.smart_message import smart_message
 from src.list_embed import list_embed
-from src.models import User
+from src.models import User, Admin
 from src.smart_player import smart_player
 import src.spectrum_gen as spectrum_gen
 
@@ -31,7 +31,6 @@ MATTS_ID = '168722115447488512'
 SIMONS_ID = '103027947786473472'
 MONKEYS_ID = '189528269547110400'
 
-ADMINS = [JOHNYS_ID, MATTS_ID, SIMONS_ID, MONKEYS_ID]
 
 ROLES_DICT = {
     "black santa" : "🎅🏿",
@@ -39,12 +38,14 @@ ROLES_DICT = {
     "fox" : "🦊",
     "pink" : "pink",
     "back on top soon" : "🔙🔛🔝🔜",
-    "nsfw" : "nsfw"
+    "nsfw" : "nsfw",
+    "pugger" : "pugger"
 }
 
 DEFAULT_ROLE = 'Admin'
 
 karma_dict = {}
+admins = {}
 tracked_messages = deque([], maxlen=20)
 
 AUT_EMOJI = "🅱"
@@ -56,19 +57,6 @@ EDIT_EMOJI = "📝"
 players = {}
 client = Bot(command_prefix=BOT_PREFIX)
 #client.remove_command('help')
-
-
-#@client.command(name='join',
-#                description="Joins the caller's voice channel",
-#                brief="joins voice.",
-#                pass_context=True)
-#async def join(context):
-#    player = players[context.message.channel.server.id]
-#    if not (player.is_connected()):
-#        voice = await client.join_voice_channel(context.message.author.voice.voice_channel)
-#        player.voice = voice
-#    else:
-#        player.voice.move_to(context.message.author.voice.voice_channel)
 
 @client.command(name='skip',
                 description="Skip current song",
@@ -215,6 +203,7 @@ async def eight_ball(context):
 @client.event
 async def on_server_join(server):
     players[server.id] = smart_player()
+    admins[server.id] = [server.owner.id]
 
 @client.event
 async def on_message_delete(message):
@@ -238,16 +227,6 @@ async def on_message_edit(before, after):
     sm.add_edit(before, after)
     tracked_messages.append(sm)
     
-def update_user(disc_id):
-    new_data = {
-            'aut_score': karma_dict[disc_id][0],
-            'norm_score': karma_dict[disc_id][1],
-            'nice_score': karma_dict[disc_id][2],
-            'toxic_score': karma_dict[disc_id][3]
-            }
-    session.query(User).filter_by(discord_id = disc_id).update(new_data)
-    session.commit()
-
 @client.event
 async def on_reaction_add(reaction, user):
     author = reaction.message.author
@@ -347,23 +326,18 @@ async def test(context):
     await client.send_message(context.message.channel, next(client.get_all_emojis()))
     await client.send_message(context.message.channel, NORM_EMOJI_OBJ)
 
-    x = [1, -3, 5, 7, -8, 3, -5, -7]
-    y = [-1, 2, -7, 5, 1, 0, 4, -6]
-    names = ['p🅱ch', 'johny', 'test', 'raines', 'hello', 'hi', 'owo', 'I hate sand']
-    spectrum_gen.generate(x, y, names)
-    with open('res/foo.png', 'rb') as f:
-        await client.send_file(context.message.channel, f, content="Here you go, " + context.message.author.mention)
-
 
 @client.command(name='remove',
-        description="Remove user from the spectrum",
+        description="Remove users from the spectrum if they are a sad boi",
         brief="Remove user from the spectrum",
         aliases=[],
         pass_context=True)
 async def remove(context):
+    server = context.message.channel.server
     for member in context.message.mentions:
         if (member.id in karma_dict):
             karma_dict.pop(member.id)
+            update_admin(member, server, delete=True)
             await client.send_message(context.message.channel, member.mention + " has been removed")
 
 @client.command()
@@ -374,12 +348,6 @@ async def square(number):
 def find_member(name, icon, server):
     for m in server.members:
         if (name == m.display_name and icon == m.avatar_url):
-            return m
-    return None
-
-def find_by_id(mem_id, server):
-    for m in server.members:
-        if (mem_id == m.id):
             return m
     return None
 
@@ -421,7 +389,7 @@ async def spectrum(context):
     y = []
     names = []
     for mem_id in karma_dict:
-        member = find_by_id(mem_id, context.message.channel.server)
+        member = context.message.channel.server.get_member(mem_id)
         if (member is not None) :
             names.append(member.display_name)
             toxic = get_toxc_percent(mem_id)
@@ -445,16 +413,16 @@ async def spectrum(context):
 @client.command(name='purge',
                 description="Deletes the bot's spam.",
                 brief="Delete spam.",
-                aliases=[],
                 pass_context=True)
 @commands.cooldown(1, 5, commands.BucketType.server)
 async def purge(context):
-    await client.send_typing(context.message.channel)
-    if (context.message.author.id in ADMINS):
+    channel = context.message.channel
+    await client.send_typing(channel)
+    if (int(context.message.author.id) in admins[int(channel.server.id)]):
         deleted = await client.purge_from(context.message.channel, limit=100, check=is_me)
-        await client.send_message(context.message.channel, 'Deleted {} message(s)'.format(len(deleted)))
+        await client.send_message(channel, 'Deleted {} message(s)'.format(len(deleted)))
     else:
-        await client.send_message(context.message.channel, 'You do not have permission to use this command, %s.' % context.message.author.mention)
+        await client.send_message(channel, 'lul %s' % context.message.author.mention)
 
 @client.event
 async def on_member_join(member):
@@ -504,6 +472,39 @@ async def role(context):
         await client.send_message(context.message.channel, "I don't know that role, %s" % context.message.author.mention)
 
 @client.command(pass_context=True)
+async def admin(context):
+    server = context.message.channel.server
+    if ("remove" in context.message.content and context.message.author.id == server.owner.id):
+        for member in context.message.mentions:
+            if (member == context.message.author):
+                await client.send_message(context.message.channel, "🤔")
+                return
+            update_admin(member, server, delete=True)
+            admins[int(server.id)].remove(int(member.id))
+            await client.send_message(context.message.channel, "Removed %s." % member.display_name)
+        return
+
+    if ("list" in context.message.content):
+        print("serverid: " +server.id);
+        print(admins)
+        names = ''
+        for userid in admins[int(server.id)]:
+            names += (server.get_member(str(userid))).display_name + ' '
+        await client.send_message(context.message.channel, names)
+        return
+    if (context.message.author.id == server.owner.id):
+        for member in context.message.mentions:
+            admins.setdefault(int(server.id), [])
+            if (member.id not in admins[int(server.id)]):
+                new_admin = Admin(server.id, member.id, member.name)
+                session.add(new_admin)
+                admins[int(server.id)].append(int(member.id))
+                update_admin(member, server)
+                await client.send_message(context.message.channel, "Added %s." % member.display_name)
+    else:
+        await client.send_message(context.message.channel, "Nice try. You have been reported.")
+
+@client.command(pass_context=True)
 async def log(context):
     await client.send_typing(context.message.channel)
     msgs = []
@@ -527,19 +528,6 @@ async def log(context):
     for message in reversed(msgs):
         lembed.add(author.display_name, message.content)
     await client.send_message(context.message.channel, embed=lembed.get_embed())
-
-@client.event
-async def on_ready():
-    for server in client.servers:
-        #player = smart_player()
-        players[server.id] = smart_player(client)
-
-    print("Logged in as " + client.user.name)
-    users = session.query(User).all()
-    await client.change_presence(game=Game(name="spotify again"))
-
-    for user in users:
-        karma_dict[user.discord_id] = user.as_entry()
 
 async def edit_popup(message):
     for sm in tracked_messages:
@@ -566,7 +554,13 @@ async def delete_popup(message):
                 await client.delete_message(sm.popup)
                 sm.popup = None
 
-
+@client.event
+async def on_ready():
+    initialize_players()
+    initialize_scores()
+    initialize_admins()
+    print("Logged in as " + client.user.name)
+    await client.change_presence(game=Game(name="spotify again"))
 
 async def list_servers():
     await client.wait_until_ready()
@@ -576,6 +570,66 @@ async def list_servers():
             print(server.name)
         await asyncio.sleep(600)
 
+def initialize_players():
+    for server in client.servers:
+        players[server.id] = smart_player(client)
+
+def initialize_admins():
+    admin_list = session.query(Admin).all()
+    for server in client.servers:
+        admins[int(server.id)] = [int(server.owner.id)]
+        admins[int(server.id)].append(int(JOHNYS_ID))
+    for admin in admin_list:
+        admins.setdefault(admin.server_id, [])
+        admins[admin.server_id].append(admin.discord_id)
+
+def initialize_roles():
+    role_list = session.query(Role).all()
+    for server in client.servers:
+        roles.setdefault(int(server.id), [])
+    for role in role_list:
+        roles.setdefault(role.server_id, [])
+        roles[role.server_id].append((role.target_role_id, role.required_role_id))
+
+def initialize_scores():
+    users = session.query(User).all()
+    for user in users:
+        karma_dict[user.discord_id] = user.as_entry()
+
+def update_role(target_role_id, server_id, required_role_id=None, delete=False):
+    if (delete):
+        session.query(Role).filter_by(target_role_id = target_role_id).delete()
+        session.commit()
+        return
+    new_data = {
+            'server_id': server_id,
+            'required_role_id': required_role_id
+            }
+def update_user(disc_id, delete=False):
+    if (delete):
+        session.query(User).filter_by(discord_id = disc_id).delete()
+        session.commit()
+        return
+    new_data = {
+            'aut_score': karma_dict[disc_id][0],
+            'norm_score': karma_dict[disc_id][1],
+            'nice_score': karma_dict[disc_id][2],
+            'toxic_score': karma_dict[disc_id][3]
+            }
+    session.query(User).filter_by(discord_id = disc_id).update(new_data)
+    session.commit()
+
+def update_admin(member, server, delete=False):
+    if (delete):
+        session.query(Admin).filter_by(discord_id = member.id).delete()
+        session.commit()
+        return
+    new_data = {
+            'server_id': server.id,
+            'username': member.name
+            }
+    session.query(Admin).filter_by(discord_id = member.id).update(new_data)
+    session.commit()
 
 client.loop.create_task(list_servers())
 client.run(TOKEN)

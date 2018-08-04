@@ -1,5 +1,5 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, ForeignKey, Integer, BigInteger, Float
+from sqlalchemy import Column, ForeignKey, Integer, BigInteger, Float, Text
 from src.config import session
 
 Base = declarative_base()
@@ -27,3 +27,40 @@ class User(Base):
     
     def as_entry(self):
         return [self.aut_score, self.norm_score, self.nice_score, self.toxic_score]
+
+class Admin(Base):
+    __tablename__ = 'tb_admins'
+    discord_id = Column('discord_id', BigInteger, primary_key=True)
+    server_id = Column('server_id', BigInteger)
+    username = Column('username', Text)
+
+    def __init__(self, server_id, discord_id, username):
+        self.server_id = server_id
+        self.discord_id = discord_id
+        self.username = username
+    
+    def get_discord_id(self):
+        return self.discord_id
+
+    def get_server_id(self):
+        return self.discord_id
+
+class Role(Base):
+    __tablename__ = 'tb_roles'
+    target_role_id = Column('target_role_id', BigInteger, primary_key=True)
+    server_id = Column('server_id', BigInteger)
+    required_role_id = Column('required_role_id', BigInteger)
+
+    def __init__(self, server_id, target_role_id, required_role_id):
+        self.server_id = server_id
+        self.target_role_id = target_role_id
+        self.required_role_id = required_role_id
+    
+    def get_required_role_id(self):
+        return self.required_role_id
+
+    def get_target_role_id(self):
+        return self.target_role_id
+
+    def get_server_id(self):
+        return self.discord_id

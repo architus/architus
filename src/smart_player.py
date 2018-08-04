@@ -195,6 +195,7 @@ class smart_player:
     def agane(self):
         if (len(self.q) < 1):
             self.voice.disconnect()
+            return
         #coro = self.client.send_message(self.client.get_channel('436189230390050830'), 'Song is done!')
         coro = self.play()
         fut = discord.compat.run_coroutine_threadsafe(coro, self.client.loop)
