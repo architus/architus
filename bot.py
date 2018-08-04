@@ -560,7 +560,7 @@ async def on_ready():
     initialize_scores()
     initialize_admins()
     print("Logged in as " + client.user.name)
-    await client.change_presence(game=Game(name="spotify again"))
+    await client.change_presence(game=Game(name="The Tragedy of Darth Plagueis the Wise", url='https://www.twitchquotes.com/copypastas/2202', type=2))
 
 async def list_servers():
     await client.wait_until_ready()
