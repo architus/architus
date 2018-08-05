@@ -52,7 +52,7 @@ class smart_command:
         filtered_trigger = unicode_filter.sub('', trigger)
         if (trigger[0] == '!' or trigger[0] == '?'):
             filtered_trigger = trigger[0] + filtered_trigger
-        return filtered_trigger
+        return filtered_trigger.lower()
 
     def __eq__(self, other):
         return self.raw_trigger == other.raw_trigger

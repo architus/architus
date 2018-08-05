@@ -562,6 +562,7 @@ async def on_message(message):
                     await client.send_message(message.channel, resp)
                 for react in reacts:
                     await client.add_reaction(message, react)
+                break
 
 async def edit_popup(message):
     for sm in tracked_messages:
