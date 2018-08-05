@@ -196,6 +196,18 @@ async def eight_ball(context):
     ]
     await client.say(random.choice(possible_responses) + ", " + context.message.author.mention)
 
+@client.command(pass_context=True)
+async def quote(ctx):
+    arg = ctx.message.content.split(' ')
+    if (arg[1]):
+        message = await client.get_message(ctx.message.channel, arg[1])
+        if message:
+            est = get_datetime(message.timestamp)
+            em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
+            em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
+            await client.send_message(ctx.message.channel, embed=em)
+
+
 @client.event
 async def on_server_join(server):
     players[server.id] = smart_player()
