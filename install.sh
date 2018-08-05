@@ -21,6 +21,7 @@ declare -a requirements=(
     lyricwikia
     PyYAML
     lxml
+    emoji
 )
 
 python3 -m venv .venv

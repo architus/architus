@@ -17,8 +17,9 @@ from discord.ext.commands import Bot
 
 from src.config import secret_token, session
 from src.smart_message import smart_message
+from src.smart_command import smart_command
 from src.list_embed import list_embed
-from src.models import User, Admin
+from src.models import User, Admin, Command
 from src.smart_player import smart_player
 import src.spectrum_gen as spectrum_gen
 
@@ -44,6 +45,7 @@ ROLES_DICT = {
 
 DEFAULT_ROLE = 'Admin'
 
+smart_commands = {}
 karma_dict = {}
 admins = {}
 tracked_messages = deque([], maxlen=20)
@@ -98,14 +100,6 @@ async def clear(context):
 async def resume(context):
     player = players[context.message.channel.server.id]
     player.resume()
-@client.command(name='adde',
-                description="Add a song to queue",
-                brief="Add song",
-                pass_context=True)
-@commands.cooldown(1, 5, commands.BucketType.server)
-async def adde(context):
-    #await client.send_typing(context.message.channel)
-    await client.send_message(context.message.channel, '')
 
 
 @client.command(name='play',
@@ -203,7 +197,8 @@ async def eight_ball(context):
 @client.event
 async def on_server_join(server):
     players[server.id] = smart_player()
-    admins[server.id] = [server.owner.id]
+    admins[int(server.id)] = [int(server.owner.id)]
+    smart_commands[int(server.id)] = []
 
 @client.event
 async def on_message_delete(message):
@@ -241,7 +236,7 @@ async def on_reaction_add(reaction, user):
         if (real_author != None):
             author = real_author
 
-    if ((author != user or user.id == JOHNYS_ID or user.id == MATTS_ID) and author != client.user):
+    if ((author != user or user.id == JOHNYS_ID or user.id == MATTS_ID) and author != client.user and user != client.user):
         if (author.id not in karma_dict):
             karma_dict[author.id] = [2,2,2,2]
             new_user = User(author.id, karma_dict[author.id])
@@ -323,6 +318,7 @@ async def test(context):
             TOXIC_EMOJI_OBJ = str(emoji)
 
     await client.send_message(context.message.channel, context.message.channel.id)
+    await client.send_message(context.message.channel, ":heart:")
     await client.send_message(context.message.channel, next(client.get_all_emojis()))
     await client.send_message(context.message.channel, NORM_EMOJI_OBJ)
 
@@ -529,6 +525,44 @@ async def log(context):
         lembed.add(author.display_name, message.content)
     await client.send_message(context.message.channel, embed=lembed.get_embed())
 
+@client.command(pass_context=True,
+                description="!set trigger::response - use [adj], [noun], [member], [count], or [:react:] in your response.  Set response to 'remove' to remove.",
+                brief="create custom command")
+async def set(context):
+    server = context.message.channel.server
+    parser = re.search('!set (.+)::(.+)', context.message.content, re.IGNORECASE)
+    if parser and len(parser.group(2)) <= 120:
+        command = smart_command(parser.group(1), parser.group(2), 0, server)
+        if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]):
+            smart_commands[int(server.id)].append(command)
+            new_command = Command(command.raw_trigger, command.raw_response, command.count, int(server.id))
+            session.add(new_command)
+            session.commit()
+            await client.send_message(context.message.channel, 'command set')
+            return
+        elif parser.group(2) == "remove":
+            for oldcommand in smart_commands[int(server.id)]:
+                if oldcommand == command:
+                    smart_commands[int(server.id)].remove(oldcommand)
+                    update_command(oldcommand.raw_trigger, '', 0, None, delete=True)
+                    await client.send_message(context.message.channel, 'removed')
+                    return
+    await client.send_message(context.message.channel, 'no')
+
+@client.event
+async def on_message(message):
+    if not message.author.bot:
+        await client.process_commands(message)
+        for command in smart_commands[int(message.channel.server.id)]:
+            if (command.triggered(message.content)):
+                resp = command.generate_response()
+                update_command(command.raw_trigger, command.raw_response, command.count, command.server)
+                reacts = command.generate_reacts()
+                if resp:
+                    await client.send_message(message.channel, resp)
+                for react in reacts:
+                    await client.add_reaction(message, react)
+
 async def edit_popup(message):
     for sm in tracked_messages:
         if (message.id == sm.peek().id or (sm.embed != None and message.id == sm.embed.id)):
@@ -559,8 +593,9 @@ async def on_ready():
     initialize_players()
     initialize_scores()
     initialize_admins()
+    initialize_commands()
     print("Logged in as " + client.user.name)
-    await client.change_presence(game=Game(name="The Tragedy of Darth Plagueis the Wise", url='https://www.twitchquotes.com/copypastas/2202', type=2))
+    await client.change_presence(game=Game(name="custom commands", url='https://www.twitchquotes.com/copypastas/2202', type=3))
 
 async def list_servers():
     await client.wait_until_ready()
@@ -596,6 +631,14 @@ def initialize_scores():
     for user in users:
         karma_dict[user.discord_id] = user.as_entry()
 
+def initialize_commands():
+    command_list = session.query(Command).all()
+    for server in client.servers:
+        smart_commands.setdefault(int(server.id), [])
+    for command in command_list:
+        smart_commands.setdefault(command.server_id, [])
+        smart_commands[command.server_id].append(smart_command(command.trigger, command.response, command.count, client.get_server(str(command.server_id))))
+
 def update_role(target_role_id, server_id, required_role_id=None, delete=False):
     if (delete):
         session.query(Role).filter_by(target_role_id = target_role_id).delete()
@@ -629,6 +672,19 @@ def update_admin(member, server, delete=False):
             'username': member.name
             }
     session.query(Admin).filter_by(discord_id = member.id).update(new_data)
+    session.commit()
+
+def update_command(triggerkey, response, count, server, delete=False):
+    if (delete):
+        session.query(Command).filter_by(trigger = triggerkey).delete()
+        session.commit()
+        return
+    new_data = {
+            'server_id': server.id,
+            'response': response,
+            'count': count
+            }
+    session.query(Command).filter_by(trigger = triggerkey).update(new_data)
     session.commit()
 
 client.loop.create_task(list_servers())

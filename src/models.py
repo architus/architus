@@ -39,12 +39,6 @@ class Admin(Base):
         self.discord_id = discord_id
         self.username = username
     
-    def get_discord_id(self):
-        return self.discord_id
-
-    def get_server_id(self):
-        return self.discord_id
-
 class Role(Base):
     __tablename__ = 'tb_roles'
     target_role_id = Column('target_role_id', BigInteger, primary_key=True)
@@ -55,12 +49,16 @@ class Role(Base):
         self.server_id = server_id
         self.target_role_id = target_role_id
         self.required_role_id = required_role_id
-    
-    def get_required_role_id(self):
-        return self.required_role_id
 
-    def get_target_role_id(self):
-        return self.target_role_id
+class Command(Base):
+    __tablename__ = 'tb_commands'
+    trigger = Column('trigger', Text, primary_key=True)
+    response = Column('response', Text)
+    count = Column('count', BigInteger)
+    server_id = Column('server_id', BigInteger)
 
-    def get_server_id(self):
-        return self.discord_id
+    def __init__(self, trigger, response, count, server_id):
+        self.trigger = trigger
+        self.response = response
+        self.count = count
+        self.server_id = server_id
