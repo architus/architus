@@ -535,7 +535,7 @@ async def set(context):
         command = smart_command(parser.group(1), parser.group(2), 0, server)
         if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]):
             smart_commands[int(server.id)].append(command)
-            new_command = Command(command.raw_trigger, command.raw_response, command.count, int(server.id))
+            new_command = Command(server.id + command.raw_trigger, command.raw_response, command.count, int(server.id))
             session.add(new_command)
             session.commit()
             await client.send_message(context.message.channel, 'command set')
@@ -544,7 +544,7 @@ async def set(context):
             for oldcommand in smart_commands[int(server.id)]:
                 if oldcommand == command:
                     smart_commands[int(server.id)].remove(oldcommand)
-                    update_command(oldcommand.raw_trigger, '', 0, None, delete=True)
+                    update_command(oldcommand.raw_trigger, '', 0, server, delete=True)
                     await client.send_message(context.message.channel, 'removed')
                     return
     await client.send_message(context.message.channel, 'no')
@@ -637,7 +637,7 @@ def initialize_commands():
         smart_commands.setdefault(int(server.id), [])
     for command in command_list:
         smart_commands.setdefault(command.server_id, [])
-        smart_commands[command.server_id].append(smart_command(command.trigger, command.response, command.count, client.get_server(str(command.server_id))))
+        smart_commands[command.server_id].append(smart_command(command.trigger.replace(str(command.server_id), '', 1), command.response, command.count, client.get_server(str(command.server_id))))
 
 def update_role(target_role_id, server_id, required_role_id=None, delete=False):
     if (delete):
@@ -676,7 +676,7 @@ def update_admin(member, server, delete=False):
 
 def update_command(triggerkey, response, count, server, delete=False):
     if (delete):
-        session.query(Command).filter_by(trigger = triggerkey).delete()
+        session.query(Command).filter_by(trigger = server.id + triggerkey).delete()
         session.commit()
         return
     new_data = {
@@ -684,7 +684,7 @@ def update_command(triggerkey, response, count, server, delete=False):
             'response': response,
             'count': count
             }
-    session.query(Command).filter_by(trigger = triggerkey).update(new_data)
+    session.query(Command).filter_by(trigger = server.id + triggerkey).update(new_data)
     session.commit()
 
 client.loop.create_task(list_servers())
