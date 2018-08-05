@@ -31,6 +31,7 @@ class smart_command:
         resp = self.raw_response
         renoun = re.compile("\[noun\]", re.IGNORECASE)
         readj = re.compile("\[adj\]", re.IGNORECASE)
+        reowl = re.compile("\[owl\]", re.IGNORECASE)
         recount = re.compile("\[count\]", re.IGNORECASE)
         remember = re.compile("\[member\]", re.IGNORECASE)
         rereact = re.compile("\[:.*:\]")
@@ -39,6 +40,8 @@ class smart_command:
             resp = renoun.sub(get_noun(), resp, 1)
         while readj.search(resp):
             resp = readj.sub(get_adj(), resp, 1)
+        while reowl.search(resp):
+            resp = reowl.sub(get_owl(), resp, 1)
         while remember.search(resp): 
             resp = remember.sub(random.choice(list(self.server.members)).display_name, resp, 1)
         resp = recount.sub(str(self.count), resp)
@@ -70,6 +73,13 @@ def get_adj():
     with open(fname) as f:
         adjs = list(set(adj.strip() for adj in f))
     return random.choice(adjs)
+
+def get_owl():
+    fname = "res/words/owl.txt"
+    owls = []
+    with open(fname) as f:
+        owls = list(set(owl.strip() for owl in f))
+    return random.choice(owls)
 
 #print(get_adj() + " " + get_noun())
 #sc = smart_command("no u !@#$", "raines has sucked a [aDj] [Noun] [count] times [:dansgame:]", 10, None)

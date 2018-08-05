@@ -16,6 +16,7 @@ from discord.ext import commands
 from discord.ext.commands import Bot
 
 from src.config import secret_token, session
+from src.formatter import BetterHelpFormatter
 from src.smart_message import smart_message
 from src.smart_command import smart_command
 from src.list_embed import list_embed
@@ -57,7 +58,8 @@ TOXIC_EMOJI = "pech"
 EDIT_EMOJI = "📝"
 
 players = {}
-client = Bot(command_prefix=BOT_PREFIX)
+from discord.ext.commands.formatter import HelpFormatter
+client = Bot(command_prefix=BOT_PREFIX)#, formatter=HelpFormatter)
 #client.remove_command('help')
 
 @client.command(name='skip',
