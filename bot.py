@@ -545,9 +545,12 @@ async def log(context):
 async def set(context):
     server = context.message.channel.server
     parser = re.search('!set (.+)::(.+)', context.message.content, re.IGNORECASE)
-    if parser and len(parser.group(2)) <= 120:
+    if parser and len(parser.group(2)) <= 120 and len(parser.group(1)) > 1:
         command = smart_command(parser.group(1), parser.group(2), 0, server)
         if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]):
+            if (context.message.author.id == '131236983413407744'):
+                await client.send_message(context.message.channel, 'you have too many commands')
+                return
             smart_commands[int(server.id)].append(command)
             new_command = Command(server.id + command.raw_trigger, command.raw_response, command.count, int(server.id))
             session.add(new_command)
