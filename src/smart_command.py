@@ -48,7 +48,7 @@ class smart_command:
         while rereact.search(resp):
             resp = rereact.sub('', resp, 1)
         self.count += 1
-        return resp
+        return emojitool.emojize(resp)
     
     def filter_trigger(self, trigger):
         unicode_filter = re.compile('[\W_]+', re.UNICODE)
