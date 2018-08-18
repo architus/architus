@@ -15,7 +15,7 @@ from discord import message
 from discord.ext import commands
 from discord.ext.commands import Bot
 
-from src.config import secret_token, session
+from src.config import secret_token, session, enabled_cmds
 from src.formatter import BetterHelpFormatter
 from src.smart_message import smart_message
 from src.smart_command import smart_command
@@ -23,6 +23,7 @@ from src.list_embed import list_embed
 from src.models import User, Admin, Command
 from src.smart_player import smart_player
 import src.spectrum_gen as spectrum_gen
+from src.commands.quote_command import quote_command
 
 BOT_PREFIX = ("?", "!")
 TOKEN = secret_token
@@ -198,14 +199,7 @@ async def eight_ball(context):
 
 @client.command(pass_context=True)
 async def quote(ctx):
-    arg = ctx.message.content.split(' ')
-    if (arg[1]):
-        message = await client.get_message(ctx.message.channel, arg[1])
-        if message:
-            est = get_datetime(message.timestamp)
-            em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
-            em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
-            await client.send_message(ctx.message.channel, embed=em)
+    await enabled_cmds['quote'].execute(ctx, client)
 
 
 @client.event
@@ -545,9 +539,9 @@ async def log(context):
 async def set(context):
     server = context.message.channel.server
     parser = re.search('!set (.+)::(.+)', context.message.content, re.IGNORECASE)
-    if parser and len(parser.group(2)) <= 120 and len(parser.group(1)) > 1:
+    if parser and len(parser.group(2)) <= 200 and len(parser.group(1)) > 1:
         command = smart_command(parser.group(1), parser.group(2), 0, server)
-        if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]):
+        if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]) and not len(command.raw_trigger) == 0:
             if (context.message.author.id == '131236983413407744'):
                 await client.send_message(context.message.channel, 'you have too many commands')
                 return
@@ -613,7 +607,7 @@ async def on_ready():
     initialize_admins()
     initialize_commands()
     print("Logged in as " + client.user.name)
-    await client.change_presence(game=Game(name="custom commands", url='https://www.twitchquotes.com/copypastas/2202', type=3))
+    await client.change_presence(game=Game(name="the tragedy of darth plagueis the wise", url='https://www.twitchquotes.com/copypastas/2202', type=2))
 
 async def list_servers():
     await client.wait_until_ready()

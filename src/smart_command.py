@@ -28,18 +28,29 @@ class smart_command:
 
 
     def generate_response(self):
+        self.count += 1
         resp = self.raw_response
         renoun = re.compile("\[noun\]", re.IGNORECASE)
         readj = re.compile("\[adj\]", re.IGNORECASE)
+        readv = re.compile("\[adv\]", re.IGNORECASE)
         reowl = re.compile("\[owl\]", re.IGNORECASE)
         recount = re.compile("\[count\]", re.IGNORECASE)
         remember = re.compile("\[member\]", re.IGNORECASE)
+        relist = re.compile("\[(.*?,.*?)\]", re.IGNORECASE)
         rereact = re.compile("\[:.*:\]")
+
+        custom_list = relist.search(resp)
+        while custom_list:
+            things = custom_list.group(1).split(',')
+            resp = relist.sub(random.choice(things).lstrip(), resp, 1)
+            custom_list = relist.search(resp)
 
         while renoun.search(resp):
             resp = renoun.sub(get_noun(), resp, 1)
         while readj.search(resp):
             resp = readj.sub(get_adj(), resp, 1)
+        while readv.search(resp):
+            resp = readv.sub(get_adv(), resp, 1)
         while reowl.search(resp):
             resp = reowl.sub(get_owl(), resp, 1)
         while remember.search(resp): 
@@ -47,7 +58,6 @@ class smart_command:
         resp = recount.sub(str(self.count), resp)
         while rereact.search(resp):
             resp = rereact.sub('', resp, 1)
-        self.count += 1
         return emojitool.emojize(resp)
     
     def filter_trigger(self, trigger):
@@ -66,6 +76,13 @@ def get_noun():
     with open(fname) as f:
         nouns = list(set(noun.strip() for noun in f))
     return random.choice(nouns)
+
+def get_adv():
+    fname = "res/words/adverbs.txt"
+    advs = []
+    with open(fname) as f:
+        advs = list(set(adv.strip() for adv in f))
+    return random.choice(advs)
 
 def get_adj():
     fname = "res/words/adjectives.txt"

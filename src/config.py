@@ -1,6 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from src.commands.quote_command import quote_command
+
 secret_token = None
 db_user = None
 db_pass = None
@@ -23,3 +25,7 @@ try:
 except Exception as e:
     print('failed to connect to database')
     print(e)
+
+enabled_cmds = {
+        'quote' : quote_command()
+    }
