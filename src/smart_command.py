@@ -36,14 +36,9 @@ class smart_command:
         reowl = re.compile("\[owl\]", re.IGNORECASE)
         recount = re.compile("\[count\]", re.IGNORECASE)
         remember = re.compile("\[member\]", re.IGNORECASE)
-        relist = re.compile("\[(.*,.*)\]", re.IGNORECASE)
+        relist = re.compile("\[([^,]+(,.*?)+)\]", re.IGNORECASE)
         rereact = re.compile("\[:.*:\]")
 
-        custom_list = relist.search(resp)
-        while custom_list:
-            things = custom_list.group(1).split(',')
-            resp = relist.sub(random.choice(things).lstrip(), resp, 1)
-            custom_list = relist.search(resp)
 
         while renoun.search(resp):
             resp = renoun.sub(get_noun(), resp, 1)
@@ -58,6 +53,13 @@ class smart_command:
         resp = recount.sub(str(self.count), resp)
         while rereact.search(resp):
             resp = rereact.sub('', resp, 1)
+
+        custom_list = relist.search(resp)
+        while custom_list:
+            things = custom_list.group(1).split(',')
+            resp = relist.sub(random.choice(things).lstrip(), resp, 1)
+            custom_list = relist.search(resp)
+
         return emojitool.emojize(resp)
     
     def filter_trigger(self, trigger):
