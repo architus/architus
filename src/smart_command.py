@@ -36,7 +36,7 @@ class smart_command:
         reowl = re.compile("\[owl\]", re.IGNORECASE)
         recount = re.compile("\[count\]", re.IGNORECASE)
         remember = re.compile("\[member\]", re.IGNORECASE)
-        relist = re.compile("\[(.*?,.*?)\]", re.IGNORECASE)
+        relist = re.compile("\[(.*,.*)\]", re.IGNORECASE)
         rereact = re.compile("\[:.*:\]")
 
         custom_list = relist.search(resp)
