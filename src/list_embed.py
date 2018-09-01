@@ -19,3 +19,11 @@ class list_embed:
             mod_bod = (tup[1][:num-3] + '...') if len(tup[1]) > num-3 else tup[1]
             em.add_field(name=tup[0], value=mod_bod, inline=True)
         return em
+
+class dank_embed:
+    def __init__(self, embed_dict):
+        self.embed = embed_dict
+
+    def to_dict(self):
+        return self.embed
+
