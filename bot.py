@@ -578,7 +578,7 @@ async def set(context):
         await client.send_message(context.message.channel, botcommands[0].mention + '?')
         return
     parser = re.search('!set (.+)::(.+)', context.message.content, re.IGNORECASE)
-    if parser and len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 or from_admin:
+    if parser and len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and server.default_role.mention not in parser.group(2) or from_admin:
         command = smart_command(parser.group(1), parser.group(2), 0, server)
         if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]) and not len(command.raw_trigger) == 0:
             if (context.message.author.id == '131236983413407744'):
