@@ -27,7 +27,7 @@ class smart_command:
         return emojitool.emojize(emojistr, use_aliases=True)
 
 
-    def generate_response(self):
+    def generate_response(self, author):
         self.count += 1
         resp = self.raw_response
         renoun = re.compile("\[noun\]", re.IGNORECASE)
@@ -36,6 +36,7 @@ class smart_command:
         reowl = re.compile("\[owl\]", re.IGNORECASE)
         recount = re.compile("\[count\]", re.IGNORECASE)
         remember = re.compile("\[member\]", re.IGNORECASE)
+        reauthor = re.compile("\[author\]", re.IGNORECASE)
         relist = re.compile("\[([^,]+(,.*?)+)\]", re.IGNORECASE)
         rereact = re.compile("\[:.*:\]")
 
@@ -48,6 +49,8 @@ class smart_command:
             resp = readv.sub(get_adv(), resp, 1)
         while reowl.search(resp):
             resp = reowl.sub(get_owl(), resp, 1)
+        while reauthor.search(resp):
+            resp = reauthor.sub(author.display_name, resp, 1)
         while remember.search(resp): 
             resp = remember.sub(random.choice(list(self.server.members)).display_name, resp, 1)
         resp = recount.sub(str(self.count), resp)
