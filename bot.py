@@ -23,7 +23,6 @@ from src.smart_command import smart_command
 from src.list_embed import list_embed, dank_embed
 from src.models import User, Admin, Command
 from src.smart_player import smart_player
-import src.spectrum_gen as spectrum_gen
 from src.commands.quote_command import quote_command
 
 BOT_PREFIX = ("?", "!")
@@ -34,6 +33,7 @@ JOHNYS_ID = '214037134477230080'
 MATTS_ID = '168722115447488512'
 SIMONS_ID = '103027947786473472'
 MONKEYS_ID = '189528269547110400'
+RYTHMS_ID = '235088799074484224'
 
 
 ROLES_DICT = {
@@ -73,6 +73,7 @@ client = Bot(command_prefix=BOT_PREFIX)#, formatter=HelpFormatter)
                 pass_context=True)
 @commands.cooldown(1, 1, commands.BucketType.server)
 async def skip(context):
+    if ctx.message.channel.server.get_member(RYTHMS_ID): return
     player = players[context.message.channel.server.id]
     name = await player.skip()
     if (name):
@@ -88,6 +89,7 @@ async def skip(context):
                 aliases=['stop'],
                 pass_context=True)
 async def pause(context):
+    if ctx.message.channel.server.get_member(RYTHMS_ID): return
     player = players[context.message.channel.server.id]
     player.pause()
 
@@ -96,6 +98,7 @@ async def pause(context):
                 brief="clear queue",
                 pass_context=True)
 async def clear(context):
+    if ctx.message.channel.server.get_member(RYTHMS_ID): return
     player = players[context.message.channel.server.id]
     await client.send_message(context.message.channel, "Removed %d songs from queue." % len(player.q))
     player.clearq()
@@ -105,6 +108,7 @@ async def clear(context):
                 brief="resume song",
                 pass_context=True)
 async def resume(context):
+    if ctx.message.channel.server.get_member(RYTHMS_ID): return
     player = players[context.message.channel.server.id]
     player.resume()
 
@@ -115,77 +119,9 @@ async def resume(context):
                 aliases=['add'],
                 pass_context=True)
 @commands.cooldown(1, 2, commands.BucketType.server)
-async def play(context):
-    player = players[context.message.channel.server.id]
-    await client.send_typing(context.message.channel)
-    if not discord.opus.is_loaded():
-        discord.opus.load_opus('res/libopus.so')
-    if not (player.is_connected()):
-        voice = await client.join_voice_channel(context.message.author.voice.voice_channel)
-        player.voice = voice
-    else:
-        player.voice.move_to(context.message.author.voice.voice_channel)
-
-    arg = context.message.content.split(' ')
-    add = arg[0] == '!add'
-    message = ''
-    if (len(arg) > 1):
-        if ('/playlist/' in arg[1]):
-            try:
-                urls = await player.add_spotify_playlist(arg[1])
-                message = "Queuing \"" + urls[0] + "\"."
-                del urls[0]
-                await player.add_url(urls[0])
-                name = await player.play()
-                for track in urls:
-                    await player.add_url(track)
-                if (name):
-                    message += "\nPlaying: " + name
-            except:
-                message = "something went badly wrong please spam my creator with pings"
-        elif ('/track/' in arg[1]):
-            if (add):
-                name = await player.add_url(arg[1]);
-                if (name):
-                    message = 'Added: ' + name
-            else:
-                await player.add_url_now(arg[1]);
-                name = await player.play()
-                if (name):
-                    message = "Now playing: " + name
-        elif ('youtu' in arg[1]):
-            if (add):
-                await player.add_url(arg[1])
-                message = 'Added'
-            else:
-                await player.add_url_now(arg[1])
-                name = await player.play()
-                if (name):
-                    message = "Playing " + name
-        elif ('town' in arg[1] or 'encounter' in arg[1] or 'boss' in arg[1] or 'exploration' in arg[1]):
-            message = "Please pass in the url of the playlist."
-        else:
-            del arg[0]
-            url = await player.get_youtube_url(' '.join(arg))
-            if (add):
-                await player.add_url(url)
-                message = "Added: " + url
-            else:
-                await player.add_url_now(url)
-                name = await player.play()
-                if (name):
-                    message = "Now Playing: " + url
-    else:
-        if (len(player.q) == 0):
-            message = "Play what, " + context.message.author.mention + "?"
-        else:
-            name = await player.play()
-            if (name):
-                message = "Now playing: " + name
-
-    await client.send_message(context.message.channel, message)
-
-    #await client.play_audio(f)
+async def play(ctx):
+    if ctx.message.channel.server.get_member(RYTHMS_ID): return
+    await enabled_cmds['play'].execute(ctx, client, players=players)
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -222,6 +158,10 @@ async def on_message_delete(message):
         est = get_datetime(message.timestamp)
         em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xff002a)
         em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
+        if message.embeds:
+            em.set_image(url=message.embeds[0]['url'])
+        elif message.attachments:
+            em.set_image(url=message.attachments[0]['url'])
         del_msg = await client.send_message(message.channel, embed=em)
         for sm in tracked_messages:
             if (sm.peek().id == message.id):
@@ -262,7 +202,7 @@ async def on_reaction_add(reaction, user):
         #await add_popup(reaction.message)
 
     if (str(reaction.emoji) == STAR_EMOJI or (reaction.custom_emoji and reaction.emoji.name == STAR_EMOJI)):
-        if reaction.count == 1:
+        if reaction.count == 5:
             await starboard_post(reaction.message, reaction.message.channel.server)
 
     if ((author != user or user.id == JOHNYS_ID or user.id == MATTS_ID) and author != client.user and user != client.user):
@@ -371,11 +311,6 @@ async def remove(context):
             update_admin(member, server, delete=True)
             await client.send_message(context.message.channel, member.mention + " has been removed")
 
-@client.command()
-async def square(number):
-    squared_value = int(number) * int(number)
-    await client.say(str(number) + " squared is " + str(squared_value))
-
 def find_member(name, icon, server):
     for m in server.members:
         if (name == m.display_name and icon == m.avatar_url):
@@ -416,36 +351,13 @@ def get_toxc_percent(m):
 
 
 @client.command(name='spectrum',
-                description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
-                brief="Check if autistic.",
-                aliases=[],
-                pass_context=True)
+        description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
+        brief="Check if autistic.",
+        aliases=[],
+        pass_context=True)
 @commands.cooldown(1, 5, commands.BucketType.server)
-async def spectrum(context):
-    await client.send_typing(context.message.channel)
-    x = []
-    y = []
-    names = []
-    for mem_id in karma_dict:
-        member = context.message.channel.server.get_member(mem_id)
-        if (member is not None) :
-            names.append(member.display_name)
-            toxic = get_toxc_percent(mem_id)
-            nice = get_nice_percent(mem_id)
-            aut = get_autism_percent(mem_id)
-            norm = get_normie_percent(mem_id)
-            if (toxic > nice):
-                x.append(-1*(toxic) / 10)
-            else:
-                x.append(nice / 10)
-            if (norm > aut):
-                y.append(-1*(norm) / 10)
-            else:
-                y.append(aut / 10)
-        #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
-    spectrum_gen.generate(x, y, names)
-    with open('res/foo.png', 'rb') as f:
-        await client.send_file(context.message.channel, f, content="Here you go, " + context.message.author.mention)
+async def spectrum(ctx):
+    await enabled_cmds['spectrum'].execute(ctx, client, karma_dict=karma_dict)
 
 
 @client.command(name='purge',
@@ -470,44 +382,12 @@ async def on_member_join(member):
         print("could not add %s to %s" % (member.display_name, DEFAULT_ROLE))
 
 @client.command(name='role',
-                description="Assign yourself a role.",
+                description="`!role list` for list of available roles",
                 brief="Assign a role.",
-                aliases=['join'],
+                aliases=['join', 'rank'],
                 pass_context=True)
-async def role(context):
-    await client.send_typing(context.message.channel)
-    arg = context.message.content.split(' ')
-    member = context.message.author
-    if (len(arg) < 2):
-        requested_role = 'list'
-    else:
-        del arg[0]
-        requested_role = ' '.join(arg)
-
-    if (requested_role == 'list'):
-        lembed = list_embed('Available Roles', '`!role [role]`', client.user)
-        roles = "Available roles:\n"
-        for roletag, rolename in ROLES_DICT.items():
-            lembed.add(rolename, roletag)
-        await client.send_message(context.message.channel, embed=lembed.get_embed())
-    elif (requested_role.lower() in (name.lower() for name in ROLES_DICT)):
-        filtered = filter(lambda role: role.name == ROLES_DICT[requested_role], member.server.role_hierarchy)
-        action = 'Added'
-        prep = 'to'
-        try:
-            role = next(filtered)
-            if (role in member.roles):
-                await client.remove_roles(member, role)
-                action = 'Removed'
-                prep = 'from'
-            else:
-                await client.add_roles(member, role)
-        except:
-            await client.send_message(context.message.channel, "Could not add %s to %s." % (context.message.author.mention, requested_role))
-        else:
-            await client.send_message(context.message.channel, "%s %s %s %s." % (action, context.message.author.mention, prep, requested_role))
-    else:
-        await client.send_message(context.message.channel, "I don't know that role, %s" % context.message.author.mention)
+async def role(ctx):
+    await enabled_cmds['role'].execute(ctx, client, ROLES_DICT=ROLES_DICT)
 
 @client.command(pass_context=True)
 async def admin(context):
@@ -542,7 +422,7 @@ async def admin(context):
     else:
         await client.send_message(context.message.channel, "Nice try. You have been reported.")
 
-@client.command(pass_context=True)
+#@client.command(pass_context=True)
 async def log(context):
     await client.send_typing(context.message.channel)
     msgs = []
@@ -570,34 +450,8 @@ async def log(context):
 @client.command(pass_context=True,
                 description="!set trigger::response - use [adj], [noun], [member], [count], or [:react:] in your response.  Set response to 'remove' to remove.",
                 brief="create custom command")
-async def set(context):
-    server = context.message.channel.server
-    from_admin = int(context.message.author.id) in admins[int(server.id)]
-    botcommands = get_channel_by_name(server, 'bot-commands')
-    if botcommands and botcommands[0] != context.message.channel and not from_admin:
-        await client.send_message(context.message.channel, botcommands[0].mention + '?')
-        return
-    parser = re.search('!set (.+)::(.+)', context.message.content, re.IGNORECASE)
-    if parser and len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and server.default_role.mention not in parser.group(2) or from_admin:
-        command = smart_command(parser.group(1), parser.group(2), 0, server)
-        if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]) and not len(command.raw_trigger) == 0:
-            if (context.message.author.id == '131236983413407744'):
-                await client.send_message(context.message.channel, 'you have too many commands')
-                return
-            smart_commands[int(server.id)].append(command)
-            new_command = Command(server.id + command.raw_trigger, command.raw_response, command.count, int(server.id))
-            session.add(new_command)
-            session.commit()
-            await client.send_message(context.message.channel, 'command set')
-            return
-        elif parser.group(2) == "remove":
-            for oldcommand in smart_commands[int(server.id)]:
-                if oldcommand == command:
-                    smart_commands[int(server.id)].remove(oldcommand)
-                    update_command(oldcommand.raw_trigger, '', 0, server, delete=True)
-                    await client.send_message(context.message.channel, 'removed')
-                    return
-    await client.send_message(context.message.channel, 'no')
+async def set(ctx):
+    await enabled_cmds['set'].execute(ctx, client, session=session, smart_commands=smart_commands, admins=admins)
 
 @client.event
 async def on_message(message):
@@ -609,22 +463,13 @@ async def on_message(message):
             if match:
                 highlights = get_channel_by_name(server, 'highlights')[0]
                 url = 'https://' + match.group(1) + match.group(2)
-                lem = list_embed(url, highlights.mention, message.author)
-                deletable_messages.append(message.id)
-                #await client.delete_message(message)
-                #await client.send_message(message.channel, embed=lem.get_embed())
-                #em = discord.Embed(title=url, description=message.content, colour=0x5998ff, url=url)
-                #em.set_author(name=message.author, icon_url=message.author.avatar_url)
-                #dank = dank_embed(message.embeds[0])
                 await client.send_message(highlights, url)
-
-
 
     if not message.author.bot:
         await client.process_commands(message)
         for command in smart_commands[int(message.channel.server.id)]:
             if (command.triggered(message.content)):
-                resp = command.generate_response()
+                resp = command.generate_response(message.author)
                 update_command(command.raw_trigger, command.raw_response, command.count, command.server)
                 reacts = command.generate_reacts()
                 if resp:
@@ -659,13 +504,20 @@ async def delete_popup(message):
                 sm.popup = None
 
 async def starboard_post(message, server):
-    if message.id in starboarded_messages:
+    starboard_ch = get_channel_by_name(server, 'starboard')
+    if message.id in starboarded_messages or not starboard_ch or is_me(message):
         return
     starboarded_messages.append(message.id)
     est = get_datetime(message.timestamp)
     em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
     em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
-    await client.send_message(get_channel_by_name(server, 'starboard')[0], embed=em)
+    #print(message.embeds)
+    #print(message.attachments)
+    if message.embeds:
+        em.set_image(url=message.embeds[0]['url'])
+    elif message.attachments:
+        em.set_image(url=message.attachments[0]['url'])
+    await client.send_message(starboard_ch[0], embed=em)
 
 @client.event
 async def on_ready():

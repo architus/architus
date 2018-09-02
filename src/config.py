@@ -2,6 +2,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.commands.quote_command import quote_command
+from src.commands.set_command import set_command
+from src.commands.spectrum_command import spectrum_command
+from src.commands.role_command import role_command
+from src.commands.play_command import play_command
 
 secret_token = None
 db_user = None
@@ -27,5 +31,9 @@ except Exception as e:
     print(e)
 
 enabled_cmds = {
-        'quote' : quote_command()
+        'quote' : quote_command(),
+        'set' : set_command(),
+        'role' : role_command(),
+        'play' : play_command(),
+        'spectrum' : spectrum_command()
     }

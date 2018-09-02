@@ -66,6 +66,7 @@ class smart_command:
         return emojitool.emojize(resp)
     
     def filter_trigger(self, trigger):
+        if len(trigger) == 0: return ''
         unicode_filter = re.compile('[\W_]+', re.UNICODE)
         filtered_trigger = unicode_filter.sub('', trigger)
         if (trigger[0] == '!' or trigger[0] == '?'):
