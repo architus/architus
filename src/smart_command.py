@@ -15,7 +15,7 @@ class smart_command:
 
     def triggered(self, phrase):
         if self.capture_regex:
-            capture = re.compile(self.capture_regex)
+            capture = re.compile(self.capture_regex, re.IGNORECASE)
             return capture.search(phrase)
         else:
             return self.raw_trigger == self.filter_trigger(phrase)
@@ -53,7 +53,7 @@ class smart_command:
     def generate_response(self, author, real_trigger):
         cap = '*'
         if self.capture_regex:
-            capture = re.compile(self.capture_regex)
+            capture = re.compile(self.capture_regex, re.IGNORECASE)
             cap = capture.search(real_trigger)
             if cap and cap.group(1):
                 cap = cap.group(1)
