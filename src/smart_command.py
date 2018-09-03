@@ -26,8 +26,6 @@ class smart_command:
         emojis = []
         for match in matches:
             emojis.append(self.get_custom_emoji(match))
-        for emoji in emojis:
-            print ('reacts: ' +emoji)
         return emojis
 
     def get_custom_emoji(self, emojistr):
@@ -74,6 +72,7 @@ class smart_command:
         relist = re.compile("\[([^,]+(,.*?)+)\]", re.IGNORECASE)
         rereact = re.compile("\[:.*:\]")
 
+        reclean = re.compile("@((:?everyone)|(:?channel)|(:?here))", re.IGNORECASE)
 
         while renoun.search(resp):
             resp = renoun.sub(get_noun(), resp, 1)
@@ -98,6 +97,11 @@ class smart_command:
             things = custom_list.group(1).split(',')
             resp = relist.sub(random.choice(things).lstrip(), resp, 1)
             custom_list = relist.search(resp)
+
+        unclean = reclean.search(resp)
+        while reclean.search(resp):
+            resp = reclean.sub(unclean.group(1), resp, 1)
+            unclean = reclean.search(resp)
 
         return emojitool.emojize(resp)
     
