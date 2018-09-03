@@ -448,7 +448,7 @@ async def log(context):
     await client.send_message(context.message.channel, embed=lembed.get_embed())
 
 @client.command(pass_context=True,
-                description="!set trigger::response - use [adj], [noun], [member], [count], or [:react:] in your response.  Set response to 'remove' to remove.",
+                description="!set trigger::response - use [adj], [adv], [noun], [member], [owl], [comma,separted items], [author], [capture], [count], or [:<react>:] in your response.  Set response to 'remove' to remove.",
                 brief="create custom command")
 async def set(ctx):
     await enabled_cmds['set'].execute(ctx, client, session=session, smart_commands=smart_commands, admins=admins)
@@ -456,7 +456,7 @@ async def set(ctx):
 @client.event
 async def on_message(message):
     server = message.channel.server
-    if 'gfycat.com' in message.content or 'clips.twitch' in message.content:
+    if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
         if message.channel in get_channel_by_name(server, 'general'):
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)
             match = parser.search(message.content)
@@ -469,7 +469,7 @@ async def on_message(message):
         await client.process_commands(message)
         for command in smart_commands[int(message.channel.server.id)]:
             if (command.triggered(message.content)):
-                resp = command.generate_response(message.author)
+                resp = command.generate_response(message.author, message.content)
                 update_command(command.raw_trigger, command.raw_response, command.count, command.server)
                 reacts = command.generate_reacts()
                 if resp:
@@ -569,6 +569,8 @@ def initialize_commands():
     for command in command_list:
         smart_commands.setdefault(command.server_id, [])
         smart_commands[command.server_id].append(smart_command(command.trigger.replace(str(command.server_id), '', 1), command.response, command.count, client.get_server(str(command.server_id))))
+    for server, cmds in smart_commands.items():
+        smart_commands[server].sort()
 
 def update_role(target_role_id, server_id, required_role_id=None, delete=False):
     if (delete):

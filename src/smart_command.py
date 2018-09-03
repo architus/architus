@@ -1,16 +1,24 @@
 import random
 import emoji as emojitool
 import re
+GROUP_LIMIT = 1
 
 class smart_command:
     def __init__(self, trigger, response, count, server):
         self.raw_trigger = self.filter_trigger(trigger)
         self.raw_response = emojitool.demojize(response)
+        self.capture_regex = ''
+        if '*' in trigger:
+            self.capture_regex = self.generate_capture_regex()
         self.count = count
         self.server = server
 
     def triggered(self, phrase):
-        return self.raw_trigger == self.filter_trigger(phrase)
+        if self.capture_regex:
+            capture = re.compile(self.capture_regex)
+            return capture.search(phrase)
+        else:
+            return self.raw_trigger == self.filter_trigger(phrase)
 
     def generate_reacts(self):
         rereact = re.compile("\[(:.+?:)\]")
@@ -18,6 +26,8 @@ class smart_command:
         emojis = []
         for match in matches:
             emojis.append(self.get_custom_emoji(match))
+        for emoji in emojis:
+            print ('reacts: ' +emoji)
         return emojis
 
     def get_custom_emoji(self, emojistr):
@@ -26,13 +36,37 @@ class smart_command:
                 return emoji
         return emojitool.emojize(emojistr, use_aliases=True)
 
+    def generate_capture_regex(self):
+        regex = '^'
+        count = 0
+        if len(self.raw_trigger) < 4:
+            raise VaguePatternError
 
-    def generate_response(self, author):
+        for char in self.raw_trigger:
+            if char == '*':
+                if count < GROUP_LIMIT:
+                    regex += '(.+?)\\s?'
+                    count += 1
+            else:
+                regex += char + '\\s*'
+        regex += '$'
+        return regex
+
+    def generate_response(self, author, real_trigger):
+        cap = '*'
+        if self.capture_regex:
+            capture = re.compile(self.capture_regex)
+            cap = capture.search(real_trigger)
+            if cap and cap.group(1):
+                cap = cap.group(1)
+
+        #self.generate_capture_regex()
         self.count += 1
         resp = self.raw_response
         renoun = re.compile("\[noun\]", re.IGNORECASE)
         readj = re.compile("\[adj\]", re.IGNORECASE)
         readv = re.compile("\[adv\]", re.IGNORECASE)
+        recapture = re.compile("\[capture\]", re.IGNORECASE)
         reowl = re.compile("\[owl\]", re.IGNORECASE)
         recount = re.compile("\[count\]", re.IGNORECASE)
         remember = re.compile("\[member\]", re.IGNORECASE)
@@ -49,6 +83,8 @@ class smart_command:
             resp = readv.sub(get_adv(), resp, 1)
         while reowl.search(resp):
             resp = reowl.sub(get_owl(), resp, 1)
+        while recapture.search(resp):
+            resp = recapture.sub(cap, resp, 1)
         while reauthor.search(resp):
             resp = reauthor.sub(author.display_name, resp, 1)
         while remember.search(resp): 
@@ -67,14 +103,20 @@ class smart_command:
     
     def filter_trigger(self, trigger):
         if len(trigger) == 0: return ''
-        unicode_filter = re.compile('[\W_]+', re.UNICODE)
+        unicode_filter = re.compile('[^a-zA-Z0-9*]+', re.UNICODE)
         filtered_trigger = unicode_filter.sub('', trigger)
         if (trigger[0] == '!' or trigger[0] == '?'):
             filtered_trigger = trigger[0] + filtered_trigger
         return filtered_trigger.lower()
 
     def __eq__(self, other):
-        return self.raw_trigger == other.raw_trigger
+        return self.raw_trigger.replace('*','') == other.raw_trigger.replace('*','')
+    def __str__(self):
+        return self.raw_trigger + '::' + self.raw_response
+    def __gt__(self, other):
+        return '*' in self.raw_trigger and '*' not in other.raw_trigger
+    def __lt__(self, other):
+        return '*' in other.raw_trigger and '*' not in self.raw_trigger
 
 def get_noun():
     fname = "res/words/nouns.txt"
@@ -103,6 +145,9 @@ def get_owl():
     with open(fname) as f:
         owls = list(set(owl.strip() for owl in f))
     return random.choice(owls)
+
+class VaguePatternError(Exception):
+    pass
 
 #print(get_adj() + " " + get_noun())
 #sc = smart_command("no u !@#$", "raines has sucked a [aDj] [Noun] [count] times [:dansgame:]", 10, None)

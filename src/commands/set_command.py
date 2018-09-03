@@ -1,7 +1,7 @@
 from src.commands.abstract_command import abstract_command
 from src.models import User, Admin, Command
 from discord import ChannelType
-from src.smart_command import smart_command
+from src.smart_command import smart_command, VaguePatternError
 import re
 import discord
 
@@ -22,7 +22,12 @@ class set_command(abstract_command):
             return
         parser = re.search('!set (.+)::(.+)', self.content, re.IGNORECASE)
         if parser and len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and server.default_role.mention not in parser.group(2) or from_admin:
-            command = smart_command(parser.group(1), parser.group(2), 0, server)
+            try:
+                command = smart_command(parser.group(1), parser.group(2), 0, server)
+            except VaguePatternError as e:
+                await self.client.send_message(self.channel, 'let\'s try making that a little more specific please')
+                return
+
             if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]) and not len(command.raw_trigger) == 0:
                 smart_commands[int(server.id)].append(command)
                 new_command = Command(server.id + command.raw_trigger, command.raw_response, command.count, int(server.id))
@@ -30,12 +35,17 @@ class set_command(abstract_command):
                 self.session.commit()
                 await self.client.send_message(self.channel, 'command set')
                 return
-            elif parser.group(2) == "remove":
+            elif parser.group(2) == "remove" or parser.group(2) == " remove":
                 for oldcommand in smart_commands[int(server.id)]:
                     if oldcommand == command:
                         smart_commands[int(server.id)].remove(oldcommand)
                         self.update_command(oldcommand.raw_trigger, '', 0, server, delete=True)
                         await self.client.send_message(self.channel, 'removed')
+                        return
+            elif parser.group(2) == "list" or parser.group(2) == " list":
+                for oldcommand in smart_commands[int(server.id)]:
+                    if oldcommand == command:
+                        await self.client.send_message(self.channel, str(oldcommand))
                         return
         await self.client.send_message(self.channel, 'no')
 
