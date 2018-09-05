@@ -16,7 +16,7 @@ class smart_command:
     def triggered(self, phrase):
         if self.capture_regex:
             capture = re.compile(self.capture_regex, re.IGNORECASE)
-            return capture.search(phrase)
+            return capture.search(self.filter_trigger(phrase))
         else:
             return self.raw_trigger == self.filter_trigger(phrase)
 
