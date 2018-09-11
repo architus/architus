@@ -15,6 +15,7 @@ from discord import message
 from discord import ChannelType
 from discord.ext import commands
 from discord.ext.commands import Bot
+from datetime import datetime
 
 from src.config import secret_token, session, enabled_cmds
 from src.formatter import BetterHelpFormatter
@@ -172,6 +173,9 @@ async def on_message_delete(message):
 
 @client.event
 async def on_message_edit(before, after):
+    server = before.channel.server
+    print('<%s>[%s](%s) - [%s](%s) %s(%s): %s CHANGED TO:' % (datetime.now(), server.name, server.id, before.channel.name, before.channel.id, before.author.display_name, before.author.id, before.content))
+    print('<%s>[%s](%s) - [%s](%s) %s(%s): %s' % (datetime.now(), server.name, server.id, after.channel.name, after.channel.id, after.author.display_name, after.author.id, after.content))
     for sm in tracked_messages:
         if (sm.add_edit(before, after)):
             await edit_popup(before)
@@ -376,6 +380,8 @@ async def purge(context):
 
 @client.event
 async def on_member_join(member):
+    if member.server.id != '416020909531594752':
+        return
     try:
         await client.add_roles(member, next(filter(lambda role: role.name == DEFAULT_ROLE, member.server.role_hierarchy)))
     except:
@@ -387,6 +393,9 @@ async def on_member_join(member):
                 aliases=['join', 'rank'],
                 pass_context=True)
 async def role(ctx):
+    if ctx.message.channel.server.id != '416020909531594752':
+        await client.send_message(ctx.message.channel, 'Not implemented for this server yet')
+        return
     await enabled_cmds['role'].execute(ctx, client, ROLES_DICT=ROLES_DICT)
 
 @client.command(pass_context=True)
@@ -456,6 +465,9 @@ async def set(ctx):
 @client.event
 async def on_message(message):
     server = message.channel.server
+    url = message.embeds[0]['url'] if message.embeds else ''
+    url = message.attachments[0]['url'] if message.attachments else ''
+    print('<%s>[%s](%s) - [%s](%s) %s(%s): %s <%s>' % (datetime.now(), server.name, server.id, message.channel.name, message.channel.id, message.author.display_name, message.author.id, message.content, url))
     if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
         if message.channel in get_channel_by_name(server, 'general'):
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)
@@ -470,7 +482,7 @@ async def on_message(message):
         for command in smart_commands[int(message.channel.server.id)]:
             if (command.triggered(message.content)):
                 resp = command.generate_response(message.author, message.content)
-                update_command(command.raw_trigger, command.raw_response, command.count, command.server)
+                update_command(command.raw_trigger, command.raw_response, command.count, command.server, command.author_id)
                 reacts = command.generate_reacts()
                 if resp:
                     await client.send_message(message.channel, resp)
@@ -533,7 +545,7 @@ async def list_servers():
     while not client.is_closed:
         print("Current servers:")
         for server in client.servers:
-            print(server.name)
+            print("%s - %s" % (server.name, server.id))
         await asyncio.sleep(600)
 
 def initialize_players():
@@ -568,7 +580,7 @@ def initialize_commands():
         smart_commands.setdefault(int(server.id), [])
     for command in command_list:
         smart_commands.setdefault(command.server_id, [])
-        smart_commands[command.server_id].append(smart_command(command.trigger.replace(str(command.server_id), '', 1), command.response, command.count, client.get_server(str(command.server_id))))
+        smart_commands[command.server_id].append(smart_command(command.trigger.replace(str(command.server_id), '', 1), command.response, command.count, client.get_server(str(command.server_id)), command.author_id))
     for server, cmds in smart_commands.items():
         smart_commands[server].sort()
 
@@ -607,7 +619,7 @@ def update_admin(member, server, delete=False):
     session.query(Admin).filter_by(discord_id = member.id).update(new_data)
     session.commit()
 
-def update_command(triggerkey, response, count, server, delete=False):
+def update_command(triggerkey, response, count, server, author_id, delete=False):
     if (delete):
         session.query(Command).filter_by(trigger = server.id + triggerkey).delete()
         session.commit()
@@ -615,7 +627,8 @@ def update_command(triggerkey, response, count, server, delete=False):
     new_data = {
             'server_id': server.id,
             'response': response,
-            'count': count
+            'count': count,
+            'author_id': int(author_id)
             }
     session.query(Command).filter_by(trigger = server.id + triggerkey).update(new_data)
     session.commit()

@@ -4,7 +4,7 @@ import re
 GROUP_LIMIT = 1
 
 class smart_command:
-    def __init__(self, trigger, response, count, server):
+    def __init__(self, trigger, response, count, server, author_id):
         self.raw_trigger = self.filter_trigger(trigger)
         self.raw_response = emojitool.demojize(response)
         self.capture_regex = ''
@@ -12,6 +12,7 @@ class smart_command:
             self.capture_regex = self.generate_capture_regex()
         self.count = count
         self.server = server
+        self.author_id = author_id
 
     def triggered(self, phrase):
         if self.capture_regex:
@@ -51,12 +52,14 @@ class smart_command:
         return regex
 
     def generate_response(self, author, real_trigger):
-        cap = '*'
+        cap = ''
         if self.capture_regex:
             capture = re.compile(self.capture_regex, re.IGNORECASE)
             cap = capture.search(real_trigger)
             if cap and cap.group(1):
                 cap = cap.group(1)
+            else:
+                cap = ''
 
         #self.generate_capture_regex()
         self.count += 1
@@ -82,7 +85,7 @@ class smart_command:
             resp = readv.sub(get_adv(), resp, 1)
         while reowl.search(resp):
             resp = reowl.sub(get_owl(), resp, 1)
-        while recapture.search(resp):
+        if recapture.search(resp):
             resp = recapture.sub(cap, resp, 1)
         while reauthor.search(resp):
             resp = reauthor.sub(author.display_name, resp, 1)

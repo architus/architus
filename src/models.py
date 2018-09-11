@@ -55,9 +55,11 @@ class Command(Base):
     response = Column('response', Text)
     count = Column('count', BigInteger)
     server_id = Column('server_id', BigInteger)
+    author_id = Column('author_id', BigInteger)
 
-    def __init__(self, trigger, response, count, server_id):
+    def __init__(self, trigger, response, count, server_id, author_id):
         self.trigger = trigger
         self.response = response
         self.count = count
         self.server_id = server_id
+        self.author_id = author_id

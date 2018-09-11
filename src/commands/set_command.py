@@ -23,14 +23,14 @@ class set_command(abstract_command):
         parser = re.search('!set (.+)::(.+)', self.content, re.IGNORECASE)
         if parser and len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and server.default_role.mention not in parser.group(2) or from_admin:
             try:
-                command = smart_command(parser.group(1), parser.group(2), 0, server)
+                command = smart_command(parser.group(1), parser.group(2), 0, server, self.author.id)
             except VaguePatternError as e:
                 await self.client.send_message(self.channel, 'let\'s try making that a little more specific please')
                 return
 
             if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]) and not len(command.raw_trigger) == 0:
                 smart_commands[int(server.id)].append(command)
-                new_command = Command(server.id + command.raw_trigger, command.raw_response, command.count, int(server.id))
+                new_command = Command(server.id + command.raw_trigger, command.raw_response, command.count, int(server.id), self.author.id)
                 self.session.add(new_command)
                 self.session.commit()
                 await self.client.send_message(self.channel, 'command set')
@@ -39,7 +39,7 @@ class set_command(abstract_command):
                 for oldcommand in smart_commands[int(server.id)]:
                     if oldcommand == command:
                         smart_commands[int(server.id)].remove(oldcommand)
-                        self.update_command(oldcommand.raw_trigger, '', 0, server, delete=True)
+                        self.update_command(oldcommand.raw_trigger, '', 0, server, self.author.id, delete=True)
                         await self.client.send_message(self.channel, 'removed')
                         return
             elif parser.group(2) == "list" or parser.group(2) == " list":
@@ -55,7 +55,7 @@ class set_command(abstract_command):
     def get_usage(self):
         return "!set <trigger>::<response>"
 
-    def update_command(self, triggerkey, response, count, server, delete=False):
+    def update_command(self, triggerkey, response, count, server, author_id, delete=False):
         if (delete):
             self.session.query(Command).filter_by(trigger = server.id + triggerkey).delete()
             self.session.commit()
@@ -63,7 +63,8 @@ class set_command(abstract_command):
         new_data = {
                 'server_id': server.id,
                 'response': response,
-                'count': count
+                'count': count,
+                'author_id': int(author_id)
                 }
         self.session.query(Command).filter_by(trigger = server.id + triggerkey).update(new_data)
         self.session.commit()
