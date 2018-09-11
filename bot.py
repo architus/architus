@@ -18,6 +18,7 @@ from discord.ext.commands import Bot
 from datetime import datetime
 
 from src.config import secret_token, session, enabled_cmds
+import src.generate.letmein as letmeingen
 from src.formatter import BetterHelpFormatter
 from src.smart_message import smart_message
 from src.smart_command import smart_command
@@ -280,6 +281,19 @@ async def check(context):
         response += ("{:3.1f}% autistic".format(get_autism_percent(member.id)) if (get_autism_percent(member.id) >= get_normie_percent(member.id)) else "{:3.1f}% normie".format(get_normie_percent(member.id)))
         response += " and " + ("{:3.1f}% toxic.".format(get_toxc_percent(member.id)) if (get_toxc_percent(member.id) >= get_nice_percent(member.id)) else "{:3.1f}% nice.".format(get_nice_percent(member.id)))
         await client.send_message(context.message.channel, response)
+
+@client.command(name='letmein',
+        description="!letmein [thing] [@user]",
+        brief="meme",
+        pass_context=True)
+async def letmein(ctx):
+    args = ctx.message.content.split(' ')
+    del args[0]
+    del args[len(args) - 1]
+    letmeingen.generate(ctx.message.mentions[0].display_name, ' '.join(args))
+    with open('res/meme.png', 'rb') as f:
+        await client.send_file(ctx.message.channel, f, content="Here you go, " + ctx.message.author.mention)
+
 
 @client.command(pass_context=True)
 async def test(context):
