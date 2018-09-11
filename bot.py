@@ -289,8 +289,9 @@ async def check(context):
 async def letmein(ctx):
     args = ctx.message.content.split(' ')
     del args[0]
+    name = ctx.message.mentions[0].display_name if ctx.message.mentions else args[len(args) - 1]
     del args[len(args) - 1]
-    letmeingen.generate(ctx.message.mentions[0].display_name, ' '.join(args))
+    letmeingen.generate(name, ' '.join(args))
     with open('res/meme.png', 'rb') as f:
         await client.send_file(ctx.message.channel, f, content="Here you go, " + ctx.message.author.mention)
 
