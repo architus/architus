@@ -44,7 +44,7 @@ class smart_command:
         for char in self.raw_trigger:
             if char == '*':
                 if count < GROUP_LIMIT:
-                    regex += '(.+?)\\s?'
+                    regex += '(.*?)\\s?'
                     count += 1
             else:
                 regex += char + '\\s*'
