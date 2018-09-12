@@ -30,16 +30,19 @@ class gulag_command(abstract_command):
         await self.client.add_reaction(msg, gulag_emoji)
         while time.time() < t_end:
             res = await self.client.wait_for_reaction(message=msg, emoji=gulag_emoji, timeout=5)
-            print(t_end - time.time())
+            #print(t_end - time.time())
             if res and res.user not in user_list and res.user != self.client.user:
                 user_list.append(res.user) 
+                for user in user_list: print (user.display_name)
                 await self.client.edit_message(msg, "%d more %s's to gulag %s" % (max(0,(GULAG_THRESHOLD - len(user_list))), gulag_emoji, comrade.mention))
                 t_end += GULAG_TIME_ADD * 60
             if len(user_list) >= GULAG_THRESHOLD and not gulag_role in comrade.roles:
                 try:
+                    print(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
                     gulaggen.generate(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
                     generated = True
-                except:
+                except Exception as e:
+                    print(e)
                     pass
                 with open('res/gulag.png', 'rb') as f:
                     if generated:
