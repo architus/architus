@@ -9,9 +9,9 @@ class gulag_command(abstract_command):
         super().__init__("gulag")
 
     async def exec_cmd(self, **kwargs):
-        GULAG_THRESHOLD = 1
-        GULAG_TIME = .1
-        GULAG_TIME_ADD = .1
+        GULAG_THRESHOLD = 5
+        GULAG_TIME = 3
+        GULAG_TIME_ADD = 1
         server = self.server
         filtered = filter(lambda role: role.name == "kulek", server.role_hierarchy)
         try:
