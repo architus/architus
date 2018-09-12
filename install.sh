@@ -1,5 +1,6 @@
 #!/bin/bash
 sudo apt-get install ffmpeg
+echo "You'll need to compile imagemagick with webp support manually!!!!"
 
 declare -a requirements=(
     aiohttp
@@ -22,6 +23,7 @@ declare -a requirements=(
     PyYAML
     lxml
     emoji
+    wand
 )
 
 python3 -m venv .venv

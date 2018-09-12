@@ -76,7 +76,7 @@ client = Bot(command_prefix=BOT_PREFIX)#, formatter=HelpFormatter)
                 pass_context=True)
 @commands.cooldown(1, 1, commands.BucketType.server)
 async def skip(context):
-    if ctx.message.channel.server.get_member(RYTHMS_ID): return
+    if context.message.channel.server.get_member(RYTHMS_ID): return
     player = players[context.message.channel.server.id]
     name = await player.skip()
     if (name):
@@ -92,7 +92,7 @@ async def skip(context):
                 aliases=['stop'],
                 pass_context=True)
 async def pause(context):
-    if ctx.message.channel.server.get_member(RYTHMS_ID): return
+    if context.message.channel.server.get_member(RYTHMS_ID): return
     player = players[context.message.channel.server.id]
     player.pause()
 
@@ -101,7 +101,7 @@ async def pause(context):
                 brief="clear queue",
                 pass_context=True)
 async def clear(context):
-    if ctx.message.channel.server.get_member(RYTHMS_ID): return
+    if context.message.channel.server.get_member(RYTHMS_ID): return
     player = players[context.message.channel.server.id]
     await client.send_message(context.message.channel, "Removed %d songs from queue." % len(player.q))
     player.clearq()
@@ -111,7 +111,7 @@ async def clear(context):
                 brief="resume song",
                 pass_context=True)
 async def resume(context):
-    if ctx.message.channel.server.get_member(RYTHMS_ID): return
+    if context.message.channel.server.get_member(RYTHMS_ID): return
     player = players[context.message.channel.server.id]
     player.resume()
 
