@@ -44,3 +44,10 @@ class abstract_command():
             if channel.name.lower() == name.lower() and channel.type == ChannelType.text:
                 channels.append(channel)
         return channels
+
+    def get_custom_emoji(self, server, emojistr):
+        for emoji in server.emojis:
+            if emoji.name == emojistr:
+                return emoji
+        raise Exception('no emoji of name "%s" the server' % emojistr)
+        return None

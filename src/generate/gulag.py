@@ -1,0 +1,28 @@
+from wand.image import Image
+import urllib.request as urllib2
+from wand.drawing import Drawing
+from wand.drawing import Color
+def generate(url):
+    hdr = {
+            'User-Agent':'Mozilla/5.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+    req = urllib2.Request(url, headers=hdr)
+    f = urllib2.urlopen(req)
+    with Image(file=f) as img:
+        img.resize(300,300)
+        with Drawing() as draw:
+            draw.fill_color = Color('#f00')
+            draw.fill_opacity = 0.4
+            draw.rectangle(0, 0, img.width, img.height)
+
+            draw(img)
+        with Image(filename='res/generate/gulag.png') as sickle:
+            sickle.resize(200,200)
+            img.composite(sickle, 50, 50)
+            img.format = 'png'
+            img.save(filename='res/gulag.png')
+
+
+#generate('https://cdn.discordapp.com/embed/avatars/3.png')
+#generate('https://cdn.discordapp.com/avatars/214037134477230080/f8bbce770f9422229b19425c9e4191fe.webp?size=1024')

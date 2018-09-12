@@ -5,6 +5,7 @@ from src.commands.quote_command import quote_command
 from src.commands.set_command import set_command
 from src.commands.spectrum_command import spectrum_command
 from src.commands.role_command import role_command
+from src.commands.gulag_command import gulag_command
 from src.commands.play_command import play_command
 
 secret_token = None
@@ -35,5 +36,6 @@ enabled_cmds = {
         'set' : set_command(),
         'role' : role_command(),
         'play' : play_command(),
+        'gulag' : gulag_command(),
         'spectrum' : spectrum_command()
     }

@@ -32,6 +32,7 @@ TOKEN = secret_token
 
 PECHS_ID = '178700066091958273'
 JOHNYS_ID = '214037134477230080'
+GHOSTS_ID = '471864040998699011'
 MATTS_ID = '168722115447488512'
 SIMONS_ID = '103027947786473472'
 MONKEYS_ID = '189528269547110400'
@@ -175,6 +176,8 @@ async def on_message_delete(message):
 @client.event
 async def on_message_edit(before, after):
     server = before.channel.server
+    if is_me(before):
+        return
     print('<%s>[%s](%s) - [%s](%s) %s(%s): %s CHANGED TO:' % (datetime.now(), server.name, server.id, before.channel.name, before.channel.id, before.author.display_name, before.author.id, before.content))
     print('<%s>[%s](%s) - [%s](%s) %s(%s): %s' % (datetime.now(), server.name, server.id, after.channel.name, after.channel.id, after.author.display_name, after.author.id, after.content))
     for sm in tracked_messages:
@@ -295,12 +298,20 @@ async def letmein(ctx):
     with open('res/meme.png', 'rb') as f:
         await client.send_file(ctx.message.channel, f, content="Here you go, " + ctx.message.author.mention)
 
+@client.command(name='gulag',
+        description="!gulag [@user] - hold a gulag vote",
+        brief="vote gulag",
+        pass_context=True)
+async def gulag(ctx):
+    await enabled_cmds['gulag'].execute(ctx, client)
 
 @client.command(pass_context=True)
 async def test(context):
-    if (message.author.id != JOHNYS_ID):
+    author = context.message.author
+    if (author.id != JOHNYS_ID and author.id != GHOSTS_ID):
         await client.send_message(context.message.channel, "it works")
         return
+    await client.send_message(context.message.channel, author.avatar_url if author.avatar_url else author.default_avatar_url)
     lem = list_embed('https://giphy.com/gifs/vv41HlvfogHAY', context.message.channel.mention, context.message.author)
     await client.send_message(context.message.channel, embed=lem.get_embed())
 
@@ -311,7 +322,6 @@ async def test(context):
         elif (emoji.name == 'pech'):
             TOXIC_EMOJI_OBJ = str(emoji)
 
-    await client.send_message(context.message.channel, context.message.channel.id)
     await client.send_message(context.message.channel, ":heart:")
     await client.send_message(context.message.channel, next(client.get_all_emojis()))
     await client.send_message(context.message.channel, NORM_EMOJI_OBJ)
@@ -480,9 +490,11 @@ async def set(ctx):
 @client.event
 async def on_message(message):
     server = message.channel.server
-    url = message.embeds[0]['url'] if message.embeds else ''
-    url = message.attachments[0]['url'] if message.attachments else ''
-    print('<%s>[%s](%s) - [%s](%s) %s(%s): %s <%s>' % (datetime.now(), server.name, server.id, message.channel.name, message.channel.id, message.author.display_name, message.author.id, message.content, url))
+    try:
+        url = message.embeds[0]['url'] if message.embeds else ''
+        url = message.attachments[0]['url'] if message.attachments else ''
+        print('<%s>[%s](%s) - [%s](%s) %s(%s): %s <%s>' % (datetime.now(), server.name, server.id, message.channel.name, message.channel.id, message.author.display_name, message.author.id, message.content, url))
+    except: pass
     if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
         if message.channel in get_channel_by_name(server, 'general'):
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)
