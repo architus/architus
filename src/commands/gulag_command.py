@@ -21,6 +21,11 @@ class gulag_command(abstract_command):
             print("gulag role/emoji not found")
             return
         comrade = self.message.mentions[0]
+        if comrade == self.client.user:
+            with open('res/treason.gif', 'rb') as f:
+                await self.client.send_file(self.channel, f)
+                comrade = self.author
+
         t_end = time.time() + 60 * 30
         user_list = []
         timer_msg = None
