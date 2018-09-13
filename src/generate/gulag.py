@@ -10,6 +10,8 @@ def generate(url):
     req = urllib2.Request(url, headers=hdr)
     f = urllib2.urlopen(req)
     with Image(file=f) as img:
+        if img.sequence:
+            img = Image(image=img.sequence[0])
         img.resize(300,300)
         with Drawing() as draw:
             draw.fill_color = Color('#f00')
@@ -20,9 +22,9 @@ def generate(url):
         with Image(filename='res/generate/gulag.png') as sickle:
             sickle.resize(200,200)
             img.composite(sickle, 50, 50)
-            img.format = 'png'
-            img.save(filename='res/gulag.png')
+        img.format = 'png'
+        img.save(filename='res/gulag.png')
 
 
-#generate('https://cdn.discordapp.com/embed/avatars/3.png')
+#generate('https://cdn.discordapp.com/avatars/131294120399470602/a_789c7272a7cf92f7450df65adc4c856c.gif?size=1024')
 #generate('https://cdn.discordapp.com/avatars/214037134477230080/f8bbce770f9422229b19425c9e4191fe.webp?size=1024')

@@ -1,6 +1,7 @@
 #!/bin/bash
 sudo apt-get install ffmpeg
 echo "You'll need to compile imagemagick with webp support manually!!!!"
+echo "https://askubuntu.com/questions/251950/imagemagick-convert-cant-convert-to-webp"
 
 declare -a requirements=(
     aiohttp
