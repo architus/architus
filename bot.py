@@ -489,6 +489,9 @@ async def set(ctx):
 
 @client.event
 async def on_message(message):
+    if message.channel.is_private and message.author != client.user:
+        await client.send_message(await client.get_user_info(JOHNYS_ID), message.author.mention + ': '+message.content)
+        return
     server = message.channel.server
     try:
         url = message.embeds[0]['url'] if message.embeds else ''
