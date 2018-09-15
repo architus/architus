@@ -26,7 +26,7 @@ declare -a requirements=(
     lxml
     emoji
     wand
-    enchant
+    pyenchant
 )
 
 python3 -m venv .venv

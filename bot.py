@@ -441,13 +441,14 @@ async def spellcheck(ctx):
     d = enchant.Dict("en_US")
     correct_words = 0
     words = 0
+    victim = ctx.message.mentions[0]
     async for msg in client.logs_from(ctx.message.channel, limit=10000):
-        if msg.author == ctx.message.mentions[0]:
-            for word in msg.clean_content:
+        if msg.author == victim:
+            for word in msg.clean_content.split():
                 words += 1
                 if d.check(word):
                     correct_words += 1
-    await client.send_message(ctx.message.channel, f"{round((correct_words/words)*100,1)}% of {words} words are spelled correctly")
+    await client.send_message(ctx.message.channel, "%.1f%s out of %d of %s's words are spelled correctly" % ((correct_words/words)*100, '%', words, victim.display_name))
 
 
 @client.command(pass_context=True)
