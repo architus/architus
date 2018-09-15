@@ -438,18 +438,21 @@ async def admin(context):
 @commands.cooldown(1, 10, commands.BucketType.server)
 async def spellcheck(ctx):
     await client.send_typing(ctx.message.channel)
+    botcommands = discord.utils.get(ctx.message.channel.server.channels, name='bot-commands', type=ChannelType.text)
     d = enchant.Dict("en_US")
     correct_words = 0
     words = 0
     victim = ctx.message.mentions[0]
     for channel in ctx.message.channel.server.channels:
         try:
-            async for msg in client.logs_from(channel, limit=10000):
-                if msg.author == victim:
-                    for word in msg.clean_content.split():
-                        words += 1
-                        if d.check(word):
-                            correct_words += 1
+            await client.send_typing(ctx.message.channel)
+            if channel != botcommands:
+                async for msg in client.logs_from(channel, limit=10000):
+                    if msg.author == victim:
+                        for word in msg.clean_content.split():
+                            words += 1
+                            if d.check(word):
+                                correct_words += 1
         except: pass
     await client.send_message(ctx.message.channel, "%.1f%s out of %d of %s's words are spelled correctly" % ((correct_words/words)*100, '%', words, victim.display_name))
 
