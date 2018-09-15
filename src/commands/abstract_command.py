@@ -38,13 +38,6 @@ class abstract_command():
         est = utc.astimezone(timezone('US/Eastern'))
         return est
 
-    def get_channel_by_name(self, server, name):
-        channels = []
-        for channel in server.channels:
-            if channel.name.lower() == name.lower() and channel.type == ChannelType.text:
-                channels.append(channel)
-        return channels
-
     def get_custom_emoji(self, server, emojistr):
         for emoji in server.emojis:
             if emoji.name == emojistr:

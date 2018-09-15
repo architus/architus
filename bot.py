@@ -147,7 +147,6 @@ async def eight_ball(context):
 async def quote(ctx):
     await enabled_cmds['quote'].execute(ctx, client)
 
-
 @client.event
 async def on_server_join(server):
     players[server.id] = smart_player()
@@ -156,8 +155,7 @@ async def on_server_join(server):
 
 @client.event
 async def on_message_delete(message):
-    # if (message.author.id == PECHS_ID):
-    if not is_me(message) and message.id not in deletable_messages:
+    if message.author != client.user and message.id not in deletable_messages:
         est = get_datetime(message.timestamp)
         em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xff002a)
         em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
@@ -176,7 +174,7 @@ async def on_message_delete(message):
 @client.event
 async def on_message_edit(before, after):
     server = before.channel.server
-    if is_me(before):
+    if before.author == client.user:
         return
     print('<%s>[%s](%s) - [%s](%s) %s(%s): %s CHANGED TO:' % (datetime.now(), server.name, server.id, before.channel.name, before.channel.id, before.author.display_name, before.author.id, before.content))
     print('<%s>[%s](%s) - [%s](%s) %s(%s): %s' % (datetime.now(), server.name, server.id, after.channel.name, after.channel.id, after.author.display_name, after.author.id, after.content))
@@ -191,27 +189,24 @@ async def on_message_edit(before, after):
 @client.event
 async def on_reaction_add(reaction, user):
     author = reaction.message.author
+    server = reaction.message.channel.server
     for e in reaction.message.embeds:
         author_name, author_avatar = '',''
         try:
             author_name = e['author']['name']
             author_avatar = e['author']['icon_url']
-        except:
-            pass # not the type of embed we were expecting
-        real_author = find_member(author_name, author_avatar, reaction.message.channel.server)
+        except: pass # not the type of embed we were expecting
+        # this won't work if the user has default avatar
+        real_author = discord.utils.get(server.members, name=author_name, avatar_url=author_avatar)
         if (real_author != None):
             author = real_author
 
-    if (str(reaction.emoji) == EDIT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == EDIT_EMOJI)):
+    if EDIT_EMOJI in str(reaction.emoji):
         await add_popup(reaction.message)
 
-    #if (str(reaction.emoji) == GULAG_EMOJI or (reaction.custom_emoji and reaction.emoji.name == GULAG_EMOJI)):
-        #if reaction.count > 3
-        #await add_popup(reaction.message)
-
-    if (str(reaction.emoji) == STAR_EMOJI or (reaction.custom_emoji and reaction.emoji.name == STAR_EMOJI)):
+    if STAR_EMOJI in str(reaction.emoji):
         if reaction.count == 5:
-            await starboard_post(reaction.message, reaction.message.channel.server)
+            await starboard_post(reaction.message, server)
 
     if ((author != user or user.id == JOHNYS_ID or user.id == MATTS_ID) and author != client.user and user != client.user):
         if (author.id not in karma_dict):
@@ -219,13 +214,13 @@ async def on_reaction_add(reaction, user):
             new_user = User(author.id, karma_dict[author.id])
             session.add(new_user)
 
-        if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
+        if AUT_EMOJI in str(reaction.emoji):
             karma_dict[author.id][0] += 1
-        elif (str(reaction.emoji) == NORM_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NORM_EMOJI)):
+        elif NORM_EMOJI in str(reaction.emoji):
             karma_dict[author.id][1] += 1
-        elif (str(reaction.emoji) == NICE_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NICE_EMOJI)):
+        elif NICE_EMOJI in str(reaction.emoji):
             karma_dict[author.id][2] += 1
-        elif (str(reaction.emoji) == TOXIC_EMOJI or (reaction.custom_emoji and reaction.emoji.name == TOXIC_EMOJI)):
+        elif TOXIC_EMOJI in str(reaction.emoji):
             karma_dict[author.id][3] += 1
         update_user(author.id)
 
@@ -238,13 +233,13 @@ async def on_reaction_remove(reaction, user):
             author_avatar = e['author']['icon_url']
         except:
             pass
-        real_author = find_member(author_name, author_avatar, reaction.message.channel.server)
+        real_author = discord.utils.get(server.members, name=author_name, avatar_url=author_avatar)
         if (real_author != None):
             author = real_author
 
-    if (str(reaction.emoji) == EDIT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == EDIT_EMOJI)):
+    if EDIT_EMOJI in str(reaction.emoji):
         for react in reaction.message.reactions:
-            if (str(reaction.emoji) == EDIT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == EDIT_EMOJI)):
+            if EDIT_EMOJI in str(react):
                 return
         await delete_popup(reaction.message)
 
@@ -253,13 +248,13 @@ async def on_reaction_remove(reaction, user):
             karma_dict[author.id] = [2,2,2,2]
             new_user = User(author.id, karma_dict[author.id])
             session.add(new_user)
-        if (str(reaction.emoji) == AUT_EMOJI or (reaction.custom_emoji and reaction.emoji.name == AUT_EMOJI)):
+        if AUT_EMOJI in str(reaction.emoji):
             karma_dict[author.id][0] -= 1
-        elif (str(reaction.emoji) == NORM_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NORM_EMOJI)):
+        elif NORM_EMOJI in str(reaction.emoji):
             karma_dict[author.id][1] -= 1
-        elif (str(reaction.emoji) == NICE_EMOJI or (reaction.custom_emoji and reaction.emoji.name == NICE_EMOJI)):
+        elif NICE_EMOJI in str(reaction.emoji):
             karma_dict[author.id][2] -= 1
-        elif (str(reaction.emoji) == TOXIC_EMOJI or (reaction.custom_emoji and reaction.emoji.name == TOXIC_EMOJI)):
+        elif TOXIC_EMOJI in str(reaction.emoji):
             karma_dict[author.id][3] -= 1
 
         update_user(author.id)
@@ -326,7 +321,6 @@ async def test(context):
     await client.send_message(context.message.channel, next(client.get_all_emojis()))
     await client.send_message(context.message.channel, NORM_EMOJI_OBJ)
 
-
 @client.command(name='remove',
         description="Remove users from the spectrum if they are a sad boi",
         brief="Remove user from the spectrum",
@@ -340,26 +334,10 @@ async def remove(context):
             update_admin(member, server, delete=True)
             await client.send_message(context.message.channel, member.mention + " has been removed")
 
-def find_member(name, icon, server):
-    for m in server.members:
-        if (name == m.display_name and icon == m.avatar_url):
-            return m
-    return None
-
 def get_datetime(timestamp):
     utc = timestamp.replace(tzinfo=timezone('UTC'))
     est = utc.astimezone(timezone('US/Eastern'))
     return est
-
-def get_channel_by_name(server, name):
-    channels = []
-    for channel in server.channels:
-        if channel.name.lower() == name.lower() and channel.type == ChannelType.text:
-            channels.append(channel)
-    return channels
-
-def is_me(m):
-    return m.author == client.user
 
 def get_autism_percent(m):
     if (karma_dict[m][0] + karma_dict[m][1] == 0):
@@ -377,7 +355,6 @@ def get_toxc_percent(m):
     if (karma_dict[m][2] + karma_dict[m][3] == 0):
         return 0
     return ((karma_dict[m][3] - karma_dict[m][2]) / (karma_dict[m][3] + karma_dict[m][2])) * 100
-
 
 @client.command(name='spectrum',
         description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
@@ -398,7 +375,7 @@ async def purge(context):
     channel = context.message.channel
     await client.send_typing(channel)
     if (int(context.message.author.id) in admins[int(channel.server.id)]):
-        deleted = await client.purge_from(context.message.channel, limit=100, check=is_me)
+        deleted = await client.purge_from(context.message.channel, limit=100, check=lambda m: m.author==client.user)
         await client.send_message(channel, 'Deleted {} message(s)'.format(len(deleted)))
     else:
         await client.send_message(channel, 'lul %s' % context.message.author.mention)
@@ -456,30 +433,51 @@ async def admin(context):
     else:
         await client.send_message(context.message.channel, "Nice try. You have been reported.")
 
-#@client.command(pass_context=True)
+@client.command(pass_context=True)
+@commands.cooldown(1, 10, commands.BucketType.server)
 async def log(context):
-    await client.send_typing(context.message.channel)
+    channel = context.message.channel
+    await client.send_typing(channel)
     msgs = []
     do_filter = bool(context.message.mentions)
     try:
-        num = int(re.search(r'\d+', context.message.content).group())
+        num = int(re.search(r'\d+', context.message.clean_content).group())
     except:
-        num = 0
-    num = 25 if num == 0 or num > 25 else num
-    author = client.user
+        num = 25
+    num = max(num, 1)
+    num = min(num, 200)
 
-    em = discord.Embed(title='Last %s messages' % (str(num)), description='My Embed Content.', colour=0x5998ff)
-    if (do_filter):
-        author = context.message.mentions[0]
-    lembed = list_embed('Last %s messages' % (str(num)), 'here you go', author)
-    async for message in client.logs_from(context.message.channel, limit=1000):
-        if (not do_filter or message.author == context.message.mentions[0]):
+    async for message in client.logs_from(channel, limit=5000):
+        if (not do_filter or message.author in context.message.mentions):
             msgs.append(message)
         if (len(msgs) >= num):
             break
-    for message in reversed(msgs):
-        lembed.add(author.display_name, message.content)
-    await client.send_message(context.message.channel, embed=lembed.get_embed())
+    msgs.reverse()
+    twenty_five = [msgs[x:x+25] for x in range(0, len(msgs), 25)]
+    target_channel = channel
+    if len(twenty_five) > 1:
+        botcommands = discord.utils.get(channel.server.channels, name='bot-commands', type=ChannelType.text)
+        if botcommands:
+            target_channel = botcommands
+            await client.send_message(channel, botcommands.mention)
+
+    for messages in twenty_five:
+        lembed = list_embed('Last %s messages' % num, channel.mention, client.user)
+        lembed.color = 0x9e6338
+        lembed.icon_url = 'https://engineeringblog.yelp.com/images/previews/logfeeder.png'
+        lembed.name = channel.server.name
+        for message in messages:
+            if message.id == context.message.id:
+                continue
+            elif message.content:
+                lembed.add(message.author.display_name, message.content)
+            elif message.embeds:
+                em = message.embeds[0]
+                lembed.add(message.author.display_name, em['url'] if 'url' in em.keys() else em['title'])
+            elif message.attachments:
+                lembed.add(message.author.display_name, message.attachments[0]['url'] or '')
+        await client.send_message(target_channel, embed=lembed.get_embed())
+
 
 @client.command(pass_context=True,
                 description="!set trigger::response - use [adj], [adv], [noun], [member], [owl], [comma,separted items], [author], [capture], [count], or [:<react>:] in your response.  Set response to 'remove' to remove.",
@@ -499,11 +497,11 @@ async def on_message(message):
         print('<%s>[%s](%s) - [%s](%s) %s(%s): %s <%s>' % (datetime.now(), server.name, server.id, message.channel.name, message.channel.id, message.author.display_name, message.author.id, message.content, url))
     except: pass
     if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
-        if message.channel in get_channel_by_name(server, 'general'):
+        if message.channel == discord.utils.get(server.channels, name='general', type=ChannelType.text):
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)
             match = parser.search(message.content)
             if match:
-                highlights = get_channel_by_name(server, 'highlights')[0]
+                highlights = discord.utils.get(server.channels, name='highlights', type=ChannelType.text)
                 url = 'https://' + match.group(1) + match.group(2)
                 await client.send_message(highlights, url)
 
@@ -546,20 +544,18 @@ async def delete_popup(message):
                 sm.popup = None
 
 async def starboard_post(message, server):
-    starboard_ch = get_channel_by_name(server, 'starboard')
-    if message.id in starboarded_messages or not starboard_ch or is_me(message):
+    starboard_ch = discord.utils.get(server.channels, name='starboard', type=ChannelType.text)
+    if message.id in starboarded_messages or not starboard_ch or message.author == client.user:
         return
     starboarded_messages.append(message.id)
     est = get_datetime(message.timestamp)
     em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
     em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
-    #print(message.embeds)
-    #print(message.attachments)
     if message.embeds:
         em.set_image(url=message.embeds[0]['url'])
     elif message.attachments:
         em.set_image(url=message.attachments[0]['url'])
-    await client.send_message(starboard_ch[0], embed=em)
+    await client.send_message(starboard_ch, embed=em)
 
 @client.event
 async def on_ready():

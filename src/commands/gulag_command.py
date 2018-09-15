@@ -1,4 +1,5 @@
 from src.commands.abstract_command import abstract_command
+from discord import ChannelType
 import src.generate.gulag as gulaggen
 import time
 import discord
@@ -31,7 +32,7 @@ class gulag_command(abstract_command):
         timer_msg = None
         timer_msg_gulag = None
         generated = False
-        msg = await self.client.send_message(self.channel, "%d more %s's to gulag %s" % (GULAG_THRESHOLD, gulag_emoji, comrade.mention))
+        msg = await self.client.send_message(self.channel, "%d more %s's to gulag %s" % (GULAG_THRESHOLD, gulag_emoji, comrade.display_name))
         await self.client.add_reaction(msg, gulag_emoji)
         while time.time() < t_end:
             res = await self.client.wait_for_reaction(message=msg, emoji=gulag_emoji, timeout=5)
@@ -39,7 +40,7 @@ class gulag_command(abstract_command):
             if res and res.user not in user_list and res.user != self.client.user:
                 user_list.append(res.user) 
                 for user in user_list: print (user.display_name)
-                await self.client.edit_message(msg, "%d more %s's to gulag %s" % (max(0,(GULAG_THRESHOLD - len(user_list))), gulag_emoji, comrade.mention))
+                await self.client.edit_message(msg, "%d more %s's to gulag %s" % (max(0,(GULAG_THRESHOLD - len(user_list))), gulag_emoji, comrade.display_name))
                 t_end += GULAG_TIME_ADD * 60
             if len(user_list) >= GULAG_THRESHOLD and not gulag_role in comrade.roles:
                 try:
@@ -53,14 +54,14 @@ class gulag_command(abstract_command):
                     if generated:
                         await self.client.send_file(self.channel, f)
                     else:
-                        await self.client.send_message(self.channel, "gulag'd " + comrade.mention)
+                        await self.client.send_message(self.channel, "gulag'd " + comrade.display_name)
                     timer_msg = await self.client.send_message(self.channel, "⏰ %d seconds" % (GULAG_TIME * 60))
-                    timer_msg_gulag = await self.client.send_message(self.get_channel_by_name(server,'gulag')[0], "⏰ %d seconds, %s" % (GULAG_TIME * 60, comrade.mention))
+                    timer_msg_gulag = await self.client.send_message(discord.utils.get(server.channels, name='gulag', type=ChannelType.text), "⏰ %d seconds, %s" % (GULAG_TIME * 60, comrade.display_name))
                     await self.client.add_roles(comrade, gulag_role)
                     t_end = time.time() + int(60 * GULAG_TIME)
             elif timer_msg or timer_msg_gulag:
                 await self.client.edit_message(timer_msg, "⏰ %d seconds" % (max(0, t_end-time.time())))
-                await self.client.edit_message(timer_msg_gulag, "⏰ %d seconds, %s" % (max(0, t_end-time.time()), comrade.mention))
+                await self.client.edit_message(timer_msg_gulag, "⏰ %d seconds, %s" % (max(0, t_end-time.time()), comrade.display_name))
 
         await self.client.remove_roles(comrade, gulag_role)
         print('ungulag\'d ' + comrade.display_name)

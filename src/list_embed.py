@@ -5,14 +5,16 @@ class list_embed:
         self.description = description
         self.list_items = []
         self.author = author
+        self.name = self.author.display_name
+        self.icon_url = author.avatar_url
+        self.color = 0x5998ff
 
     def add(self, title, body):
         self.list_items.append((title, body))
-    
-    
+     
     def get_embed(self):
-        em = discord.Embed(title=self.title, description=self.description, colour=0x5998ff)
-        em.set_author(name=self.author.display_name, icon_url=self.author.avatar_url)
+        em = discord.Embed(title=self.title, description=self.description, colour=self.color)
+        em.set_author(name=self.name, icon_url=self.icon_url)
         num = 230 if len(self.list_items) > 10 else 460
         
         for tup in self.list_items:
