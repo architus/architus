@@ -38,6 +38,7 @@ MATTS_ID = '168722115447488512'
 SIMONS_ID = '103027947786473472'
 MONKEYS_ID = '189528269547110400'
 RYTHMS_ID = '235088799074484224'
+LINHS_ID = '81231616772411392'
 
 
 ROLES_DICT = {
@@ -438,7 +439,9 @@ async def admin(context):
 @commands.cooldown(1, 10, commands.BucketType.server)
 async def spellcheck(ctx):
     await client.send_typing(ctx.message.channel)
-    botcommands = discord.utils.get(ctx.message.channel.server.channels, name='bot-commands', type=ChannelType.text)
+    blacklist = []
+    blacklist.append(discord.utils.get(ctx.message.channel.server.channels, name='bot-commands', type=ChannelType.text))
+    blacklist.append(discord.utils.get(ctx.message.channel.server.channels, name='private-bot-commands', type=ChannelType.text))
     d = enchant.Dict("en_US")
     correct_words = 0
     words = 0
@@ -446,15 +449,17 @@ async def spellcheck(ctx):
     for channel in ctx.message.channel.server.channels:
         try:
             await client.send_typing(ctx.message.channel)
-            if channel != botcommands:
+            if not channel in blacklist:
                 async for msg in client.logs_from(channel, limit=10000):
                     if msg.author == victim:
                         for word in msg.clean_content.split():
                             words += 1
-                            if d.check(word):
+                            if d.check(word) and len(word) > 1 or word in ['a','i', 'A', 'I']:
                                 correct_words += 1
         except: pass
-    await client.send_message(ctx.message.channel, "%.1f%s out of %d of %s's words are spelled correctly" % ((correct_words/words)*100, '%', words, victim.display_name))
+    linh_modifier = 10 if victim.id == LINHS_ID else 0
+    await client.send_message(ctx.message.channel, "%.1f%s out of %d of %s's words are spelled correctly" %
+            (((correct_words/words)*100) - linh_modifier, '%', words, victim.display_name))
 
 
 @client.command(pass_context=True)
