@@ -53,6 +53,7 @@ ROLES_DICT = {
 
 DEFAULT_ROLE = 'Admin'
 
+cache = {}
 smart_commands = {}
 karma_dict = {}
 admins = {}
@@ -154,6 +155,7 @@ async def on_server_join(server):
     players[server.id] = smart_player()
     admins[int(server.id)] = [int(server.owner.id)]
     smart_commands[int(server.id)] = []
+    cache[server] = {"messages": {}}
 
 @client.event
 async def on_message_delete(message):
@@ -308,6 +310,7 @@ async def test(context):
     if (author.id != JOHNYS_ID and author.id != GHOSTS_ID):
         await client.send_message(context.message.channel, "it works")
         return
+    #await client.change_nickname(context.message.author, 't)
     await client.send_message(context.message.channel, author.avatar_url if author.avatar_url else author.default_avatar_url)
     lem = list_embed('https://giphy.com/gifs/vv41HlvfogHAY', context.message.channel.mention, context.message.author)
     await client.send_message(context.message.channel, embed=lem.get_embed())
@@ -436,21 +439,29 @@ async def admin(context):
         await client.send_message(context.message.channel, "Nice try. You have been reported.")
 
 @client.command(pass_context=True)
-@commands.cooldown(1, 10, commands.BucketType.server)
 async def spellcheck(ctx):
+    ctxchannel = ctx.message.channel
+    cache[ctxchannel.server].setdefault('messages', {})
     await client.send_typing(ctx.message.channel)
     blacklist = []
     blacklist.append(discord.utils.get(ctx.message.channel.server.channels, name='bot-commands', type=ChannelType.text))
     blacklist.append(discord.utils.get(ctx.message.channel.server.channels, name='private-bot-commands', type=ChannelType.text))
     d = enchant.Dict("en_US")
     correct_words = 0
-    words = 0
+    words = 1
     victim = ctx.message.mentions[0]
     for channel in ctx.message.channel.server.channels:
         try:
             await client.send_typing(ctx.message.channel)
-            if not channel in blacklist:
-                async for msg in client.logs_from(channel, limit=10000):
+            if not channel in blacklist and channel.type == ChannelType.text:
+                if not channel in cache[ctxchannel.server]['messages'].keys() or not cache[ctxchannel.server]['messages'][channel]:
+                    print("reloading cache for " + channel.name)
+                    iterator = [log async for log in client.logs_from(channel, limit=10000)]
+                    print(type(iterator))
+                    logs = list(iterator)
+                    cache[ctxchannel.server]['messages'][channel] = logs
+                msgs = cache[ctxchannel.server]['messages'][channel]
+                for msg in msgs:
                     if msg.author == victim:
                         for word in msg.clean_content.split():
                             words += 1
@@ -520,6 +531,7 @@ async def on_message(message):
         await client.send_message(await client.get_user_info(JOHNYS_ID), message.author.mention + ': '+message.content)
         return
     server = message.channel.server
+    cache[server]['messages'][message.channel] = None
     try:
         url = message.embeds[0]['url'] if message.embeds else ''
         url = message.attachments[0]['url'] if message.attachments else ''
@@ -592,6 +604,7 @@ async def on_ready():
     initialize_scores()
     initialize_admins()
     initialize_commands()
+    initialize_cache()
     print("Logged in as " + client.user.name)
     await client.change_presence(game=Game(name="the tragedy of darth plagueis the wise", url='https://www.twitchquotes.com/copypastas/2202', type=2))
 
@@ -628,6 +641,13 @@ def initialize_scores():
     users = session.query(User).all()
     for user in users:
         karma_dict[user.discord_id] = user.as_entry()
+
+def initialize_cache():
+    for server in client.servers:
+        print(server.name)
+        cache[server] = {
+            'messages' : {}
+        }
 
 def initialize_commands():
     command_list = session.query(Command).all()
