@@ -442,12 +442,15 @@ async def spellcheck(ctx):
     correct_words = 0
     words = 0
     victim = ctx.message.mentions[0]
-    async for msg in client.logs_from(ctx.message.channel, limit=10000):
-        if msg.author == victim:
-            for word in msg.clean_content.split():
-                words += 1
-                if d.check(word):
-                    correct_words += 1
+    for channel in ctx.message.channel.server.channels:
+        try:
+            async for msg in client.logs_from(channel, limit=10000):
+                if msg.author == victim:
+                    for word in msg.clean_content.split():
+                        words += 1
+                        if d.check(word):
+                            correct_words += 1
+        except: pass
     await client.send_message(ctx.message.channel, "%.1f%s out of %d of %s's words are spelled correctly" % ((correct_words/words)*100, '%', words, victim.display_name))
 
 
