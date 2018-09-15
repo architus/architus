@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import random
+import enchant
 import re
 import asyncio
 import aiohttp
@@ -432,6 +433,22 @@ async def admin(context):
                 await client.send_message(context.message.channel, "Added %s." % member.display_name)
     else:
         await client.send_message(context.message.channel, "Nice try. You have been reported.")
+
+@client.command(pass_context=True)
+@commands.cooldown(1, 10, commands.BucketType.server)
+async def spellcheck(ctx):
+    await client.send_typing(ctx.message.channel)
+    d = enchant.Dict("en_US")
+    correct_words = 0
+    words = 0
+    async for msg in client.logs_from(ctx.message.channel, limit=10000):
+        if msg.author == ctx.message.mentions[0]:
+            for word in msg.clean_content:
+                words += 1
+                if d.check(word):
+                    correct_words += 1
+    await client.send_message(ctx.message.channel, f"{round((correct_words/words)*100,1)}% of {words} words are spelled correctly")
+
 
 @client.command(pass_context=True)
 @commands.cooldown(1, 10, commands.BucketType.server)
