@@ -47,6 +47,15 @@ class set_command(abstract_command):
                     if oldcommand == command:
                         await self.client.send_message(self.channel, str(oldcommand))
                         return
+            elif parser.group(2) == "author" or parser.group(2) == " author":
+                for oldcommand in smart_commands[int(server.id)]:
+                    if oldcommand == command:
+                        try:
+                            usr = await self.client.get_user_info(str(oldcommand.author_id))
+                            await self.client.send_message(self.channel, usr.name + '#' + usr.discriminator)
+                        except:
+                            await self.client.send_message(self.channel, 'idk')
+                        return
         await self.client.send_message(self.channel, 'no')
 
     def get_help(self):

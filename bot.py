@@ -18,7 +18,7 @@ from discord.ext import commands
 from discord.ext.commands import Bot
 from datetime import datetime
 
-from src.config import secret_token, session, enabled_cmds
+from src.config import secret_token, session, default_cmds
 import src.generate.letmein as letmeingen
 from src.formatter import BetterHelpFormatter
 from src.smart_message import smart_message
@@ -63,8 +63,10 @@ starboarded_messages = []
 
 AUT_EMOJI = "🅱"
 NORM_EMOJI = "reee"
+NORM_EMOJI_B = "💤"
 NICE_EMOJI = "❤"
 TOXIC_EMOJI = "pech"
+TOXIC_EMOJI_B = "👿"
 EDIT_EMOJI = "📝"
 STAR_EMOJI = "⭐"
 
@@ -127,7 +129,7 @@ async def resume(context):
 @commands.cooldown(1, 2, commands.BucketType.server)
 async def play(ctx):
     if ctx.message.channel.server.get_member(RYTHMS_ID): return
-    await enabled_cmds['play'].execute(ctx, client, players=players)
+    await default_cmds['play'].execute(ctx, client, players=players)
 
 @client.command(name='8ball',
                 description="Answers a yes/no question.",
@@ -148,7 +150,7 @@ async def eight_ball(context):
 
 @client.command(pass_context=True)
 async def quote(ctx):
-    await enabled_cmds['quote'].execute(ctx, client)
+    await default_cmds['quote'].execute(ctx, client)
 
 @client.event
 async def on_server_join(server):
@@ -220,11 +222,11 @@ async def on_reaction_add(reaction, user):
 
         if AUT_EMOJI in str(reaction.emoji):
             karma_dict[author.id][0] += 1
-        elif NORM_EMOJI in str(reaction.emoji):
+        elif NORM_EMOJI in str(reaction.emoji) or NORM_EMOJI_B in str(reaction.emoji):
             karma_dict[author.id][1] += 1
         elif NICE_EMOJI in str(reaction.emoji):
             karma_dict[author.id][2] += 1
-        elif TOXIC_EMOJI in str(reaction.emoji):
+        elif TOXIC_EMOJI in str(reaction.emoji) or TOXIC_EMOJI_B in str(reaction.emoji):
             karma_dict[author.id][3] += 1
         update_user(author.id)
 
@@ -254,11 +256,11 @@ async def on_reaction_remove(reaction, user):
             session.add(new_user)
         if AUT_EMOJI in str(reaction.emoji):
             karma_dict[author.id][0] -= 1
-        elif NORM_EMOJI in str(reaction.emoji):
+        elif NORM_EMOJI in str(reaction.emoji) or NORM_EMOJI_B in str(reaction.emoji):
             karma_dict[author.id][1] -= 1
         elif NICE_EMOJI in str(reaction.emoji):
             karma_dict[author.id][2] -= 1
-        elif TOXIC_EMOJI in str(reaction.emoji):
+        elif TOXIC_EMOJI in str(reaction.emoji) or TOXIC_EMOJI_B in str(reaction.emoji):
             karma_dict[author.id][3] -= 1
 
         update_user(author.id)
@@ -302,7 +304,19 @@ async def letmein(ctx):
         brief="vote gulag",
         pass_context=True)
 async def gulag(ctx):
-    await enabled_cmds['gulag'].execute(ctx, client)
+    await default_cmds['gulag'].execute(ctx, client)
+
+@client.command(name='whois',
+        description="!whois [userid] - get name from user id",
+        brief="check user id",
+        pass_context=True)
+async def whois(ctx):
+    usr = await client.get_user_info(ctx.message.clean_content.split()[1])
+    await client.send_message(ctx.message.channel, usr.name + '#' + usr.discriminator)
+
+@client.command(pass_context=True)
+async def schedule(ctx):
+    await default_cmds['schedule'].execute(ctx, client)
 
 @client.command(pass_context=True)
 async def test(context):
@@ -311,7 +325,10 @@ async def test(context):
         await client.send_message(context.message.channel, "it works")
         return
     #await client.change_nickname(context.message.author, 't)
+
     await client.send_message(context.message.channel, author.avatar_url if author.avatar_url else author.default_avatar_url)
+    #usr = context.message.mentions[0]
+    #await client.send_message(context.message.channel, usr.avatar_url if usr.avatar_url else usr.default_avatar_url)
     lem = list_embed('https://giphy.com/gifs/vv41HlvfogHAY', context.message.channel.mention, context.message.author)
     await client.send_message(context.message.channel, embed=lem.get_embed())
 
@@ -362,13 +379,13 @@ def get_toxc_percent(m):
     return ((karma_dict[m][3] - karma_dict[m][2]) / (karma_dict[m][3] + karma_dict[m][2])) * 100
 
 @client.command(name='spectrum',
-        description="Vote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
+        description="Vote 👿 for toxic, 🅱️ for autistic, ❤ for nice, and 💤 for normie." ,
         brief="Check if autistic.",
         aliases=[],
         pass_context=True)
 @commands.cooldown(1, 5, commands.BucketType.server)
 async def spectrum(ctx):
-    await enabled_cmds['spectrum'].execute(ctx, client, karma_dict=karma_dict)
+    await default_cmds['spectrum'].execute(ctx, client, karma_dict=karma_dict)
 
 
 @client.command(name='purge',
@@ -403,7 +420,7 @@ async def role(ctx):
     if ctx.message.channel.server.id != '416020909531594752':
         await client.send_message(ctx.message.channel, 'Not implemented for this server yet')
         return
-    await enabled_cmds['role'].execute(ctx, client, ROLES_DICT=ROLES_DICT)
+    await default_cmds['role'].execute(ctx, client, ROLES_DICT=ROLES_DICT)
 
 @client.command(pass_context=True)
 async def admin(context):
@@ -457,7 +474,6 @@ async def spellcheck(ctx):
                 if not channel in cache[ctxchannel.server]['messages'].keys() or not cache[ctxchannel.server]['messages'][channel]:
                     print("reloading cache for " + channel.name)
                     iterator = [log async for log in client.logs_from(channel, limit=10000)]
-                    print(type(iterator))
                     logs = list(iterator)
                     cache[ctxchannel.server]['messages'][channel] = logs
                 msgs = cache[ctxchannel.server]['messages'][channel]
@@ -523,7 +539,7 @@ async def log(context):
                 description="!set trigger::response - use [adj], [adv], [noun], [member], [owl], [comma,separted items], [author], [capture], [count], or [:<react>:] in your response.  Set response to 'remove' to remove.",
                 brief="create custom command")
 async def set(ctx):
-    await enabled_cmds['set'].execute(ctx, client, session=session, smart_commands=smart_commands, admins=admins)
+    await default_cmds['set'].execute(ctx, client, session=session, smart_commands=smart_commands, admins=admins)
 
 @client.event
 async def on_message(message):
@@ -691,7 +707,7 @@ def update_admin(member, server, delete=False):
             'server_id': server.id,
             'username': member.name
             }
-    session.query(Admin).filter_by(discord_id = member.id).update(new_data)
+    session.query(Admin).filter_by(discord_id = int(member.id)).update(new_data)
     session.commit()
 
 def update_command(triggerkey, response, count, server, author_id, delete=False):

@@ -7,6 +7,7 @@ from src.commands.spectrum_command import spectrum_command
 from src.commands.role_command import role_command
 from src.commands.gulag_command import gulag_command
 from src.commands.play_command import play_command
+from src.commands.schedule_command import schedule_command
 
 secret_token = None
 db_user = None
@@ -31,11 +32,12 @@ except Exception as e:
     print('failed to connect to database')
     print(e)
 
-enabled_cmds = {
+default_cmds = {
         'quote' : quote_command(),
         'set' : set_command(),
         'role' : role_command(),
         'play' : play_command(),
         'gulag' : gulag_command(),
-        'spectrum' : spectrum_command()
+        'spectrum' : spectrum_command(),
+        'schedule' : schedule_command()
     }
