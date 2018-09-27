@@ -15,7 +15,7 @@ class abstract_command():
         self.client = client
         self.message = context.message
         self.content = self.message.content
-        self.args = self.content.split(' ')
+        self.args = self.message.clean_content.split(' ')
         self.channel = self.message.channel
         self.server = self.message.channel.server
         self.author = self.message.author

@@ -314,7 +314,10 @@ async def whois(ctx):
     usr = await client.get_user_info(ctx.message.clean_content.split()[1])
     await client.send_message(ctx.message.channel, usr.name + '#' + usr.discriminator)
 
-@client.command(pass_context=True)
+@client.command(name='schedule',
+        description="!schedule [title] [time] - start an event poll",
+        brief="schedule an event",
+        pass_context=True)
 async def schedule(ctx):
     await default_cmds['schedule'].execute(ctx, client)
 
