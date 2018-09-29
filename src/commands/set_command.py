@@ -17,7 +17,7 @@ class set_command(abstract_command):
         server = self.server
         from_admin = int(self.author.id) in admins[int(server.id)]
         botcommands = discord.utils.get(self.server.channels, name='bot-commands', type=ChannelType.text)
-        if botcommands != self.channel and not from_admin:
+        if botcommands != self.channel and not from_admin and botcommands:
             await self.client.send_message(self.channel, botcommands.mention + '?')
             return
         parser = re.search('!set (.+)::(.+)', self.content, re.IGNORECASE)

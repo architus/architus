@@ -149,7 +149,10 @@ async def eight_ball(context):
     ]
     await client.say(random.choice(possible_responses) + ", " + context.message.author.mention)
 
-@client.command(pass_context=True)
+@client.command(name='quote',
+                description="!quote [messageid] - repost message from the same channel.",
+                brief="Repost a message.",
+                pass_context=True)
 async def quote(ctx):
     await default_cmds['quote'].execute(ctx, client)
 
@@ -322,7 +325,7 @@ async def whois(ctx):
 async def schedule(ctx):
     await default_cmds['schedule'].execute(ctx, client)
 
-@client.command(pass_context=True)
+#@client.command(pass_context=True)
 async def settings(ctx):
     await default_cmds['settings'].execute(ctx, client, session=session)
 
@@ -395,7 +398,7 @@ def get_toxc_percent(m):
 async def spectrum(ctx):
     await default_cmds['spectrum'].execute(ctx, client, karma_dict=karma_dict)
 
-@client.command(pass_context=True)
+#@client.command(pass_context=True)
 async def spectrum3d(ctx):
     await default_cmds['spectrum_3d'].execute(ctx, client, karma_dict=karma_dict)
 
@@ -467,7 +470,10 @@ async def admin(context):
     else:
         await client.send_message(context.message.channel, "Nice try. You have been reported.")
 
-@client.command(pass_context=True)
+@client.command(name='spellcheck',
+                description="!spellcheck [@user] - calculate % of correctly spelled words",
+                brief="Check spelling of user.", 
+                pass_context=True)
 async def spellcheck(ctx):
     ctxchannel = ctx.message.channel
     cache[ctxchannel.server].setdefault('messages', {})
