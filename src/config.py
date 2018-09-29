@@ -4,10 +4,12 @@ from sqlalchemy.orm import sessionmaker
 from src.commands.quote_command import quote_command
 from src.commands.set_command import set_command
 from src.commands.spectrum_command import spectrum_command
+from src.commands.spectrum_threed_command import spectrum_threed_command
 from src.commands.role_command import role_command
 from src.commands.gulag_command import gulag_command
 from src.commands.play_command import play_command
 from src.commands.schedule_command import schedule_command
+from src.commands.settings_command import settings_command
 
 secret_token = None
 db_user = None
@@ -39,5 +41,7 @@ default_cmds = {
         'play' : play_command(),
         'gulag' : gulag_command(),
         'spectrum' : spectrum_command(),
-        'schedule' : schedule_command()
+        'spectrum_3d' : spectrum_threed_command(),
+        'schedule' : schedule_command(),
+        'settings' : settings_command()
     }

@@ -2,7 +2,7 @@
 *.secret_token
 *.pkl
 __py*
-res/foo.png
+res/foo.*
 res/gulag.png
 res/meme.png
 *pyc

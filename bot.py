@@ -24,6 +24,7 @@ from src.formatter import BetterHelpFormatter
 from src.smart_message import smart_message
 from src.smart_command import smart_command
 from src.list_embed import list_embed, dank_embed
+from src.server_settings import server_settings
 from src.models import User, Admin, Command
 from src.smart_player import smart_player
 from src.commands.quote_command import quote_command
@@ -322,6 +323,10 @@ async def schedule(ctx):
     await default_cmds['schedule'].execute(ctx, client)
 
 @client.command(pass_context=True)
+async def settings(ctx):
+    await default_cmds['settings'].execute(ctx, client, session=session)
+
+@client.command(pass_context=True)
 async def test(context):
     author = context.message.author
     if (author.id != JOHNYS_ID and author.id != GHOSTS_ID):
@@ -389,6 +394,10 @@ def get_toxc_percent(m):
 @commands.cooldown(1, 5, commands.BucketType.server)
 async def spectrum(ctx):
     await default_cmds['spectrum'].execute(ctx, client, karma_dict=karma_dict)
+
+@client.command(pass_context=True)
+async def spectrum3d(ctx):
+    await default_cmds['spectrum_3d'].execute(ctx, client, karma_dict=karma_dict)
 
 
 @client.command(name='purge',
@@ -663,7 +672,6 @@ def initialize_scores():
 
 def initialize_cache():
     for server in client.servers:
-        print(server.name)
         cache[server] = {
             'messages' : {}
         }
@@ -672,6 +680,10 @@ def initialize_commands():
     command_list = session.query(Command).all()
     for server in client.servers:
         smart_commands.setdefault(int(server.id), [])
+        settings = server_settings(session, server.id)
+        settings.admins_ids = [JOHNYS_ID]
+        settings.bot_commands_channels = []
+        print(settings.admins_ids)
     for command in command_list:
         smart_commands.setdefault(command.server_id, [])
         smart_commands[command.server_id].append(smart_command(command.trigger.replace(str(command.server_id), '', 1), command.response, command.count, client.get_server(str(command.server_id)), command.author_id))
