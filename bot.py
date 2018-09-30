@@ -398,7 +398,7 @@ def get_toxc_percent(m):
 async def spectrum(ctx):
     await default_cmds['spectrum'].execute(ctx, client, karma_dict=karma_dict)
 
-#@client.command(pass_context=True)
+@client.command(pass_context=True)
 async def spectrum3d(ctx):
     await default_cmds['spectrum_3d'].execute(ctx, client, karma_dict=karma_dict)
 

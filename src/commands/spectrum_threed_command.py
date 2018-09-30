@@ -1,6 +1,11 @@
 from discord import ChannelType
 from src.commands.abstract_command import abstract_command
 import src.threed as spectrum_gen
+from threading import Thread
+import asyncio
+import random
+import string
+import os
 import discord
 
 class spectrum_threed_command(abstract_command):
@@ -33,9 +38,16 @@ class spectrum_threed_command(abstract_command):
                 else:
                     y.append(aut / 10)
             #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
-        spectrum_gen.generate(x, y, z, names)
-        with open('res/foo.webm', 'rb') as f:
+        title = self.server.name
+        key = ''.join([random.choice(string.ascii_letters) for n in range(10)])
+        thread = Thread(target = spectrum_gen.generate, args = (x, y, z, names, title, key))
+        thread.start()
+        while not os.path.exists('res/%s.webm' % key):
+            await self.client.send_typing(self.channel)
+            asyncio.sleep(1)
+        with open('res/%s.webm' % key, 'rb') as f:
             await self.client.send_file(self.channel, f, content="Here you go, " + self.author.mention)
+        os.remove('res/%s.webm' % key)
 
     def get_help(self):
         return "!spectrum - generate a graph of autism\nVote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
