@@ -28,7 +28,7 @@ class spectrum_threed_command(abstract_command):
                 nice = self.get_nice_percent(mem_id)
                 aut = self.get_autism_percent(mem_id)
                 norm = self.get_normie_percent(mem_id)
-                z.append(0)
+                z.append(self.karma_dict[mem_id][4])
                 if (toxic > nice):
                     x.append(-1*(toxic) / 10)
                 else:
@@ -40,6 +40,8 @@ class spectrum_threed_command(abstract_command):
             #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
         title = self.server.name
         key = ''.join([random.choice(string.ascii_letters) for n in range(10)])
+        max_bot = max(z)
+        z = [(b/max_bot) * 10 for b in z]
         thread = Thread(target = spectrum_gen.generate, args = (x, y, z, names, title, key))
         thread.start()
         while not os.path.exists('res/%s.webm' % key):

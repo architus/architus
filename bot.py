@@ -68,6 +68,7 @@ NORM_EMOJI_B = "💤"
 NICE_EMOJI = "❤"
 TOXIC_EMOJI = "pech"
 TOXIC_EMOJI_B = "👿"
+UN_SELF_AWARENESS_EMOJI = "🤖"
 EDIT_EMOJI = "📝"
 STAR_EMOJI = "⭐"
 
@@ -220,7 +221,7 @@ async def on_reaction_add(reaction, user):
 
     if ((author != user or user.id == JOHNYS_ID or user.id == MATTS_ID) and author != client.user and user != client.user):
         if (author.id not in karma_dict):
-            karma_dict[author.id] = [2,2,2,2]
+            karma_dict[author.id] = [2,2,2,2,0]
             new_user = User(author.id, karma_dict[author.id])
             session.add(new_user)
 
@@ -232,6 +233,8 @@ async def on_reaction_add(reaction, user):
             karma_dict[author.id][2] += 1
         elif TOXIC_EMOJI in str(reaction.emoji) or TOXIC_EMOJI_B in str(reaction.emoji):
             karma_dict[author.id][3] += 1
+        elif UN_SELF_AWARENESS_EMOJI in str(reaction.emoji):
+            karma_dict[author.id][4] += 1
         update_user(author.id)
 
 @client.event
@@ -255,7 +258,7 @@ async def on_reaction_remove(reaction, user):
 
     if ((author != user or user.id == JOHNYS_ID) and author != client.user):
         if (author.id not in karma_dict):
-            karma_dict[author.id] = [2,2,2,2]
+            karma_dict[author.id] = [2,2,2,2,0]
             new_user = User(author.id, karma_dict[author.id])
             session.add(new_user)
         if AUT_EMOJI in str(reaction.emoji):
@@ -266,6 +269,8 @@ async def on_reaction_remove(reaction, user):
             karma_dict[author.id][2] -= 1
         elif TOXIC_EMOJI in str(reaction.emoji) or TOXIC_EMOJI_B in str(reaction.emoji):
             karma_dict[author.id][3] -= 1
+        elif UN_SELF_AWARENESS_EMOJI in str(reaction.emoji):
+            karma_dict[author.id][4] -= 1
 
         update_user(author.id)
 
@@ -282,12 +287,13 @@ async def check(context):
             await client.send_message(context.message.channel, "Leave me out of this, " + context.message.author.mention)
             return
         if (member.id not in karma_dict):
-            karma_dict[member.id] = [2,2,2,2]
+            karma_dict[member.id] = [2,2,2,2,0]
             new_user = User(member.id, karma_dict[member.id])
             session.add(new_user)
         response = member.display_name + " is "
         response += ("{:3.1f}% autistic".format(get_autism_percent(member.id)) if (get_autism_percent(member.id) >= get_normie_percent(member.id)) else "{:3.1f}% normie".format(get_normie_percent(member.id)))
-        response += " and " + ("{:3.1f}% toxic.".format(get_toxc_percent(member.id)) if (get_toxc_percent(member.id) >= get_nice_percent(member.id)) else "{:3.1f}% nice.".format(get_nice_percent(member.id)))
+        response += " and " + ("{:3.1f}% toxic".format(get_toxc_percent(member.id)) if (get_toxc_percent(member.id) >= get_nice_percent(member.id)) else "{:3.1f}% nice".format(get_nice_percent(member.id)))
+        response += " with %d bots." % karma_dict[member.id][4]
         await client.send_message(context.message.channel, response)
 
 @client.command(name='letmein',
@@ -714,7 +720,8 @@ def update_user(disc_id, delete=False):
             'aut_score': karma_dict[disc_id][0],
             'norm_score': karma_dict[disc_id][1],
             'nice_score': karma_dict[disc_id][2],
-            'toxic_score': karma_dict[disc_id][3]
+            'toxic_score': karma_dict[disc_id][3],
+            'awareness_score': karma_dict[disc_id][4]
             }
     session.query(User).filter_by(discord_id = disc_id).update(new_data)
     session.commit()

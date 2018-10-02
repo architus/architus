@@ -10,6 +10,7 @@ class User(Base):
     norm_score = Column('norm_score', Float)
     nice_score = Column('nice_score', Float)
     toxic_score = Column('toxic_score', Float)
+    awareness_score = Column('awareness_score', Integer)
 
     def __init__(self, discord_id, scores):
         self.discord_id = discord_id
@@ -17,15 +18,16 @@ class User(Base):
         self.norm_score = scores[1]
         self.nice_score = scores[2]
         self.toxic_score = scores[3]
+        self.toxic_score = scores[4]
     
     def as_dict(self):
         return {
             'discord_id' : self.discord_id,
-            'scores' : [self.aut_score, self.norm_score, self.nice_score, self.toxic_score]
+            'scores' : [self.aut_score, self.norm_score, self.nice_score, self.toxic_score, self.awareness_score]
         }
     
     def as_entry(self):
-        return [self.aut_score, self.norm_score, self.nice_score, self.toxic_score]
+        return [self.aut_score, self.norm_score, self.nice_score, self.toxic_score, self.awareness_score]
 
 class Admin(Base):
     __tablename__ = 'tb_admins'
