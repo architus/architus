@@ -692,10 +692,10 @@ def initialize_commands():
     command_list = session.query(Command).all()
     for server in client.servers:
         smart_commands.setdefault(int(server.id), [])
-        settings = server_settings(session, server.id)
-        settings.admins_ids = [JOHNYS_ID]
-        settings.bot_commands_channels = []
-        print(settings.admins_ids)
+        #settings = server_settings(session, server.id)
+        #settings.admins_ids = [JOHNYS_ID]
+        #settings.bot_commands_channels = []
+        #print(settings.admins_ids)
     for command in command_list:
         smart_commands.setdefault(command.server_id, [])
         smart_commands[command.server_id].append(smart_command(command.trigger.replace(str(command.server_id), '', 1), command.response, command.count, client.get_server(str(command.server_id)), command.author_id))
