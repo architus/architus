@@ -52,7 +52,7 @@ def generate(xx, yy, zz, names, title, key):
         elif len(names) < 30:
             leg = ax.legend(loc=3, prop={'size': 6})
         else:
-            leg = ax.legend(loc=3, prop={'size': 4})
+            leg = ax.legend(loc=3, prop={'size': 5})
         leg.get_frame().set_alpha(0.7)
         #ax.scatter(xx, yy, zz, marker='o', c=col, s=20, alpha=0.6)
 
@@ -69,7 +69,7 @@ def generate(xx, yy, zz, names, title, key):
 #anim.save('res/animation.gif', writer='imagemagick', fps=5)
     ax.clear()
 
-    anim.save('res/%spart.webm' % key, fps=36, extra_args=['-vcodec', 'libvpx-vp9'])
+    anim.save('res/%spart.webm' % key, fps=12, extra_args=['-vcodec', 'libvpx-vp9'])
     os.rename('res/%spart.webm' % key, 'res/%s.webm' % key)
 #writer = FFMpegWriter(fps=15, codec='libvpx-vp9') # or libvpx-vp8
 
