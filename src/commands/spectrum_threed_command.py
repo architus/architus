@@ -40,7 +40,7 @@ class spectrum_threed_command(abstract_command):
             #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
         title = self.server.name
         key = ''.join([random.choice(string.ascii_letters) for n in range(10)])
-        max_bot = max(z)
+        max_bot = max(z) or 1
         z = [(b/max_bot) * 10 for b in z]
         thread = Thread(target = spectrum_gen.generate, args = (x, y, z, names, title, key))
         thread.start()
