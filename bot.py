@@ -502,7 +502,7 @@ async def spellcheck(ctx):
             if not channel in blacklist and channel.type == ChannelType.text:
                 if not channel in cache[ctxchannel.server]['messages'].keys() or not cache[ctxchannel.server]['messages'][channel]:
                     print("reloading cache for " + channel.name)
-                    iterator = [log async for log in client.logs_from(channel, limit=100000)]
+                    iterator = [log async for log in client.logs_from(channel, limit=7500)]
                     logs = list(iterator)
                     cache[ctxchannel.server]['messages'][channel] = logs
                 msgs = cache[ctxchannel.server]['messages'][channel]
@@ -514,8 +514,37 @@ async def spellcheck(ctx):
                                 correct_words += 1
         except: pass
     linh_modifier = 10 if victim.id == LINHS_ID else 0
-    await client.send_message(ctx.message.channel, "%.1f%s out of %d of %s's words are spelled correctly" %
+    await client.send_message(ctx.message.channel, "%.1f%s out of the %d scanned words sent by %s are spelled correctly" %
             (((correct_words/words)*100) - linh_modifier, '%', words, victim.display_name))
+
+@client.command(name='messagecount',
+                description="!messagecount [@user] - count number of messages sent in the server",
+                brief="Count sent messages.", 
+                pass_context=True)
+async def messagecount(ctx):
+    ctxchannel = ctx.message.channel
+    cache[ctxchannel.server].setdefault('messages', {})
+    await client.send_typing(ctx.message.channel)
+    blacklist = []
+    words = 0
+    messages = 0
+    victim = ctx.message.mentions[0]
+    for channel in ctx.message.channel.server.channels:
+        try:
+            await client.send_typing(ctx.message.channel)
+            if not channel in blacklist and channel.type == ChannelType.text:
+                if not channel in cache[ctxchannel.server]['messages'].keys() or not cache[ctxchannel.server]['messages'][channel]:
+                    print("reloading cache for " + channel.name)
+                    iterator = [log async for log in client.logs_from(channel, limit=1000000)]
+                    logs = list(iterator)
+                    cache[ctxchannel.server]['messages'][channel] = logs
+                msgs = cache[ctxchannel.server]['messages'][channel]
+                messages += len(msgs)
+                for msg in msgs:
+                    if msg.author == victim:
+                        words += len(msg.clean_content.split())
+        except: pass
+    await client.send_message(ctx.message.channel, "%s has sent %d words across %d messages" % (victim.display_name, words, messages))
 
 
 @client.command(pass_context=True)
