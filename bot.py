@@ -502,7 +502,7 @@ async def spellcheck(ctx):
             if not channel in blacklist and channel.type == ChannelType.text:
                 if not channel in cache[ctxchannel.server]['messages'].keys() or not cache[ctxchannel.server]['messages'][channel]:
                     print("reloading cache for " + channel.name)
-                    iterator = [log async for log in client.logs_from(channel, limit=10000)]
+                    iterator = [log async for log in client.logs_from(channel, limit=100000)]
                     logs = list(iterator)
                     cache[ctxchannel.server]['messages'][channel] = logs
                 msgs = cache[ctxchannel.server]['messages'][channel]
