@@ -35,7 +35,7 @@ class set_command(abstract_command):
                 self.session.commit()
                 await self.client.send_message(self.channel, 'command set')
                 return
-            elif parser.group(2) == "remove" or parser.group(2) == " remove":
+            elif (parser.group(2) == "remove" or parser.group(2) == " remove") and self.author.id != 81231616772411392:
                 for oldcommand in smart_commands[int(server.id)]:
                     if oldcommand == command:
                         smart_commands[int(server.id)].remove(oldcommand)
