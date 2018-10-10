@@ -599,11 +599,22 @@ async def log(context):
 async def set(ctx):
     await default_cmds['set'].execute(ctx, client, session=session, smart_commands=smart_commands, admins=admins)
 
+def get_custom_emoji(server, emojistr):
+    for emoji in server.emojis:
+        if emoji.name == emojistr:
+            return emoji
+    print('no emoji of name "%s" the server' % emojistr)
+    return None
+
 @client.event
 async def on_message(message):
     if message.channel.is_private and message.author != client.user:
         await client.send_message(await client.get_user_info(JOHNYS_ID), message.author.mention + ': '+message.content)
         return
+    if message.author.id == SIMONS_ID:
+        simn_emoji = get_custom_emoji(message.channel.server, "simN")
+        if simn_emoji:
+            client.add_reaction(message, simn_emoji)
     server = message.channel.server
     cache[server]['messages'][message.channel] = None
     try:
