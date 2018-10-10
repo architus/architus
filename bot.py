@@ -539,9 +539,9 @@ async def messagecount(ctx):
                     logs = list(iterator)
                     cache[ctxchannel.server]['messages'][channel] = logs
                 msgs = cache[ctxchannel.server]['messages'][channel]
-                messages += len(msgs)
                 for msg in msgs:
                     if msg.author == victim:
+                        messages += 1
                         words += len(msg.clean_content.split())
         except: pass
     await client.send_message(ctx.message.channel, "%s has sent %d words across %d messages" % (victim.display_name, words, messages))
