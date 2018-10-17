@@ -37,7 +37,10 @@ class poll_command(abstract_command):
             react = await self.client.wait_for_reaction(self.ANSWERS, message=msg)
             if react.user == self.client.user: continue
             i = self.ANSWERS.index(str(react.reaction.emoji))
-            votes[i].append(react.user)
+            if not react.user in votes[i]:
+                votes[i].append(react.user)
+            else:
+                votes[i].remove(react.user)
 
             await self.client.edit_message(msg, self.render_text(title, options, votes))
 
