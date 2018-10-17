@@ -331,6 +331,13 @@ async def whois(ctx):
 async def schedule(ctx):
     await default_cmds['schedule'].execute(ctx, client)
 
+@client.command(name='poll',
+        description="!poll [title] [comma, separated, items] - start a poll",
+        brief="poll something",
+        pass_context=True)
+async def schedule(ctx):
+    await default_cmds['poll'].execute(ctx, client)
+
 #@client.command(pass_context=True)
 async def settings(ctx):
     await default_cmds['settings'].execute(ctx, client, session=session)
@@ -594,7 +601,7 @@ async def log(context):
 
 
 @client.command(pass_context=True,
-                description="!set trigger::response - use [adj], [adv], [noun], [member], [owl], [comma,separted items], [author], [capture], [count], or [:<react>:] in your response.  Set response to 'remove' to remove.",
+                description="!set trigger::response - use [adj], [adv], [noun], [member], [owl], [comma,separated items], [author], [capture], [count], or [:<react>:] in your response.  Set response to 'remove' to remove.",
                 brief="create custom command")
 async def set(ctx):
     await default_cmds['set'].execute(ctx, client, session=session, smart_commands=smart_commands, admins=admins)
@@ -611,10 +618,6 @@ async def on_message(message):
     if message.channel.is_private and message.author != client.user:
         await client.send_message(await client.get_user_info(JOHNYS_ID), message.author.mention + ': '+message.content)
         return
-    if message.author.id == SIMONS_ID:
-        simn_emoji = get_custom_emoji(message.channel.server, "simN")
-        if simn_emoji:
-            client.add_reaction(message, simn_emoji)
     server = message.channel.server
     cache[server]['messages'][message.channel] = None
     try:
