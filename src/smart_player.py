@@ -5,6 +5,7 @@ from collections import deque
 import src.spotify_tools as spotify_tools
 import urllib
 import asyncio
+import aiohttp
 #import urllib2
 from bs4 import BeautifulSoup
 
@@ -118,20 +119,23 @@ class smart_player:
         return info
 
     async def add_url(self, url):
-        self.q.append(url)
+        self.q.appendleft(url)
 
     async def add_url_now(self, url):
-        self.q.appendleft(url)
+        self.q.append(url)
 
     async def get_youtube_url(self, search):
         query = urllib.parse.quote(search)
         url = "https://www.youtube.com/results?search_query=" + query
-        response = urllib.request.urlopen(url)
-        html = response.read()
-        soup = BeautifulSoup(html, 'lxml')
-        for video in soup.findAll(attrs={'class':'yt-uix-tile-link'}):
-            if ('googleadservices' not in video['href']):
-                return 'https://www.youtube.com' + video['href']
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                response = await resp.read()
+        #response = urllib.request.urlopen(url)
+                html = response
+                soup = BeautifulSoup(html, 'lxml')
+                for video in soup.findAll(attrs={'class':'yt-uix-tile-link'}):
+                    if ('googleadservices' not in video['href']):
+                        return 'https://www.youtube.com' + video['href']
         return ''
         
 

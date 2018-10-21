@@ -613,6 +613,23 @@ def get_custom_emoji(server, emojistr):
     print('no emoji of name "%s" the server' % emojistr)
     return None
 
+def log_message(msg):
+    url = ''
+    try:
+        url = message.embeds[0]['url'] if message.embeds else ''
+        url = message.attachments[0]['url'] if message.attachments else ''
+    except: pass
+    log = str(datetime.now())
+    try: log += '[%s](%s) - ' % (msg.channel.server.name, msg.channel.server.id)
+    except: log += '[err](err) - '
+    try: log += '[%s](%s) ' % (msg.channel.name, msg.channel.id)
+    except: log += '[err](err) '
+    try: log += '%s(%s): ' % (msg.author.display_name, msg.author.id)
+    except: log += 'err(err): '
+    try: log += '%s <%s>' % (msg.clean_content, url)
+    except: log += 'err <err>'
+    return log
+
 @client.event
 async def on_message(message):
     if message.channel.is_private and message.author != client.user:
@@ -620,11 +637,7 @@ async def on_message(message):
         return
     server = message.channel.server
     cache[server]['messages'][message.channel] = None
-    try:
-        url = message.embeds[0]['url'] if message.embeds else ''
-        url = message.attachments[0]['url'] if message.attachments else ''
-        print('<%s>[%s](%s) - [%s](%s) %s(%s): %s <%s>' % (datetime.now(), server.name, server.id, message.channel.name, message.channel.id, message.author.display_name, message.author.id, message.content, url))
-    except: pass
+    print(log_message(message))
     if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
         if message.channel == discord.utils.get(server.channels, name='general', type=ChannelType.text):
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)

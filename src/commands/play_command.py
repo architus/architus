@@ -51,6 +51,7 @@ class play_command(abstract_command):
                     await player.add_url(arg[1])
                     message = 'Added'
                 else:
+                    player.pause()
                     await player.add_url_now(arg[1])
                     name = await player.play()
                     if (name):
@@ -75,6 +76,10 @@ class play_command(abstract_command):
                 name = await player.play()
                 if (name):
                     message = "Now playing: " + name
+
+        print ('q ' + str(len(player.q)))
+        for song in list(player.q):
+            print ('song: ' + song)
 
         await self.client.send_message(self.channel, message)
 
