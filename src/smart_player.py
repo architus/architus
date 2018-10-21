@@ -125,17 +125,20 @@ class smart_player:
         self.q.append(url)
 
     async def get_youtube_url(self, search):
-        query = urllib.parse.quote(search)
-        url = "https://www.youtube.com/results?search_query=" + query
         async with aiohttp.ClientSession() as session:
+            query = urllib.parse.quote(search)
+            url = "https://www.youtube.com/results?search_query=" + query
             async with session.get(url) as resp:
-                response = await resp.read()
+                html = await resp.read()
         #response = urllib.request.urlopen(url)
-                html = response
-                soup = BeautifulSoup(html, 'lxml')
-                for video in soup.findAll(attrs={'class':'yt-uix-tile-link'}):
-                    if ('googleadservices' not in video['href']):
-                        return 'https://www.youtube.com' + video['href']
+                def get_video(html):
+                    soup = BeautifulSoup(html, 'lxml')
+                    for video in soup.findAll(attrs={'class':'yt-uix-tile-link'}):
+                        if ('googleadservices' not in video['href']):
+                            return 'https://www.youtube.com' + video['href']
+                loop = asyncio.get_event_loop()
+                return await loop.run_in_executor(None, get_video, html)
+
         return ''
         
 
