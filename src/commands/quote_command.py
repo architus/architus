@@ -10,7 +10,7 @@ class quote_command(abstract_command):
         if (self.args[1]):
             if self.args[2]:
                 message = await self.client.get_message(self.args[2], self.args[1])
-                else:
+            else:
                 message = await self.client.get_message(self.channel, self.args[1])
             if message:
                 est = self.get_datetime(message.timestamp)
