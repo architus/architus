@@ -8,7 +8,10 @@ class quote_command(abstract_command):
 
     async def exec_cmd(self, **kwargs):
         if (self.args[1]):
-            message = await self.client.get_message(self.channel, self.args[1])
+            if self.args[2]:
+                message = await self.client.get_message(self.args[2], self.args[1])
+                else:
+                message = await self.client.get_message(self.channel, self.args[1])
             if message:
                 est = self.get_datetime(message.timestamp)
                 em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
