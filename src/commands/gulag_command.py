@@ -52,6 +52,8 @@ class gulag_command(abstract_command):
                     timer_msg = await self.client.send_message(self.channel, "⏰ %d seconds" % (GULAG_TIME * 60))
                     timer_msg_gulag = await self.client.send_message(self.get_channel_by_name(server,'gulag')[0], "⏰ %d seconds, %s" % (GULAG_TIME * 60, comrade.mention))
                     await self.client.add_roles(comrade, gulag_role)
+                    if comrade.voice.voice_channel is not None and not comrade.voice.voice_channel.is_private:
+                        await self.move_member(comrade, 421091411031621652)
                     t_end = time.time() + int(60 * GULAG_TIME)
             elif timer_msg or timer_msg_gulag:
                 await self.client.edit_message(timer_msg, "⏰ %d seconds" % (max(0, t_end-time.time())))
