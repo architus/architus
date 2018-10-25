@@ -21,7 +21,7 @@ class set_command(abstract_command):
             await self.client.send_message(self.channel, botcommands.mention + '?')
             return
         parser = re.search('!set (.+)::(.+)', self.content, re.IGNORECASE)
-        if parser and len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and server.default_role.mention not in parser.group(2) or from_admin:
+        if parser and len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and server.default_role.mention not in parser.group(2) and self.author.id != 257260785258987530 or from_admin:
             try:
                 command = smart_command(parser.group(1), parser.group(2), 0, server, self.author.id)
             except VaguePatternError as e:
