@@ -655,6 +655,13 @@ async def on_message(message):
                 url = 'https://' + match.group(1) + match.group(2)
                 await client.send_message(highlights, url)
 
+    if message.content == 'dab' or message.content == 'miss':
+        filtered = filter(lambda role: role.name == "kulak", server.role_hierarchy)
+        try:
+            gulag_role = next(filtered)
+            await self.client.add_roles(ctx.author, gulag_role)
+        except: return
+    
     if not message.author.bot:
         await client.process_commands(message)
         for command in smart_commands[int(message.channel.server.id)]:
