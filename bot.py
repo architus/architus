@@ -429,9 +429,16 @@ async def spectrum3d(ctx):
 @commands.cooldown(1, 5, commands.BucketType.server)
 async def purge(context):
     channel = context.message.channel
+    args = context.message.content.split(' ')
+    user = client.user
+    count = 100
+    if len(args) > 1:
+        user = context.message.channel.server.get_member(args[1])
+    if len(args) > 2:
+        count = min(int(args[2]), 100000)
     await client.send_typing(channel)
     if (int(context.message.author.id) in admins[int(channel.server.id)]):
-        deleted = await client.purge_from(context.message.channel, limit=100, check=lambda m: m.author==client.user)
+        deleted = await client.purge_from(context.message.channel, limit=count, check=lambda m: m.author==user)
         await client.send_message(channel, 'Deleted {} message(s)'.format(len(deleted)))
     else:
         await client.send_message(channel, 'lul %s' % context.message.author.mention)
