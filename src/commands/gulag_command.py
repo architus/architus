@@ -55,13 +55,16 @@ class gulag_command(abstract_command):
                         await self.client.send_file(self.channel, f)
                     else:
                         await self.client.send_message(self.channel, "gulag'd " + comrade.display_name)
+
                     timer_msg = await self.client.send_message(self.channel, "⏰ %d seconds" % (GULAG_TIME * 60))
                     timer_msg_gulag = await self.client.send_message(discord.utils.get(server.channels, name='gulag', type=ChannelType.text), "⏰ %d seconds, %s" % (GULAG_TIME * 60, comrade.display_name))
                     await self.client.add_roles(comrade, gulag_role)
-                    if comrade.voice.voice_channel is not None and not comrade.voice.voice_channel.is_private \
-                            and server.id is 416020909531594752:
-                        await self.move_member(comrade, self.get_channel_by_name(server, 'gulag'))
+
+                    if comrade.voice.voice_channel and not comrade.voice.voice_channel.is_private:
+                        try: await self.move_member(comrade, discord.utils.get(self.server.channels, name='gulag', type=ChannelType.voice))
+                        except: pass
                     t_end = time.time() + int(60 * GULAG_TIME)
+
             elif timer_msg or timer_msg_gulag:
                 await self.client.edit_message(timer_msg, "⏰ %d seconds" % (max(0, t_end-time.time())))
                 await self.client.edit_message(timer_msg_gulag, "⏰ %d seconds, %s" % (max(0, t_end-time.time()), comrade.display_name))
