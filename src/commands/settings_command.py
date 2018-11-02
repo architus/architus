@@ -11,10 +11,13 @@ class settings_command(abstract_command):
 
     async def exec_cmd(self, **kwargs):
         session = kwargs['session']
-        settings = server_settings(session, self.server.id)
-        if 'defaultrole' in self.message.clean_content.lower():
+        settings = server_settings(session, self.server)
+        if self.author.id not in settings.admins_ids:
+            self.client.send_message(self.channel, 'nope, sorry')
+            return
+        if 'defaultrole' in self.content.lower():
             settings.default_role_id = self.message.role_mentions[0].id
-        elif 'botcommands' in self.message.clean_content.lower():
+        elif 'botcommands' in self.content.lower():
             bc_channels = settings.bot_commands_channels
             new_channels = self.message.channel_mentions or [self.channel.id]
 
@@ -25,6 +28,24 @@ class settings_command(abstract_command):
                     bc_channels.append(channel.id)
                 print (bc_channels)
                 settings.bot_commands_channels = bc_channels
+
+        elif 'aut-emoji' in self.content.lower():
+            settings.aut_emoji = self.args[2]
+        elif 'nice-emoji' in self.content.lower():
+            settings.nice_emoji = self.args[2]
+        elif 'toxic-emoji' in self.content.lower():
+            settings.toxic_emoji = self.args[2]
+        elif 'bot-emoji' in self.content.lower():
+            settings.bot_emoji = self.args[2]
+        elif 'norm-emoji' in self.content.lower():
+            settings.norm_emoji = self.args[2]
+        elif 'edit-emoji' in self.content.lower():
+            settings.edit_emoji = self.args[2]
+
+        elif 'admin' in self.content.lower():
+            if self.message.mentions[0].id in settings.admins_ids:
+                settings.admins_ids.remove(self.message.mentions[0].id)
+            else:  settings.admins_ids += [self.message.mentions[0].id]
 
         await self.client.send_message(self.channel, str(settings._settings_dict))
     def get_help(self):

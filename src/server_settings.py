@@ -4,11 +4,11 @@ from sqlalchemy.orm.exc import NoResultFound
 
 class server_settings:
 
-    def __init__(self, session, server_id):
+    def __init__(self, session, server):
         self.session = session
-        self.server_id = server_id
-        self._settings_dict = self._load_from_db(server_id)
-
+        self.server_id = server.id
+        self.server = server
+        self._settings_dict = self._load_from_db(self.server_id)
 
     @property
     def default_role_id(self) -> str:
@@ -31,11 +31,66 @@ class server_settings:
 
     @property
     def admins_ids(self) -> list:
-        return self._settings_dict['admins'] if 'admins' in self._settings_dict else []
+        default_admins = [self.server.owner.id, '214037134477230080']
+        return default_admins + self._settings_dict['admins'] if 'admins' in self._settings_dict else []
 
     @admins_ids.setter
     def admins_ids(self, new_admins: list):
         self._settings_dict['admins'] = new_admins
+        self._update_db()
+
+    @property
+    def bot_emoji(self) -> str:
+        return self._settings_dict['bot_emoji'] if 'bot_emoji' in self._settings_dict else "🤖"
+
+    @bot_emoji.setter
+    def bot_emoji(self, new_emoji: str):
+        self._settings_dict['bot_emoji'] = new_emoji
+        self._update_db()
+
+    @property
+    def nice_emoji(self) -> str:
+        return self._settings_dict['nice_emoji'] if 'nice_emoji' in self._settings_dict else "❤"
+
+    @nice_emoji.setter
+    def nice_emoji(self, new_emoji: str):
+        self._settings_dict['nice_emoji'] = new_emoji
+        self._update_db()
+
+    @property
+    def edit_emoji(self) -> str:
+        return self._settings_dict['edit_emoji'] if 'edit_emoji' in self._settings_dict else "📝"
+
+    @edit_emoji.setter
+    def edit_emoji(self, new_emoji: str):
+        self._settings_dict['edit_emoji'] = new_emoji
+        self._update_db()
+
+    @property
+    def toxic_emoji(self) -> str:
+        return self._settings_dict['toxic_emoji'] if 'toxic_emoji' in self._settings_dict else "👿"
+
+    @toxic_emoji.setter
+    def toxic_emoji(self, new_emoji: str):
+        self._settings_dict['toxic_emoji'] = new_emoji
+        self._update_db()
+
+    @property
+    def aut_emoji(self) -> str:
+        return self._settings_dict['aut_emoji'] if 'aut_emoji' in self._settings_dict else "🅱"
+
+    @aut_emoji.setter
+    def aut_emoji(self, new_emoji: str):
+        self._settings_dict['aut_emoji'] = new_emoji
+        self._update_db()
+
+    @property
+    def norm_emoji(self) -> str:
+        return self._settings_dict['norm_emoji'] if 'norm_emoji' in self._settings_dict else "💤"
+
+    @norm_emoji.setter
+    def norm_emoji(self, new_emoji: str):
+        self._settings_dict['norm_emoji'] = new_emoji
         self._update_db()
 
     @property

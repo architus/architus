@@ -1,16 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-from src.commands.quote_command import quote_command
-from src.commands.set_command import set_command
-from src.commands.spectrum_command import spectrum_command
-from src.commands.spectrum_threed_command import spectrum_threed_command
-from src.commands.role_command import role_command
-from src.commands.gulag_command import gulag_command
-from src.commands.poll_command import poll_command
-from src.commands.play_command import play_command
-from src.commands.schedule_command import schedule_command
-from src.commands.settings_command import settings_command
+from src.commands import *
+import src.commands as command_modules
 
 secret_token = None
 db_user = None
@@ -35,15 +26,9 @@ except Exception as e:
     print('failed to connect to database')
     print(e)
 
-default_cmds = {
-        'quote' : quote_command(),
-        'set' : set_command(),
-        'role' : role_command(),
-        'play' : play_command(),
-        'gulag' : gulag_command(),
-        'spectrum' : spectrum_command(),
-        'spectrum_3d' : spectrum_threed_command(),
-        'schedule' : schedule_command(),
-        'poll' : poll_command(),
-        'settings' : settings_command()
-    }
+get_class = lambda x: globals()[x]
+
+default_cmds = {}
+for command in command_modules.__all__:
+    if command != 'abstract_command':
+        default_cmds[command.replace('_command', '')] = getattr(get_class(command), command)()

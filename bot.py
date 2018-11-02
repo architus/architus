@@ -3,7 +3,6 @@
 #ur mom gay
 
 import random
-import enchant
 import re
 import asyncio
 import aiohttp
@@ -202,6 +201,8 @@ async def on_message_edit(before, after):
 async def on_reaction_add(reaction, user):
     author = reaction.message.author
     server = reaction.message.channel.server
+    settings = server_settings(session, server)
+    print (settings.aut_emoji)
     for e in reaction.message.embeds:
         author_name, author_avatar = '',''
         try:
@@ -213,7 +214,7 @@ async def on_reaction_add(reaction, user):
         if (real_author != None):
             author = real_author
 
-    if EDIT_EMOJI in str(reaction.emoji):
+    if settings.edit_emoji in str(reaction.emoji):
         await add_popup(reaction.message)
 
     if STAR_EMOJI in str(reaction.emoji):
@@ -226,21 +227,23 @@ async def on_reaction_add(reaction, user):
             new_user = User(author.id, karma_dict[author.id])
             session.add(new_user)
 
-        if AUT_EMOJI in str(reaction.emoji):
+        if settings.aut_emoji in str(reaction.emoji):
             karma_dict[author.id][0] += 1
-        elif NORM_EMOJI in str(reaction.emoji) or NORM_EMOJI_B in str(reaction.emoji):
+        elif settings.norm_emoji in str(reaction.emoji):
             karma_dict[author.id][1] += 1
-        elif NICE_EMOJI in str(reaction.emoji):
+        elif settings.nice_emoji in str(reaction.emoji):
             karma_dict[author.id][2] += 1
-        elif TOXIC_EMOJI in str(reaction.emoji) or TOXIC_EMOJI_B in str(reaction.emoji):
+        elif settings.toxic_emoji in str(reaction.emoji):
             karma_dict[author.id][3] += 1
-        elif UN_SELF_AWARENESS_EMOJI in str(reaction.emoji):
+        elif settings.bot_emoji in str(reaction.emoji):
             karma_dict[author.id][4] += 1
         update_user(author.id)
 
 @client.event
 async def on_reaction_remove(reaction, user):
     author = reaction.message.author
+    server = reaction.message.channel.server
+    settings = server_settings(session, server)
     for e in reaction.message.embeds:
         try:
             author_name = e['author']['name']
@@ -251,10 +254,9 @@ async def on_reaction_remove(reaction, user):
         if (real_author != None):
             author = real_author
 
-    if EDIT_EMOJI in str(reaction.emoji):
+    if settings.edit_emoji in str(reaction.emoji):
         for react in reaction.message.reactions:
-            if EDIT_EMOJI in str(react):
-                return
+            if settings.edit_emoji in str(react): return
         await delete_popup(reaction.message)
 
     if ((author != user or user.id == JOHNYS_ID) and author != client.user):
@@ -262,15 +264,15 @@ async def on_reaction_remove(reaction, user):
             karma_dict[author.id] = [2,2,2,2,0]
             new_user = User(author.id, karma_dict[author.id])
             session.add(new_user)
-        if AUT_EMOJI in str(reaction.emoji):
+        if settings.aut_emoji in str(reaction.emoji):
             karma_dict[author.id][0] -= 1
-        elif NORM_EMOJI in str(reaction.emoji) or NORM_EMOJI_B in str(reaction.emoji):
+        elif settings.norm_emoji in str(reaction.emoji):
             karma_dict[author.id][1] -= 1
-        elif NICE_EMOJI in str(reaction.emoji):
+        elif settings.nice_emoji in str(reaction.emoji):
             karma_dict[author.id][2] -= 1
-        elif TOXIC_EMOJI in str(reaction.emoji) or TOXIC_EMOJI_B in str(reaction.emoji):
+        elif settings.toxic_emoji in str(reaction.emoji):
             karma_dict[author.id][3] -= 1
-        elif UN_SELF_AWARENESS_EMOJI in str(reaction.emoji):
+        elif settings.bot_emoji in str(reaction.emoji):
             karma_dict[author.id][4] -= 1
 
         update_user(author.id)
@@ -339,7 +341,7 @@ async def schedule(ctx):
 async def schedule(ctx):
     await default_cmds['poll'].execute(ctx, client)
 
-#@client.command(pass_context=True)
+@client.command(pass_context=True)
 async def settings(ctx):
     await default_cmds['settings'].execute(ctx, client, session=session)
 
@@ -463,74 +465,12 @@ async def role(ctx):
         return
     await default_cmds['role'].execute(ctx, client, ROLES_DICT=ROLES_DICT)
 
-@client.command(pass_context=True)
-async def admin(context):
-    server = context.message.channel.server
-    if ("remove" in context.message.content and context.message.author.id == server.owner.id):
-        for member in context.message.mentions:
-            if (member == context.message.author):
-                await client.send_message(context.message.channel, "🤔")
-                return
-            update_admin(member, server, delete=True)
-            admins[int(server.id)].remove(int(member.id))
-            await client.send_message(context.message.channel, "Removed %s." % member.display_name)
-        return
-
-    if ("list" in context.message.content):
-        print("serverid: " +server.id);
-        print(admins)
-        names = ''
-        for userid in admins[int(server.id)]:
-            names += (server.get_member(str(userid))).display_name + ' '
-        await client.send_message(context.message.channel, names)
-        return
-    if (context.message.author.id == server.owner.id):
-        for member in context.message.mentions:
-            admins.setdefault(int(server.id), [])
-            if (member.id not in admins[int(server.id)]):
-                new_admin = Admin(server.id, member.id, member.name)
-                session.add(new_admin)
-                admins[int(server.id)].append(int(member.id))
-                update_admin(member, server)
-                await client.send_message(context.message.channel, "Added %s." % member.display_name)
-    else:
-        await client.send_message(context.message.channel, "Nice try. You have been reported.")
-
 @client.command(name='spellcheck',
                 description="!spellcheck [@user] - calculate % of correctly spelled words",
                 brief="Check spelling of user.", 
                 pass_context=True)
 async def spellcheck(ctx):
-    ctxchannel = ctx.message.channel
-    cache[ctxchannel.server].setdefault('messages', {})
-    await client.send_typing(ctx.message.channel)
-    blacklist = []
-    blacklist.append(discord.utils.get(ctx.message.channel.server.channels, name='bot-commands', type=ChannelType.text))
-    blacklist.append(discord.utils.get(ctx.message.channel.server.channels, name='private-bot-commands', type=ChannelType.text))
-    d = enchant.Dict("en_US")
-    correct_words = 0
-    words = 1
-    victim = ctx.message.mentions[0]
-    for channel in ctx.message.channel.server.channels:
-        try:
-            await client.send_typing(ctx.message.channel)
-            if not channel in blacklist and channel.type == ChannelType.text:
-                if not channel in cache[ctxchannel.server]['messages'].keys() or not cache[ctxchannel.server]['messages'][channel]:
-                    print("reloading cache for " + channel.name)
-                    iterator = [log async for log in client.logs_from(channel, limit=7500)]
-                    logs = list(iterator)
-                    cache[ctxchannel.server]['messages'][channel] = logs
-                msgs = cache[ctxchannel.server]['messages'][channel]
-                for msg in msgs:
-                    if msg.author == victim:
-                        for word in msg.clean_content.split():
-                            words += 1
-                            if d.check(word) and len(word) > 1 or word in ['a','i', 'A', 'I']:
-                                correct_words += 1
-        except: pass
-    linh_modifier = 10 if victim.id == LINHS_ID else 0
-    await client.send_message(ctx.message.channel, "%.1f%s out of the %d scanned words sent by %s are spelled correctly" %
-            (((correct_words/words)*100) - linh_modifier, '%', words, victim.display_name))
+    await default_cmds['spellcheck'].execute(ctx, client, cache=cache)
 
 @client.command(name='messagecount',
                 description="!messagecount [@user] - count number of messages sent in the server",
@@ -564,48 +504,8 @@ async def messagecount(ctx):
 
 @client.command(pass_context=True)
 @commands.cooldown(1, 10, commands.BucketType.server)
-async def log(context):
-    channel = context.message.channel
-    await client.send_typing(channel)
-    msgs = []
-    do_filter = bool(context.message.mentions)
-    try:
-        num = int(re.search(r'\d+', context.message.clean_content).group())
-    except:
-        num = 25
-    num = max(num, 1)
-    num = min(num, 200)
-
-    async for message in client.logs_from(channel, limit=5000):
-        if (not do_filter or message.author in context.message.mentions):
-            msgs.append(message)
-        if (len(msgs) >= num):
-            break
-    msgs.reverse()
-    twenty_five = [msgs[x:x+25] for x in range(0, len(msgs), 25)]
-    target_channel = channel
-    if len(twenty_five) > 1:
-        botcommands = discord.utils.get(channel.server.channels, name='bot-commands', type=ChannelType.text)
-        if botcommands:
-            target_channel = botcommands
-            await client.send_message(channel, botcommands.mention)
-
-    for messages in twenty_five:
-        lembed = list_embed('Last %s messages' % num, channel.mention, client.user)
-        lembed.color = 0x9e6338
-        lembed.icon_url = 'https://engineeringblog.yelp.com/images/previews/logfeeder.png'
-        lembed.name = channel.server.name
-        for message in messages:
-            if message.id == context.message.id:
-                continue
-            elif message.content:
-                lembed.add(message.author.display_name, message.content)
-            elif message.embeds:
-                em = message.embeds[0]
-                lembed.add(message.author.display_name, em['url'] if 'url' in em.keys() else em['title'])
-            elif message.attachments:
-                lembed.add(message.author.display_name, message.attachments[0]['url'] or '')
-        await client.send_message(target_channel, embed=lembed.get_embed())
+async def log(ctx):
+    await default_cmds['log'].execute(ctx, client)
 
 
 @client.command(pass_context=True,
@@ -737,13 +637,14 @@ def initialize_players():
         players[server.id] = smart_player(client)
 
 def initialize_admins():
-    admin_list = session.query(Admin).all()
+    #admin_list = session.query(Admin).all()
     for server in client.servers:
-        admins[int(server.id)] = [int(server.owner.id)]
-        admins[int(server.id)].append(int(JOHNYS_ID))
-    for admin in admin_list:
-        admins.setdefault(admin.server_id, [])
-        admins[admin.server_id].append(admin.discord_id)
+        settings = server_settings(session, server)
+        admins[int(server.id)] = [int(admin) for admin in settings.admins_ids]
+        #admins[int(server.id)].append(int(JOHNYS_ID))
+    #for admin in admin_list:
+        #admins.setdefault(admin.server_id, [])
+        #admins[admin.server_id].append(admin.discord_id)
 
 def initialize_roles():
     role_list = session.query(Role).all()
@@ -768,10 +669,10 @@ def initialize_commands():
     command_list = session.query(Command).all()
     for server in client.servers:
         smart_commands.setdefault(int(server.id), [])
-        settings = server_settings(session, server.id)
-        settings.admins_ids = [JOHNYS_ID]
-        settings.bot_commands_channels = []
-        print(settings.admins_ids)
+        #settings = server_settings(session, server)
+        #settings.admins_ids = [JOHNYS_ID]
+        #settings.bot_commands_channels = []
+        #print(settings.admins_ids)
     for command in command_list:
         smart_commands.setdefault(command.server_id, [])
         smart_commands[command.server_id].append(smart_command(command.trigger.replace(str(command.server_id), '', 1), command.response, command.count, client.get_server(str(command.server_id)), command.author_id))
