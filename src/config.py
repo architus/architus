@@ -26,9 +26,7 @@ except Exception as e:
     print('failed to connect to database')
     print(e)
 
-get_class = lambda x: globals()[x]
-
 default_cmds = {}
 for command in command_modules.__all__:
     if command != 'abstract_command':
-        default_cmds[command.replace('_command', '')] = getattr(get_class(command), command)()
+        default_cmds[command.replace('_command', '')] = getattr(globals()[command], command)()
