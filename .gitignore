@@ -1,4 +1,5 @@
 .venv/*
+emojis/*
 *.secret_token
 *.pkl
 __py*

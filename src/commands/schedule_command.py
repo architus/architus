@@ -98,10 +98,10 @@ class schedule_command(abstract_command):
         return title_msg.clean_content or None
 
     def get_help(self):
-        return "!gulag <@member> - hold a gulag vote"
+        return "this is wrong"
 
     def get_usage(self):
-        return "!gulag <@member> - hold a gulag vote"
+        return "<not done>"
 
     def get_timezone(self, region):
         region = str(region)

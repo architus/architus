@@ -45,7 +45,7 @@ class spellcheck_command(abstract_command):
 
 
     def get_help(self):
-        return "!spellcheck"
+        return "Checks the spelling of the user mentioned"
 
     def get_usage(self):
-        return "!spellcheck"
+        return "<@member>"

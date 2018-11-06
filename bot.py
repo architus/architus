@@ -19,10 +19,10 @@ from discord.ext.commands import Bot
 from datetime import datetime
 
 from src.config import secret_token, session, default_cmds
-import src.generate.letmein as letmeingen
 from src.formatter import BetterHelpFormatter
 from src.smart_message import smart_message
 from src.smart_command import smart_command
+from src.emoji_manager import emoji_manager
 from src.list_embed import list_embed, dank_embed
 from src.server_settings import server_settings
 from src.models import User, Admin, Command
@@ -58,18 +58,11 @@ cache = {}
 smart_commands = {}
 karma_dict = {}
 admins = {}
+emoji_managers = {}
 tracked_messages = deque([], maxlen=20)
 deletable_messages = []
 starboarded_messages = []
 
-AUT_EMOJI = "🅱"
-NORM_EMOJI = "reee"
-NORM_EMOJI_B = "💤"
-NICE_EMOJI = "❤"
-TOXIC_EMOJI = "pech"
-TOXIC_EMOJI_B = "👿"
-UN_SELF_AWARENESS_EMOJI = "🤖"
-EDIT_EMOJI = "📝"
 STAR_EMOJI = "⭐"
 
 players = {}
@@ -138,17 +131,8 @@ async def play(ctx):
                 brief="Answers from the beyond.",
                 aliases=['eight_ball', 'eightball', '8-ball'],
                 pass_context=True)
-async def eight_ball(context):
-    possible_responses = [
-        'That is a resounding no',
-        'It is not looking likely',
-        'Too hard to tell',
-        'It is quite possible',
-        'Definitely',
-        'Yep.',
-        'Possibly.'
-    ]
-    await client.say(random.choice(possible_responses) + ", " + context.message.author.mention)
+async def eight_ball(ctx):
+    await default_cmds['eight_ball'].execute(ctx, client)
 
 @client.command(name='quote',
                 description="!quote [messageid] - repost message from the same channel.",
@@ -156,6 +140,24 @@ async def eight_ball(context):
                 pass_context=True)
 async def quote(ctx):
     await default_cmds['quote'].execute(ctx, client)
+
+@client.event
+async def on_server_emojis_update(before, after):
+    try: server = before[0].server
+    except: server = after[0].server
+
+    if len(before) == len(after):
+        diff = [i for i in range(len(after)) if before[i].name != after[i].name]
+        for i in diff:
+            await emoji_managers[server.id].rename_emoji(before[i], after[i])
+
+    elif len(before) > len(after):
+        for emoji in [emoji for emoji in before if emoji not in after]:
+            await emoji_managers[server.id].remove_emoji(emoji)
+
+    elif len(after) > len(before):
+        await emoji_managers[server.id].save_emojis()
+
 
 @client.event
 async def on_server_join(server):
@@ -281,36 +283,16 @@ async def on_reaction_remove(reaction, user):
 @client.command(name='check',
         description="See how autistic one person is",
         brief="check up on one person",
-        aliases=[],
         pass_context=True)
-async def check(context):
-    await client.send_typing(context.message.channel)
-    for member in context.message.mentions:
-        if (member == client.user):
-            await client.send_message(context.message.channel, "Leave me out of this, " + context.message.author.mention)
-            return
-        if (member.id not in karma_dict):
-            karma_dict[member.id] = [2,2,2,2,0]
-            new_user = User(member.id, karma_dict[member.id])
-            session.add(new_user)
-        response = member.display_name + " is "
-        response += ("{:3.1f}% autistic".format(get_autism_percent(member.id)) if (get_autism_percent(member.id) >= get_normie_percent(member.id)) else "{:3.1f}% normie".format(get_normie_percent(member.id)))
-        response += " and " + ("{:3.1f}% toxic".format(get_toxc_percent(member.id)) if (get_toxc_percent(member.id) >= get_nice_percent(member.id)) else "{:3.1f}% nice".format(get_nice_percent(member.id)))
-        response += " with %d bots." % karma_dict[member.id][4]
-        await client.send_message(context.message.channel, response)
+async def check(ctx):
+    await default_cmds['check'].execute(ctx, client, karma_dict=karma_dict, session=session)
 
 @client.command(name='letmein',
         description="!letmein [thing] [@user]",
         brief="meme",
         pass_context=True)
 async def letmein(ctx):
-    args = ctx.message.content.split(' ')
-    del args[0]
-    name = ctx.message.mentions[0].display_name if ctx.message.mentions else args[len(args) - 1]
-    del args[len(args) - 1]
-    letmeingen.generate(name, ' '.join(args))
-    with open('res/meme.png', 'rb') as f:
-        await client.send_file(ctx.message.channel, f, content="Here you go, " + ctx.message.author.mention)
+    await default_cmds['letmein'].execute(ctx, client)
 
 @client.command(name='gulag',
         description="!gulag [@user] - hold a gulag vote",
@@ -320,7 +302,7 @@ async def gulag(ctx):
     await default_cmds['gulag'].execute(ctx, client)
 
 @client.command(name='whois',
-        description="!whois [userid] - get name from user id",
+        description="!whois <userid> - get name from user id",
         brief="check user id",
         pass_context=True)
 async def whois(ctx):
@@ -348,12 +330,15 @@ async def settings(ctx):
 @client.command(pass_context=True)
 async def test(context):
     author = context.message.author
+    server = context.message.channel.server
     if (author.id != JOHNYS_ID and author.id != GHOSTS_ID):
         await client.send_message(context.message.channel, "it works")
         return
-    #await client.change_nickname(context.message.author, 't)
+    await client.change_nickname(server.get_member(client.user.id), 't')
+    await client.send_message(context.message.channel, "```usage:       !gulag <member>\ndescription: Starts a vote to move a member to the gulag. Each vote over the threshold (5) will add additional time.```")
 
-    await client.send_message(context.message.channel, author.avatar_url if author.avatar_url else author.default_avatar_url)
+    await client.send_message(context.message.channel,'<%s>' % author.avatar_url if author.avatar_url else author.default_avatar_url)
+    await client.change_nickname(server.get_member(client.user.id), None)
     #usr = context.message.mentions[0]
     #await client.send_message(context.message.channel, usr.avatar_url if usr.avatar_url else usr.default_avatar_url)
     lem = list_embed('https://giphy.com/gifs/vv41HlvfogHAY', context.message.channel.mention, context.message.author)
@@ -361,14 +346,7 @@ async def test(context):
 
     emojis = client.get_all_emojis()
     for emoji in emojis:
-        if (emoji.name == 'reee'):
-            NORM_EMOJI_OBJ = str(emoji)
-        elif (emoji.name == 'pech'):
-            TOXIC_EMOJI_OBJ = str(emoji)
-
-    await client.send_message(context.message.channel, ":heart:")
-    await client.send_message(context.message.channel, next(client.get_all_emojis()))
-    await client.send_message(context.message.channel, NORM_EMOJI_OBJ)
+        await client.send_message(context.message.channel, emoji.url)
 
 @client.command(name='remove',
         description="Remove users from the spectrum if they are a sad boi",
@@ -387,23 +365,6 @@ def get_datetime(timestamp):
     utc = timestamp.replace(tzinfo=timezone('UTC'))
     est = utc.astimezone(timezone('US/Eastern'))
     return est
-
-def get_autism_percent(m):
-    if (karma_dict[m][0] + karma_dict[m][1] == 0):
-        return 
-    return ((karma_dict[m][0] - karma_dict[m][1]) / (karma_dict[m][0] + karma_dict[m][1])) * 100
-def get_normie_percent(m):
-    if (karma_dict[m][0] + karma_dict[m][1] == 0):
-        return 0
-    return ((karma_dict[m][1] - karma_dict[m][0]) / (karma_dict[m][1] + karma_dict[m][0])) * 100
-def get_nice_percent(m):
-    if (karma_dict[m][2] + karma_dict[m][3] == 0):
-        return 0
-    return ((karma_dict[m][2] - karma_dict[m][3]) / (karma_dict[m][2] + karma_dict[m][3])) * 100
-def get_toxc_percent(m):
-    if (karma_dict[m][2] + karma_dict[m][3] == 0):
-        return 0
-    return ((karma_dict[m][3] - karma_dict[m][2]) / (karma_dict[m][3] + karma_dict[m][2])) * 100
 
 @client.command(name='spectrum',
         description="Vote 👿 for toxic, 🅱️ for autistic, ❤ for nice, and 💤 for normie." ,
@@ -514,13 +475,6 @@ async def log(ctx):
 async def set(ctx):
     await default_cmds['set'].execute(ctx, client, session=session, smart_commands=smart_commands, admins=admins)
 
-def get_custom_emoji(server, emojistr):
-    for emoji in server.emojis:
-        if emoji.name == emojistr:
-            return emoji
-    print('no emoji of name "%s" the server' % emojistr)
-    return None
-
 def log_message(msg):
     url = ''
     try:
@@ -546,8 +500,9 @@ async def on_message(message):
     server = message.channel.server
     cache[server]['messages'][message.channel] = None
     print(log_message(message))
+    settings = server_settings(session, server)
     if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
-        if message.channel == discord.utils.get(server.channels, name='general', type=ChannelType.text):
+        if message.channel == server.default_channel:
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)
             match = parser.search(message.content)
             if match:
@@ -555,12 +510,13 @@ async def on_message(message):
                 url = 'https://' + match.group(1) + match.group(2)
                 await client.send_message(highlights, url)
 
-    if message.content == 'dab' or message.content == 'miss':
-        filtered = filter(lambda role: role.name == "kulak", server.role_hierarchy)
-        try:
-            gulag_role = next(filtered)
-            await self.client.add_roles(ctx.author, gulag_role)
-        except: return
+    args = message.clean_content.split(' ')
+    if args and args[0][0] in BOT_PREFIX:
+        for name, command in default_cmds.items():
+            if args[0][1:] in command.get_aliases():
+                print (command.name)
+                print (command.format_help(args[0], settings=settings))
+
     
     if not message.author.bot:
         await client.process_commands(message)
@@ -621,6 +577,7 @@ async def on_ready():
     initialize_admins()
     initialize_commands()
     initialize_cache()
+    await initialize_emoji_managers()
     print("Logged in as " + client.user.name)
     await client.change_presence(game=Game(name="the tragedy of darth plagueis the wise", url='https://www.twitchquotes.com/copypastas/2202', type=2))
 
@@ -632,19 +589,20 @@ async def list_servers():
             print("%s - %s" % (server.name, server.id))
         await asyncio.sleep(600)
 
+async def initialize_emoji_managers():
+    from src.emoji_manager import emoji_manager
+    for server in client.servers:
+        emoji_managers[server.id] = emoji_manager(server)
+        await emoji_managers[server.id].save_emojis()
+
 def initialize_players():
     for server in client.servers:
         players[server.id] = smart_player(client)
 
 def initialize_admins():
-    #admin_list = session.query(Admin).all()
     for server in client.servers:
         settings = server_settings(session, server)
         admins[int(server.id)] = [int(admin) for admin in settings.admins_ids]
-        #admins[int(server.id)].append(int(JOHNYS_ID))
-    #for admin in admin_list:
-        #admins.setdefault(admin.server_id, [])
-        #admins[admin.server_id].append(admin.discord_id)
 
 def initialize_roles():
     role_list = session.query(Role).all()

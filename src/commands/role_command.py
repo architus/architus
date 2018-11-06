@@ -52,4 +52,4 @@ class role_command(abstract_command):
         return lembed.get_embed()
 
     def get_usage(self):
-        return "!role <role> - give yourself a role"
+        return "<role>"

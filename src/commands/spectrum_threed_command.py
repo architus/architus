@@ -52,10 +52,10 @@ class spectrum_threed_command(abstract_command):
         os.remove('res/%s.webm' % key)
 
     def get_help(self):
-        return "!spectrum - generate a graph of autism\nVote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
+        return "Generate a 3d graph of autism\nVote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
 
     def get_usage(self):
-        return "!spectrum"
+        return ""
 
 
     def get_autism_percent(self, m):

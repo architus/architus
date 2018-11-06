@@ -84,7 +84,7 @@ class play_command(abstract_command):
         await self.client.send_message(self.channel, message)
 
     def get_help(self):
-        return self.get_usage()
+        return "Add a song to the queue or play immediately. Supports youtube and spotify links."
 
     def get_usage(self):
-        return "!<play|add> <url|search>"
+        return "(<url> | <search>)"

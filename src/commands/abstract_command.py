@@ -22,9 +22,13 @@ class abstract_command():
         await self.exec_cmd(**kwargs)
    
     def get_aliases(self):
-        return [self.name] + aliases
+        return [self.name] + self.aliases
 
-    def get_help(self):
+    def format_help(self, invocation, settings=None):
+        self.settings = settings
+        return "```usage:       %s %s\ndescription: %s```" % (invocation, self.get_usage(), self.get_help())
+
+    def get_help(self, settings=None):
         raise NotImplementedError
 
     def get_usage(self):

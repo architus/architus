@@ -20,4 +20,6 @@ class quote_command(abstract_command):
                     return
 
     def get_help(self):
-        return "!quote <messageid> - quotes a previous message in a pretty format"
+        return "Quotes a previous message in a pretty format. https://support.discordapp.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID-"
+    def get_usage(self):
+        return "<messageid>"

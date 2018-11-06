@@ -59,10 +59,10 @@ class set_command(abstract_command):
         await self.client.send_message(self.channel, 'no')
 
     def get_help(self):
-        return "!set <trigger>::<response>\nYou may include the following options:\n[noun],[adj],[adv],[member],[owl],[:reaction:],[count],[comma,separated,choices]"
+        return "Sets a custom command\nYou may include the following options:\n[noun],[adj],[adv],[member],[owl],[:reaction:],[count],[comma,separated,choices]"
 
     def get_usage(self):
-        return "!set <trigger>::<response>"
+        return "<trigger>::<response>"
 
     def update_command(self, triggerkey, response, count, server, author_id, delete=False):
         if (delete):

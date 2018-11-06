@@ -1,4 +1,5 @@
 from discord import ChannelType
+from src.server_settings import server_settings
 from src.commands.abstract_command import abstract_command
 import src.spectrum_gen as spectrum_gen
 import discord
@@ -36,10 +37,10 @@ class spectrum_command(abstract_command):
             await self.client.send_file(self.channel, f, content="Here you go, " + self.author.mention)
 
     def get_help(self):
-        return "!spectrum - generate a graph of autism\nVote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
+        return "Generate a graph of autism\nVote %s for toxic, %s for autistic, %s for nice, and %s for normie." % (self.settings.toxic_emoji, self.settings.aut_emoji, self.settings.nice_emoji, self.settings.norm_emoji)
 
     def get_usage(self):
-        return "!spectrum"
+        return ""
 
 
     def get_autism_percent(self, m):

@@ -52,8 +52,9 @@ class log_command(abstract_command):
                 elif message.attachments:
                     lembed.add(message.author.display_name, message.attachments[0]['url'] or '')
             await self.client.send_message(target_channel, embed=lembed.get_embed())
+
     def get_help(self):
-        return "!spellcheck"
+        return "Returns a formatted list of messages. Can be filtered by user."
 
     def get_usage(self):
-        return "!spellcheck"
+        return "[@member] [count]"

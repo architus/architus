@@ -4,15 +4,15 @@ import src.generate.gulag as gulaggen
 import time
 import discord
 
+GULAG_THRESHOLD = 5
+GULAG_TIME = 5
+GULAG_TIME_ADD = 2
 class gulag_command(abstract_command):
 
     def __init__(self):
         super().__init__("gulag")
 
     async def exec_cmd(self, **kwargs):
-        GULAG_THRESHOLD = 5
-        GULAG_TIME = 5
-        GULAG_TIME_ADD = 2
         server = self.server
         filtered = filter(lambda role: role.name == "kulak", server.role_hierarchy)
         try:
@@ -73,7 +73,7 @@ class gulag_command(abstract_command):
         print('ungulag\'d ' + comrade.display_name)
 
     def get_help(self):
-        return "!gulag <@member> - hold a gulag vote"
+        return "Starts a vote to move a member to the gulag. Each vote over the threshold (%d) will add additional time." % GULAG_THRESHOLD
 
     def get_usage(self):
-        return "!gulag <@member> - hold a gulag vote"
+        return "<@member>"

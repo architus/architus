@@ -55,7 +55,7 @@ class poll_command(abstract_command):
 
 
     def get_help(self):
-        return "!gulag <@member> - hold a gulag vote"
+        return "Starts a poll with some pretty formatting. Supports up to 10 options"
 
     def get_usage(self):
-        return "!gulag <@member> - hold a gulag vote"
+        return '"<title>" <option1>, <option2>,...'
