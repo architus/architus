@@ -330,6 +330,7 @@ async def settings(ctx):
 @client.command(pass_context=True)
 async def test(context):
     author = context.message.author
+    channel = context.message.channel
     server = context.message.channel.server
     if (author.id != JOHNYS_ID and author.id != GHOSTS_ID):
         await client.send_message(context.message.channel, "it works")
@@ -344,9 +345,12 @@ async def test(context):
     lem = list_embed('https://giphy.com/gifs/vv41HlvfogHAY', context.message.channel.mention, context.message.author)
     await client.send_message(context.message.channel, embed=lem.get_embed())
 
-    emojis = client.get_all_emojis()
-    for emoji in emojis:
-        await client.send_message(context.message.channel, emoji.url)
+    await client.send_message(channel, 'bumping: ' + str(server.emojis[3]))
+    await emoji_managers[server.id].bump_emoji(server.emojis[3])
+
+    #emojis = client.get_all_emojis()
+    #for emoji in emojis:
+        #await client.send_message(context.message.channel, emoji.url)
 
 @client.command(name='remove',
         description="Remove users from the spectrum if they are a sad boi",

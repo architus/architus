@@ -39,7 +39,7 @@ class emoji_manager():
 
     def _get_by_priority(self, priority):
         '''returns emoji from self.server'''
-        return discord.utils.get(self.server.emojis, id=next(x for x in self.saved_emojis if x[2] == emoji.id)[2])
+        return discord.utils.get(self.server.emojis, id=next(x for x in self.saved_emojis if int(x[0]) == priority)[2])
 
     async def remove_emoji(self, emoji):
         try:
@@ -50,9 +50,9 @@ class emoji_manager():
 
     async def bump_emoji(self, emoji):
         priority = self._get_priority(emoji)
-        self.rename_emoji(emoji, emoji, after_priority=(priority - (1 if priority > 1 else 0)))
+        await self.rename_emoji(emoji, emoji, after_priority=(priority - (1 if priority > 1 else 0)))
         down_bump_emoji = self._get_by_priority(priority - (1 if priority > 1 else 0))
-        self.rename_emoji(down_bump_emoji, down_bump_emoji, after_priority=priority)
+        await self.rename_emoji(down_bump_emoji, down_bump_emoji, after_priority=priority)
 
     async def rename_emoji(self, before, after, after_priority=None):
         try:
