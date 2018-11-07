@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 import random
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 
 import matplotlib.pyplot as plt
 
