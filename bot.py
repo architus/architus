@@ -22,7 +22,7 @@ from src.config import secret_token, session, default_cmds
 from src.formatter import BetterHelpFormatter
 from src.smart_message import smart_message
 from src.smart_command import smart_command
-from src.emoji_manager import emoji_manager
+from src.emoji_manager_real import emoji_manager
 from src.list_embed import list_embed, dank_embed
 from src.server_settings import server_settings
 from src.models import User, Admin, Command
@@ -146,17 +146,19 @@ async def on_server_emojis_update(before, after):
     try: server = before[0].server
     except: server = after[0].server
 
-    if len(before) == len(after):
+    if len(before) == len(after): # if renamed
         diff = [i for i in range(len(after)) if before[i].name != after[i].name]
         for i in diff:
             await emoji_managers[server.id].rename_emoji(before[i], after[i])
 
-    elif len(before) > len(after):
+    elif len(before) > len(after): # if removed
         for emoji in [emoji for emoji in before if emoji not in after]:
-            await emoji_managers[server.id].remove_emoji(emoji)
+            emoji_managers[server.id].del_emoji(emoji)
 
-    elif len(after) > len(before):
-        await emoji_managers[server.id].save_emojis()
+    elif len(after) > len(before): # if added
+        for emoji in [emoji for emoji in after if emoji not in before]:
+            print(emoji)
+            await emoji_managers[server.id].add_emoji(emoji)
 
 
 @client.event
@@ -328,6 +330,10 @@ async def settings(ctx):
     await default_cmds['settings'].execute(ctx, client, session=session)
 
 @client.command(pass_context=True)
+async def emojis(ctx):
+    await client.send_message(ctx.message.channel, '```' + '\n'.join(emoji_managers[ctx.message.channel.server.id].list_unloaded()) + '```')
+
+@client.command(pass_context=True)
 async def test(context):
     author = context.message.author
     channel = context.message.channel
@@ -346,7 +352,8 @@ async def test(context):
     await client.send_message(context.message.channel, embed=lem.get_embed())
 
     await client.send_message(channel, 'bumping: ' + str(server.emojis[3]))
-    await emoji_managers[server.id].bump_emoji(server.emojis[3])
+    #await emoji_managers[server.id].bump_emoji(server.emojis[3])
+    await emoji_managers[server.id].save_emojis_disk()
 
     #emojis = client.get_all_emojis()
     #for emoji in emojis:
@@ -514,8 +521,10 @@ async def on_message(message):
                 url = 'https://' + match.group(1) + match.group(2)
                 await client.send_message(highlights, url)
 
+    if not message.author.bot: await emoji_managers[server.id].scan(message)
+
     args = message.clean_content.split(' ')
-    if args and args[0][0] in BOT_PREFIX:
+    if args and args[0] and args[0][0] in BOT_PREFIX:
         for name, command in default_cmds.items():
             if args[0][1:] in command.get_aliases():
                 print (command.name)
@@ -594,10 +603,10 @@ async def list_servers():
         await asyncio.sleep(600)
 
 async def initialize_emoji_managers():
-    from src.emoji_manager import emoji_manager
+    from src.emoji_manager_real import emoji_manager
     for server in client.servers:
-        emoji_managers[server.id] = emoji_manager(client, server)
-        await emoji_managers[server.id].save_emojis()
+        emoji_managers[server.id] = emoji_manager(client, server, deletable_messages)
+        await emoji_managers[server.id].clean()
 
 def initialize_players():
     for server in client.servers:
