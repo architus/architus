@@ -16,6 +16,12 @@ class quote_command(abstract_command):
                     em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
                     em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
                     em.set_footer(text='#'+channel.name)
+                    try:
+                        if message.embeds:
+                            em.set_image(url=message.embeds[0]['url'])
+                        elif message.attachments:
+                            em.set_image(url=message.attachments[0]['url'])
+                    except: print("tried to attach image, couldn't")
                     await self.client.send_message(self.channel, embed=em)
                     return
 
