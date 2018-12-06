@@ -22,7 +22,7 @@ from src.config import secret_token, session, default_cmds
 from src.formatter import BetterHelpFormatter
 from src.smart_message import smart_message
 from src.smart_command import smart_command
-from src.emoji_manager_real import emoji_manager
+from src.emoji_manager import emoji_manager
 from src.list_embed import list_embed, dank_embed
 from src.server_settings import server_settings
 from src.models import User, Admin, Command
@@ -603,7 +603,7 @@ async def list_servers():
         await asyncio.sleep(600)
 
 async def initialize_emoji_managers():
-    from src.emoji_manager_real import emoji_manager
+    from src.emoji_manager import emoji_manager
     for server in client.servers:
         emoji_managers[server.id] = emoji_manager(client, server, deletable_messages)
         await emoji_managers[server.id].clean()
