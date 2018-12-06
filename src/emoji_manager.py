@@ -18,7 +18,7 @@ class emoji_manager():
         except: pass
 
     def list_unloaded(self):
-        return os.listdir(EMOJI_DIR + '/' + self.server.id)
+        return os.listdir(EMOJI_DIR + '/' + self.server.id) or ['No cached emojis']
 
     async def clean(self):
         '''renames any emoji on the server that shares a name with an emoji on the disk or on the server'''
@@ -39,17 +39,21 @@ class emoji_manager():
         emojis = pattern.finditer(message.content)
         for emojistr in emojis:
             if emojistr.group('nameonly'):
+                try:
+                    emoji = await self.bump_emoji(emojistr.group('nameonly'))
+                except Exception as e:
+                    print(e)
+                    continue
+                if not emoji: continue
                 self.deletable_messages.append(message.id)
                 await self.client.delete_message(message)
-                emoji = await self.bump_emoji(emojistr.group('nameonly'))
                 send_message(message.channel,
                         message.content.replace(':%s:' % emojistr.group('nameonly'), str(emoji)),
                         username=message.author.display_name,
                         avatar_url=message.author.avatar_url,
                         embeds=message.embeds
                 )
-                #r = requests.post('https://discordapp.com/api/webhooks/509399067139244033/tYPM7VBadNoZb20pNAaAS9NoVa17squmKO74E7o63dY0Cwh_BKyrI1TryA7IWugDdpyA', data={'username': message.author.display_name, 'avatar_url': message.author.avatar_url, 'content': message.content.replace(':%s:'%emojistr.group('nameonly'), str(emoji))})
-                #await self.client.send_message(message.channel, message.content)
+                break
 
             elif emojistr.group('name'):
                 emoji = discord.utils.get(self.server.emojis, id=emojistr.group('id'), name=emojistr.group('name'))
@@ -78,7 +82,6 @@ class emoji_manager():
                 self._priorities[i-1] = emoji
         else:
             image = await self._load(emoji)
-            os.remove(self._path(emoji))
             return await self.client.create_custom_emoji(self.server, name=emoji, image=image)
 
     def del_emoji(self, emoji):
@@ -97,6 +100,7 @@ class emoji_manager():
         f = await aiofiles.open(self._path(emoji), 'rb')
         binary = await f.read()
         await f.close()
+        os.remove(self._path(emoji))
         return binary
     
     async def _save(self, emoji):
