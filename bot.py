@@ -525,6 +525,7 @@ async def on_message(message):
 
     args = message.clean_content.split(' ')
     if args and args[0] and args[0][0] in BOT_PREFIX:
+        pass
         for name, command in default_cmds.items():
             if args[0][1:] in command.get_aliases():
                 print (command.name)
