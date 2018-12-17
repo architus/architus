@@ -85,6 +85,15 @@ class server_settings:
         self._update_db()
 
     @property
+    def repost_del_msg(self) -> bool:
+        return self._settings_dict['repost_del_msg'] if 'repost_del_msg' in self._settings_dict else False
+
+    @repost_del_msg.setter
+    def repost_del_msg(self, new_setting: bool):
+        self._settings_dict['repost_del_msg'] = new_setting
+        self._update_db()
+
+    @property
     def norm_emoji(self) -> str:
         return self._settings_dict['norm_emoji'] if 'norm_emoji' in self._settings_dict else "💤"
 

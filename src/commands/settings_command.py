@@ -17,7 +17,7 @@ class settings_command(abstract_command):
             return
         if 'defaultrole' in self.content.lower():
             settings.default_role_id = self.message.role_mentions[0].id
-        elif 'botcommands' in self.content.lower():
+        elif 'bot-commands' in self.content.lower():
             bc_channels = settings.bot_commands_channels
             new_channels = self.message.channel_mentions or [self.channel.id]
 
@@ -41,6 +41,9 @@ class settings_command(abstract_command):
             settings.norm_emoji = self.args[2]
         elif 'edit-emoji' in self.content.lower():
             settings.edit_emoji = self.args[2]
+        elif 'repost-deletes' in self.content.lower():
+            settings.repost_del_msg = True if self.args[2] in ['1','True','true','yes'] else False
+
 
         elif 'admin' in self.content.lower():
             if self.message.mentions[0].id in settings.admins_ids:

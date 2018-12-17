@@ -1,4 +1,5 @@
 from src.commands.abstract_command import abstract_command
+from unidecode import unidecode
 import time
 import re
 import discord
@@ -21,7 +22,7 @@ class poll_command(abstract_command):
 
     async def exec_cmd(self, **kwargs):
         pattern = re.compile('!poll (?P<title>(?:".+")|(?:[^ ]+)) (?P<options>.*$)')
-        match = pattern.search(self.content)
+        match = pattern.search(unidecode(self.content))
         if not match: return
         
         votes = [[],[],[],[],[],[],[],[],[],[]]

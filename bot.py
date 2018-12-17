@@ -170,7 +170,8 @@ async def on_server_join(server):
 
 @client.event
 async def on_message_delete(message):
-    if message.author != client.user and message.id not in deletable_messages:
+    settings = server_settings(session, message.channel.server)
+    if message.author != client.user and message.id not in deletable_messages and settings.repost_del_msg:
         est = get_datetime(message.timestamp)
         em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xff002a)
         em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
@@ -439,14 +440,14 @@ async def role(ctx):
 
 @client.command(name='spellcheck',
                 description="!spellcheck [@user] - calculate % of correctly spelled words",
-                brief="Check spelling of user.", 
+                brief="Check spelling of user.",
                 pass_context=True)
 async def spellcheck(ctx):
     await default_cmds['spellcheck'].execute(ctx, client, cache=cache)
 
 @client.command(name='messagecount',
                 description="!messagecount [@user] - count number of messages sent in the server",
-                brief="Count sent messages.", 
+                brief="Count sent messages.",
                 pass_context=True)
 async def messagecount(ctx):
     ctxchannel = ctx.message.channel
@@ -524,14 +525,13 @@ async def on_message(message):
     if not message.author.bot: await emoji_managers[server.id].scan(message)
 
     args = message.clean_content.split(' ')
-    if args and args[0] and args[0][0] in BOT_PREFIX:
-        pass
+    if args and args[0] and args[0][0] in BOT_PREFIX and False:
         for name, command in default_cmds.items():
             if args[0][1:] in command.get_aliases():
                 print (command.name)
                 print (command.format_help(args[0], settings=settings))
 
-    
+
     if not message.author.bot:
         await client.process_commands(message)
         for command in smart_commands[int(message.channel.server.id)]:
