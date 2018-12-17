@@ -32,7 +32,7 @@ class server_settings:
     @property
     def admins_ids(self) -> list:
         default_admins = [self.server.owner.id, '214037134477230080']
-        return default_admins + self._settings_dict['admins'] if 'admins' in self._settings_dict else []
+        return default_admins + self._settings_dict['admins'] if 'admins' in self._settings_dict else default_admins
 
     @admins_ids.setter
     def admins_ids(self, new_admins: list):
