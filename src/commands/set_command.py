@@ -41,11 +41,12 @@ class set_command(abstract_command):
                 self.session.commit()
                 msg = 'command set'
             elif parser.group(2) == "remove" or parser.group(2) == " remove":
+                msg = 'no command with that trigger'
                 for oldcommand in smart_commands[int(server.id)]:
                     if oldcommand == command:
                         smart_commands[int(server.id)].remove(oldcommand)
                         self.update_command(oldcommand.raw_trigger, '', 0, server, self.author.id, delete=True)
-                        msg = 'removed'
+                        msg = 'removed ' + oldcommand.raw_trigger + "::" + oldcommand.raw_response
             elif parser.group(2) == "list" or parser.group(2) == " list":
                 for oldcommand in smart_commands[int(server.id)]:
                     if oldcommand == command:
