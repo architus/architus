@@ -1,9 +1,9 @@
 from src.commands.abstract_command import abstract_command
-import enchant
 from discord import ChannelType
 import time
 import re
 import discord
+import json
 LINHS_ID = '81231616772411392'
 
 class spellcheck_command(abstract_command):
@@ -18,7 +18,8 @@ class spellcheck_command(abstract_command):
         blacklist = []
         blacklist.append(discord.utils.get(self.server.channels, name='bot-commands', type=ChannelType.text))
         blacklist.append(discord.utils.get(self.server.channels, name='private-bot-commands', type=ChannelType.text))
-        d = enchant.Dict("en_US")
+        with open('res/words/words.json') as f:
+            d = json.loads(f.read())
         correct_words = 0
         words = 1
         victim = self.message.mentions[0]
@@ -35,6 +36,7 @@ class spellcheck_command(abstract_command):
                     for msg in msgs:
                         if msg.author == victim:
                             for word in msg.clean_content.split():
+                                if word[0] == '!': continue
                                 words += 1
                                 if d.check(word) and len(word) > 1 or word in ['a','i', 'A', 'I']:
                                     correct_words += 1

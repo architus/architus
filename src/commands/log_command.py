@@ -1,6 +1,5 @@
 from src.commands.abstract_command import abstract_command
 from src.list_embed import list_embed, dank_embed
-import enchant
 from discord import ChannelType
 import time
 import re
