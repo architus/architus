@@ -19,7 +19,6 @@ from discord.ext.commands import Bot
 from datetime import datetime
 
 from src.config import secret_token, session, default_cmds
-from src.formatter import BetterHelpFormatter
 from src.smart_message import smart_message
 from src.smart_command import smart_command
 from src.emoji_manager import emoji_manager
@@ -66,8 +65,7 @@ starboarded_messages = []
 STAR_EMOJI = "⭐"
 
 players = {}
-from discord.ext.commands.formatter import HelpFormatter
-client = Bot(command_prefix=BOT_PREFIX)#, formatter=HelpFormatter)
+client = Bot(command_prefix=BOT_PREFIX)
 #client.remove_command('help')
 
 @client.command(name='skip',
@@ -394,7 +392,7 @@ async def spectrum(ctx):
         pass_context=True)
 @commands.cooldown(1, 20, commands.BucketType.server)
 async def spectrum3d(ctx):
-    await default_cmds['spectrum_3d'].execute(ctx, client, karma_dict=karma_dict)
+    await default_cmds['spectrum_threed'].execute(ctx, client, karma_dict=karma_dict)
 
 
 @client.command(name='purge',

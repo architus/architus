@@ -1,7 +1,7 @@
 from discord import ChannelType
 from src.server_settings import server_settings
 from src.commands.abstract_command import abstract_command
-import src.spectrum_gen as spectrum_gen
+import src.generate.spectrum_gen as spectrum_gen
 import discord
 
 class spectrum_command(abstract_command):
