@@ -9,7 +9,7 @@ import discord
 class set_command(abstract_command):
 
     def __init__(self):
-        super().__init__("set")
+        super().__init__("set", aliases=["remove"])
 
     async def exec_cmd(self, **kwargs):
         self.session = kwargs['session']
@@ -24,7 +24,8 @@ class set_command(abstract_command):
                 if botcommands:
                     await self.client.send_message(self.channel, botcommands.mention + '?')
                     return
-
+        if self.args[0] == '!remove':
+            self.content = '!set %s::remove' % self.content.replace('!remove ', '')
         parser = re.search('!set (.+)::(.+)', self.content, re.IGNORECASE)
         msg = "try actually reading the syntax"
         if parser and len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and server.default_role.mention not in parser.group(2) or from_admin:
@@ -46,7 +47,7 @@ class set_command(abstract_command):
                     if oldcommand == command:
                         smart_commands[int(server.id)].remove(oldcommand)
                         self.update_command(oldcommand.raw_trigger, '', 0, server, self.author.id, delete=True)
-                        msg = 'removed ' + oldcommand.raw_trigger + "::" + oldcommand.raw_response
+                        msg = 'removed `' + oldcommand.raw_trigger + "::" + oldcommand.raw_response + '`'
             elif parser.group(2) == "list" or parser.group(2) == " list":
                 for oldcommand in smart_commands[int(server.id)]:
                     if oldcommand == command:
@@ -62,6 +63,10 @@ class set_command(abstract_command):
                             msg = usr.name + '#' + usr.discriminator
                         except:
                             msg = 'idk'
+            else:
+                for oldcommand in smart_commands[int(server.id)]:
+                    if oldcommand == command:
+                        msg = 'Remove `%s` first' % (oldcommand.raw_trigger)
         elif parser and len(parser.group(2)) >= 200:
             msg = 'too long, sorry. ask the owner to set it'
         elif parser and len(parser.group(1)) > 1:
@@ -69,7 +74,7 @@ class set_command(abstract_command):
         await self.client.send_message(self.channel, msg)
 
     def get_help(self):
-        return "Sets a custom command\nYou may include the following options:\n[noun],[adj],[adv],[member],[owl],[:reaction:],[count],[comma,separated,choices]"
+        return "Sets a custom command\nYou may include the following options:\n[noun], [adj], [adv], [member], [owl], [:reaction:], [count], [comma,separated,choices]"
 
     def get_usage(self):
         return "<trigger>::<response>"

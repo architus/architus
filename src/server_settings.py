@@ -11,6 +11,64 @@ class server_settings:
         self._settings_dict = self._load_from_db(self.server_id)
 
     @property
+    def roles_dict(self) -> dict:
+        return self._settings_dict['roles_dict'] if 'roles_dict' in self._settings_dict else {}
+
+    @roles_dict.setter
+    def roles_dict(self, roles_dict: dict):
+        self._settings_dict['roles_dict']
+        self._update_db()
+
+    @property
+    def default_role_id(self) -> str:
+        return self._settings_dict['default_role'] if 'default_role' in self._settings_dict else ''
+
+    @default_role_id.setter
+    def default_role_id(self, new_id: str):
+        self._settings_dict['default_role'] = new_id
+        self._update_db()
+
+    @property
+    def bot_commands_channels(self) -> list:
+        return self._settings_dict['bot_commands'] if 'bot_commands' in self._settings_dict else []
+
+    @bot_commands_channels.setter
+    def bot_commands_channels(self, new_bot_commands: list):
+        print (new_bot_commands)
+        self._settings_dict['bot_commands'] = new_bot_commands
+        self._update_db()
+
+    @property
+    def admins_ids(self) -> list:
+
+        self._settings_dict = self._load_from_db(self.server_id)
+
+    @property
+    def default_role_id(self) -> str:
+        return self._settings_dict['default_role'] if 'default_role' in self._settings_dict else ''
+
+    @default_role_id.setter
+    def default_role_id(self, new_id: str):
+        self._settings_dict['default_role'] = new_id
+        self._update_db()
+
+    @property
+    def bot_commands_channels(self) -> list:
+        return self._settings_dict['bot_commands'] if 'bot_commands' in self._settings_dict else []
+
+    @bot_commands_channels.setter
+    def bot_commands_channels(self, new_bot_commands: list):
+        print (new_bot_commands)
+        self._settings_dict['bot_commands'] = new_bot_commands
+        self._update_db()
+
+    @property
+    def admins_ids(self) -> list:
+
+        self.server = server
+        self._settings_dict = self._load_from_db(self.server_id)
+
+    @property
     def default_role_id(self) -> str:
         return self._settings_dict['default_role'] if 'default_role' in self._settings_dict else ''
 
@@ -100,6 +158,15 @@ class server_settings:
     @norm_emoji.setter
     def norm_emoji(self, new_emoji: str):
         self._settings_dict['norm_emoji'] = new_emoji
+        self._update_db()
+
+    @property
+    def manage_emojis(self) -> bool:
+        return self._settings_dict['manage_emojis'] if 'manage_emojis' in self._settings_dict else False
+
+    @manage_emojis.setter
+    def manage_emojis(self, manage_emojis: bool):
+        self._settings_dict['manage_emojis'] = manage_emojis
         self._update_db()
 
     @property

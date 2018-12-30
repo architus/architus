@@ -31,14 +31,11 @@ from src.commands.quote_command import quote_command
 BOT_PREFIX = ("?", "!")
 TOKEN = secret_token
 
-PECHS_ID = '178700066091958273'
 JOHNYS_ID = '214037134477230080'
 GHOSTS_ID = '471864040998699011'
 MATTS_ID = '168722115447488512'
 SIMONS_ID = '103027947786473472'
-MONKEYS_ID = '189528269547110400'
 RYTHMS_ID = '235088799074484224'
-LINHS_ID = '81231616772411392'
 
 
 ROLES_DICT = {
@@ -48,7 +45,9 @@ ROLES_DICT = {
     "pink" : "pink",
     "back on top soon" : "🔙🔛🔝🔜",
     "nsfw" : "nsfw",
-    "pugger" : "pugger"
+    "pugger" : "pugger",
+    "prugger" : "prugger",
+    "gw" : "guild wars"
 }
 
 DEFAULT_ROLE = 'Admin'
@@ -57,8 +56,9 @@ cache = {}
 smart_commands = {}
 karma_dict = {}
 admins = {}
+settings_dict = {}
 emoji_managers = {}
-tracked_messages = deque([], maxlen=20)
+tracked_messages = deque([], maxlen=30)
 deletable_messages = []
 starboarded_messages = []
 
@@ -161,10 +161,8 @@ async def on_server_emojis_update(before, after):
 
 @client.event
 async def on_server_join(server):
-    players[server.id] = smart_player()
-    admins[int(server.id)] = [int(server.owner.id)]
-    smart_commands[int(server.id)] = []
-    cache[server] = {"messages": {}}
+    print("JOINED NEW SERVER: %s - %s (%s)" % (server.name, server.id, server.member_count))
+    await on_ready()
 
 @client.event
 async def on_message_delete(message):
@@ -358,12 +356,12 @@ async def test(context):
     #for emoji in emojis:
         #await client.send_message(context.message.channel, emoji.url)
 
-@client.command(name='remove',
+@client.command(name='removespec',
         description="Remove users from the spectrum if they are a sad boi",
         brief="Remove user from the spectrum",
         aliases=[],
         pass_context=True)
-async def remove(context):
+async def removespec(context):
     server = context.message.channel.server
     for member in context.message.mentions:
         if (member.id in karma_dict):
@@ -481,6 +479,7 @@ async def log(ctx):
 
 @client.command(pass_context=True,
                 description="!set trigger::response - use [adj], [adv], [noun], [member], [owl], [comma,separated items], [author], [capture], [count], or [:<react>:] in your response.  Set response to 'remove' to remove.",
+                aliases=['remove'],
                 brief="create custom command")
 async def set(ctx):
     await default_cmds['set'].execute(ctx, client, session=session, smart_commands=smart_commands, admins=admins)
@@ -584,6 +583,7 @@ async def starboard_post(message, server):
 
 @client.event
 async def on_ready():
+    initialize_settings()
     initialize_players()
     initialize_scores()
     initialize_admins()
@@ -598,7 +598,7 @@ async def list_servers():
     while not client.is_closed:
         print("Current servers:")
         for server in client.servers:
-            print("%s - %s" % (server.name, server.id))
+            print("%s - %s (%s)" % (server.name, server.id, server.member_count))
         await asyncio.sleep(600)
 
 async def initialize_emoji_managers():
@@ -610,6 +610,10 @@ async def initialize_emoji_managers():
 def initialize_players():
     for server in client.servers:
         players[server.id] = smart_player(client)
+
+def initialize_settings():
+    for server in client.servers:
+        settings_dict[server] = server_settings(session, server)
 
 def initialize_admins():
     for server in client.servers:

@@ -25,7 +25,7 @@ class emoji_manager():
         print("renaming dupes")
         names = os.listdir(EMOJI_DIR + '/' + self.server.id)
         for emoji in self.server.emojis:
-            count = 1
+            cunt = 1
             name = emoji.name
             if name in names:
                 while name + str(count) in names:
@@ -33,6 +33,10 @@ class emoji_manager():
                 print("renaming %s to %s" % (emoji.name, emoji.name + str(count)))
                 await self.client.edit_custom_emoji(emoji, name=emoji.name + str(count))
             names.append(emoji.name)
+        if len(self.server.emojis) > MAX_ENABLED:
+            print("caching one emoji...")
+            await self.client.delete_custom_emoji(self.server.emojis[-1])
+
 
     async def scan(self, message):
         pattern = re.compile('(?:<:(?P<name>\w+):(?P<id>\d+)>)|(?::(?P<nameonly>\w+):)')
@@ -94,7 +98,7 @@ class emoji_manager():
             return "%s/%s/%s" % (EMOJI_DIR, self.server.id, emoji.name)
         except:
             return "%s/%s/%s" % (EMOJI_DIR, self.server.id, emoji)
-    
+
     async def _load(self, emoji):
         print('loaded ' + str(emoji))
         f = await aiofiles.open(self._path(emoji), 'rb')
@@ -102,7 +106,7 @@ class emoji_manager():
         await f.close()
         os.remove(self._path(emoji))
         return binary
-    
+
     async def _save(self, emoji):
         print('saving ' + str(emoji))
         '''load all emojis in the server into memory'''

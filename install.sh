@@ -11,6 +11,7 @@ declare -a requirements=(
     discord
     matplotlib
     pytz
+    PyNaCl
     pillow
     psycopg2-binary
     sqlalchemy

@@ -1,4 +1,7 @@
 import os, random
+from threading import Thread
+import multiprocessing as mp
+
 import discord
 #from queue import Queue
 from collections import deque
@@ -41,6 +44,8 @@ class smart_player:
         print("starting " + url)
         try:
             self.player = await self.voice.create_ytdl_player(url, after=self.agane)
+            #thread = Thread(target = self.player.start)
+            #thread.start()
             self.player.start()
             if not self.name:
                 self.name = self.player.title
@@ -120,6 +125,8 @@ class smart_player:
 
     async def add_url(self, url):
         self.q.appendleft(url)
+        if 'spotify' in url:
+            return spotify_tools.generate_metadata(url)['name']
 
     async def add_url_now(self, url):
         self.q.append(url)

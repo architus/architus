@@ -33,29 +33,29 @@ class play_command(abstract_command):
                     for track in urls:
                         await player.add_url(track)
                     if (name):
-                        message += "\nPlaying: " + name
+                        message += "\n🎶 **Playing:** *%s*" % name
                 except:
                     message = "something went badly wrong please spam my creator with pings"
             elif ('/track/' in arg[1]):
                 if (add):
                     name = await player.add_url(arg[1]);
                     if (name):
-                        message = 'Added: ' + name
+                        message = '**Queued:** *%s*' % name
                 else:
                     await player.add_url_now(arg[1]);
                     name = await player.play()
                     if (name):
-                        message = "Now playing: " + name
+                        message = "🎶 **Now playing:** *%s*" % name
             elif ('youtu' in arg[1]):
                 if (add):
                     await player.add_url(arg[1])
-                    message = 'Added'
+                    message = '**Queued**'
                 else:
                     player.pause()
                     await player.add_url_now(arg[1])
                     name = await player.play()
                     if (name):
-                        message = "Playing " + name
+                        message = "🎶 **Playing:** *%s*" % name
             elif ('town' in arg[1] or 'encounter' in arg[1] or 'boss' in arg[1] or 'exploration' in arg[1]):
                 message = "Please pass in the url of the playlist."
             else:
@@ -63,19 +63,19 @@ class play_command(abstract_command):
                 url = await player.get_youtube_url(' '.join(arg))
                 if (add):
                     await player.add_url(url)
-                    message = "Added: " + url
+                    message = "**Queued:** *%s*" % url
                 else:
                     await player.add_url_now(url)
                     name = await player.play()
                     if (name):
-                        message = "Now Playing: " + url
+                        message = "🎶 **Now Playing:** " + url
         else:
             if (len(player.q) == 0):
                 message = "Play what, " + self.author.mention + "?"
             else:
                 name = await player.play()
                 if (name):
-                    message = "Now playing: " + name
+                    message = "🎶 **Now playing:** *%s*" % name
 
         print ('q ' + str(len(player.q)))
         for song in list(player.q):
