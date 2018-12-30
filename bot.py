@@ -78,7 +78,7 @@ async def skip(context):
     player = players[context.message.channel.server.id]
     name = await player.skip()
     if (name):
-        await client.send_message(context.message.channel, "Now playing: " + name)
+        await client.send_message(context.message.channel, "🎶 **Now playing:** *%s*" % name)
     else:
         await client.send_message(context.message.channel, "No songs left. nice job. bye.")
         if (player.is_connected()):
