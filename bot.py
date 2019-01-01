@@ -115,7 +115,7 @@ async def resume(context):
 @client.command(name='play',
                 description="![play|add] [url|search]",
                 brief="play tunes",
-                aliases=['add'],
+                aliases=['add', 'playnow'],
                 pass_context=True)
 @commands.cooldown(1, 2, commands.BucketType.server)
 async def play(ctx):

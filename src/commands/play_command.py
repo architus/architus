@@ -20,7 +20,7 @@ class play_command(abstract_command):
             player.voice.move_to(self.author.voice.voice_channel)
 
         arg = self.content.split(' ')
-        add = arg[0] == '!add'
+        add = arg[0] != '!playnow' and (player.q or (player.player and player.player.is_playing()))
         message = ''
         if (len(arg) > 1):
             if ('/playlist/' in arg[1]):
