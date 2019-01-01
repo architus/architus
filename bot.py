@@ -81,8 +81,6 @@ async def skip(context):
         await client.send_message(context.message.channel, "🎶 **Now playing:** *%s*" % name)
     else:
         await client.send_message(context.message.channel, "No songs left. nice job. bye.")
-        if (player.is_connected()):
-            await player.voice.disconnect()
 
 @client.command(name='pause',
                 description="Pauses current song",
@@ -167,6 +165,7 @@ async def on_server_join(server):
 @client.event
 async def on_message_delete(message):
     settings = server_settings(session, message.channel.server)
+    print(message)
     if message.author != client.user and message.id not in deletable_messages and settings.repost_del_msg:
         est = get_datetime(message.timestamp)
         em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xff002a)
@@ -179,9 +178,8 @@ async def on_message_delete(message):
         for sm in tracked_messages:
             if (sm.peek().id == message.id):
                 sm.embed = del_msg
-    else:
-        if message.id in deletable_messages:
-            deletable_messages.remove(message.id)
+    elif message.id in deletable_messages:
+        deletable_messages.remove(message.id)
 
 @client.event
 async def on_message_edit(before, after):
