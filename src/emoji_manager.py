@@ -33,7 +33,7 @@ class emoji_manager():
                 print("renaming %s to %s" % (emoji.name, emoji.name + str(count)))
                 await self.client.edit_custom_emoji(emoji, name=emoji.name + str(count))
             names.append(emoji.name)
-        if len(self.server.emojis) > MAX_ENABLED:
+        if len(self.server.emojis) > MAX_ENABLED and False:
             print("caching one emoji...")
             await self.client.delete_custom_emoji(self.server.emojis[-1])
 

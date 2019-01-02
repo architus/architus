@@ -92,6 +92,18 @@ async def pause(context):
     player = players[context.message.channel.server.id]
     player.pause()
 
+@client.command(name='queue',
+                description="Displayes a the list of queued songs",
+                brief="Show queued songs",
+                aliases=['q'],
+                pass_context=True)
+async def queue(ctx):
+    if ctx.message.channel.server.get_member(RYTHMS_ID): return
+    await client.send_typing(ctx.message.channel)
+    player = players[ctx.message.channel.server.id]
+    await client.send_message(ctx.message.channel, embed=player.qembed())
+
+
 @client.command(name='clear',
                 description="Remove all songs from queue.",
                 brief="clear queue",
@@ -117,9 +129,10 @@ async def resume(context):
                 brief="play tunes",
                 aliases=['add', 'playnow'],
                 pass_context=True)
-@commands.cooldown(1, 2, commands.BucketType.server)
+@commands.cooldown(1, 1, commands.BucketType.server)
 async def play(ctx):
     if ctx.message.channel.server.get_member(RYTHMS_ID): return
+    await client.send_typing(ctx.message.channel)
     await default_cmds['play'].execute(ctx, client, players=players)
 
 @client.command(name='8ball',

@@ -11,6 +11,7 @@ import asyncio
 import aiohttp
 #import urllib2
 from bs4 import BeautifulSoup
+from src.list_embed import list_embed
 
 
 
@@ -31,7 +32,7 @@ class smart_player:
             return await self.skip()
         self.stop()
         self.name = ''
-        url = self.q.pop()
+        url = self.q.pop().url
         print("starting " + url)
         if ('spotify' in url):
             url = await self.spotify_to_youtube(url)
@@ -119,12 +120,12 @@ class smart_player:
         return info
 
     async def add_url(self, url):
-        self.q.appendleft(url)
-        if 'spotify' in url:
-            return spotify_tools.generate_metadata(url)['name']
+        self.q.appendleft(Song(url=url))
+        #if 'spotify' in url:
+            #return spotify_tools.generate_metadata(url)['name']
 
     async def add_url_now(self, url):
-        self.q.append(url)
+        self.q.append(Song(url=url))
 
     async def get_youtube_url(self, search):
         async with aiohttp.ClientSession() as session:
@@ -160,7 +161,6 @@ class smart_player:
         if (self.player == None):
             return
         old_name = self.name
-        if self.q: print(self.q[0])
         if (len(self.q) < 1):
             print("len was less than 1")
             await self.voice.disconnect()
@@ -177,8 +177,15 @@ class smart_player:
     def clearq(self):
         self.q.clear()
 
-    def readq(self):
-        return list(self.q)
+    def qembed(self):
+        name = self.name or "None"
+        lem = list_embed("Currently Playing:", "*%s*" % name, self.client.user)
+        lem.color = 0x6600ff
+        lem.icon_url = ''
+        lem.name = "Song Queue"
+        for i in range(len(self.q)):
+            lem.add("%d. *Song*" % (i + 1), self.q[i].url)
+        return lem.get_embed()
 
     def is_connected(self):
         return self.voice != None and self.voice.is_connected()
@@ -197,3 +204,12 @@ class smart_player:
             # an error happened sending the message
             pass
         #await self.play()
+
+class Song:
+    def __init__(self, url=None, query=None):
+        if url:
+            self.url = url
+        elif query:
+            self.query = query
+        else:
+            raise ValueError("must supply query or url")

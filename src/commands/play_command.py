@@ -39,8 +39,8 @@ class play_command(abstract_command):
             elif ('/track/' in arg[1]):
                 if (add):
                     name = await player.add_url(arg[1]);
-                    if (name):
-                        message = '**Queued:** *%s*' % name
+                    #if (name):
+                        #message = '**Queued:** *%s*' % name
                 else:
                     await player.add_url_now(arg[1]);
                     name = await player.play()
@@ -77,9 +77,9 @@ class play_command(abstract_command):
                 if (name):
                     message = "🎶 **Now playing:** *%s*" % name
 
-        print ('q ' + str(len(player.q)))
-        for song in list(player.q):
-            print ('song: ' + song)
+        #print ('q ' + str(len(player.q)))
+        #for song in list(player.q):
+            #print ('song: ' + song)
 
         await self.client.send_message(self.channel, message)
 
