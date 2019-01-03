@@ -1,4 +1,5 @@
 import os, random
+import youtube_dl
 from threading import Thread
 import multiprocessing as mp
 
@@ -21,11 +22,9 @@ class smart_player:
         self.q = deque()
         self.player = None
         self.voice = None
-        self.setting = ''
-        self.goAgane = False
         self.name = ''
 
-    async def play(self, isManual=True):
+    async def play(self):
         if (self.voice == None or len(self.q) == 0):
             return ''
         if (self.player and self.player.is_playing()):
@@ -40,8 +39,6 @@ class smart_player:
             url = url['url']
         try:
             self.player = await self.voice.create_ytdl_player(url, after=self.agane)
-            #thread = Thread(target = self.player.start)
-            #thread.start()
             self.player.start()
             if not self.name:
                 self.name = self.player.title
@@ -54,30 +51,6 @@ class smart_player:
         return ''
         #self.player.volume = 0.15
 
-
-    #def play(self, setting):
-    #    if (self.voice == None):
-    #        return
-    #    self.goAgane = False
-    #    self.stop()
-    #    self.setting = setting
-    #    del self.player
-    #    if (setting.lower() == 'town'):
-    #        self.player = self.play_town()
-    #    elif (setting.lower() == 'exploration'):
-    #        self.player = self.play_exploration()
-    #    elif (setting.lower() == 'encounter'):
-    #        self.player = self.play_encounter()
-    #    elif (setting.lower() == 'boss'):
-    #        self.player = self.play_boss()
-    #    else:
-    #        self.player = self.play_town()
-
-    #    print('setting: ' + setting)
-
-    #    self.player.volume = 0.15
-    #    self.player.start()
-    #    self.goAgane = True
     async def add_spotify_playlist(self, url):
         urls = []
         data = spotify_tools.fetch_playlist(url)
@@ -91,26 +64,14 @@ class smart_player:
                     track = item
                 try:
                     track_url = track['external_urls']['spotify']
-                    #log.debug(track_url)
-                    #print(track_url)
                     urls.append(track_url)
-                    #self.add_spotify_track(track_url)
-                    #track_urls.append(track_url)
-                except KeyError:
-                    pass
-                    #log.warning(u'Skipping track {0} by {1} (local only?)'.format(
-                    #track['name'], track['artists'][0]['name']))
-            # 1 page = 50 results
-            # check if there are more pages
+                except KeyError: pass
             if tracks['next']:
                 tracks = spotify.next(tracks)
             else:
                 break
 
         return urls
-        #utubeurl = self.get_youtube_url("%s - %s" % (name, data['artists'][0]['name']))
-        #self.add_youtube_track(utubeurl)
-        #return name
 
     async def spotify_to_youtube(self, url):
         info = {}
@@ -120,12 +81,12 @@ class smart_player:
         return info
 
     async def add_url(self, url):
-        self.q.appendleft(Song(url=url))
-        #if 'spotify' in url:
-            #return spotify_tools.generate_metadata(url)['name']
+        song = Song(url)
+        self.q.appendleft(song)
+        return song.title
 
     async def add_url_now(self, url):
-        self.q.append(Song(url=url))
+        self.q.append(Song(url))
 
     async def get_youtube_url(self, search):
         async with aiohttp.ClientSession() as session:
@@ -133,9 +94,9 @@ class smart_player:
             url = "https://www.youtube.com/results?search_query=" + query
             async with session.get(url) as resp:
                 html = await resp.read()
-        #response = urllib.request.urlopen(url)
                 def get_video(html):
                     soup = BeautifulSoup(html, 'lxml')
+                    print (soup.findAll(attrs={'class':'yt-uix-tile-link'}, limit=2))
                     for video in soup.findAll(attrs={'class':'yt-uix-tile-link'}):
                         if ('googleadservices' not in video['href']):
                             return 'https://www.youtube.com' + video['href']
@@ -184,7 +145,7 @@ class smart_player:
         lem.icon_url = ''
         lem.name = "Song Queue"
         for i in range(len(self.q)):
-            lem.add("%d. *Song*" % (i + 1), self.q[i].url)
+            lem.add("%d. *%s*" % (i + 1, self.q[i].title), self.q[i].url)
         return lem.get_embed()
 
     def is_connected(self):
@@ -206,10 +167,24 @@ class smart_player:
         #await self.play()
 
 class Song:
-    def __init__(self, url=None, query=None):
-        if url:
-            self.url = url
-        elif query:
-            self.query = query
+    def __init__(self, url):
+        self.url = url
+        self._title = None
+        self.spotify = 'track' in url
+
+    @property
+    def title(self):
+        if self._title: return self._title
+
+        if self.spotify:
+            data = spotify_tools.generate_metadata(self.url)
+            self._title = data['name'] if 'name' in data else 'n/a'
         else:
-            raise ValueError("must supply query or url")
+            ydl = youtube_dl.YoutubeDL({'outtmpl': '%(id)s%(ext)s'})
+
+            with ydl:
+                result = ydl.extract_info(self.url, download=False)
+            video = result['entries'][0] if 'entries' in result else result
+
+            self._title = video['title'] if 'title' in video else 'n/a'
+        return self._title

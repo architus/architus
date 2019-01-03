@@ -38,9 +38,8 @@ class play_command(abstract_command):
                     message = "something went badly wrong please spam my creator with pings"
             elif ('/track/' in arg[1]):
                 if (add):
-                    name = await player.add_url(arg[1]);
-                    #if (name):
-                        #message = '**Queued:** *%s*' % name
+                    name = await player.add_url(arg[1])
+                    message = '**Queued:** *%s*' % name
                 else:
                     await player.add_url_now(arg[1]);
                     name = await player.play()
@@ -48,8 +47,8 @@ class play_command(abstract_command):
                         message = "🎶 **Now playing:** *%s*" % name
             elif ('youtu' in arg[1]):
                 if (add):
-                    await player.add_url(arg[1])
-                    message = '**Queued**'
+                    name = await player.add_url(arg[1])
+                    message = '**Queued:** *%s*' % name
                 else:
                     player.pause()
                     await player.add_url_now(arg[1])
