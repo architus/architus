@@ -145,7 +145,8 @@ class smart_player:
         lem.icon_url = ''
         lem.name = "Song Queue"
         for i in range(len(self.q)):
-            lem.add("%d. *%s*" % (i + 1, self.q[i].title), self.q[i].url)
+            song = self.q[len(self.q) - i - 1]
+            lem.add("%d. *%s*" % (i + 1, song.title), song.url)
         return lem.get_embed()
 
     def is_connected(self):
