@@ -21,7 +21,7 @@ from datetime import datetime
 from src.config import secret_token, session, default_cmds
 from src.smart_message import smart_message
 from src.smart_command import smart_command
-from src.emoji_manager import emoji_manager
+from src.emoji_manager import emoji_manager, is_animated
 from src.list_embed import list_embed, dank_embed
 from src.server_settings import server_settings
 from src.models import User, Admin, Command
@@ -34,7 +34,6 @@ TOKEN = secret_token
 JOHNYS_ID = '214037134477230080'
 GHOSTS_ID = '471864040998699011'
 MATTS_ID = '168722115447488512'
-SIMONS_ID = '103027947786473472'
 RYTHMS_ID = '235088799074484224'
 
 
@@ -61,8 +60,6 @@ emoji_managers = {}
 tracked_messages = deque([], maxlen=30)
 deletable_messages = []
 starboarded_messages = []
-
-STAR_EMOJI = "⭐"
 
 players = {}
 client = Bot(command_prefix=BOT_PREFIX)
@@ -158,15 +155,17 @@ async def on_server_emojis_update(before, after):
     if len(before) == len(after): # if renamed
         diff = [i for i in range(len(after)) if before[i].name != after[i].name]
         for i in diff:
+            if is_animated(before[i]): continue
             await emoji_managers[server.id].rename_emoji(before[i], after[i])
 
     elif len(before) > len(after): # if removed
         for emoji in [emoji for emoji in before if emoji not in after]:
+            if is_animated(emoji): continue
             emoji_managers[server.id].del_emoji(emoji)
 
     elif len(after) > len(before): # if added
         for emoji in [emoji for emoji in after if emoji not in before]:
-            print(emoji)
+            if is_animated(emoji): continue
             await emoji_managers[server.id].add_emoji(emoji)
 
 
@@ -177,7 +176,7 @@ async def on_server_join(server):
 
 @client.event
 async def on_message_delete(message):
-    settings = server_settings(session, message.channel.server)
+    settings = settings_dict[message.channel.server]
     print(message)
     if message.author != client.user and message.id not in deletable_messages and settings.repost_del_msg:
         est = get_datetime(message.timestamp)
@@ -213,8 +212,8 @@ async def on_message_edit(before, after):
 async def on_reaction_add(reaction, user):
     author = reaction.message.author
     server = reaction.message.channel.server
-    settings = server_settings(session, server)
-    print (settings.aut_emoji)
+    settings = settings_dict[server]
+    print (reaction.emoji)
     for e in reaction.message.embeds:
         author_name, author_avatar = '',''
         try:
@@ -229,8 +228,8 @@ async def on_reaction_add(reaction, user):
     if settings.edit_emoji in str(reaction.emoji):
         await add_popup(reaction.message)
 
-    if STAR_EMOJI in str(reaction.emoji):
-        if reaction.count == 5:
+    if settings.starboard_emoji in str(reaction.emoji):
+        if reaction.count == settings.starboard_threshold:
             await starboard_post(reaction.message, server)
 
     if ((author != user or user.id == JOHNYS_ID or user.id == MATTS_ID) and author != client.user and user != client.user):
@@ -255,7 +254,7 @@ async def on_reaction_add(reaction, user):
 async def on_reaction_remove(reaction, user):
     author = reaction.message.author
     server = reaction.message.channel.server
-    settings = server_settings(session, server)
+    settings = settings_dict[server]
     for e in reaction.message.embeds:
         try:
             author_name = e['author']['name']
@@ -318,6 +317,20 @@ async def gulag(ctx):
 async def whois(ctx):
     usr = await client.get_user_info(ctx.message.clean_content.split()[1])
     await client.send_message(ctx.message.channel, usr.name + '#' + usr.discriminator)
+
+@client.command(name='roleids',
+        description="!roleids - lists ids for each role in the server",
+        brief="see role ids",
+        pass_context=True)
+async def roleids(ctx):
+    channel = ctx.message.channel
+    lem = list_embed(channel.server.name, '')
+    lem.name = "Role IDs"
+    for role in channel.server.roles:
+        if not role.is_everyone:
+            lem.add(role.name, role.id)
+    print(lem.get_embed().to_dict())
+    await client.send_message(channel, embed=lem.get_embed())
 
 @client.command(name='schedule',
         description="!schedule [title] [time] - start an event poll",
@@ -427,6 +440,7 @@ async def purge(context):
 
 @client.event
 async def on_member_join(member):
+    print("%s joined server: %s" % (member.name, member.server.name))
     if member.server.id != '416020909531594752':
         return
     try:
@@ -520,7 +534,7 @@ async def on_message(message):
     server = message.channel.server
     cache[server]['messages'][message.channel] = None
     print(log_message(message))
-    settings = server_settings(session, server)
+    settings = settings_dict[server]
     if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
         if message.channel == server.default_channel:
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)

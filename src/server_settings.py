@@ -11,6 +11,24 @@ class server_settings:
         self._settings_dict = self._load_from_db(self.server_id)
 
     @property
+    def starboard_emoji(self) -> str:
+        return self._settings_dict['starboard_emoji'] if 'starboard_emoji' in self._settings_dict else "⭐"
+
+    @starboard_emoji.setter
+    def starboard_emoji(self, new_emoji: str):
+        self._settings_dict['starboard_emoji'] = new_emoji
+        self._update_db()
+
+    @property
+    def starboard_threshold(self) -> int:
+        return self._settings_dict['starboard_threshold'] if 'starboard_threshold' in self._settings_dict else 5
+
+    @starboard_threshold.setter
+    def starboard_threshold(self, new_threshold: int):
+        self._settings_dict['starboard_threshold'] = new_threshold
+        self._update_db()
+
+    @property
     def roles_dict(self) -> dict:
         return self._settings_dict['roles_dict'] if 'roles_dict' in self._settings_dict else {}
 

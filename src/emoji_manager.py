@@ -7,6 +7,11 @@ from src.webhook import send_message
 EMOJI_DIR = 'emojis'
 MAX_ENABLED = 49
 
+def is_animated(emoji):
+    animated = requests.get(emoji.url[:-3] + 'gif').status_code == 200
+    if animated: print(emoji.name + " is animated")
+    return animated
+
 class emoji_manager():
     def __init__(self, client, server, deletable_messages):
         self.client = client
@@ -25,7 +30,8 @@ class emoji_manager():
         print("renaming dupes")
         names = os.listdir(EMOJI_DIR + '/' + self.server.id)
         for emoji in self.server.emojis:
-            cunt = 1
+            if is_animated(emoji): continue
+            count = 1
             name = emoji.name
             if name in names:
                 while name + str(count) in names:
