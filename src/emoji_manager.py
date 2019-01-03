@@ -8,6 +8,7 @@ EMOJI_DIR = 'emojis'
 MAX_ENABLED = 49
 
 def is_animated(emoji):
+    return False
     animated = requests.get(emoji.url[:-3] + 'gif').status_code == 200
     if animated: print(emoji.name + " is animated")
     return animated

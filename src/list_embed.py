@@ -1,12 +1,16 @@
 import discord
 class list_embed:
-    def __init__(self, title, description, author):
+    def __init__(self, title, description, author=None):
         self.title = title
         self.description = description
         self.list_items = []
         self.author = author
-        self.name = self.author.display_name
-        self.icon_url = author.avatar_url
+        if self.author:
+            self.name = self.author.display_name
+            self.icon_url = author.avatar_url
+        else:
+            self.name = title
+            self.icon_url = ''
         self.color = 0x5998ff
 
     def add(self, title, body):

@@ -348,7 +348,7 @@ async def schedule(ctx):
 
 @client.command(pass_context=True)
 async def settings(ctx):
-    await default_cmds['settings'].execute(ctx, client, session=session)
+    await default_cmds['settings'].execute(ctx, client, session=session, settings=settings_dict[ctx.message.channel.server])
 
 @client.command(pass_context=True)
 async def emojis(ctx):
@@ -441,12 +441,11 @@ async def purge(context):
 @client.event
 async def on_member_join(member):
     print("%s joined server: %s" % (member.name, member.server.name))
-    if member.server.id != '416020909531594752':
-        return
     try:
-        await client.add_roles(member, next(filter(lambda role: role.name == DEFAULT_ROLE, member.server.role_hierarchy)))
+        default_role = discord.utils.get(self.server.roles, id=settings_dict[member.server].default_role_id)
+        await client.add_roles(member, default_role)
     except:
-        print("could not add %s to %s" % (member.display_name, DEFAULT_ROLE))
+        print("could not add %s to %s" % (member.display_name, default_role))
 
 @client.command(name='role',
                 description="`!role list` for list of available roles",
@@ -544,7 +543,7 @@ async def on_message(message):
                 url = 'https://' + match.group(1) + match.group(2)
                 await client.send_message(highlights, url)
 
-    if not message.author.bot: await emoji_managers[server.id].scan(message)
+    if not message.author.bot and settings.manage_emojis: await emoji_managers[server.id].scan(message)
 
     args = message.clean_content.split(' ')
     if args and args[0] and args[0][0] in BOT_PREFIX and False:
@@ -630,7 +629,8 @@ async def initialize_emoji_managers():
     from src.emoji_manager import emoji_manager
     for server in client.servers:
         emoji_managers[server.id] = emoji_manager(client, server, deletable_messages)
-        await emoji_managers[server.id].clean()
+        if settings_dict[server].manage_emojis:
+            await emoji_managers[server.id].clean()
 
 def initialize_players():
     for server in client.servers:
