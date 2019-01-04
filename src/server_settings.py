@@ -34,7 +34,7 @@ class server_settings:
 
     @roles_dict.setter
     def roles_dict(self, roles_dict: dict):
-        self._settings_dict['roles_dict']
+        self._settings_dict['roles_dict'] = roles_dict
         self._update_db()
 
     @property

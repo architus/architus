@@ -260,7 +260,7 @@ async def on_reaction_remove(reaction, user):
             author_name = e['author']['name']
             author_avatar = e['author']['icon_url']
         except:
-            pass
+            author_avatar = ''
         real_author = discord.utils.get(server.members, name=author_name, avatar_url=author_avatar)
         if (real_author != None):
             author = real_author
@@ -450,13 +450,10 @@ async def on_member_join(member):
 @client.command(name='role',
                 description="`!role list` for list of available roles",
                 brief="Assign a role.",
-                aliases=['join', 'rank'],
+                aliases=['join', 'rank', 'roles'],
                 pass_context=True)
 async def role(ctx):
-    if ctx.message.channel.server.id != '416020909531594752':
-        await client.send_message(ctx.message.channel, 'Not implemented for this server yet')
-        return
-    await default_cmds['role'].execute(ctx, client, ROLES_DICT=ROLES_DICT)
+    await default_cmds['role'].execute(ctx, client, settings=settings_dict[ctx.message.channel.server])
 
 @client.command(name='spellcheck',
                 description="!spellcheck [@user] - calculate % of correctly spelled words",

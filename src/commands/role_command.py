@@ -9,7 +9,9 @@ class role_command(abstract_command):
         super().__init__("role", aliases=['rank', 'join'])
 
     async def exec_cmd(self, **kwargs):
-        ROLES_DICT = kwargs['ROLES_DICT']
+        settings = kwargs['settings']
+        self.roles_dict = settings.roles_dict
+        roles_dict = self.roles_dict
         await self.client.send_typing(self.channel)
         arg = self.content.split(' ')
         member = self.author
@@ -22,15 +24,16 @@ class role_command(abstract_command):
         if (requested_role == 'list'):
             lembed = list_embed('Available Roles', '`!role [role]`', self.client.user)
             roles = "Available roles:\n"
-            for roletag, rolename in ROLES_DICT.items():
-                lembed.add(rolename, roletag)
+            for nick, channelid in roles_dict.items():
+                role = discord.utils.get(self.server.roles, id=channelid)
+                lembed.add(nick, role.mention)
             await self.client.send_message(self.channel, embed=lembed.get_embed())
-        elif (requested_role.lower() in (name.lower() for name in ROLES_DICT)):
-            filtered = filter(lambda role: role.name == ROLES_DICT[requested_role], member.server.role_hierarchy)
+        elif requested_role in roles_dict:
+            #filtered = filter(lambda role: role.name == ROLES_DICT[requested_role], member.server.role_hierarchy)
+            role = discord.utils.get(self.server.roles, id=roles_dict[requested_role.lower()])
             action = 'Added'
             prep = 'to'
             try:
-                role = next(filtered)
                 if (role in member.roles):
                     await self.client.remove_roles(member, role)
                     action = 'Removed'
@@ -47,8 +50,9 @@ class role_command(abstract_command):
     def get_help(self):
         lembed = list_embed('Available Roles', '`!role [role]`', self.client.user)
         roles = "Available roles:\n"
-        for roletag, rolename in ROLES_DICT.items():
-            lembed.add(rolename, roletag)
+        for nick, channelid in self.roles_dict.items():
+            role = discord.utils.get(self.server.roles, id=channelid)
+            lembed.add(nick, role.mention)
         return lembed.get_embed()
 
     def get_usage(self):

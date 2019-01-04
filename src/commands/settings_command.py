@@ -3,11 +3,14 @@ from src.server_settings import server_settings
 from src.commands.abstract_command import abstract_command
 import time
 import discord
+import re
+
 TRASH = u"\U0001F5D1"
 OPEN_FOLDER = u"\U0001F4C2"
 BOT_FACE = u"\U0001F916"
 SHIELD = u"\U0001F6E1"
 LOCK_KEY = u"\U0001F510"
+SWORDS= u"\U00002694"
 
 class settings_command(abstract_command):
 
@@ -30,6 +33,7 @@ class settings_command(abstract_command):
         await self.client.add_reaction(msg, BOT_FACE)
         await self.client.add_reaction(msg, SHIELD)
         await self.client.add_reaction(msg, LOCK_KEY)
+        await self.client.add_reaction(msg, SWORDS)
 
         while True:
             react = await self.client.wait_for_reaction(message=msg, user=self.author)
@@ -48,58 +52,12 @@ class settings_command(abstract_command):
                 await self.default_role()
             elif e == LOCK_KEY:
                 await self.admins()
+            elif e == SWORDS:
+                await self.roles()
             await self.client.edit_message(msg, embed=await self.get_embed())
 
-
-
-
-
-
-
-
-
-
-
-        return
-        if 'defaultrole' in self.content.lower():
-            settings.default_role_id = self.message.role_mentions[0].id
-        elif 'bot-commands' in self.content.lower():
-            bc_channels = settings.bot_commands_channels
-            new_channels = self.message.channel_mentions or [self.channel.id]
-
-            for channel in new_channels:
-                if channel.id in bc_channels:
-                    bc_channels.remove(channel.id)
-                else:
-                    bc_channels.append(channel.id)
-                print (bc_channels)
-                settings.bot_commands_channels = bc_channels
-
-        elif 'aut-emoji' in self.content.lower():
-            settings.aut_emoji = self.args[2]
-        elif 'nice-emoji' in self.content.lower():
-            settings.nice_emoji = self.args[2]
-        elif 'toxic-emoji' in self.content.lower():
-            settings.toxic_emoji = self.args[2]
-        elif 'bot-emoji' in self.content.lower():
-            settings.bot_emoji = self.args[2]
-        elif 'norm-emoji' in self.content.lower():
-            settings.norm_emoji = self.args[2]
-        elif 'edit-emoji' in self.content.lower():
-            settings.edit_emoji = self.args[2]
-        elif 'repost-deletes' in self.content.lower():
-            settings.repost_del_msg = True if self.args[2] in ['1','True','true','yes'] else False
-
-
-        elif 'admin' in self.content.lower():
-            if self.message.mentions[0].id in settings.admins_ids:
-                settings.admins_ids.remove(self.message.mentions[0].id)
-            else:  settings.admins_ids += [self.message.mentions[0].id]
-
-        await self.client.send_message(self.channel, str(settings._settings_dict))
-
     async def starboard_threshold(self):
-        await self.client.send_message(self.channel, 'This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
+        await self.client.send_message(self.channel, '⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
         msg = await self.client.wait_for_message(author=self.author)
         try:
             self.settings.starboard_threshold = int(msg.content)
@@ -109,7 +67,7 @@ class settings_command(abstract_command):
         await self.client.send_message(self.channel, resp)
 
     async def repost_deletes(self):
-        await self.client.send_message(self.channel, 'If true, deleted messages will be reposted immediately. Enter `true` or `false` to modify it:')
+        await self.client.send_message(self.channel, '🗑️ If true, deleted messages will be reposted immediately. Enter `true` or `false` to modify it:')
         msg = await self.client.wait_for_message(author=self.author)
         resp = "Setting updated"
         if msg.content in ['1','True','true','yes', 'y']:
@@ -122,7 +80,7 @@ class settings_command(abstract_command):
         await self.client.send_message(self.channel, resp)
 
     async def manage_emojis(self):
-        await self.client.send_message(self.channel, 'If true, less popular emojis will be cycled in and out as needed, effectively allowing greater than 50 emojis. Enter `true` or `false` to modify it:')
+        await self.client.send_message(self.channel, '📂 If true, less popular emojis will be cycled in and out as needed, effectively allowing greater than 50 emojis. Enter `true` or `false` to modify it:')
         msg = await self.client.wait_for_message(author=self.author)
         resp = "Setting updated"
         if msg.content in ['1','True','true','yes', 'y']:
@@ -135,7 +93,7 @@ class settings_command(abstract_command):
         await self.client.send_message(self.channel, resp)
 
     async def bot_commands(self):
-        await self.client.send_message(self.channel, "Some verbose commands are limited to these channels. Mention channels to toggle them:")
+        await self.client.send_message(self.channel, "🤖 Some verbose commands are limited to these channels. Mention channels to toggle them:")
         msg = await self.client.wait_for_message(author=self.author)
         bc_channels = self.settings.bot_commands_channels
         new_channels = msg.channel_mentions
@@ -151,7 +109,7 @@ class settings_command(abstract_command):
         await self.client.send_message(self.channel, resp)
 
     async def default_role(self):
-        await self.client.send_message(self.channel, "New members will be automatically moved into this role. Enter a role id (`!roleids`) to change:")
+        await self.client.send_message(self.channel, "🛡 New members will be automatically moved into this role. Enter a role id (`!roleids`) to change:")
         def check(msg):
             return msg.content != '!roleids'
         msg = await self.client.wait_for_message(author=self.author, check=check)
@@ -163,7 +121,7 @@ class settings_command(abstract_command):
         await self.client.send_message(self.channel, resp)
 
     async def admins(self):
-        await self.client.send_message(self.channel, "These members have access to more bot functions such as `!purge` and setting longer commands. Mention a member to toggle:")
+        await self.client.send_message(self.channel, "🔐 These members have access to more bot functions such as `!purge` and setting longer commands. Mention a member to toggle:")
         msg = await self.client.wait_for_message(author=self.author)
         resp = "Admins unchanged"
         if msg.mentions:
@@ -174,10 +132,39 @@ class settings_command(abstract_command):
                 self.settings.admins_ids += [msg.mentions[0].id]
         await self.client.send_message(self.channel, resp)
 
+    async def roles(self):
+        def check(msg):
+            return msg.content != '!roleids'
+        await self.client.send_message(self.channel, "⚔ These are the roles that any member can join at will. Enter a list of role ids (`!roleids`) to toggle. Optionally enter a nickname for the role in the format `nickname::roleid` if the role's name is untypable:")
+        msg = await self.client.wait_for_message(author=self.author, check=check)
+        pattern = re.compile("((?P<nick>\w+)::)?(?P<id>\d{18})")
+        new_roles = []
+        roles = self.settings.roles_dict
+        for match in re.finditer(pattern, msg.content):
+            role = discord.utils.get(self.server.roles, id=match.group('id'))
+            if match.group('nick') and role:
+                new_roles.append((match.group('nick').lower(), role.id))
+            elif role:
+                new_roles.append((role.name.lower(), role.id))
+        resp = "Roles unchanged"
+        for role in new_roles:
+            resp = "Roles updated"
+            if role[1] in roles.values(): # if role already in dict
+                if role[0] not in roles:  # in dict with a different nick
+                    roles = { k:v for k, v in roles.items() if v != role[1] }
+                    roles[role[0]] = role[1]
+                else:                     # in dict with the same nick
+                    roles = { k:v for k, v in roles.items() if v != role[1] }
+            else:                         # new role
+                roles[role[0]] = role[1]
+
+        self.settings.roles_dict = roles
+        await self.client.send_message(self.channel, resp)
 
     async def get_embed(self):
         settings = self.settings
         admin_names = list(set([(await self.client.get_user_info(u)).name for u in settings.admins_ids]))
+        roles_names = [r.mention for r in [discord.utils.get(self.server.roles, id=i) for i in settings.roles_dict.values()] if r] or ['None']
         bot_commandses = [c.mention for c in [discord.utils.get(self.server.channels, id=i) for i in settings.bot_commands_channels] if c] or ['None']
         default_role = discord.utils.get(self.server.roles, id=settings.default_role_id)
 
@@ -189,6 +176,7 @@ class settings_command(abstract_command):
         em.add_field(name='🤖 Bot Commands Channels', value='Current value: %s' % ', '.join(bot_commandses), inline=True)
         em.add_field(name='🛡 Default Role', value='Current value: %s' % (default_role.mention if default_role else 'None'), inline=True)
         em.add_field(name='🔐 Aut-Bot Admins', value='Current value: %s' % ', '.join(admin_names), inline=True)
+        em.add_field(name='⚔ Joinable Roles', value='Current value: %s' % ', '.join(roles_names), inline=True)
         return em
 
     def get_help(self):
