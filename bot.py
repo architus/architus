@@ -36,21 +36,6 @@ GHOSTS_ID = '471864040998699011'
 MATTS_ID = '168722115447488512'
 RYTHMS_ID = '235088799074484224'
 
-
-ROLES_DICT = {
-    "black santa" : "🎅🏿",
-    "whale" : "🐋",
-    "fox" : "🦊",
-    "pink" : "pink",
-    "back on top soon" : "🔙🔛🔝🔜",
-    "nsfw" : "nsfw",
-    "pugger" : "pugger",
-    "prugger" : "prugger",
-    "gw" : "guild wars"
-}
-
-DEFAULT_ROLE = 'Admin'
-
 cache = {}
 smart_commands = {}
 karma_dict = {}
@@ -308,7 +293,7 @@ async def letmein(ctx):
         brief="vote gulag",
         pass_context=True)
 async def gulag(ctx):
-    await default_cmds['gulag'].execute(ctx, client)
+    await default_cmds['gulag'].execute(ctx, client, settings=settings_dict[ctx.message.channel.server])
 
 @client.command(name='whois',
         description="!whois <userid> - get name from user id",
@@ -363,7 +348,6 @@ async def test(context):
         await client.send_message(context.message.channel, "it works")
         return
     await client.change_nickname(server.get_member(client.user.id), 't')
-    await client.send_message(context.message.channel, "```usage:       !gulag <member>\ndescription: Starts a vote to move a member to the gulag. Each vote over the threshold (5) will add additional time.```")
 
     await client.send_message(context.message.channel,'<%s>' % author.avatar_url if author.avatar_url else author.default_avatar_url)
     await client.change_nickname(server.get_member(client.user.id), None)
@@ -372,13 +356,6 @@ async def test(context):
     lem = list_embed('https://giphy.com/gifs/vv41HlvfogHAY', context.message.channel.mention, context.message.author)
     await client.send_message(context.message.channel, embed=lem.get_embed())
 
-    await client.send_message(channel, 'bumping: ' + str(server.emojis[3]))
-    #await emoji_managers[server.id].bump_emoji(server.emojis[3])
-    await emoji_managers[server.id].save_emojis_disk()
-
-    #emojis = client.get_all_emojis()
-    #for emoji in emojis:
-        #await client.send_message(context.message.channel, emoji.url)
 
 @client.command(name='removespec',
         description="Remove users from the spectrum if they are a sad boi",
@@ -532,7 +509,8 @@ async def on_message(message):
     print(log_message(message))
     settings = settings_dict[server]
     if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
-        if message.channel == server.default_channel:
+        highlights = discord.utils.get(server.channels, name='highlights', type=ChannelType.text)
+        if highlights and message.channel != highlights:
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)
             match = parser.search(message.content)
             if match:

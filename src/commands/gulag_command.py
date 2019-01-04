@@ -14,12 +14,14 @@ class gulag_command(abstract_command):
 
     async def exec_cmd(self, **kwargs):
         server = self.server
+        settings = kwargs['settings']
         filtered = filter(lambda role: role.name == "kulak", server.role_hierarchy)
         try:
             gulag_role = next(filtered)
             gulag_emoji = self.get_custom_emoji(server, "gulag")
         except:
             print("gulag role/emoji not found")
+            await self.client.send_message(self.channel, "Please create a role called `kulak` and an emoji called `gulag` to use this feature.")
             return
         comrade = self.message.mentions[0]
         if comrade == self.client.user:
@@ -32,7 +34,7 @@ class gulag_command(abstract_command):
         timer_msg = None
         timer_msg_gulag = None
         generated = False
-        msg = await self.client.send_message(self.channel, "%d more %s's to gulag %s" % (GULAG_THRESHOLD, gulag_emoji, comrade.display_name))
+        msg = await self.client.send_message(self.channel, "%d more %s's to gulag %s" % (settings.gulag_threshold, gulag_emoji, comrade.display_name))
         await self.client.add_reaction(msg, gulag_emoji)
         while time.time() < t_end:
             res = await self.client.wait_for_reaction(message=msg, emoji=gulag_emoji, timeout=5)
@@ -40,9 +42,9 @@ class gulag_command(abstract_command):
             if res and res.user not in user_list and res.user != self.client.user:
                 user_list.append(res.user) 
                 for user in user_list: print (user.display_name)
-                await self.client.edit_message(msg, "%d more %s's to gulag %s" % (max(0,(GULAG_THRESHOLD - len(user_list))), gulag_emoji, comrade.display_name))
-                t_end += GULAG_TIME_ADD * 60
-            if len(user_list) >= GULAG_THRESHOLD and not gulag_role in comrade.roles:
+                await self.client.edit_message(msg, "%d more %s's to gulag %s" % (max(0,(settings.gulag_threshold - len(user_list))), gulag_emoji, comrade.display_name))
+                t_end += int((settings.gulag_severity / 2) * 60)
+            if len(user_list) >= settings.gulag_threshold and not gulag_role in comrade.roles:
                 try:
                     print(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
                     gulaggen.generate(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
@@ -56,14 +58,14 @@ class gulag_command(abstract_command):
                     else:
                         await self.client.send_message(self.channel, "gulag'd " + comrade.display_name)
 
-                    timer_msg = await self.client.send_message(self.channel, "⏰ %d seconds" % (GULAG_TIME * 60))
-                    timer_msg_gulag = await self.client.send_message(discord.utils.get(server.channels, name='gulag', type=ChannelType.text), "⏰ %d seconds, %s" % (GULAG_TIME * 60, comrade.display_name))
+                    timer_msg = await self.client.send_message(self.channel, "⏰ %d seconds" % (settings.gulag_severity * 60))
+                    timer_msg_gulag = await self.client.send_message(discord.utils.get(server.channels, name='gulag', type=ChannelType.text), "⏰ %d seconds, %s" % (settings.gulag_severity * 60, comrade.display_name))
                     await self.client.add_roles(comrade, gulag_role)
 
                     if comrade.voice.voice_channel and not comrade.voice.voice_channel.is_private:
                         try: await self.move_member(comrade, discord.utils.get(self.server.channels, name='gulag', type=ChannelType.voice))
                         except: pass
-                    t_end = time.time() + int(60 * GULAG_TIME)
+                    t_end = time.time() + int(60 * settings.gulag_severity)
 
             elif timer_msg or timer_msg_gulag:
                 await self.client.edit_message(timer_msg, "⏰ %d seconds" % (max(0, t_end-time.time())))
@@ -73,7 +75,7 @@ class gulag_command(abstract_command):
         print('ungulag\'d ' + comrade.display_name)
 
     def get_help(self):
-        return "Starts a vote to move a member to the gulag. Each vote over the threshold (%d) will add additional time." % GULAG_THRESHOLD
+        return "Starts a vote to move a member to the gulag. Each vote over the threshold (%d) will add additional time." % 5
 
     def get_usage(self):
         return "<@member>"

@@ -11,6 +11,8 @@ BOT_FACE = u"\U0001F916"
 SHIELD = u"\U0001F6E1"
 LOCK_KEY = u"\U0001F510"
 SWORDS= u"\U00002694"
+HAMMER_PICK = u"\U00002692"
+HAMMER = u"\U000026CF"
 
 class settings_command(abstract_command):
 
@@ -34,6 +36,8 @@ class settings_command(abstract_command):
         await self.client.add_reaction(msg, SHIELD)
         await self.client.add_reaction(msg, LOCK_KEY)
         await self.client.add_reaction(msg, SWORDS)
+        await self.client.add_reaction(msg, HAMMER_PICK)
+        await self.client.add_reaction(msg, HAMMER)
 
         while True:
             react = await self.client.wait_for_reaction(message=msg, user=self.author)
@@ -54,13 +58,17 @@ class settings_command(abstract_command):
                 await self.admins()
             elif e == SWORDS:
                 await self.roles()
+            elif e == HAMMER_PICK:
+                await self.gulag_threshold()
+            elif e == HAMMER:
+                await self.gulag_severity()
             await self.client.edit_message(msg, embed=await self.get_embed())
 
     async def starboard_threshold(self):
         await self.client.send_message(self.channel, '⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
         msg = await self.client.wait_for_message(author=self.author)
         try:
-            self.settings.starboard_threshold = int(msg.content)
+            self.settings.starboard_threshold = abs(int(msg.content))
             resp = "Threshold set"
         except:
             resp = "Threshold unchanged"
@@ -161,6 +169,25 @@ class settings_command(abstract_command):
         self.settings.roles_dict = roles
         await self.client.send_message(self.channel, resp)
 
+    async def gulag_threshold(self):
+        await self.client.send_message(self.channel, HAMMER_PICK + ' This is the number of reacts a gulag vote must get to be pass. Enter a number to modify it:')
+        msg = await self.client.wait_for_message(author=self.author)
+        try:
+            self.settings.gulag_threshold = abs(int(msg.content))
+            resp = "Threshold set"
+        except:
+            resp = "Threshold unchanged"
+        await self.client.send_message(self.channel, resp)
+    async def gulag_severity(self):
+        await self.client.send_message(self.channel, HAMMER + ' This is the number of minutes a member will be confined to gulag. Half again per extra vote. Enter a number to modify it:')
+        msg = await self.client.wait_for_message(author=self.author)
+        try:
+            self.settings.gulag_severity = abs(int(msg.content))
+            resp = "Severity set"
+        except:
+            resp = "Severity unchanged"
+        await self.client.send_message(self.channel, resp)
+
     async def get_embed(self):
         settings = self.settings
         admin_names = list(set([(await self.client.get_user_info(u)).name for u in settings.admins_ids]))
@@ -176,6 +203,8 @@ class settings_command(abstract_command):
         em.add_field(name='🤖 Bot Commands Channels', value='Current value: %s' % ', '.join(bot_commandses), inline=True)
         em.add_field(name='🛡 Default Role', value='Current value: %s' % (default_role.mention if default_role else 'None'), inline=True)
         em.add_field(name='🔐 Aut-Bot Admins', value='Current value: %s' % ', '.join(admin_names), inline=True)
+        em.add_field(name=HAMMER_PICK + ' Gulag Threshold', value='Current value: %d' % settings.gulag_threshold, inline=True)
+        em.add_field(name=HAMMER + ' Gulag Severity', value='Current value: %d' % settings.gulag_severity, inline=True)
         em.add_field(name='⚔ Joinable Roles', value='Current value: %s' % ', '.join(roles_names), inline=True)
         return em
 

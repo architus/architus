@@ -29,6 +29,24 @@ class server_settings:
         self._update_db()
 
     @property
+    def gulag_threshold(self) -> int:
+        return self._settings_dict['gulag_threshold'] if 'gulag_threshold' in self._settings_dict else 5
+
+    @gulag_threshold.setter
+    def gulag_threshold(self, new_threshold: int):
+        self._settings_dict['gulag_threshold'] = new_threshold
+        self._update_db()
+
+    @property
+    def gulag_severity(self) -> int:
+        return self._settings_dict['gulag_severity'] if 'gulag_severity' in self._settings_dict else 5
+
+    @gulag_severity.setter
+    def gulag_severity(self, new_severity: int):
+        self._settings_dict['gulag_severity'] = new_severity
+        self._update_db()
+
+    @property
     def roles_dict(self) -> dict:
         return self._settings_dict['roles_dict'] if 'roles_dict' in self._settings_dict else {}
 
