@@ -1,0 +1,80 @@
+@font-face {
+  font-family: Montserrat;
+  src: url(/fonts/Montserrat-Medium.ttf);
+}
+
+@font-face {
+  font-family: Roboto Slab;
+  src: url(/fonts/RobotoSlab-Regular.ttf);
+}
+
+p{
+	font-family:"Roboto Slab";
+	color:white;
+}
+h1, h2, h3, h4, h4, h5, h6{
+	font-family:"Montserrat";
+	font-weight:500;
+	color:white;
+}
+body{
+	background-color:#23272A;
+}
+.callout{
+	background-color:#36393E;
+	border-radius:10px;
+	box-shadow:5px 5px 15px rgba(10,10,10,0.25);
+}
+.vcenter{
+	flex-direction: column;
+    display: flex;
+    align-items:flex-start;
+    justify-content:center;
+}
+
+.no-pad{
+	padding:0 !important;
+	padding-left:0;
+	padding-right:0;
+}
+
+img{
+	width:100%;
+	border-radius:10px;
+}
+
+tbody{
+	border:0;
+}
+
+tr{
+	color:white;
+	background-color:#23272A !important;
+}
+
+tr#last{
+	border-bottom:0px;
+}
+
+.footer{
+	background-color:#36393E;
+	color:white;
+}
+
+.fullwidth {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: initial;
+}
+
+.logo {
+    max-width: 50px;
+    display: inline-block;
+}
+
+h1 {
+    display: inline-block;
+    padding-left:10px;
+    margin-bottom:0px;
+}
