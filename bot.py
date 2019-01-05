@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#ur mom gay
 
 import random
 import re
@@ -419,10 +418,10 @@ async def purge(context):
 async def on_member_join(member):
     print("%s joined server: %s" % (member.name, member.server.name))
     try:
-        default_role = discord.utils.get(self.server.roles, id=settings_dict[member.server].default_role_id)
+        default_role = discord.utils.get(member.server.roles, id=settings_dict[member.server].default_role_id)
         await client.add_roles(member, default_role)
     except:
-        print("could not add %s to %s" % (member.display_name, default_role))
+        print("could not add %s to %s" % (member.display_name, 'default role'))
 
 @client.command(name='role',
                 description="`!role list` for list of available roles",
