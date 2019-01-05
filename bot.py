@@ -162,7 +162,7 @@ async def on_server_join(server):
 @client.event
 async def on_message_delete(message):
     settings = settings_dict[message.channel.server]
-    print(message)
+    if message.channel.name == 'bangers': return  #TODO
     if message.author != client.user and message.id not in deletable_messages and settings.repost_del_msg:
         est = get_datetime(message.timestamp)
         em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xff002a)
@@ -509,14 +509,13 @@ async def on_message(message):
     print(log_message(message))
     settings = settings_dict[server]
     if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
-        highlights = discord.utils.get(server.channels, name='highlights', type=ChannelType.text)
-        if highlights and message.channel != highlights:
+        if message.channel.overwrites_for(server.default_role).read_messages != False and message.channel.name != 'highlights':
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)
             match = parser.search(message.content)
             if match:
                 highlights = discord.utils.get(server.channels, name='highlights', type=ChannelType.text)
                 url = 'https://' + match.group(1) + match.group(2)
-                await client.send_message(highlights, url)
+                if highlights: await client.send_message(highlights, url)
 
     if not message.author.bot and settings.manage_emojis: await emoji_managers[server.id].scan(message)
 
