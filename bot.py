@@ -135,6 +135,7 @@ async def quote(ctx):
 async def on_server_emojis_update(before, after):
     try: server = before[0].server
     except: server = after[0].server
+    if not settings_dict[server].manage_emojis: return
 
     if len(before) == len(after): # if renamed
         diff = [i for i in range(len(after)) if before[i].name != after[i].name]
