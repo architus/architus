@@ -37,4 +37,4 @@ def generate(url):
 
 
 #generate('https://cdn.discordapp.com/avatars/131294120399470602/a_789c7272a7cf92f7450df65adc4c856c.gif?size=1024')
-generate('https://cdn.discordapp.com/avatars/214037134477230080/f8bbce770f9422229b19425c9e4191fe.webp?size=1024')
+#:generate('https://cdn.discordapp.com/avatars/214037134477230080/f8bbce770f9422229b19425c9e4191fe.webp?size=1024')
