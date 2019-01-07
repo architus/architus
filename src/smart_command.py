@@ -88,7 +88,9 @@ class smart_command:
         if recapture.search(resp):
             resp = recapture.sub(cap, resp, 1)
         while reauthor.search(resp):
-            resp = reauthor.sub(author.display_name, resp, 1)
+            unicode_filter = re.compile('[^a-zA-Z0-9* ]+', re.UNICODE)
+            filtered_name = unicode_filter.sub('', author.display_name)
+            resp = reauthor.sub(filtered_name, resp, 1)
         while remember.search(resp): 
             resp = remember.sub(random.choice(list(self.server.members)).display_name, resp, 1)
         resp = recount.sub(str(self.count), resp)
@@ -102,7 +104,7 @@ class smart_command:
             custom_list = relist.search(resp)
 
         unclean = reclean.search(resp)
-        while reclean.search(resp):
+        while unclean:
             resp = reclean.sub(unclean.group(1), resp, 1)
             unclean = reclean.search(resp)
 
