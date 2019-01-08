@@ -12,7 +12,7 @@ SHIELD = u"\U0001F6E1"
 LOCK_KEY = u"\U0001F510"
 SWORDS= u"\U00002694"
 HAMMER_PICK = u"\U00002692"
-HAMMER = u"\U000026CF"
+HAMMER = u"\U0001F528"
 
 class settings_command(abstract_command):
 
