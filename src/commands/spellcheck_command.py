@@ -38,9 +38,10 @@ class spellcheck_command(abstract_command):
                             for word in msg.clean_content.split():
                                 if word[0] == '!': continue
                                 words += 1
-                                if d.check(word) and len(word) > 1 or word in ['a','i', 'A', 'I']:
+                                if word in d and len(word) > 1 or word in ['a','i', 'A', 'I']:
                                     correct_words += 1
-            except: pass
+            except Exception as e:
+                print(e)
         linh_modifier = 10 if victim.id == LINHS_ID else 0
         await self.client.send_message(self.channel, "%.1f%s out of the %d scanned words sent by %s are spelled correctly" %
                 (((correct_words/words)*100) - linh_modifier, '%', words, victim.display_name))
