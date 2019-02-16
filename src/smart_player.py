@@ -38,7 +38,8 @@ class smart_player:
             self.name = url['name']
             url = url['url']
         try:
-            self.player = await self.voice.create_ytdl_player(url, after=self.agane)
+            options = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+            self.player = await self.voice.create_ytdl_player(url, before_options=options, ytdl_options={'--prefer-insecure'}, after=self.agane)
             self.player.start()
             if not self.name:
                 self.name = self.player.title
