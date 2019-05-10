@@ -11,6 +11,7 @@ declare -a requirements=(
     aiofiles
     discord
     matplotlib
+    gtts
     pytz
     PyNaCl
     pillow

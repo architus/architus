@@ -24,6 +24,24 @@ class smart_player:
         self.voice = None
         self.name = ''
 
+        self.playing_file = False
+
+    async def play_file(self, filepath):
+        self.playing_file = True
+        self.stop()
+        if (self.voice == None):
+            return
+        #if (self.player and self.player.is_playing()):
+            #return await self.skip()
+
+        try:
+            self.player = self.voice.create_ffmpeg_player(filepath, after=self.agane)
+            self.player.start();
+        except Exception as e:
+            print(e)
+        self.playing_file = False
+        return True
+
     async def play(self):
         if (self.voice == None or len(self.q) == 0):
             return ''
@@ -135,7 +153,7 @@ class smart_player:
             print(self.name)
             count += 1
         return self.name
-        #return await self.play()
+    #return await self.play()
     def clearq(self):
         self.q.clear()
 
@@ -155,6 +173,9 @@ class smart_player:
 
     def agane(self):
         #coro = self.client.send_message(self.client.get_channel('436189230390050830'), 'Song is done!')
+        if self.playing_file:
+            return
+
         if len(self.q) == 0:
             coro = self.voice.disconnect()
         else:

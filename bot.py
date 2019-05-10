@@ -131,6 +131,13 @@ async def eight_ball(ctx):
 async def quote(ctx):
     await default_cmds['quote'].execute(ctx, client)
 
+@client.command(name='say',
+                description="!say [message] - speak a message in the voice channel",
+                brief="Say a message.",
+                pass_context=True)
+async def say(ctx):
+    await default_cmds['say'].execute(ctx, client, players=players)
+
 @client.event
 async def on_server_emojis_update(before, after):
     try: server = before[0].server
