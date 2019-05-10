@@ -524,7 +524,7 @@ async def on_message(message):
     cache[server]['messages'][message.channel] = None
     print(log_message(message))
     settings = settings_dict[server]
-    if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot:
+    if 'gfycat.com' in message.content or 'clips.twitch' in message.content and not message.author.bot and False:
         if message.channel.overwrites_for(server.default_role).read_messages != False and message.channel.name != 'highlights':
             parser = re.compile('(clips\.twitch\.tv\/|gfycat\.com\/)([^ ]+)', re.IGNORECASE)
             match = parser.search(message.content)
