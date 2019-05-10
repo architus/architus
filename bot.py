@@ -331,6 +331,13 @@ async def schedule(ctx):
 async def schedule(ctx):
     await default_cmds['poll'].execute(ctx, client)
 
+@client.command(name='owl',
+        description="!owl [something]",
+        brief="owl",
+        pass_context=True)
+async def owl(ctx):
+    await default_cmds['owl'].execute(ctx, client)
+
 @client.command(pass_context=True)
 async def settings(ctx):
     await default_cmds['settings'].execute(ctx, client, session=session, settings=settings_dict[ctx.message.channel.server])
@@ -408,6 +415,8 @@ async def purge(context):
         user = context.message.channel.server.get_member(args[1])
     if len(args) > 2:
         count = min(int(args[2]), 100000)
+    if len(args) > 3:
+        channel = context.message.channel_mentions[0]
     await client.send_typing(channel)
     if (int(context.message.author.id) in admins[int(channel.server.id)]):
         deleted = await client.purge_from(context.message.channel, limit=count, check=lambda m: m.author==user)
