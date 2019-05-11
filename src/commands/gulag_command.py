@@ -22,7 +22,7 @@ class gulag_command(abstract_command):
         except:
             print("gulag role/emoji not found")
             await self.client.send_message(self.channel, "Please create a role called `kulak` and an emoji called `gulag` to use this feature.")
-            return
+            return True
         comrade = self.message.mentions[0]
         if comrade == self.client.user:
             with open('res/treason.gif', 'rb') as f:
@@ -74,8 +74,14 @@ class gulag_command(abstract_command):
         await self.client.remove_roles(comrade, gulag_role)
         print('ungulag\'d ' + comrade.display_name)
 
-    def get_help(self):
-        return "Starts a vote to move a member to the gulag. Each vote over the threshold (%d) will add additional time." % 5
+        return True
+
+    def get_brief(self):
+        return "Starts a vote to move a member to the gulag."
+
+    def get_help(self, **kwargs):
+        settings = kwargs['settings']
+        return "Starts a vote to move a member to the gulag. Each vote over the threshold (%d) will add additional time." % (settings.gulag_threshold if settings else 5)
 
     def get_usage(self):
         return "<@member>"

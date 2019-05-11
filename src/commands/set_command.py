@@ -73,8 +73,12 @@ class set_command(abstract_command):
             msg = 'too short'
         await self.client.send_message(self.channel, msg)
 
-    def get_help(self):
+        return True
+
+    def get_help(self, **kwargs):
         return "Sets a custom command\nYou may include the following options:\n[noun], [adj], [adv], [member], [owl], [:reaction:], [count], [comma,separated,choices]"
+    def get_brief(self):
+        return "Set a custom command"
 
     def get_usage(self):
         return "<trigger>::<response>"

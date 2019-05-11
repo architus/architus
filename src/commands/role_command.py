@@ -47,13 +47,24 @@ class role_command(abstract_command):
         else:
             await self.client.send_message(self.channel, "I don't know that role, %s" % self.author.mention)
 
-    def get_help(self):
-        lembed = list_embed('Available Roles', '`!role [role]`', self.client.user)
+        return True
+
+    def get_help(self, **kwargs):
+        #lembed = list_embed('Available Roles', '`!role [role]`', self.client.user)
+        settings = kwargs['settings']
+        self.roles_dict = settings.roles_dict
+        help_txt = "Available Roles:\n```"
         roles = "Available roles:\n"
         for nick, channelid in self.roles_dict.items():
-            role = discord.utils.get(self.server.roles, id=channelid)
-            lembed.add(nick, role.mention)
-        return lembed.get_embed()
+            role = discord.utils.get(settings.server.roles, id=channelid)
+            #lembed.add(nick, role.mention)
+            help_txt += '{0:15} {1}'.format('`' + nick + '`', role.mention) + '\n'
+
+        #return lembed.get_embed()
+        return help_txt + '```\nUse the nickname in the left column'
+
+    def get_brief(self):
+        return "assign yourself a role"
 
     def get_usage(self):
         return "<role>"

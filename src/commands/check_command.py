@@ -14,7 +14,7 @@ class check_command(abstract_command):
         for member in self.message.mentions:
             if (member == self.client.user):
                 await self.client.send_message(self.channel, "Leave me out of this, " + self.author.mention)
-                return
+                return True
             if (member.id not in self.karma_dict):
                 self.karma_dict[member.id] = [2,2,2,2,0]
                 new_user = User(member.id, self.karma_dict[member.id])
@@ -24,8 +24,9 @@ class check_command(abstract_command):
             response += " and " + ("{:3.1f}% toxic".format(self.get_toxc_percent(member.id)) if (self.get_toxc_percent(member.id) >= self.get_nice_percent(member.id)) else "{:3.1f}% nice".format(self.get_nice_percent(member.id)))
             response += " with %d bots." % self.karma_dict[member.id][4]
             await self.client.send_message(self.channel, response)
+        return bool(self.message.mentions)
 
-    def get_help(self):
+    def get_help(self, **kwargs):
         return "See exactly how autistic people are"
     def get_usage(self):
         return "<@member>..."

@@ -22,6 +22,8 @@ class spellcheck_command(abstract_command):
             d = json.loads(f.read())
         correct_words = 0
         words = 1
+        if not self.message.mentions: return False
+
         victim = self.message.mentions[0]
         for channel in self.server.channels:
             try:
@@ -46,8 +48,10 @@ class spellcheck_command(abstract_command):
         await self.client.send_message(self.channel, "%.1f%s out of the %d scanned words sent by %s are spelled correctly" %
                 (((correct_words/words)*100) - linh_modifier, '%', words, victim.display_name))
 
+        return True
 
-    def get_help(self):
+
+    def get_help(self, **kwargs):
         return "Checks the spelling of the user mentioned"
 
     def get_usage(self):

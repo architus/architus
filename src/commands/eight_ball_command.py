@@ -19,7 +19,9 @@ class eight_ball_command(abstract_command):
         ]
         await self.client.send_message(self.channel, random.choice(possible_responses) + ", " + self.author.mention)
 
-    def get_help(self):
+        return True
+
+    def get_help(self, **kwargs):
         return 'Answers a yes or no question'
     def get_usage(self):
         return "[question]"

@@ -23,9 +23,13 @@ class quote_command(abstract_command):
                             em.set_image(url=message.attachments[0]['url'])
                     except: print("tried to attach image, couldn't")
                     await self.client.send_message(self.channel, embed=em)
-                    return
+                    return True
 
-    def get_help(self):
+        return True
+
+    def get_help(self, **kwargs):
         return "Quotes a previous message in a pretty format. https://support.discordapp.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID-"
+    def get_brief(self):
+        return "Quotes a previous message in a pretty format"
     def get_usage(self):
         return "<messageid>"

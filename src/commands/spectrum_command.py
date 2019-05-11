@@ -36,7 +36,13 @@ class spectrum_command(abstract_command):
         with open('res/foo.png', 'rb') as f:
             await self.client.send_file(self.channel, f, content="Here you go, " + self.author.mention)
 
-    def get_help(self):
+        return True
+
+    def get_brief(self):
+        return "Generate a graph of autism"
+
+    def get_help(self, **kwargs):
+        self.settings = kwargs['settings']
         return "Generate a graph of autism\nVote %s for toxic, %s for autistic, %s for nice, and %s for normie." % (self.settings.toxic_emoji, self.settings.aut_emoji, self.settings.nice_emoji, self.settings.norm_emoji)
 
     def get_usage(self):

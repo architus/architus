@@ -10,29 +10,30 @@ class abstract_command():
         self.aliases = aliases
         super().__init__()
 
-    async def execute(self, context, client, **kwargs):
-        self.context = context
+    async def execute(self, message, client, **kwargs):
         self.client = client
-        self.message = context.message
+        self.message = message
         self.content = self.message.content
         self.args = self.message.clean_content.split(' ')
         self.channel = self.message.channel
         self.server = self.message.channel.server
         self.author = self.message.author
-        await self.exec_cmd(**kwargs)
+        return await self.exec_cmd(**kwargs)
    
     def get_aliases(self):
         return [self.name] + self.aliases
 
-    def format_help(self, invocation, settings=None):
-        self.settings = settings
-        return "```usage:       %s %s\ndescription: %s```" % (invocation, self.get_usage(), self.get_help())
+    def format_help(self, invocation, **kwargs):
+        return "```usage:          %s %s\ndescription:    %s```" % (invocation, self.get_usage(), self.get_help(**kwargs))
 
-    def get_help(self, settings=None):
+    def get_help(self, **kwargs):
         raise NotImplementedError
 
     def get_usage(self):
         raise NotImplementedError
+
+    def get_brief(self):
+        return self.get_help()
 
     async def exec_cmd(self, **kwargs):
         raise NotImplementedError

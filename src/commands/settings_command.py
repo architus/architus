@@ -64,6 +64,8 @@ class settings_command(abstract_command):
                 await self.gulag_severity()
             await self.client.edit_message(msg, embed=await self.get_embed())
 
+        return True
+
     async def starboard_threshold(self):
         await self.client.send_message(self.channel, '⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
         msg = await self.client.wait_for_message(author=self.author)
@@ -208,8 +210,8 @@ class settings_command(abstract_command):
         em.add_field(name='⚔ Joinable Roles', value='Current value: %s' % ', '.join(roles_names), inline=True)
         return em
 
-    def get_help(self):
-        return ""
+    def get_help(self, **kwargs):
+        return "Open a settings menu"
 
     def get_usage(self):
         return ''

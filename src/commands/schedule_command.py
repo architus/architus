@@ -79,6 +79,8 @@ class schedule_command(abstract_command):
 
             await self.client.edit_message(msg, self.render_text(title_str, parsed_time, yes, no, maybe))
 
+        return True
+
 
     def render_text(self, title_str, parsed_time, yes, no, maybe):
         return "__**%s**__\n**Time: **%s\n:white_check_mark: **Yes (%d): %s**\n:x: **No (%d): %s**\n:shrug: **Maybe (%d): %s**" % (title_str, parsed_time.strftime("%b %d %I:%M%p %Z"), len(yes), ' '.join([u.mention for u in yes]), len(no), ' '.join([u.mention for u in no]), len(maybe), ' '.join([u.mention for u in maybe]))
@@ -97,11 +99,14 @@ class schedule_command(abstract_command):
         title_msg = await self.client.wait_for_message(timeout=30, author=author)
         return title_msg.clean_content or None
 
-    def get_help(self):
-        return "this is wrong"
+    def get_help(self, **kwargs):
+        return "Start an event poll with pretty formatting. Knows the difference between daylight and standard time."
+
+    def get_brief(self):
+        return "Start an event poll with pretty formatting"
 
     def get_usage(self):
-        return "<not done>"
+        return "<title> [date]"
 
     def get_timezone(self, region):
         region = str(region)

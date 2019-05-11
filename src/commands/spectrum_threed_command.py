@@ -11,7 +11,7 @@ import discord
 class spectrum_threed_command(abstract_command):
 
     def __init__(self):
-        super().__init__("spectrum_3d")
+        super().__init__("spectrum_3d", aliases=['spectrum3d'])
 
     async def exec_cmd(self, **kwargs):
         self.karma_dict = kwargs['karma_dict']
@@ -40,7 +40,7 @@ class spectrum_threed_command(abstract_command):
             #y.append((get_autism_percent(member) - get_normie_percent(member)) / 10)
         title = self.server.name
         key = ''.join([random.choice(string.ascii_letters) for n in range(10)])
-        max_bot = max(z or [1])
+        max_bot = max(max(z or [1]), 1)
         z = [(b/max_bot) * 10 for b in z]
         thread = Thread(target = spectrum_gen.generate, args = (x, y, z, names, title, key))
         thread.start()
@@ -50,13 +50,16 @@ class spectrum_threed_command(abstract_command):
         with open('res/%s.webm' % key, 'rb') as f:
             await self.client.send_file(self.channel, f, content="Here you go, " + self.author.mention)
         os.remove('res/%s.webm' % key)
+        return True
 
-    def get_help(self):
+    def get_help(self, **kwargs):
         return "Generate a 3d graph of autism\nVote :pech: for toxic, 🅱️for autistic, ❤ for nice, and :reee: for normie." ,
+
+    def get_brief(self):
+        return "Generate a 3d graph of autism"
 
     def get_usage(self):
         return ""
-
 
     def get_autism_percent(self, m):
         if (self.karma_dict[m][0] + self.karma_dict[m][1] == 0):

@@ -16,7 +16,9 @@ class letmein_command(abstract_command):
         with open('res/meme.png', 'rb') as f:
             await self.client.send_file(self.channel, f, content="Here you go, " + self.author.mention)
 
-    def get_help(self):
+        return True
+
+    def get_help(self, **kwargs):
         return "stupid meme"
     def get_usage(self):
         return "<exclusion> [@member]"

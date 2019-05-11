@@ -45,6 +45,8 @@ class poll_command(abstract_command):
 
             await self.client.edit_message(msg, self.render_text(title, options, votes))
 
+        return True
+
 
     def render_text(self, title, options, votes):
         text = "__**%s**__\n" % title
@@ -55,7 +57,7 @@ class poll_command(abstract_command):
         return text
 
 
-    def get_help(self):
+    def get_help(self, **kwargs):
         return "Starts a poll with some pretty formatting. Supports up to 10 options"
 
     def get_usage(self):

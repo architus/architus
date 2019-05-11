@@ -2,6 +2,8 @@ import json
 from src.models import Settings
 from sqlalchemy.orm.exc import NoResultFound
 
+RYTHMS_ID = '235088799074484224'
+
 class server_settings:
 
     def __init__(self, session, server):
@@ -9,6 +11,15 @@ class server_settings:
         self.server_id = server.id
         self.server = server
         self._settings_dict = self._load_from_db(self.server_id)
+
+    @property
+    def music_enabled(self) -> bool:
+        return self._settings_dict['music_enabled'] if 'music_enabled' in self._settings_dict else not bool(self.server.get_member(RYTHMS_ID))
+
+    @music_enabled.setter
+    def music_enabled(self, new_music_enabled: bool):
+        self._settings_dict['music_enabled'] = new_music_enabled
+        self._update_db()
 
     @property
     def starboard_emoji(self) -> str:

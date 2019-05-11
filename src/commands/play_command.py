@@ -8,7 +8,13 @@ class play_command(abstract_command):
         super().__init__("play")
 
     async def exec_cmd(self, **kwargs):
+
         players = kwargs['players']
+        settings = kwargs['settings']
+
+        if not settings.music_enabled:
+            return True
+
         player = players[self.server.id]
         await self.client.send_typing(self.channel)
         if not discord.opus.is_loaded():
@@ -76,13 +82,15 @@ class play_command(abstract_command):
                 if (name):
                     message = "🎶 **Now playing:** *%s*" % name
 
+        return True
+
         #print ('q ' + str(len(player.q)))
         #for song in list(player.q):
             #print ('song: ' + song)
 
         await self.client.send_message(self.channel, message)
 
-    def get_help(self):
+    def get_help(self, **kwargs):
         return "Add a song to the queue or play immediately. Supports youtube and spotify links."
 
     def get_usage(self):

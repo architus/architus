@@ -28,8 +28,11 @@ class say_command(abstract_command):
             await self.client.send_typing(self.channel)
             await asyncio.sleep(10)
             os.remove("res/generate/%s.mp3" % key)
+            return True
 
-    def get_help(self):
-        return "Say a message in voice channel"
+    def get_help(self, **kwargs):
+        return "Say a message in voice channel (user must be in a voice channel currently)"
     def get_usage(self):
         return "<message>"
+    def get_brief(self):
+        return "Say a message in voice channel"
