@@ -281,7 +281,7 @@ def log_message(msg):
 async def on_message(message):
     # forward dms
     if message.channel.is_private and message.author != client.user:
-        await client.send_message(await client.get_user_info(JOHNYS_ID), message.author.mention + ': '+message.content)
+        await client.send_message(await client.get_user_info(JOHNYS_ID), message.author.mention + ': ' + message.content)
         return
 
     server = message.channel.server
@@ -290,7 +290,7 @@ async def on_message(message):
     settings = settings_dict[server]
 
     if not message.author.bot:
-        
+
         # check for built in commands
         args = message.clean_content.split(' ')
         if args and args[0] and  args[0][0] in BOT_PREFIX:
@@ -302,7 +302,7 @@ async def on_message(message):
 
         # check for commands in this file
         await client.process_commands(message)
-        
+
         # bump/insert emojis if necessary
         if settings.manage_emojis: await emoji_managers[server.id].scan(message)
 

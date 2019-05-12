@@ -4,18 +4,24 @@ import discord
 class list_emojis_command(abstract_command):
 
     def __init__(self):
-        super().__init__("list_emojis", aliases=['emojis'])
+        super().__init__("list_emojis", aliases=['emojis', 'emotes', 'emoji', 'emote'])
 
     async def exec_cmd(self, **kwargs):
         emoji_managers = kwargs['emoji_managers']
         settings = kwargs['settings']
+        
+        message = '```\n • ' + '\n • '.join(emoji_managers[self.server.id].list_unloaded()) + '```\n'
+        message += "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
 
-        await self.client.send_message(self.channel, '```' + '\n'.join(emoji_managers[self.server.id].list_unloaded()) + '```')
+        await self.client.send_message(self.channel, message)
 
         return True
 
+    def get_brief(self, **kwargs):
+        return "List currently cached emojis"
+
     def get_help(self, **kwargs):
-        return "List currently caches emojis"
+        return "List currently cached emojis. Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
 
     def get_usage(self):
         return ""

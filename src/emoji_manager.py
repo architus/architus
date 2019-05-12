@@ -106,6 +106,10 @@ class emoji_manager():
         except:
             return "%s/%s/%s" % (EMOJI_DIR, self.server.id, emoji)
 
+    def _get_url(self, emoji):
+        '''discord api scuffed'''
+        return emoji.url.replace("api/", "").replace("discordapp", "cdn.discordapp")
+
     async def _load(self, emoji):
         print('loaded ' + str(emoji))
         f = await aiofiles.open(self._path(emoji), 'rb')
@@ -115,11 +119,13 @@ class emoji_manager():
         return binary
 
     async def _save(self, emoji):
-        print('saving ' + str(emoji))
+        print('saving ' + str(emoji) + ' from ' + self._get_url(emoji))
         '''load all emojis in the server into memory'''
         async with aiohttp.ClientSession() as session:
-            async with session.get(emoji.url) as resp:
+            async with session.get(self._get_url(emoji)) as resp:
                 if resp.status == 200:
                     f = await aiofiles.open(self._path(emoji), mode='wb')
                     await f.write(await resp.read())
                     await f.close()
+                else:
+                    print("API gave unexpected response (%d) emoji not saved" % resp.status)

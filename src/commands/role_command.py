@@ -6,7 +6,7 @@ import discord
 class role_command(abstract_command):
 
     def __init__(self):
-        super().__init__("role", aliases=['rank', 'join'])
+        super().__init__("role", aliases=['rank', 'join', 'roles'])
 
     async def exec_cmd(self, **kwargs):
         settings = kwargs['settings']

@@ -25,7 +25,7 @@ class settings_command(abstract_command):
         self.settings = settings
         if self.author.id not in settings.admins_ids:
             self.client.send_message(self.channel, 'nope, sorry')
-            return
+            return True
 
         msg = await self.client.send_message(self.channel, embed=await self.get_embed())
 
