@@ -422,7 +422,11 @@ def initialize_commands():
         smart_commands.setdefault(int(server.id), [])
     for command in command_list:
         smart_commands.setdefault(command.server_id, [])
-        smart_commands[command.server_id].append(smart_command(command.trigger.replace(str(command.server_id), '', 1), command.response, command.count, client.get_server(str(command.server_id)), command.author_id))
+        smart_commands[command.server_id].append(smart_command(
+                    command.trigger.replace(str(command.server_id), '', 1),
+                    command.response, command.count,
+                    client.get_server(str(command.server_id)),
+                    command.author_id))
     for server, cmds in smart_commands.items():
         smart_commands[server].sort()
 
@@ -439,18 +443,6 @@ def update_user(disc_id, delete=False):
             'awareness_score': karma_dict[disc_id][4]
             }
     session.query(User).filter_by(discord_id = disc_id).update(new_data)
-    session.commit()
-
-def update_admin(member, server, delete=False):
-    if (delete):
-        session.query(Admin).filter_by(discord_id = member.id).delete()
-        session.commit()
-        return
-    new_data = {
-            'server_id': server.id,
-            'username': member.name
-            }
-    session.query(Admin).filter_by(discord_id = int(member.id)).update(new_data)
     session.commit()
 
 def update_command(triggerkey, response, count, server, author_id, delete=False):

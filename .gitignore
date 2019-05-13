@@ -5,6 +5,7 @@ emojis/*
 __py*
 res/foo.*
 res/gulag.png
+res/wordhello.png
 res/*part.webm
 res/meme.png
 *pyc
