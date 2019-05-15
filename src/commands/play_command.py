@@ -82,13 +82,16 @@ class play_command(abstract_command):
                 if (name):
                     message = "🎶 **Now playing:** *%s*" % name
 
-        return True
+
 
         #print ('q ' + str(len(player.q)))
         #for song in list(player.q):
             #print ('song: ' + song)
 
         await self.client.send_message(self.channel, message)
+        
+        return True
+        
 
     def get_help(self, **kwargs):
         return "Add a song to the queue or play immediately. Supports youtube and spotify links."
