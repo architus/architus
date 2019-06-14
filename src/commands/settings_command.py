@@ -24,10 +24,10 @@ class settings_command(abstract_command):
         settings = kwargs['settings']
         self.settings = settings
         if self.author.id not in settings.admins_ids:
-            self.client.send_message(self.channel, 'nope, sorry')
+            self.channel.send('nope, sorry')
             return True
 
-        msg = await self.client.send_message(self.channel, embed=await self.get_embed())
+        msg = await self.channel.send(embed=await self.get_embed())
 
         await self.client.add_reaction(msg, "⭐")
         await self.client.add_reaction(msg, TRASH)
@@ -40,6 +40,7 @@ class settings_command(abstract_command):
         await self.client.add_reaction(msg, HAMMER)
 
         while True:
+            #TODO
             react = await self.client.wait_for_reaction(message=msg, user=self.author)
             if react.user == self.client.user: continue
             e = react.reaction.emoji
@@ -67,17 +68,19 @@ class settings_command(abstract_command):
         return True
 
     async def starboard_threshold(self):
-        await self.client.send_message(self.channel, '⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
+        await self.channel.send('⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
+        #TODO
         msg = await self.client.wait_for_message(author=self.author)
         try:
             self.settings.starboard_threshold = abs(int(msg.content))
             resp = "Threshold set"
         except:
             resp = "Threshold unchanged"
-        await self.client.send_message(self.channel, resp)
+        await self.channel.send(resp)
 
     async def repost_deletes(self):
-        await self.client.send_message(self.channel, '🗑️ If true, deleted messages will be reposted immediately. Enter `true` or `false` to modify it:')
+        await self.channel.send('🗑️ If true, deleted messages will be reposted immediately. Enter `true` or `false` to modify it:')
+        #TODO
         msg = await self.client.wait_for_message(author=self.author)
         resp = "Setting updated"
         if msg.content in ['1','True','true','yes', 'y']:
@@ -87,10 +90,11 @@ class settings_command(abstract_command):
         else:
             resp = "Setting unchanged"
 
-        await self.client.send_message(self.channel, resp)
+       await self.channel.send(resp)
 
     async def manage_emojis(self):
-        await self.client.send_message(self.channel, '📂 If true, less popular emojis will be cycled in and out as needed, effectively allowing greater than 50 emojis. Enter `true` or `false` to modify it:')
+        await self.channel.send('📂 If true, less popular emojis will be cycled in and out as needed, effectively allowing greater than 50 emojis. Enter `true` or `false` to modify it:')
+        #TODO
         msg = await self.client.wait_for_message(author=self.author)
         resp = "Setting updated"
         if msg.content in ['1','True','true','yes', 'y']:
@@ -100,10 +104,11 @@ class settings_command(abstract_command):
         else:
             resp = "Setting unchanged"
 
-        await self.client.send_message(self.channel, resp)
+        await self.channel.send(resp)
 
     async def bot_commands(self):
-        await self.client.send_message(self.channel, "🤖 Some verbose commands are limited to these channels. Mention channels to toggle them:")
+        await self.channel.send("🤖 Some verbose commands are limited to these channels. Mention channels to toggle them:")
+        #TODO
         msg = await self.client.wait_for_message(author=self.author)
         bc_channels = self.settings.bot_commands_channels
         new_channels = msg.channel_mentions
@@ -116,22 +121,23 @@ class settings_command(abstract_command):
             else:
                 bc_channels.append(channel.id)
             self.settings.bot_commands_channels = bc_channels
-        await self.client.send_message(self.channel, resp)
+        await self.channel.send(resp)
 
     async def default_role(self):
-        await self.client.send_message(self.channel, "🛡 New members will be automatically moved into this role. Enter a role id (`!roleids`) to change:")
+        await self.channel.send("🛡 New members will be automatically moved into this role. Enter a role id (`!roleids`) to change:")
         def check(msg):
             return msg.content != '!roleids'
+        #TODO
         msg = await self.client.wait_for_message(author=self.author, check=check)
         if discord.utils.get(self.server.roles, id=msg.content):
             self.settings.default_role_id = msg.content
             resp = "Default role updated"
         else:
             resp = "Default role unchanged"
-        await self.client.send_message(self.channel, resp)
+        await self.channel.send(resp)
 
     async def admins(self):
-        await self.client.send_message(self.channel, "🔐 These members have access to more bot functions such as `!purge` and setting longer commands. Mention a member to toggle:")
+        await self.channel.send("🔐 These members have access to more bot functions such as `!purge` and setting longer commands. Mention a member to toggle:")
         msg = await self.client.wait_for_message(author=self.author)
         resp = "Admins unchanged"
         if msg.mentions:
@@ -140,12 +146,12 @@ class settings_command(abstract_command):
                 self.settings.admins_ids.remove(msg.mentions[0].id)
             else:
                 self.settings.admins_ids += [msg.mentions[0].id]
-        await self.client.send_message(self.channel, resp)
+        await self.channel.send(resp)
 
     async def roles(self):
         def check(msg):
             return msg.content != '!roleids'
-        await self.client.send_message(self.channel, "⚔ These are the roles that any member can join at will. Enter a list of role ids (`!roleids`) to toggle. Optionally enter a nickname for the role in the format `nickname::roleid` if the role's name is untypable:")
+        await self.channel.send("⚔ These are the roles that any member can join at will. Enter a list of role ids (`!roleids`) to toggle. Optionally enter a nickname for the role in the format `nickname::roleid` if the role's name is untypable:")
         msg = await self.client.wait_for_message(author=self.author, check=check)
         pattern = re.compile("((?P<nick>\w+)::)?(?P<id>\d{18})")
         new_roles = []
@@ -169,26 +175,26 @@ class settings_command(abstract_command):
                 roles[role[0]] = role[1]
 
         self.settings.roles_dict = roles
-        await self.client.send_message(self.channel, resp)
+        await self.channel.send(resp)
 
     async def gulag_threshold(self):
-        await self.client.send_message(self.channel, HAMMER_PICK + ' This is the number of reacts a gulag vote must get to be pass. Enter a number to modify it:')
+        await self.channel.send(HAMMER_PICK + ' This is the number of reacts a gulag vote must get to be pass. Enter a number to modify it:')
         msg = await self.client.wait_for_message(author=self.author)
         try:
             self.settings.gulag_threshold = abs(int(msg.content))
             resp = "Threshold set"
         except:
             resp = "Threshold unchanged"
-        await self.client.send_message(self.channel, resp)
+        await self.channel.send(resp)
     async def gulag_severity(self):
-        await self.client.send_message(self.channel, HAMMER + ' This is the number of minutes a member will be confined to gulag. Half again per extra vote. Enter a number to modify it:')
+        await self.channel.send(HAMMER + ' This is the number of minutes a member will be confined to gulag. Half again per extra vote. Enter a number to modify it:')
         msg = await self.client.wait_for_message(author=self.author)
         try:
             self.settings.gulag_severity = abs(int(msg.content))
             resp = "Severity set"
         except:
             resp = "Severity unchanged"
-        await self.client.send_message(self.channel, resp)
+        await self.channel.send(resp)
 
     async def get_embed(self):
         settings = self.settings

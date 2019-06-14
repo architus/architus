@@ -17,7 +17,7 @@ class eight_ball_command(abstract_command):
             'Yep.',
             'Possibly.'
         ]
-        await self.client.send_message(self.channel, random.choice(possible_responses) + ", " + self.author.mention)
+        await self.channel.send(random.choice(possible_responses) + ", " + self.author.mention)
 
         return True
 

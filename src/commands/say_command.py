@@ -15,6 +15,7 @@ class say_command(abstract_command):
             if not discord.opus.is_loaded():
                 discord.opus.load_opus('res/libopus.so')
             if not (player.is_connected()):
+                #TODO
                 voice = await self.client.join_voice_channel(self.author.voice.voice_channel)
                 player.voice = voice
             else:
@@ -23,9 +24,9 @@ class say_command(abstract_command):
 
             tts = gTTS(text=' '.join(self.args[1:]), lang='en')
             key = ''.join([random.choice(string.ascii_letters) for n in range(10)])
-            tts.save("res/generate/%s.mp3" % key)
-            done = await player.play_file("res/generate/%s.mp3" % key)
-            await self.client.send_typing(self.channel)
+            async with self.channel.typing():
+                tts.save("res/generate/%s.mp3" % key)
+                done = await player.play_file("res/generate/%s.mp3" % key)
             await asyncio.sleep(10)
             os.remove("res/generate/%s.mp3" % key)
             return True

@@ -14,9 +14,9 @@ class queue_command(abstract_command):
         if not settings.music_enabled:
             return True
 
-        await self.client.send_typing(self.channel)
-        player = players[self.server.id]
-        await self.client.send_message(self.channel, embed=player.qembed())
+        async with self.channel.typing():
+            player = players[self.server.id]
+            await self.channel.send(embed=player.qembed())
 
         return True
 

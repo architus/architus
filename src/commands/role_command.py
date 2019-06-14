@@ -12,7 +12,6 @@ class role_command(abstract_command):
         settings = kwargs['settings']
         self.roles_dict = settings.roles_dict
         roles_dict = self.roles_dict
-        await self.client.send_typing(self.channel)
         arg = self.content.split(' ')
         member = self.author
         if (len(arg) < 2):
@@ -27,7 +26,7 @@ class role_command(abstract_command):
             for nick, channelid in roles_dict.items():
                 role = discord.utils.get(self.server.roles, id=channelid)
                 lembed.add(nick, role.mention)
-            await self.client.send_message(self.channel, embed=lembed.get_embed())
+            await self.channel.send(embed=lembed.get_embed())
         elif requested_role in roles_dict:
             #filtered = filter(lambda role: role.name == ROLES_DICT[requested_role], member.server.role_hierarchy)
             role = discord.utils.get(self.server.roles, id=roles_dict[requested_role.lower()])
@@ -41,11 +40,11 @@ class role_command(abstract_command):
                 else:
                     await self.client.add_roles(member, role)
             except:
-                await self.client.send_message(self.channel, "Could not add %s to %s." % (self.author.mention, requested_role))
+                await self.channel.send("Could not add %s to %s." % (self.author.mention, requested_role))
             else:
-                await self.client.send_message(self.channel, "%s %s %s %s." % (action, self.author.mention, prep, requested_role))
+                await self.channel.send("%s %s %s %s." % (action, self.author.mention, prep, requested_role))
         else:
-            await self.client.send_message(self.channel, "I don't know that role, %s" % self.author.mention)
+            await self.channel.send("I don't know that role, %s" % self.author.mention)
 
         return True
 

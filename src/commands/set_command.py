@@ -22,7 +22,7 @@ class set_command(abstract_command):
             for channelid in settings.bot_commands_channels:
                 botcommands = discord.utils.get(self.server.channels, id=channelid, type=ChannelType.text)
                 if botcommands:
-                    await self.client.send_message(self.channel, botcommands.mention + '?')
+                    await self.channel.send(botcommands.mention + '?')
                     return
         if self.args[0] == '!remove':
             self.content = '!set %s::remove' % self.content.replace('!remove ', '')
@@ -32,7 +32,7 @@ class set_command(abstract_command):
             try:
                 command = smart_command(parser.group(1), parser.group(2), 0, server, self.author.id)
             except VaguePatternError as e:
-                await self.client.send_message(self.channel, 'let\'s try making that a little more specific please')
+                await self.channel.send('let\'s try making that a little more specific please')
                 return
 
             if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]) and not len(command.raw_trigger) == 0 and command.raw_response not in ['remove', 'author']:
@@ -71,7 +71,7 @@ class set_command(abstract_command):
             msg = 'too long, sorry. ask the owner to set it'
         elif parser and len(parser.group(1)) > 1:
             msg = 'too short'
-        await self.client.send_message(self.channel, msg)
+        await self.channel.send(msg)
 
         return True
 

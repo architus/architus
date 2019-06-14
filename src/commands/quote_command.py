@@ -22,7 +22,7 @@ class quote_command(abstract_command):
                         elif message.attachments:
                             em.set_image(url=message.attachments[0]['url'])
                     except: print("tried to attach image, couldn't")
-                    await self.client.send_message(self.channel, embed=em)
+                    await self.channel.send(embed=em)
                     return True
 
         return True

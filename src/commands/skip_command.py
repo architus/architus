@@ -17,9 +17,9 @@ class skip_command(abstract_command):
 
         name = await player.skip()
         if (name):
-            await self.client.send_message(self.channel, "🎶 **Now playing:** *%s*" % name)
+            await self.channel.send("🎶 **Now playing:** *%s*" % name)
         else:
-            await self.client.send_message(self.channel, "No songs left. nice job. bye.")
+            await self.channel.send("No songs left. nice job. bye.")
 
         return True
 

@@ -50,11 +50,12 @@ class schedule_command(abstract_command):
         yes = []
         no = []
         maybe = []
-        msg = await self.client.send_message(self.channel, self.render_text(title_str, parsed_time, yes, no, maybe))
+        msg = await self.channel.send(self.render_text(title_str, parsed_time, yes, no, maybe))
         await self.client.add_reaction(msg, self.YES_EMOJI)
         await self.client.add_reaction(msg, self.NO_EMOJI)
         await self.client.add_reaction(msg, self.MAYBE_EMOJI)
         while True:
+            #TODO
             react = await self.client.wait_for_reaction([self.YES_EMOJI, self.NO_EMOJI, self.MAYBE_EMOJI], message=msg)
             if react.user == self.client.user: continue
             elif self.YES_EMOJI in str(react.reaction.emoji) and react.user not in yes:
@@ -85,16 +86,16 @@ class schedule_command(abstract_command):
         return "__**%s**__\n**Time: **%s\n:white_check_mark: **Yes (%d): %s**\n:x: **No (%d): %s**\n:shrug: **Maybe (%d): %s**" % (title_str, parsed_time.strftime("%b %d %I:%M%p %Z"), len(yes), ' '.join([u.mention for u in yes]), len(no), ' '.join([u.mention for u in no]), len(maybe), ' '.join([u.mention for u in maybe]))
 
     async def prompt_date(self, author):
-        await self.client.send_message(self.channel, "what time?")
+        await self.channel.send("what time?")
         time_msg = await self.client.wait_for_message(timeout=30, author=author)
         try:
             return dateutil.parser.parse(time_msg.clean_content)
         except:
-            await self.client.send_message(self.channel, "not sure what that means")
+            await self.channel.send("not sure what that means")
             return None
 
     async def prompt_title(self, author):
-        await self.client.send_message(self.channel, "what event?")
+        await self.channel.send("what event?")
         title_msg = await self.client.wait_for_message(timeout=30, author=author)
         return title_msg.clean_content or None
 
