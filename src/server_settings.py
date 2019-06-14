@@ -109,11 +109,11 @@ class server_settings:
         self._settings_dict['bot_commands'] = new_bot_commands
         self._update_db()
 
-    @property
-    def admins_ids(self) -> list:
+    #@property
+    #def admins_ids(self) -> list:
 
-        self.server = server
-        self._settings_dict = self._load_from_db(self.server_id)
+        #self.server = server
+        #self._settings_dict = self._load_from_db(self.server_id)
 
     @property
     def default_role_id(self) -> str:
