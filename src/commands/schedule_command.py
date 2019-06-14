@@ -2,7 +2,6 @@ from src.commands.abstract_command import abstract_command
 import time
 import datetime
 import pytz
-from discord import ServerRegion
 import discord
 import dateutil.parser
 

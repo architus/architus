@@ -15,7 +15,7 @@ class clear_command(abstract_command):
 
         player = players[self.server.id]
 
-        await self.client.send_message(self.channel, "Removed %d songs from queue." % len(player.q))
+        await self.channel.send("Removed %d songs from queue." % len(player.q))
         player.clearq()
         return True
 

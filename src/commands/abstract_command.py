@@ -16,7 +16,7 @@ class abstract_command():
         self.content = self.message.content
         self.args = self.message.clean_content.split(' ')
         self.channel = self.message.channel
-        self.server = self.message.channel.server
+        self.server = self.message.channel.guild
         self.author = self.message.author
         return await self.exec_cmd(**kwargs)
    

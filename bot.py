@@ -49,64 +49,66 @@ client.remove_command('help')
                 pass_context=True)
 async def help(ctx):
     help_txt = '```Commands:\n'
-    settings = settings_dict[ctx.message.channel.server]
+    settings = settings_dict[ctx.message.channel.guild]
     args = ctx.message.content.split(' ')
 
     if len(args) > 1:
         for name, command in default_cmds.items():
             if args[1] in command.get_aliases():
-                await client.send_message(ctx.message.channel, command.format_help(BOT_PREFIX[1] + args[1], settings=settings))
+                await ctx.channel.send(command.format_help(BOT_PREFIX[1] + args[1], settings=settings))
                 return
 
     for name, command in default_cmds.items():
         help_txt += '{0:15} {1}'.format(command.name, command.get_brief()) + '\n'
     help_txt += '\nType !help <command> for command specific help```'
 
-    await client.send_message(ctx.message.channel, help_txt)
+    await ctx.channel.send(help_txt)
 
 @client.command(pass_context=True)
 async def pause(context):
-    if not settings_dict[context.message.channel.server].music_enabled: return
-    player = players[context.message.channel.server.id]
+    if not settings_dict[context.message.channel.guild].music_enabled: return
+    player = players[context.message.channel.guild.id]
     player.pause()
 
 @client.command(pass_context=True)
 async def resume(context):
-    if not settings_dict[context.message.channel.server].music_enabled: return
-    player = players[context.message.channel.server.id]
+    if not settings_dict[context.message.channel.guild].music_enabled: return
+    player = players[context.message.channel.guild.id]
     player.resume()
 
 @client.event
-async def on_server_emojis_update(before, after):
-    try: server = before[0].server
-    except: server = after[0].server
-    if not settings_dict[server].manage_emojis: return
+async def on_guild_emojis_update(before, after):
+    #TODO
+    return
+    try: guild = before[0].guild
+    except: guild = after[0].guild
+    if not settings_dict[guild].manage_emojis: return
 
     if len(before) == len(after): # if renamed
         diff = [i for i in range(len(after)) if before[i].name != after[i].name]
         for i in diff:
             if is_animated(before[i]): continue
-            await emoji_managers[server.id].rename_emoji(before[i], after[i])
+            await emoji_managers[guild.id].rename_emoji(before[i], after[i])
 
     elif len(before) > len(after): # if removed
         for emoji in [emoji for emoji in before if emoji not in after]:
             if is_animated(emoji): continue
-            emoji_managers[server.id].del_emoji(emoji)
+            emoji_managers[guild.id].del_emoji(emoji)
 
     elif len(after) > len(before): # if added
         for emoji in [emoji for emoji in after if emoji not in before]:
             if is_animated(emoji): continue
-            await emoji_managers[server.id].add_emoji(emoji)
+            await emoji_managers[guild.id].add_emoji(emoji)
 
 
 @client.event
-async def on_server_join(server):
-    print("JOINED NEW SERVER: %s - %s (%s)" % (server.name, server.id, server.member_count))
+async def on_guild_join(guild):
+    print("JOINED NEW guild: %s - %s (%s)" % (guild.name, guild.id, guild.member_count))
     await on_ready()
 
 @client.event
 async def on_message_delete(message):
-    settings = settings_dict[message.channel.server]
+    settings = settings_dict[message.channel.guild]
     if message.channel.name == 'bangers': return  #TODO
     if message.author != client.user and message.id not in deletable_messages and settings.repost_del_msg:
         est = get_datetime(message.timestamp)
@@ -116,7 +118,7 @@ async def on_message_delete(message):
             em.set_image(url=message.embeds[0]['url'])
         elif message.attachments:
             em.set_image(url=message.attachments[0]['url'])
-        del_msg = await client.send_message(message.channel, embed=em)
+        del_msg = await message.channel.send(embed=em)
         for sm in tracked_messages:
             if (sm.peek().id == message.id):
                 sm.embed = del_msg
@@ -125,11 +127,11 @@ async def on_message_delete(message):
 
 @client.event
 async def on_message_edit(before, after):
-    server = before.channel.server
+    guild = before.channel.guild
     if before.author == client.user:
         return
-    print('<%s>[%s](%s) - [%s](%s) %s(%s): %s CHANGED TO:' % (datetime.now(), server.name, server.id, before.channel.name, before.channel.id, before.author.display_name, before.author.id, before.content))
-    print('<%s>[%s](%s) - [%s](%s) %s(%s): %s' % (datetime.now(), server.name, server.id, after.channel.name, after.channel.id, after.author.display_name, after.author.id, after.content))
+    print('<%s>[%s](%s) - [%s](%s) %s(%s): %s CHANGED TO:' % (datetime.now(), guild.name, guild.id, before.channel.name, before.channel.id, before.author.display_name, before.author.id, before.content))
+    print('<%s>[%s](%s) - [%s](%s) %s(%s): %s' % (datetime.now(), guild.name, guild.id, after.channel.name, after.channel.id, after.author.display_name, after.author.id, after.content))
     for sm in tracked_messages:
         if (sm.add_edit(before, after)):
             await edit_popup(before)
@@ -141,8 +143,8 @@ async def on_message_edit(before, after):
 @client.event
 async def on_reaction_add(reaction, user):
     author = reaction.message.author
-    server = reaction.message.channel.server
-    settings = settings_dict[server]
+    guild = reaction.message.channel.guild
+    settings = settings_dict[guild]
     print (reaction.emoji)
     for e in reaction.message.embeds:
         author_name, author_avatar = '',''
@@ -151,7 +153,7 @@ async def on_reaction_add(reaction, user):
             author_avatar = e['author']['icon_url']
         except: pass # not the type of embed we were expecting
         # this won't work if the user has default avatar
-        real_author = discord.utils.get(server.members, name=author_name, avatar_url=author_avatar)
+        real_author = discord.utils.get(guild.members, name=author_name, avatar_url=author_avatar)
         if (real_author != None):
             author = real_author
 
@@ -160,7 +162,7 @@ async def on_reaction_add(reaction, user):
 
     if settings.starboard_emoji in str(reaction.emoji):
         if reaction.count == settings.starboard_threshold:
-            await starboard_post(reaction.message, server)
+            await starboard_post(reaction.message, guild)
 
     if ((author != user or user.id == JOHNYS_ID or user.id == MATTS_ID) and author != client.user and user != client.user):
         if (author.id not in karma_dict):
@@ -183,15 +185,15 @@ async def on_reaction_add(reaction, user):
 @client.event
 async def on_reaction_remove(reaction, user):
     author = reaction.message.author
-    server = reaction.message.channel.server
-    settings = settings_dict[server]
+    guild = reaction.message.channel.guild
+    settings = settings_dict[guild]
     for e in reaction.message.embeds:
         try:
             author_name = e['author']['name']
             author_avatar = e['author']['icon_url']
         except:
             author_avatar = ''
-        real_author = discord.utils.get(server.members, name=author_name, avatar_url=author_avatar)
+        real_author = discord.utils.get(guild.members, name=author_name, avatar_url=author_avatar)
         if (real_author != None):
             author = real_author
 
@@ -222,29 +224,29 @@ async def on_reaction_remove(reaction, user):
 @client.command(pass_context=True)
 async def whois(ctx):
     usr = await client.get_user_info(ctx.message.clean_content.split()[1])
-    await client.send_message(ctx.message.channel, usr.name + '#' + usr.discriminator)
+    await ctx.channel.send(usr.name + '#' + usr.discriminator)
 
 @client.command(pass_context=True)
 async def roleids(ctx):
     channel = ctx.message.channel
-    lem = list_embed(channel.server.name, '')
+    lem = list_embed(channel.guild.name, '')
     lem.name = "Role IDs"
-    for role in channel.server.roles:
+    for role in channel.guild.roles:
         if not role.is_everyone:
             lem.add(role.name, role.id)
     print(lem.get_embed().to_dict())
-    await client.send_message(channel, embed=lem.get_embed())
+    await channel.send(embed=lem.get_embed())
 
 @client.command(pass_context=True)
 async def test(context):
     author = context.message.author
     channel = context.message.channel
-    server = context.message.channel.server
+    guild = context.message.channel.guild
     if (author.id != JOHNYS_ID and author.id != GHOSTS_ID):
-        await client.send_message(context.message.channel, "it works")
+        await context.channel.send("it works")
         return
 
-    await client.send_message(context.message.channel, embed=lem.get_embed())
+    await context.channel.send(embed=lem.get_embed())
 
 def get_datetime(timestamp):
     utc = timestamp.replace(tzinfo=timezone('UTC'))
@@ -253,9 +255,9 @@ def get_datetime(timestamp):
 
 @client.event
 async def on_member_join(member):
-    print("%s joined server: %s" % (member.name, member.server.name))
+    print("%s joined guild: %s" % (member.name, member.guild.name))
     try:
-        default_role = discord.utils.get(member.server.roles, id=settings_dict[member.server].default_role_id)
+        default_role = discord.utils.get(member.guild.roles, id=settings_dict[member.guild].default_role_id)
         await client.add_roles(member, default_role)
     except:
         print("could not add %s to %s" % (member.display_name, 'default role'))
@@ -267,7 +269,7 @@ def log_message(msg):
         url = message.attachments[0]['url'] if message.attachments else ''
     except: pass
     log = str(datetime.now())
-    try: log += '[%s](%s) - ' % (msg.channel.server.name, msg.channel.server.id)
+    try: log += '[%s](%s) - ' % (msg.channel.guild.name, msg.channel.guild.id)
     except: log += '[err](err) - '
     try: log += '[%s](%s) ' % (msg.channel.name, msg.channel.id)
     except: log += '[err](err) '
@@ -280,14 +282,14 @@ def log_message(msg):
 @client.event
 async def on_message(message):
     # forward dms
-    if message.channel.is_private and message.author != client.user:
+    if isinstance(message.channel, discord.abc.PrivateChannel) and message.author != client.user:
         await client.send_message(await client.get_user_info(JOHNYS_ID), message.author.mention + ': ' + message.content)
         return
 
-    server = message.channel.server
-    cache[server]['messages'][message.channel] = None
+    guild = message.channel.guild
+    cache[guild]['messages'][message.channel] = None
     print(log_message(message))
-    settings = settings_dict[server]
+    settings = settings_dict[guild]
 
     if not message.author.bot:
 
@@ -298,22 +300,23 @@ async def on_message(message):
                 if args[0][1:] in command.get_aliases():
                     if not await command.execute(message, client, players=players, settings=settings, karma_dict=karma_dict,
                             session=session, cache=cache, smart_commands=smart_commands, admins=admins, emoji_managers=emoji_managers):
-                        await client.send_message(message.channel, command.format_help(args[0], settings=settings))
+                        await message.channel.send( command.format_help(args[0], settings=settings))
 
         # check for commands in this file
         await client.process_commands(message)
 
         # bump/insert emojis if necessary
-        if settings.manage_emojis: await emoji_managers[server.id].scan(message)
+        # TODO
+        if settings.manage_emojis and False: await emoji_managers[guild.id].scan(message)
 
         # check for user commands
-        for command in smart_commands[int(message.channel.server.id)]:
+        for command in smart_commands[int(message.channel.guild.id)]:
             if (command.triggered(message.content)):
                 resp = command.generate_response(message.author, message.content)
-                update_command(command.raw_trigger, command.raw_response, command.count, command.server, command.author_id)
+                update_command(command.raw_trigger, command.raw_response, command.count, command.guild, command.author_id)
                 reacts = command.generate_reacts()
                 if resp:
-                    await client.send_message(message.channel, resp)
+                    await message.channel.send(resp)
                 for react in reacts:
                     await client.add_reaction(message, react)
                 break
@@ -331,7 +334,7 @@ async def add_popup(message):
         if (message.id == sm.peek().id or (sm.embed != None and message.id == sm.embed.id)):
             if (not sm.has_popup()):
                 lem = sm.add_popup()
-                popup = await client.send_message(message.channel, embed=lem)
+                popup = await message.channel(embed=lem)
                 sm.popup = popup
             else:
                 await edit_popup(message)
@@ -343,8 +346,8 @@ async def delete_popup(message):
                 await client.delete_message(sm.popup)
                 sm.popup = None
 
-async def starboard_post(message, server):
-    starboard_ch = discord.utils.get(server.channels, name='starboard', type=ChannelType.text)
+async def starboard_post(message, guild):
+    starboard_ch = discord.utils.get(guild.channels, name='starboard', type=ChannelType.text)
     if message.id in starboarded_messages or not starboard_ch or message.author == client.user:
         return
     starboarded_messages.append(message.id)
@@ -355,7 +358,7 @@ async def starboard_post(message, server):
         em.set_image(url=message.embeds[0]['url'])
     elif message.attachments:
         em.set_image(url=message.attachments[0]['url'])
-    await client.send_message(starboard_ch, embed=em)
+    await starboard_ch.send(embed=em)
 
 @client.event
 async def on_ready():
@@ -365,45 +368,45 @@ async def on_ready():
     initialize_admins()
     initialize_commands()
     initialize_cache()
-    await initialize_emoji_managers()
+    #await initialize_emoji_managers()
     print("Logged in as " + client.user.name)
-    await client.change_presence(game=Game(name="the tragedy of darth plagueis the wise", url='https://www.twitchquotes.com/copypastas/2202', type=2))
+    await client.change_presence(activity=Game(name="the tragedy of darth plagueis the wise", url='https://www.twitchquotes.com/copypastas/2202', type=2))
 
-async def list_servers():
+async def list_guilds():
     await client.wait_until_ready()
     while not client.is_closed:
-        print("Current servers:")
-        for server in client.servers:
-            print("%s - %s (%s)" % (server.name, server.id, server.member_count))
+        print("Current guilds:")
+        for guild in client.guilds:
+            print("%s - %s (%s)" % (guild.name, guild.id, guild.member_count))
         await asyncio.sleep(600)
 
 async def initialize_emoji_managers():
     from src.emoji_manager import emoji_manager
-    for server in client.servers:
-        emoji_managers[server.id] = emoji_manager(client, server, deletable_messages)
-        if settings_dict[server].manage_emojis:
-            await emoji_managers[server.id].clean()
+    for guild in client.guilds:
+        emoji_managers[guild.id] = emoji_manager(client, guild, deletable_messages)
+        if settings_dict[guild].manage_emojis:
+            await emoji_managers[guild.id].clean()
 
 def initialize_players():
-    for server in client.servers:
-        players[server.id] = smart_player(client)
+    for guild in client.guilds:
+        players[guild.id] = smart_player(client)
 
 def initialize_settings():
-    for server in client.servers:
-        settings_dict[server] = server_settings(session, server)
+    for guild in client.guilds:
+        settings_dict[guild] = server_settings(session, guild)
 
 def initialize_admins():
-    for server in client.servers:
-        settings = server_settings(session, server)
-        admins[int(server.id)] = [int(admin) for admin in settings.admins_ids]
+    for guild in client.guilds:
+        settings = server_settings(session, guild)
+        admins[int(guild.id)] = [int(admin) for admin in settings.admins_ids]
 
 def initialize_roles():
     role_list = session.query(Role).all()
-    for server in client.servers:
-        roles.setdefault(int(server.id), [])
+    for guild in client.guilds:
+        roles.setdefault(int(guild.id), [])
     for role in role_list:
-        roles.setdefault(role.server_id, [])
-        roles[role.server_id].append((role.target_role_id, role.required_role_id))
+        roles.setdefault(role.guild_id, [])
+        roles[role.guild_id].append((role.target_role_id, role.required_role_id))
 
 def initialize_scores():
     users = session.query(User).all()
@@ -411,24 +414,24 @@ def initialize_scores():
         karma_dict[user.discord_id] = user.as_entry()
 
 def initialize_cache():
-    for server in client.servers:
-        cache[server] = {
+    for guild in client.guilds:
+        cache[guild] = {
             'messages' : {}
         }
 
 def initialize_commands():
     command_list = session.query(Command).all()
-    for server in client.servers:
-        smart_commands.setdefault(int(server.id), [])
+    for guild in client.guilds:
+        smart_commands.setdefault(int(guild.id), [])
     for command in command_list:
         smart_commands.setdefault(command.server_id, [])
         smart_commands[command.server_id].append(smart_command(
                     command.trigger.replace(str(command.server_id), '', 1),
                     command.response, command.count,
-                    client.get_server(str(command.server_id)),
+                    client.get_guild(str(command.server_id)),
                     command.author_id))
-    for server, cmds in smart_commands.items():
-        smart_commands[server].sort()
+    for guild, cmds in smart_commands.items():
+        smart_commands[guild].sort()
 
 def update_user(disc_id, delete=False):
     if (delete):
@@ -445,19 +448,19 @@ def update_user(disc_id, delete=False):
     session.query(User).filter_by(discord_id = disc_id).update(new_data)
     session.commit()
 
-def update_command(triggerkey, response, count, server, author_id, delete=False):
+def update_command(triggerkey, response, count, guild, author_id, delete=False):
     if (delete):
-        session.query(Command).filter_by(trigger = server.id + triggerkey).delete()
+        session.query(Command).filter_by(trigger = guild.id + triggerkey).delete()
         session.commit()
         return
     new_data = {
-            'server_id': server.id,
+            'guild_id': guild.id,
             'response': response,
             'count': count,
             'author_id': int(author_id)
             }
-    session.query(Command).filter_by(trigger = server.id + triggerkey).update(new_data)
+    session.query(Command).filter_by(trigger = guild.id + triggerkey).update(new_data)
     session.commit()
 
-client.loop.create_task(list_servers())
+client.loop.create_task(list_guilds())
 client.run(TOKEN)

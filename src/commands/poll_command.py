@@ -30,12 +30,16 @@ class poll_command(abstract_command):
         title = match.group('title').replace('"', '')
         text = self.render_text(title, options, votes)
 
-        msg = await self.client.send_message(self.channel, text)
+        msg = await self.channel.send(text)
         for i in range(len(options)):
-            await self.client.add_reaction(msg, self.ANSWERS[i])
+            await msg.add_reaction(self.ANSWERS[i])
+        def pred(r, u):
+            print(r.emoji)
+            return r.message == msg
 
         while True:
-            react = await self.client.wait_for_reaction(self.ANSWERS, message=msg)
+            #TODO
+            react, user = await self.client.wait_for('reaction_add', check=pred)
             if react.user == self.client.user: continue
             i = self.ANSWERS.index(str(react.reaction.emoji))
             if not react.user in votes[i]:

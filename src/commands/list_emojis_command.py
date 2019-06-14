@@ -13,7 +13,7 @@ class list_emojis_command(abstract_command):
         message = '```\n • ' + '\n • '.join(emoji_managers[self.server.id].list_unloaded()) + '```\n'
         message += "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
 
-        await self.client.send_message(self.channel, message)
+        await self.channel.send(message)
 
         return True
 
