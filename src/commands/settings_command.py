@@ -89,8 +89,7 @@ class settings_command(abstract_command):
             self.settings.repost_del_msg = False
         else:
             resp = "Setting unchanged"
-
-       await self.channel.send(resp)
+        await self.channel.send(resp)
 
     async def manage_emojis(self):
         await self.channel.send('📂 If true, less popular emojis will be cycled in and out as needed, effectively allowing greater than 50 emojis. Enter `true` or `false` to modify it:')

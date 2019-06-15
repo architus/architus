@@ -2,7 +2,7 @@ import json
 from src.models import Settings
 from sqlalchemy.orm.exc import NoResultFound
 
-RYTHMS_ID = '235088799074484224'
+RYTHMS_ID = 235088799074484224
 
 class server_settings:
 

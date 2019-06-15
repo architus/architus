@@ -7,6 +7,8 @@ import asyncio, aiohttp
 from collections import deque
 import discord
 import time
+import zmq
+import zmq.asyncio
 from pytz import timezone
 from discord import Game, message
 from discord.ext import commands
@@ -25,9 +27,9 @@ from src.smart_player import smart_player
 BOT_PREFIX = ("?", "!")
 TOKEN = secret_token
 
-JOHNYS_ID = '214037134477230080'
-GHOSTS_ID = '471864040998699011'
-MATTS_ID = '168722115447488512'
+JOHNYS_ID = 214037134477230080
+GHOSTS_ID = 471864040998699011
+MATTS_ID = 168722115447488512
 
 cache = {}
 smart_commands = {}
@@ -223,7 +225,7 @@ async def on_reaction_remove(reaction, user):
 
 @client.command(pass_context=True)
 async def whois(ctx):
-    usr = await client.get_user_info(ctx.message.clean_content.split()[1])
+    usr = await client.fetch_user(int(ctx.message.clean_content.split()[1]))
     await ctx.channel.send(usr.name + '#' + usr.discriminator)
 
 @client.command(pass_context=True)
@@ -283,7 +285,9 @@ def log_message(msg):
 async def on_message(message):
     # forward dms
     if isinstance(message.channel, discord.abc.PrivateChannel) and message.author != client.user:
-        await client.send_message(await client.get_user_info(JOHNYS_ID), message.author.mention + ': ' + message.content)
+        await (await client.fetch_user(JOHNYS_ID)).send(message.author.mention + ': ' + message.content)
+        return
+    if message.author == client.user:
         return
 
     guild = message.channel.guild
@@ -299,7 +303,7 @@ async def on_message(message):
             for name, command in default_cmds.items():
                 if args[0][1:] in command.get_aliases():
                     if not await command.execute(message, client, players=players, settings=settings, karma_dict=karma_dict,
-                            session=session, cache=cache, smart_commands=smart_commands, admins=admins, emoji_managers=emoji_managers):
+                            session=session, cache=cache, smart_commands=smart_commands, emoji_managers=emoji_managers):
                         await message.channel.send( command.format_help(args[0], settings=settings))
 
         # check for commands in this file
@@ -310,10 +314,10 @@ async def on_message(message):
         if settings.manage_emojis and False: await emoji_managers[guild.id].scan(message)
 
         # check for user commands
-        for command in smart_commands[int(message.channel.guild.id)]:
+        for command in smart_commands[message.channel.guild.id]:
             if (command.triggered(message.content)):
                 resp = command.generate_response(message.author, message.content)
-                update_command(command.raw_trigger, command.raw_response, command.count, command.guild, command.author_id)
+                update_command(command.raw_trigger, command.raw_response, command.count, command.server, command.author_id)
                 reacts = command.generate_reacts()
                 if resp:
                     await message.channel.send(resp)
@@ -365,12 +369,11 @@ async def on_ready():
     initialize_settings()
     initialize_players()
     initialize_scores()
-    initialize_admins()
     initialize_commands()
     initialize_cache()
     #await initialize_emoji_managers()
     print("Logged in as " + client.user.name)
-    await client.change_presence(activity=Game(name="the tragedy of darth plagueis the wise", url='https://www.twitchquotes.com/copypastas/2202', type=2))
+    await client.change_presence(activity=discord.Activity(name="the tragedy of darth plagueis the wise", url='https://www.twitchquotes.com/copypastas/2202', type=3))
 
 async def list_guilds():
     await client.wait_until_ready()
@@ -379,6 +382,18 @@ async def list_guilds():
         for guild in client.guilds:
             print("%s - %s (%s)" % (guild.name, guild.id, guild.member_count))
         await asyncio.sleep(600)
+
+@asyncio.coroutine
+def api_listener():
+    context = zmq.asyncio.Context()
+    socket = context.socket(zmq.REP)
+    socket.bind('tcp://127.0.0.1:7100')
+    while True:
+        msg = yield from socket.recv_string()
+
+        usr = yield from client.fetch_user(int(msg))
+        yield from socket.send_string(usr.name)
+
 
 async def initialize_emoji_managers():
     from src.emoji_manager import emoji_manager
@@ -394,19 +409,6 @@ def initialize_players():
 def initialize_settings():
     for guild in client.guilds:
         settings_dict[guild] = server_settings(session, guild)
-
-def initialize_admins():
-    for guild in client.guilds:
-        settings = server_settings(session, guild)
-        admins[int(guild.id)] = [int(admin) for admin in settings.admins_ids]
-
-def initialize_roles():
-    role_list = session.query(Role).all()
-    for guild in client.guilds:
-        roles.setdefault(int(guild.id), [])
-    for role in role_list:
-        roles.setdefault(role.guild_id, [])
-        roles[role.guild_id].append((role.target_role_id, role.required_role_id))
 
 def initialize_scores():
     users = session.query(User).all()
@@ -428,7 +430,7 @@ def initialize_commands():
         smart_commands[command.server_id].append(smart_command(
                     command.trigger.replace(str(command.server_id), '', 1),
                     command.response, command.count,
-                    client.get_guild(str(command.server_id)),
+                    client.get_guild(command.server_id),
                     command.author_id))
     for guild, cmds in smart_commands.items():
         smart_commands[guild].sort()
@@ -450,17 +452,18 @@ def update_user(disc_id, delete=False):
 
 def update_command(triggerkey, response, count, guild, author_id, delete=False):
     if (delete):
-        session.query(Command).filter_by(trigger = guild.id + triggerkey).delete()
+        session.query(Command).filter_by(trigger = str(guild.id) + triggerkey).delete()
         session.commit()
         return
     new_data = {
-            'guild_id': guild.id,
+            'server_id': guild.id,
             'response': response,
             'count': count,
             'author_id': int(author_id)
             }
-    session.query(Command).filter_by(trigger = guild.id + triggerkey).update(new_data)
+    session.query(Command).filter_by(trigger = str(guild.id) + triggerkey).update(new_data)
     session.commit()
 
 client.loop.create_task(list_guilds())
+client.loop.create_task(api_listener())
 client.run(TOKEN)

@@ -14,7 +14,6 @@ class set_command(abstract_command):
     async def exec_cmd(self, **kwargs):
         self.session = kwargs['session']
         smart_commands = kwargs['smart_commands']
-        admins = kwargs['admins']
         server = self.server
         settings = server_settings(self.session, self.server)
         from_admin = self.author.id in settings.admins_ids
@@ -37,7 +36,7 @@ class set_command(abstract_command):
 
             if not any(command == oldcommand for oldcommand in smart_commands[int(server.id)]) and not len(command.raw_trigger) == 0 and command.raw_response not in ['remove', 'author']:
                 smart_commands[int(server.id)].append(command)
-                new_command = Command(server.id + command.raw_trigger, command.raw_response, command.count, int(server.id), self.author.id)
+                new_command = Command(str(server.id) + command.raw_trigger, command.raw_response, command.count, int(server.id), self.author.id)
                 self.session.add(new_command)
                 self.session.commit()
                 msg = 'command set'
@@ -85,7 +84,7 @@ class set_command(abstract_command):
 
     def update_command(self, triggerkey, response, count, server, author_id, delete=False):
         if (delete):
-            self.session.query(Command).filter_by(trigger = server.id + triggerkey).delete()
+            self.session.query(Command).filter_by(trigger = str(server.id) + triggerkey).delete()
             self.session.commit()
             return
         new_data = {
@@ -94,5 +93,5 @@ class set_command(abstract_command):
                 'count': count,
                 'author_id': int(author_id)
                 }
-        self.session.query(Command).filter_by(trigger = server.id + triggerkey).update(new_data)
+        self.session.query(Command).filter_by(trigger = str(server.id) + triggerkey).update(new_data)
         self.session.commit()
