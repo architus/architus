@@ -12,7 +12,7 @@ class quote_command(abstract_command):
                 try: message = await self.client.get_message(channel, self.args[1])
                 except: message = None
                 if message:
-                    est = self.get_datetime(message.timestamp)
+                    est = self.get_datetime(message.created_at)
                     em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
                     em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
                     em.set_footer(text='#'+channel.name)

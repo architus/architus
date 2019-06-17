@@ -14,6 +14,7 @@ from discord import Game, message
 from discord.ext import commands
 from discord.ext.commands import Bot
 from datetime import datetime
+from contextlib import suppress
 
 from src.config import secret_token, session, default_cmds
 from src.smart_message import smart_message
@@ -40,6 +41,7 @@ emoji_managers = {}
 tracked_messages = deque([], maxlen=30)
 deletable_messages = []
 starboarded_messages = []
+reaction_callbacks = {}
 
 players = {}
 client = Bot(command_prefix=BOT_PREFIX)
@@ -113,7 +115,7 @@ async def on_message_delete(message):
     settings = settings_dict[message.channel.guild]
     if message.channel.name == 'bangers': return  #TODO
     if message.author != client.user and message.id not in deletable_messages and settings.repost_del_msg:
-        est = get_datetime(message.timestamp)
+        est = get_datetime(message.created_at)
         em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0xff002a)
         em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
         if message.embeds:
@@ -144,20 +146,8 @@ async def on_message_edit(before, after):
 
 @client.event
 async def on_reaction_add(reaction, user):
-    author = reaction.message.author
     guild = reaction.message.channel.guild
     settings = settings_dict[guild]
-    print (reaction.emoji)
-    for e in reaction.message.embeds:
-        author_name, author_avatar = '',''
-        try:
-            author_name = e['author']['name']
-            author_avatar = e['author']['icon_url']
-        except: pass # not the type of embed we were expecting
-        # this won't work if the user has default avatar
-        real_author = discord.utils.get(guild.members, name=author_name, avatar_url=author_avatar)
-        if (real_author != None):
-            author = real_author
 
     if settings.edit_emoji in str(reaction.emoji):
         await add_popup(reaction.message)
@@ -165,63 +155,22 @@ async def on_reaction_add(reaction, user):
     if settings.starboard_emoji in str(reaction.emoji):
         if reaction.count == settings.starboard_threshold:
             await starboard_post(reaction.message, guild)
-
-    if ((author != user or user.id == JOHNYS_ID or user.id == MATTS_ID) and author != client.user and user != client.user):
-        if (author.id not in karma_dict):
-            karma_dict[author.id] = [2,2,2,2,0]
-            new_user = User(author.id, karma_dict[author.id])
-            session.add(new_user)
-
-        if settings.aut_emoji in str(reaction.emoji):
-            karma_dict[author.id][0] += 1
-        elif settings.norm_emoji in str(reaction.emoji):
-            karma_dict[author.id][1] += 1
-        elif settings.nice_emoji in str(reaction.emoji):
-            karma_dict[author.id][2] += 1
-        elif settings.toxic_emoji in str(reaction.emoji):
-            karma_dict[author.id][3] += 1
-        elif settings.bot_emoji in str(reaction.emoji):
-            karma_dict[author.id][4] += 1
-        update_user(author.id)
+    with suppress(KeyError):
+        if user != client.user:
+            await reaction_callbacks[reaction.message.id][0](reaction, user)
 
 @client.event
 async def on_reaction_remove(reaction, user):
-    author = reaction.message.author
     guild = reaction.message.channel.guild
     settings = settings_dict[guild]
-    for e in reaction.message.embeds:
-        try:
-            author_name = e['author']['name']
-            author_avatar = e['author']['icon_url']
-        except:
-            author_avatar = ''
-        real_author = discord.utils.get(guild.members, name=author_name, avatar_url=author_avatar)
-        if (real_author != None):
-            author = real_author
 
     if settings.edit_emoji in str(reaction.emoji):
         for react in reaction.message.reactions:
             if settings.edit_emoji in str(react): return
         await delete_popup(reaction.message)
-
-    if ((author != user or user.id == JOHNYS_ID) and author != client.user):
-        if (author.id not in karma_dict):
-            karma_dict[author.id] = [2,2,2,2,0]
-            new_user = User(author.id, karma_dict[author.id])
-            session.add(new_user)
-        if settings.aut_emoji in str(reaction.emoji):
-            karma_dict[author.id][0] -= 1
-        elif settings.norm_emoji in str(reaction.emoji):
-            karma_dict[author.id][1] -= 1
-        elif settings.nice_emoji in str(reaction.emoji):
-            karma_dict[author.id][2] -= 1
-        elif settings.toxic_emoji in str(reaction.emoji):
-            karma_dict[author.id][3] -= 1
-        elif settings.bot_emoji in str(reaction.emoji):
-            karma_dict[author.id][4] -= 1
-
-        update_user(author.id)
-
+    with suppress(KeyError):
+        if user != client.user:
+            await reaction_callbacks[reaction.message.id][1](reaction, user)
 
 @client.command(pass_context=True)
 async def whois(ctx):
@@ -239,7 +188,7 @@ async def roleids(ctx):
     print(lem.get_embed().to_dict())
     await channel.send(embed=lem.get_embed())
 
-@client.command(pass_context=True)
+#@client.command(pass_context=True)
 async def test(context):
     author = context.message.author
     channel = context.message.channel
@@ -249,6 +198,8 @@ async def test(context):
         return
 
     await context.channel.send(embed=lem.get_embed())
+
+test = client.command(test)
 
 def get_datetime(timestamp):
     utc = timestamp.replace(tzinfo=timezone('UTC'))
@@ -299,11 +250,12 @@ async def on_message(message):
 
         # check for built in commands
         args = message.clean_content.split(' ')
-        if args and args[0] and  args[0][0] in BOT_PREFIX:
+        if args and args[0] and args[0][0] in BOT_PREFIX:
             for name, command in default_cmds.items():
                 if args[0][1:] in command.get_aliases():
                     if not await command.execute(message, client, players=players, settings=settings, karma_dict=karma_dict,
-                            session=session, cache=cache, smart_commands=smart_commands, emoji_managers=emoji_managers):
+                            session=session, cache=cache, smart_commands=smart_commands, emoji_managers=emoji_managers,
+                            reaction_callbacks=reaction_callbacks):
                         await message.channel.send( command.format_help(args[0], settings=settings))
 
         # check for commands in this file
@@ -351,11 +303,11 @@ async def delete_popup(message):
                 sm.popup = None
 
 async def starboard_post(message, guild):
-    starboard_ch = discord.utils.get(guild.channels, name='starboard', type=ChannelType.text)
+    starboard_ch = discord.utils.get(guild.text_channels, name='starboard')
     if message.id in starboarded_messages or not starboard_ch or message.author == client.user:
         return
     starboarded_messages.append(message.id)
-    est = get_datetime(message.timestamp)
+    est = get_datetime(message.created_at)
     em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
     em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
     if message.embeds:
@@ -373,7 +325,7 @@ async def on_ready():
     initialize_cache()
     #await initialize_emoji_managers()
     print("Logged in as " + client.user.name)
-    await client.change_presence(activity=discord.Activity(name="the tragedy of darth plagueis the wise", url='https://www.twitchquotes.com/copypastas/2202', type=3))
+    await client.change_presence(activity=discord.Activity(name="the tragedy of darth plagueis the wise", type=3))
 
 async def list_guilds():
     await client.wait_until_ready()

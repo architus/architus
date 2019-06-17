@@ -4,6 +4,9 @@ import datetime
 import pytz
 import discord
 import dateutil.parser
+from contextlib import suppress
+from discord.ext.commands import Cog
+from discord.ext import commands
 
 class schedule_command(abstract_command):
 
@@ -16,71 +19,72 @@ class schedule_command(abstract_command):
 
     async def exec_cmd(self, **kwargs):
         # event bot's id
-        if self.server.get_member('476042677440479252'):
+        if self.server.get_member(476042677440479252):
             print("not scheduling cause event bot exists")
             return
+        reaction_callbacks = kwargs['reaction_callbacks']
         region = self.server.region
         print(region)
         tz = pytz.timezone(self.get_timezone(region))
         ct = datetime.datetime.now(tz=tz)
         del self.args[0]
         title = []
-        parsed_time = None
+        self.parsed_time = None
         for i in range(len(self.args)):
-            try:
+            with suppress(ValueError):
                 print(' '.join(self.args))
-                parsed_time = dateutil.parser.parse(' '.join(self.args))
-                parsed_time = tz.localize(parsed_time)
+                self.parsed_time = dateutil.parser.parse(' '.join(self.args))
+                self.parsed_time = tz.localize(self.parsed_time)
                 break
-            except Exception as e:
-                pass
             title.append(self.args[0])
             del self.args[0]
 
-        if not parsed_time:
-            parsed_time = await self.prompt_date(self.author)
-            if not parsed_time: return
-            parsed_time = tz.localize(parsed_time)
+        if not self.parsed_time:
+            self.parsed_time = await self.prompt_date(self.author)
+            if not self.parsed_time: return
+            self.parsed_time = tz.localize(self.parsed_time)
         if len(title) == 0:
-            title_str = await self.prompt_title(self.author)
+            self.title_str = await self.prompt_title(self.author)
             if not title_str: return
         else:
-            title_str = ' '.join(title)
-        
-        yes = []
-        no = []
-        maybe = []
-        msg = await self.channel.send(self.render_text(title_str, parsed_time, yes, no, maybe))
-        await self.client.add_reaction(msg, self.YES_EMOJI)
-        await self.client.add_reaction(msg, self.NO_EMOJI)
-        await self.client.add_reaction(msg, self.MAYBE_EMOJI)
-        while True:
-            #TODO
-            react = await self.client.wait_for_reaction([self.YES_EMOJI, self.NO_EMOJI, self.MAYBE_EMOJI], message=msg)
-            if react.user == self.client.user: continue
-            elif self.YES_EMOJI in str(react.reaction.emoji) and react.user not in yes:
-                yes.append(react.user)
-                try: no.remove(react.user)
-                except: pass
-                try: maybe.remove(react.user)
-                except: pass
-            elif self.NO_EMOJI in str(react.reaction.emoji) and react.user not in no:
-                no.append(react.user)
-                try: yes.remove(react.user)
-                except: pass
-                try: maybe.remove(react.user)
-                except: pass
-            elif self.MAYBE_EMOJI in str(react.reaction.emoji) and react.user not in maybe:
-                maybe.append(react.user)
-                try: no.remove(react.user)
-                except: pass
-                try: yes.remove(react.user)
-                except: pass
+            self.title_str = ' '.join(title)
 
-            await self.client.edit_message(msg, self.render_text(title_str, parsed_time, yes, no, maybe))
-
+        self.yes = set()
+        self.no = set()
+        self.maybe = set()
+        self.msg = await self.channel.send(self.render_text(self.title_str, self.parsed_time, self.yes, self.no, self.maybe))
+        await self.msg.add_reaction(self.YES_EMOJI)
+        await self.msg.add_reaction(self.NO_EMOJI)
+        await self.msg.add_reaction(self.MAYBE_EMOJI)
+        reaction_callbacks[self.msg.id] = (self.on_react_add, self.on_react_remove)
         return True
 
+    async def on_react_add(self, react, user):
+        if str(react.emoji) in [self.YES_EMOJI, self.NO_EMOJI, self.MAYBE_EMOJI]:
+            with suppress(KeyError):
+                self.yes.remove(user)
+            with suppress(KeyError):
+                self.no.remove(user)
+            with suppress(KeyError):
+                self.maybe.remove(user)
+
+        if self.YES_EMOJI in str(react.emoji):
+            self.yes.add(user)
+        elif self.NO_EMOJI in str(react.emoji):
+            self.no.add(user)
+        elif self.MAYBE_EMOJI in str(react.emoji):
+            self.maybe.add(user)
+        await self.msg.edit(content=self.render_text(self.title_str, self.parsed_time, self.yes, self.no, self.maybe))
+
+    async def on_react_remove(self, react, user):
+        with suppress(KeyError):
+            if self.YES_EMOJI in str(react.emoji):
+                self.yes.remove(user)
+            elif self.NO_EMOJI in str(react.emoji):
+                self.no.remove(user)
+            elif self.MAYBE_EMOJI in str(react.emoji):
+                self.maybe.remove(user)
+        await self.msg.edit(content=self.render_text(self.title_str, self.parsed_time, self.yes, self.no, self.maybe))
 
     def render_text(self, title_str, parsed_time, yes, no, maybe):
         return "__**%s**__\n**Time: **%s\n:white_check_mark: **Yes (%d): %s**\n:x: **No (%d): %s**\n:shrug: **Maybe (%d): %s**" % (title_str, parsed_time.strftime("%b %d %I:%M%p %Z"), len(yes), ' '.join([u.mention for u in yes]), len(no), ' '.join([u.mention for u in no]), len(maybe), ' '.join([u.mention for u in maybe]))
@@ -118,3 +122,31 @@ class schedule_command(abstract_command):
             return 'America/Los_Angeles'
         else:
             return 'Etc/UTC'
+
+class Schedule(Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self._last_member = None
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        channel = member.guild.system_channel
+        if channel is not None:
+            await channel.send('Welcome {0.mention}.'.format(member))
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        print('Message aoeutaoeufrom {0.author}: {0.content}'.format(message))
+
+    @commands.command()
+    async def hello(self, ctx, *, member: discord.Member = None):
+        """Says hello"""
+        member = member or ctx.author
+        if self._last_member is None or self._last_member.id != member.id:
+            await ctx.send('Hello {0.name}~'.format(member))
+        else:
+            await ctx.send('Hello {0.name}... This feels familiar.'.format(member))
+        self._last_member = member
+
+def setup(bot):
+    bot.add_cog(Schedule(bot))

@@ -2,6 +2,7 @@ from src.commands.abstract_command import abstract_command
 from unidecode import unidecode
 import time
 import re
+import asyncio
 import discord
 
 class poll_command(abstract_command):
@@ -21,45 +22,46 @@ class poll_command(abstract_command):
         super().__init__("poll")
 
     async def exec_cmd(self, **kwargs):
+        reaction_callbacks = kwargs['reaction_callbacks']
         pattern = re.compile('!poll (?P<title>(?:".+")|(?:[^ ]+)) (?P<options>.*$)')
         match = pattern.search(unidecode(self.content))
         if not match: return
-        
-        votes = [[],[],[],[],[],[],[],[],[],[]]
-        options = [o.lstrip() for o in match.group('options').split(",")[:10]]
-        title = match.group('title').replace('"', '')
-        text = self.render_text(title, options, votes)
 
-        msg = await self.channel.send(text)
-        for i in range(len(options)):
-            await msg.add_reaction(self.ANSWERS[i])
-        def pred(r, u):
-            print(r.emoji)
-            return r.message == msg
+        self.votes = [[] for x in range(10)]
+        self.options = [o.lstrip() for o in match.group('options').split(",")[:10]]
+        self.title = match.group('title').replace('"', '')
+        text = self.render_text(self.title, self.options, self.votes)
 
-        while True:
-            #TODO
-            react, user = await self.client.wait_for('reaction_add', check=pred)
-            if react.user == self.client.user: continue
-            i = self.ANSWERS.index(str(react.reaction.emoji))
-            if not react.user in votes[i]:
-                votes[i].append(react.user)
-            else:
-                votes[i].remove(react.user)
+        self.msg = await self.channel.send(text)
+        for i in range(len(self.options)):
+            await self.msg.add_reaction(self.ANSWERS[i])
 
-            await self.client.edit_message(msg, self.render_text(title, options, votes))
-
+        reaction_callbacks[self.msg.id] = (self.on_vote_add, self.on_vote_remove)
         return True
 
+    async def on_vote_add(self, react, user):
+        try:
+            i = self.ANSWERS.index(str(react.emoji))
+        except ValueError:
+            return
+        self.votes[i].append(user)
+        await self.msg.edit(content=self.render_text(self.title, self.options, self.votes))
+
+    async def on_vote_remove(self, react, user):
+        try:
+            i = self.ANSWERS.index(str(react.emoji))
+        except ValueError:
+            return
+        self.votes[i].remove(user)
+        await self.msg.edit(content=self.render_text(self.title, self.options, self.votes))
 
     def render_text(self, title, options, votes):
-        text = "__**%s**__\n" % title
+        text = f"__**{title}**__\n"
         i = 0
         for option in options:
             text += "%s **%s (%d)**: %s\n" % (self.ANSWERS[i], option, len(votes[i]), ' '.join([u.mention for u in votes[i]]))
             i += 1
         return text
-
 
     def get_help(self, **kwargs):
         return "Starts a poll with some pretty formatting. Supports up to 10 options"

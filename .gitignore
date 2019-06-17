@@ -8,6 +8,7 @@ res/gulag.png
 res/word*.png
 res/*part.webm
 res/meme.png
+*mp3
 *pyc
 *sw*
 tags

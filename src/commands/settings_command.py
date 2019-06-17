@@ -20,7 +20,6 @@ class settings_command(abstract_command):
         super().__init__("settings")
 
     async def exec_cmd(self, **kwargs):
-        session = kwargs['session']
         settings = kwargs['settings']
         self.settings = settings
         if self.author.id not in settings.admins_ids:
@@ -29,21 +28,20 @@ class settings_command(abstract_command):
 
         msg = await self.channel.send(embed=await self.get_embed())
 
-        await self.client.add_reaction(msg, "⭐")
-        await self.client.add_reaction(msg, TRASH)
-        await self.client.add_reaction(msg, OPEN_FOLDER)
-        await self.client.add_reaction(msg, BOT_FACE)
-        await self.client.add_reaction(msg, SHIELD)
-        await self.client.add_reaction(msg, LOCK_KEY)
-        await self.client.add_reaction(msg, SWORDS)
-        await self.client.add_reaction(msg, HAMMER_PICK)
-        await self.client.add_reaction(msg, HAMMER)
+        await msg.add_reaction("⭐")
+        await msg.add_reaction(TRASH)
+        await msg.add_reaction(OPEN_FOLDER)
+        await msg.add_reaction(BOT_FACE)
+        await msg.add_reaction(SHIELD)
+        await msg.add_reaction(LOCK_KEY)
+        await msg.add_reaction(SWORDS)
+        await msg.add_reaction(HAMMER_PICK)
+        await msg.add_reaction(HAMMER)
 
         while True:
             #TODO
-            react = await self.client.wait_for_reaction(message=msg, user=self.author)
-            if react.user == self.client.user: continue
-            e = react.reaction.emoji
+            react, user = await self.client.wait_for('reaction_add', check=lambda r,u: r.message.id == msg.id and u == self.author)
+            e = react.emoji
             print(e)
             if e == '⭐':
                 await self.starboard_threshold()
@@ -63,7 +61,7 @@ class settings_command(abstract_command):
                 await self.gulag_threshold()
             elif e == HAMMER:
                 await self.gulag_severity()
-            await self.client.edit_message(msg, embed=await self.get_embed())
+            await msg.edit(embed=await self.get_embed())
 
         return True
 
@@ -93,8 +91,7 @@ class settings_command(abstract_command):
 
     async def manage_emojis(self):
         await self.channel.send('📂 If true, less popular emojis will be cycled in and out as needed, effectively allowing greater than 50 emojis. Enter `true` or `false` to modify it:')
-        #TODO
-        msg = await self.client.wait_for_message(author=self.author)
+        msg = await self.client.wait_for('message', check=lambda m: m.author == self.author)
         resp = "Setting updated"
         if msg.content in ['1','True','true','yes', 'y']:
             self.settings.manage_emojis = True
@@ -197,7 +194,7 @@ class settings_command(abstract_command):
 
     async def get_embed(self):
         settings = self.settings
-        admin_names = list(set([(await self.client.get_user_info(u)).name for u in settings.admins_ids]))
+        admin_names = list(set([(await self.client.fetch_user(u)).name for u in settings.admins_ids]))
         roles_names = [r.mention for r in [discord.utils.get(self.server.roles, id=i) for i in settings.roles_dict.values()] if r] or ['None']
         bot_commandses = [c.mention for c in [discord.utils.get(self.server.channels, id=i) for i in settings.bot_commands_channels] if c] or ['None']
         default_role = discord.utils.get(self.server.roles, id=settings.default_role_id)

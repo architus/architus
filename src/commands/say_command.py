@@ -16,7 +16,7 @@ class say_command(abstract_command):
                 discord.opus.load_opus('res/libopus.so')
             if not (player.is_connected()):
                 #TODO
-                voice = await self.client.join_voice_channel(self.author.voice.voice_channel)
+                voice = await self.author.voice.channel.connect()
                 player.voice = voice
             else:
                 player.voice.move_to(self.author.voice.voice_channel)
@@ -26,7 +26,8 @@ class say_command(abstract_command):
             key = ''.join([random.choice(string.ascii_letters) for n in range(10)])
             async with self.channel.typing():
                 tts.save("res/generate/%s.mp3" % key)
-                done = await player.play_file("res/generate/%s.mp3" % key)
+                voice.play(discord.FFmpegPCMAudio("res/generate/{}.mp3".format(key)))
+                #done = await player.play_file("res/generate/%s.mp3" % key)
             await asyncio.sleep(10)
             os.remove("res/generate/%s.mp3" % key)
             return True

@@ -5,7 +5,7 @@ import discord
 class play_command(abstract_command):
 
     def __init__(self):
-        super().__init__("play")
+        super().__init__("play", aliases=['notplay'])
 
     async def exec_cmd(self, **kwargs):
 
