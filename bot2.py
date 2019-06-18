@@ -3,13 +3,21 @@ from discord.ext import commands
 from discord.ext.commands import Bot
 import asyncio
 
-from src.config import secret_token
 
-class AutBot(Bot):
+class CoolBot(Bot):
 
     @commands.command()
     async def test(ctx):
         print(ctx.message.content)
+
+    async def poll_pipe(self):
+        print("running thing")
+        while True:
+            if self and hasattr(self, 'conn'):
+                channel = self.get_channel(436189230390050830)
+                if channel:
+                    await channel.send(str(self.conn.recv()) + " in the bot")
+                await asyncio.sleep(1)
 
     async def on_ready(self):
         self.add_command(self.test)
@@ -20,20 +28,9 @@ class AutBot(Bot):
         await self.process_commands(message)
         print('Message from {0.author}: {0.content}'.format(message))
 
-@asyncio.coroutine
-def api_listener():
-    context = zmq.asyncio.Context()
-    socket = context.socket(zmq.REP)
-    socket.bind('tcp://127.0.0.1:7100')
-    while True:
-        msg = yield from socket.recv_string()
-
-        usr = yield from client.fetch_user(int(msg))
-        yield from socket.send_string(usr.name)
-
 BOT_PREFIX = ("?", "!")
-autbot = AutBot(command_prefix=BOT_PREFIX)
+coolbot = CoolBot(command_prefix=BOT_PREFIX)
 
-autbot.load_extension('src.commands.schedule_command')
+coolbot.load_extension('src.commands.schedule_command')
+coolbot.loop.create_task(coolbot.poll_pipe())
 
-autbot.run(secret_token)
