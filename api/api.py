@@ -34,7 +34,8 @@ class autbot(Resource):
         #msg = new_socket.recv_string()
         #new_socket.close()
         self.conn.send(name)
-        time.sleep(1)
+        name = self.conn.recv()
+        #time.sleep(1)
         return f"{name}", 201
 
     def post(self, name):

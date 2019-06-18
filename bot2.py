@@ -14,9 +14,15 @@ class CoolBot(Bot):
         print("running thing")
         while True:
             if self and hasattr(self, 'conn'):
-                channel = self.get_channel(436189230390050830)
-                if channel:
-                    await channel.send(str(self.conn.recv()) + " in the bot")
+                #channel = self.get_channel(436189230390050830)
+                if (self.conn.poll()):
+                    print('yes')
+                    i = self.conn.recv()
+                    print(i)
+                    user = await self.fetch_user(int(i))
+                    if user:
+                        self.conn.send(user.name)
+                        #await channel.send(str(a) + " in the bot")
                 await asyncio.sleep(1)
 
     async def on_ready(self):
