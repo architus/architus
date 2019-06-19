@@ -41,7 +41,7 @@ class CoolBot(Bot):
         except Exception as e:
             resp = e
         print("sending back " + str(resp))
-        yield from pub.send((str(msg['topic']) + ' ' + resp.name).encode())
+        yield from pub.send((str(msg['topic']) + ' ' + resp).encode())
 
 
     async def fill_q(self):
