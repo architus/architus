@@ -36,8 +36,11 @@ class CoolBot(Bot):
 
     @asyncio.coroutine
     def handle_thing(self, pub, msg):
-        resp = yield from getattr(self, msg['method'])(msg['arg'])
-        print("sending back " + str(resp.name))
+        try:
+            resp = yield from getattr(self, msg['method'])(msg['arg']).name
+        except Exception as e:
+            resp = e
+        print("sending back " + str(resp))
         yield from pub.send((str(msg['topic']) + ' ' + resp.name).encode())
 
 
