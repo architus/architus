@@ -2,7 +2,9 @@ from flask import Flask
 from quart import Quart
 from flask_restful import Api, Resource, reqparse
 import time
+import json
 import zmq
+import os
 
 application = Flask(__name__)
 
@@ -22,20 +24,20 @@ def request_socket(ctx):
     return socket
 
 
-class autbot(Resource):
+class user(Resource):
 
-    def __init__(self, conn):
-        self.conn = conn
+    def __init__(self, conn_q=None):
+        self.q = conn_q[0]
+        ctx = zmq.Context()
+        self.topic = os.getpid()
+        self.sub = ctx.socket(zmq.SUB)
+        self.sub.connect("tcp://127.0.0.1:7208")
+        self.sub.setsockopt(zmq.SUBSCRIBE, str(self.topic).encode())
 
     def get(self, name):
-        print("new get")
-        #new_socket = request_socket(context)
-        #new_socket.send_string(name)
-        #msg = new_socket.recv_string()
-        #new_socket.close()
-        self.conn.send(name)
-        name = self.conn.recv()
-        #time.sleep(1)
+        print("sending from api.py")
+        self.q.put(json.dumps({'method' : "fetch_user", 'arg' : name, 'topic' : self.topic}))
+        name = self.sub.recv()
         return f"{name}", 201
 
     def post(self, name):
