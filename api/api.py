@@ -26,6 +26,7 @@ def request_socket(ctx):
 @application.route('/login')
 def login():
     return redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Faut-bot.com%2Fhome&response_type=code&scope=identify')
+
 class user(Resource):
 
     def __init__(self, q=None):
@@ -38,9 +39,10 @@ class user(Resource):
 
     def get(self, name):
         print("sending from api.py")
-        self.q.put(json.dumps({'method' : "fetch_user", 'arg' : name, 'topic' : self.topic}))
+        self.q.put(json.dumps({'method' : "fetch_user_dict", 'arg' : name, 'topic' : self.topic}))
         name = self.sub.recv().decode().replace(self.topic + ' ', '')
-        return f"{name}", 201
+        name = json.loads(name)
+        return name, 200
 
     def post(self, name):
         return "not implemented", 418
@@ -50,8 +52,6 @@ class user(Resource):
 
     def delete(self, name):
         return "not implemented", 418
-
-
 
 if __name__ == '__main__':
     app.run(debug=False, port=5050)

@@ -15,6 +15,12 @@ class CoolBot(Bot):
     async def test(ctx):
         print(ctx.message.content)
 
+    async def fetch_user_dict(self, id):
+        usr = await self.fetch_user(int(id))
+        avatar = usr.avatar_url or usr.default_avatar_url
+        return json.dumps({'name' : usr.name, 'avatar_url' : str(avatar)})
+
+
     @asyncio.coroutine
     def sub(self, ctx):
         #sub = ctx.socket(zmq.SUB)
@@ -38,7 +44,7 @@ class CoolBot(Bot):
             resp = (yield from getattr(self, msg['method'])(msg['arg']))
         except Exception as e:
             print(f"caught {e} while handling {msg['topic']}s request")
-            resp = e
+            resp = '{"message": "' + str(e) + '"}'
         print("sending back " + str(resp))
         yield from pub.send((str(msg['topic']) + ' ' + str(resp)).encode())
 
