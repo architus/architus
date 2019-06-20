@@ -34,8 +34,8 @@ declare -a requirements=(
     wand
 )
 
-python3.6 -m venv .venv
-source "./.venv/bin/activate"
+#python3.6 -m venv .venv
+#source "./.venv/bin/activate"
 for i in "${requirements[@]}"
 do
     pip install "$i"

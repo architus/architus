@@ -73,8 +73,8 @@ class Settings(Cog):
         await ctx.channel.send('⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
         #TODO
         msg = await self.bot.wait_for_message(author=ctx.author)
-        try:
         self.guild_settings.get_guild(ctx.guild).starboard_threshold = abs(int(msg.content))
+        try:
             resp = "Threshold set"
         except:
             resp = "Threshold unchanged"
