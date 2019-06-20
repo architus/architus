@@ -1,20 +1,22 @@
 import json
 from src.models import Settings
+from src.config import session
 from sqlalchemy.orm.exc import NoResultFound
+from discord.ext.commands import Cog
 
 RYTHMS_ID = 235088799074484224
 
-class server_settings:
+class Setting:
 
-    def __init__(self, session, server):
+    def __init__(self, session, guild):
         self.session = session
-        self.server_id = server.id
-        self.server = server
-        self._settings_dict = self._load_from_db(self.server_id)
+        self.guild_id = guild.id
+        self.guild = guild
+        self._settings_dict = self._load_from_db(self.guild_id)
 
     @property
     def music_enabled(self) -> bool:
-        return self._settings_dict['music_enabled'] if 'music_enabled' in self._settings_dict else not bool(self.server.get_member(RYTHMS_ID))
+        return self._settings_dict['music_enabled'] if 'music_enabled' in self._settings_dict else not bool(self.guild.get_member(RYTHMS_ID))
 
     @music_enabled.setter
     def music_enabled(self, new_music_enabled: bool):
@@ -88,7 +90,7 @@ class server_settings:
     @property
     def admins_ids(self) -> list:
 
-        self._settings_dict = self._load_from_db(self.server_id)
+        self._settings_dict = self._load_from_db(self.guild_id)
 
     @property
     def default_role_id(self) -> str:
@@ -112,8 +114,8 @@ class server_settings:
     #@property
     #def admins_ids(self) -> list:
 
-        #self.server = server
-        #self._settings_dict = self._load_from_db(self.server_id)
+        #self.guild = guild
+        #self._settings_dict = self._load_from_db(self.guild_id)
 
     @property
     def default_role_id(self) -> str:
@@ -136,7 +138,7 @@ class server_settings:
 
     @property
     def admins_ids(self) -> list:
-        default_admins = [self.server.owner.id, '214037134477230080']
+        default_admins = [self.guild.owner.id, '214037134477230080']
         return default_admins + self._settings_dict['admins'] if 'admins' in self._settings_dict else default_admins
 
     @admins_ids.setter
@@ -225,21 +227,34 @@ class server_settings:
         self._settings_dict['emojis'] = new_emojis
         self._update_db()
 
-    def _load_from_db(self, server_id) -> dict:
+    def _load_from_db(self, guild_id) -> dict:
         settings_row = None
         try:
-            settings_row = self.session.query(Settings).filter_by(server_id = int(server_id)).one()
+            settings_row = self.session.query(Settings).filter_by(guild_id = int(guild_id)).one()
         except NoResultFound as e:
-            new_server = Settings(int(self.server_id), json.dumps({}))
-            self.session.add(new_server)
+            new_guild = Settings(int(self.guild_id), json.dumps({}))
+            self.session.add(new_guild)
         return json.loads(settings_row.json_blob) if settings_row else {}
 
     def _update_db(self):
         new_data = {
-            'server_id' : int(self.server_id),
+            'server_id' : int(self.guild_id),
             'json_blob' : json.dumps(self._settings_dict)
         }
-        self.session.query(Settings).filter_by(server_id = int(self.server_id)).update(new_data)
+        self.session.query(Settings).filter_by(guild_id = int(self.guild_id)).update(new_data)
         self.session.commit()
 
+class GuildSettings(Cog):
 
+    def __init__(self, bot):
+        self.guilds = {}
+
+    def get_guild(guild):
+        try:
+            return self.guilds[guild]
+        except KeyError as e:
+            self.guilds[guild] = Setting(session, guild)
+            return self.guilds[guild]
+
+def setup(bot):
+    bot.add_cog(GuildSettings(bot))

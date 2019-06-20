@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from src.commands import *
-import src.commands as command_modules
+#from src.commands import *
+#import src.commands as command_modules
 
 secret_token = None
 db_user = None
@@ -23,10 +23,11 @@ try:
     session = Session()
 
 except Exception as e:
+    session = None
     print('failed to connect to database')
     print(e)
 
 default_cmds = {}
-for command in command_modules.__all__:
-    if command != 'abstract_command':
-        default_cmds[command.replace('_command', '')] = getattr(globals()[command], command)()
+#for command in command_modules.__all__:
+    #if command != 'abstract_command':
+        #default_cmds[command.replace('_command', '')] = getattr(globals()[command], command)()

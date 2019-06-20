@@ -17,7 +17,7 @@ pub = ctx.socket(zmq.PUB)
 
 q = Queue()
 api = Api(application)
-api.add_resource(user, "/user/<string:name>", resource_class_kwargs={'conn_q' : (q, ctx)})
+api.add_resource(user, "/user/<string:name>", resource_class_kwargs={'q' : q})
 
 coolbot.q = q
 p = Process(target=coolbot.run, args=(secret_token,))

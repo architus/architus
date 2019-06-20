@@ -28,18 +28,18 @@ def login():
     return redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Faut-bot.com%2Fhome&response_type=code&scope=identify')
 class user(Resource):
 
-    def __init__(self, conn_q=None):
-        self.q = conn_q[0]
+    def __init__(self, q=None):
+        self.q = q
         ctx = zmq.Context()
-        self.topic = os.getpid()
+        self.topic = str(os.getpid())
         self.sub = ctx.socket(zmq.SUB)
         self.sub.connect("tcp://127.0.0.1:7208")
-        self.sub.setsockopt(zmq.SUBSCRIBE, str(self.topic).encode())
+        self.sub.setsockopt(zmq.SUBSCRIBE, self.topic.encode())
 
     def get(self, name):
         print("sending from api.py")
         self.q.put(json.dumps({'method' : "fetch_user", 'arg' : name, 'topic' : self.topic}))
-        name = self.sub.recv().decode().split()[1]
+        name = self.sub.recv().decode().replace(self.topic + ' ', '')
         return f"{name}", 201
 
     def post(self, name):
