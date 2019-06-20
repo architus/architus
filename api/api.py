@@ -1,5 +1,4 @@
-from flask import Flask
-from quart import Quart
+from flask import Flask, redirect
 from flask_restful import Api, Resource, reqparse
 import time
 import json
@@ -24,6 +23,9 @@ def request_socket(ctx):
     return socket
 
 
+@application.route('/login')
+def login():
+    return redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Faut-bot.com%2Fhome&response_type=code&scope=identify')
 class user(Resource):
 
     def __init__(self, conn_q=None):
@@ -37,7 +39,7 @@ class user(Resource):
     def get(self, name):
         print("sending from api.py")
         self.q.put(json.dumps({'method' : "fetch_user", 'arg' : name, 'topic' : self.topic}))
-        name = self.sub.recv()
+        name = self.sub.recv().decode().split()[1]
         return f"{name}", 201
 
     def post(self, name):
