@@ -12,6 +12,8 @@ try:
     secret_token = lines[0]
     db_user = lines[1]
     db_pass = lines[2]
+    client_id = lines[3]
+    client_secret = lines[4]
 
 except Exception as e:
     print(e)

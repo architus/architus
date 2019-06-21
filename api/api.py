@@ -5,8 +5,9 @@ import time
 import json
 import zmq
 import os
+import secrets
 
-from src.config import secret_token
+from src.config import client_secret
 
 application = Flask(__name__)
 
@@ -69,7 +70,7 @@ def post():
     REDIRECT_URI = 'https://aut-bot.com/home'
     data = {
         'client_id': CLIENT_ID,
-        'client_secret': '',
+        'client_secret': client_secret,
         'grant_type': 'authorization_code',
         'code': args['code'],
         'redirect_uri': REDIRECT_URI,
@@ -79,7 +80,15 @@ def post():
         'Content-Type': 'application/x-www-form-urlencoded'
     }
     r = requests.post('%s/oauth2/token' % API_ENDPOINT, data=data, headers=headers)
-    return json.dumps(r.json())
+    resp_data = r.json()
+    if r.status_code == 200:
+        print("trying to get me")
+        headers['Authorization'] = "Bearer " + resp_data['access_token']
+        r = requests.get('%s/users/@me' % API_ENDPOINT, headers=headers)
+        if r.status_code == 200:
+            resp_data = r.json()
+            return json.dumps({'access_token': secrets.token_urlsafe(), 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']})
+    return "nope", 401
 
 
 if __name__ == '__main__':
