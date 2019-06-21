@@ -11,10 +11,6 @@ import zmq
 #export PYTHON=python3.6; uwsgi --ini config_uwsgi.ini --http :5061 --wsgi-file wsgi.py
 print("wsgi loaded")
 
-ctx = zmq.Context()
-pub = ctx.socket(zmq.PUB)
-#pub.bind("tcp://127.0.0.1:7100")
-
 q = Queue()
 api = Api(application)
 api.add_resource(user, "/user/<string:name>", resource_class_kwargs={'q' : q})

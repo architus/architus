@@ -23,11 +23,6 @@ class CoolBot(Bot):
 
     @asyncio.coroutine
     def sub(self, ctx):
-        #sub = ctx.socket(zmq.SUB)
-        #sub.connect("tcp://127.0.0.1:7100")
-        #sub.setsockopt(zmq.SUBSCRIBE, b"")
-        #yield from sub.recv_multipart()
-        #print("subbing")
         pub = ctx.socket(zmq.PUB)
         pub.bind("tcp://127.0.0.1:7208")
         while True:
@@ -36,7 +31,6 @@ class CoolBot(Bot):
                 msg = json.loads(self.q.get())
                 self.loop.create_task(self.handle_thing(pub, msg))
             yield from asyncio.sleep(.01)
-            #yield from pub.send_json(b'2 hello')
 
     @asyncio.coroutine
     def handle_thing(self, pub, msg):
