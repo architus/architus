@@ -16,8 +16,6 @@ from src.models import AppSession
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 REDIRECT_URI = 'https://aut-bot.com/home'
 
-session = get_session()
-
 application = Flask(__name__)
 cors = CORS(application)
 
@@ -71,6 +69,7 @@ class user(CustomResource):
 
 
 def commit_tokens(autbot_token, discord_token, refresh_token, expires_in):
+    session = get_session()
     time = datetime.now() + timedelta(seconds=int(expires_in) - 60)
     new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, datetime.now())
     session.add(new_appsession)
@@ -78,6 +77,7 @@ def commit_tokens(autbot_token, discord_token, refresh_token, expires_in):
 
 @application.route('/identify', methods=['GET'])
 def identify():
+    session = get_session()
     headers = request.headers
     try:
         autbot_token = headers['Authorization']
