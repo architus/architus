@@ -52,16 +52,16 @@ class Settings(Base):
 class AppSession(Base):
     __tablename__ = 'tb_session'
     autbot_access_token = Column('autbot_access_token', Text, primary_key=True)
-    dicord_access_token = Column('discord_access_token', Text)
+    discord_access_token = Column('discord_access_token', Text)
     discord_refresh_token = Column('discord_refresh_token', Text)
     discord_expiration = Column('discord_expiration', DateTime)
     autbot_expiration = Column('autbot_expiration', DateTime)
     last_login = Column('last_login', DateTime)
 
-    def __init__(self, autbot_access_token, dicord_access_token, discord_refresh_token, discord_expiration, autbot_expiration, last_login=None):
+    def __init__(self, autbot_access_token, discord_access_token, discord_refresh_token, discord_expiration, autbot_expiration, last_login=None):
 
         self.autbot_access_token = autbot_access_token
-        self.dicord_access_token = dicord_access_token
+        self.discord_access_token = discord_access_token
         self.discord_refresh_token = discord_refresh_token
         self.discord_expiration  = discord_expiration
         self.autbot_expiration = autbot_expiration

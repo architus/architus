@@ -8,6 +8,7 @@ import zmq
 import os
 import secrets
 from datetime import datetime, timedelta
+from sqlalchemy.exc import IntegrityError
 
 from src.config import client_id, client_secret, get_session
 from src.models import AppSession
@@ -67,10 +68,23 @@ class user(CustomResource):
 
 
 def commit_new_tokens(autbot_token, discord_token, refresh_token, expires_in):
+    row = session.query(AppSession).filter_by(autbot_access_token=autbot_token)
     time = datetime.now() + timedelta(seconds=int(expires_in) - 60)
-    new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time)
-    session.add(new_appsession)
-    session.commit()
+    if not row:
+        new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, datetime.now())
+        session.add(new_appsession)
+        session.commit()
+    else:
+        new_data = {
+                'autbot_access_token': autbot_token,
+                'discord_access_token': discord_token,
+                'discord_refresh_token': refresh_token,
+                'discord_expiration': time,
+                'autbot_expiration': time,
+                'last_login': datetime.now() 
+        }
+        row.update(new_data)
+        session.commit()
 
 
 @application.route('/token_exchange', methods=['POST'])
