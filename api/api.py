@@ -71,28 +71,18 @@ class user(CustomResource):
 
 
 def commit_tokens(autbot_token, discord_token, refresh_token, expires_in):
-    #row = session.query(AppSession).filter_by(autbot_access_token=autbot_token)
     time = datetime.now() + timedelta(seconds=int(expires_in) - 60)
-    #if not row:
     new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, datetime.now())
     session.add(new_appsession)
     session.commit()
-    #else:
-        #new_data = {
-                #'autbot_access_token': autbot_token,
-                #'discord_access_token': discord_token,
-                #'discord_refresh_token': refresh_token,
-                #'discord_expiration': time,
-                #'autbot_expiration': time,
-                #'last_login': datetime.now() 
-        #}
-        #row.update(new_data)
-        #session.commit()
 
 @application.route('/identify', methods=['GET'])
 def identify():
     headers = request.headers
-    autbot_token = headers['Authorization']
+    try:
+        autbot_token = headers['Authorization']
+    except KeyError:
+        return "missing token", 401
     rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
     for row in rows:
         if datetime.now() < row.autbot_expiration:
@@ -144,7 +134,3 @@ def token_exchange():
             print(resp_data)
             return json.dumps({'access_token': autbot_token, 'expires_in': expires_in, 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']}), 200
     return "invalid code", 401
-
-
-if __name__ == '__main__':
-    app.run(debug=False, port=5050)
