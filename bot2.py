@@ -52,9 +52,13 @@ class CoolBot(Bot):
         yield from pub.send((str(msg['topic']) + ' ' + str(resp)).encode())
 
     async def on_message(self, msg):
-        await self.process_commands(msg)
         print('Message from {0.author}: {0.content}'.format(msg))
 
+        if msg.author == self.user:
+            return
+
+        # check for real commands
+        await self.process_commands(msg)
         # check for user commands
         for command in self.user_commands[msg.guild.id]:
             if (command.triggered(msg.content)):
@@ -86,6 +90,8 @@ coolbot = CoolBot(command_prefix=BOT_PREFIX)
 coolbot.load_extension('src.commands.schedule_command')
 coolbot.load_extension('src.commands.eight_ball_command')
 coolbot.load_extension('src.commands.settings_command')
+coolbot.load_extension('src.commands.quote_command')
+coolbot.load_extension('src.commands.set_command')
 coolbot.load_extension('src.guild_settings')
 ctx = zmq.asyncio.Context()
 coolbot.loop.create_task(coolbot.poll_requests(ctx))

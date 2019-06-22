@@ -202,11 +202,11 @@ class GuildSettings(Cog):
     def __init__(self, bot):
         self.guilds = {}
 
-    def get_guild(self, guild):
+    def get_guild(self, guild, session=None):
         try:
             return self.guilds[guild]
         except KeyError as e:
-            self.guilds[guild] = Setting(get_session(), guild)
+            self.guilds[guild] = Setting(session or get_session(), guild)
             return self.guilds[guild]
 
 def setup(bot):
