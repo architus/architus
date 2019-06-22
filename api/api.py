@@ -61,7 +61,7 @@ class Interpret(CustomResource):
         self.enqueue({'method': "interpret", 'args': [args['message']]})
         resp = self.recv()
         print(resp)
-        if resp['response']:
+        if 'response' in resp:
             return resp, 200
         return resp, 204
 

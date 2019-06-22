@@ -26,24 +26,14 @@ class CoolBot(Bot):
 
     @asyncio.coroutine
     def poll_requests(self, ctx):
+        api = self.get_cog('Api')
         pub = ctx.socket(zmq.PUB)
         pub.bind("tcp://127.0.0.1:7200")
         while True:
             if not self.q.empty():
                 msg = json.loads(self.q.get())
-                self.loop.create_task(self.handle_request(pub, msg))
+                self.loop.create_task(api.handle_request(pub, msg))
             yield from asyncio.sleep(.01)
-
-    @asyncio.coroutine
-    def handle_request(self, pub, msg):
-        api = self.get_cog('Api')
-        try:
-            resp = (yield from getattr(api, msg['method'])(*msg['args']))
-        except Exception as e:
-            print(f"caught {e} while handling {msg['topic']}s request")
-            resp = '{"message": "' + str(e) + '"}'
-        print("sending back " + str(resp))
-        yield from pub.send((str(msg['topic']) + ' ' + str(resp)).encode())
 
     async def on_message(self, msg):
         print('Message from {0.author}: {0.content}'.format(msg))

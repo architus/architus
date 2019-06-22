@@ -93,6 +93,8 @@ class SetCommand(commands.Cog):
         await ctx.channel.send(msg)
 
 def update_command(session, triggerkey, response, count, guild, author_id, delete=False):
+    if guild.id == 0:
+        return
     if delete:
         session.query(Command).filter_by(trigger=str(guild.id) + triggerkey).delete()
     else:

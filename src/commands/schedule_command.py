@@ -67,23 +67,24 @@ class Schedule(Cog):
                 event.maybe.remove(user)
         await react.message.edit(content=self.render_text(event.title_str, event.parsed_time, event.yes, event.no, event.maybe))
 
-    async def prompt_date(self, author):
-        await self.channel.send("what time?")
-        time_msg = await self.client.wait_for('message', timeout=30, check=lambda m: m.author == author)
+    async def prompt_date(self, ctx, author):
+        await ctx.channel.send("what time?")
+        time_msg = await self.bot.wait_for('message', timeout=30, check=lambda m: m.author == author)
         try:
             return dateutil.parser.parse(time_msg.clean_content)
         except:
-            await self.channel.send("not sure what that means")
+            await ctx.channel.send("not sure what that means")
             return None
 
-    async def prompt_title(self, author):
-        await self.channel.send("what event?")
-        title_msg = await self.client.wait_for('message', timeout=30, check=lambda m: m.author == author)
+    async def prompt_title(self, ctx, author):
+        await ctx.channel.send("what event?")
+        title_msg = await self.bot.wait_for('message', timeout=30, check=lambda m: m.author == author)
         return title_msg.clean_content or None
 
     @commands.command()
     async def schedule(self, ctx, *argst):
         args = list(argst)
+        print(args)
         # event bot's id
         if ctx.guild.get_member(476042677440479252):
             print("not scheduling cause event bot exists")
@@ -102,7 +103,7 @@ class Schedule(Cog):
             del args[0]
 
         if not parsed_time:
-            parsed_time = await self.prompt_date(ctx.author)
+            parsed_time = await self.prompt_date(ctx, ctx.author)
             if not self.parsed_time: return
             parsed_time = tz.localize(parsed_time)
         if len(title) == 0:
