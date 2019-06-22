@@ -1,4 +1,4 @@
-from flask import Flask, redirect
+from flask import Flask, redirect, request
 from flask_restful import Api, Resource, reqparse
 from flask_cors import CORS
 import requests
@@ -12,6 +12,9 @@ from sqlalchemy.exc import IntegrityError
 
 from src.config import client_id, client_secret, get_session
 from src.models import AppSession
+
+API_ENDPOINT = 'https://discordapp.com/api/v6'
+REDIRECT_URI = 'https://aut-bot.com/home'
 
 session = get_session()
 
@@ -67,24 +70,45 @@ class user(CustomResource):
         return "not implemented", 418
 
 
-def commit_new_tokens(autbot_token, discord_token, refresh_token, expires_in):
-    row = session.query(AppSession).filter_by(autbot_access_token=autbot_token)
+def commit_tokens(autbot_token, discord_token, refresh_token, expires_in):
+    #row = session.query(AppSession).filter_by(autbot_access_token=autbot_token)
     time = datetime.now() + timedelta(seconds=int(expires_in) - 60)
-    if not row:
-        new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, datetime.now())
-        session.add(new_appsession)
-        session.commit()
-    else:
-        new_data = {
-                'autbot_access_token': autbot_token,
-                'discord_access_token': discord_token,
-                'discord_refresh_token': refresh_token,
-                'discord_expiration': time,
-                'autbot_expiration': time,
-                'last_login': datetime.now() 
-        }
-        row.update(new_data)
-        session.commit()
+    #if not row:
+    new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, datetime.now())
+    session.add(new_appsession)
+    session.commit()
+    #else:
+        #new_data = {
+                #'autbot_access_token': autbot_token,
+                #'discord_access_token': discord_token,
+                #'discord_refresh_token': refresh_token,
+                #'discord_expiration': time,
+                #'autbot_expiration': time,
+                #'last_login': datetime.now() 
+        #}
+        #row.update(new_data)
+        #session.commit()
+
+@application.route('/identify', methods=['GET'])
+def identify():
+    headers = request.headers
+    autbot_token = headers['Authorization']
+    rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
+    for row in rows:
+        if datetime.now() < row.autbot_expiration:
+            data, code = discord_identify_request(row.discord_access_token)
+            return json.dumps(data), code
+
+    return "token invalid or expired", 401
+
+
+def discord_identify_request(token):
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': f"Bearer {token}"
+    }
+    r = requests.get('%s/users/@me' % API_ENDPOINT, headers=headers)
+    return r.json(), r.status_code
 
 
 @application.route('/token_exchange', methods=['POST'])
@@ -93,8 +117,6 @@ def token_exchange():
     parser = reqparse.RequestParser()
     parser.add_argument('code')
     args = parser.parse_args()
-    API_ENDPOINT = 'https://discordapp.com/api/v6'
-    REDIRECT_URI = 'https://aut-bot.com/home'
     data = {
         'client_id': client_id,
         'client_secret': client_secret,
@@ -113,15 +135,14 @@ def token_exchange():
 
         discord_token = resp_data['access_token']
         autbot_token = secrets.token_urlsafe()
-        commit_new_tokens(autbot_token, discord_token, resp_data['refresh_token'], resp_data['expires_in'])
+        expires_in = resp_data['expires_in']
+        commit_tokens(autbot_token, discord_token, resp_data['refresh_token'], expires_in)
 
-        headers['Authorization'] = f"Bearer {discord_token}"
         print("trying to get me")
-        r = requests.get('%s/users/@me' % API_ENDPOINT, headers=headers)
-        if r.status_code == 200:
-            resp_data = r.json()
+        resp_data, status_code = discord_identify_request(discord_token)
+        if status_code == 200:
             print(resp_data)
-            return json.dumps({'access_token': autbot_token, 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']}), 200
+            return json.dumps({'access_token': autbot_token, 'expires_in': expires_in, 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']}), 200
     return "invalid code", 401
 
 
