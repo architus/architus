@@ -1,5 +1,8 @@
 from src.commands.abstract_command import abstract_command
+import youtube_dl
+from discord.ext import commands
 import re
+import functools
 import discord
 
 class play_command(abstract_command):
@@ -96,5 +99,27 @@ class play_command(abstract_command):
     def get_help(self, **kwargs):
         return "Add a song to the queue or play immediately. Supports youtube and spotify links."
 
-    def get_usage(self):
-        return "(<url> | <search>)"
+class PlayCommand(commands.Cog):
+
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.command()
+    async def play(self, ctx, url):
+        opts = {
+            'format': 'webm[abr>0]/bestaudio/best',
+            'prefer_ffmpeg': False
+        }
+        ydl = youtube_dl.YoutubeDL(opts)
+        func = functools.partial(ydl.extract_info, url, download=False)
+        info = await self.bot.loop.run_in_executor(None, func)
+        if "entries" in info:
+            info = info['entries'][0]
+
+        download_url = info['url']
+        vc = await ctx.author.voice.channel.connect()
+        vc.play(discord.FFmpegPCMAudio(download_url), after=lambda e: print('done', e))
+        await ctx.send(download_url)
+
+def setup(bot):
+    bot.add_cog(PlayCommand(bot))
