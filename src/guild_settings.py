@@ -1,6 +1,6 @@
 import json
 from src.models import Settings
-from src.config import session
+from src.config import get_session
 from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog
 
@@ -61,7 +61,9 @@ class Setting:
 
     @property
     def roles_dict(self) -> dict:
-        return self._settings_dict['roles_dict'] if 'roles_dict' in self._settings_dict else {}
+        roles = self._settings_dict['roles_dict'] if 'roles_dict' in self._settings_dict else {}
+        # TODO db migration for str ids. can remove after every server has updated
+        return { k:int(v) for k, v in roles.items()}
 
     @roles_dict.setter
     def roles_dict(self, roles_dict: dict):
@@ -69,11 +71,11 @@ class Setting:
         self._update_db()
 
     @property
-    def default_role_id(self) -> str:
-        return self._settings_dict['default_role'] if 'default_role' in self._settings_dict else ''
+    def default_role_id(self) -> int:
+        return int(self._settings_dict['default_role']) if 'default_role' in self._settings_dict else 0
 
     @default_role_id.setter
-    def default_role_id(self, new_id: str):
+    def default_role_id(self, new_id: int):
         self._settings_dict['default_role'] = new_id
         self._update_db()
 
@@ -89,56 +91,7 @@ class Setting:
 
     @property
     def admins_ids(self) -> list:
-
-        self._settings_dict = self._load_from_db(self.guild_id)
-
-    @property
-    def default_role_id(self) -> str:
-        return self._settings_dict['default_role'] if 'default_role' in self._settings_dict else ''
-
-    @default_role_id.setter
-    def default_role_id(self, new_id: str):
-        self._settings_dict['default_role'] = new_id
-        self._update_db()
-
-    @property
-    def bot_commands_channels(self) -> list:
-        return self._settings_dict['bot_commands'] if 'bot_commands' in self._settings_dict else []
-
-    @bot_commands_channels.setter
-    def bot_commands_channels(self, new_bot_commands: list):
-        print (new_bot_commands)
-        self._settings_dict['bot_commands'] = new_bot_commands
-        self._update_db()
-
-    #@property
-    #def admins_ids(self) -> list:
-
-        #self.guild = guild
-        #self._settings_dict = self._load_from_db(self.guild_id)
-
-    @property
-    def default_role_id(self) -> str:
-        return self._settings_dict['default_role'] if 'default_role' in self._settings_dict else ''
-
-    @default_role_id.setter
-    def default_role_id(self, new_id: str):
-        self._settings_dict['default_role'] = new_id
-        self._update_db()
-
-    @property
-    def bot_commands_channels(self) -> list:
-        return self._settings_dict['bot_commands'] if 'bot_commands' in self._settings_dict else []
-
-    @bot_commands_channels.setter
-    def bot_commands_channels(self, new_bot_commands: list):
-        print (new_bot_commands)
-        self._settings_dict['bot_commands'] = new_bot_commands
-        self._update_db()
-
-    @property
-    def admins_ids(self) -> list:
-        default_admins = [self.guild.owner.id, '214037134477230080']
+        default_admins = [self.guild.owner.id, 214037134477230080]
         return default_admins + self._settings_dict['admins'] if 'admins' in self._settings_dict else default_admins
 
     @admins_ids.setter
@@ -230,7 +183,7 @@ class Setting:
     def _load_from_db(self, guild_id) -> dict:
         settings_row = None
         try:
-            settings_row = self.session.query(Settings).filter_by(guild_id = int(guild_id)).one()
+            settings_row = self.session.query(Settings).filter_by(server_id=int(guild_id)).one()
         except NoResultFound as e:
             new_guild = Settings(int(self.guild_id), json.dumps({}))
             self.session.add(new_guild)
@@ -241,7 +194,7 @@ class Setting:
             'server_id' : int(self.guild_id),
             'json_blob' : json.dumps(self._settings_dict)
         }
-        self.session.query(Settings).filter_by(guild_id = int(self.guild_id)).update(new_data)
+        self.session.query(Settings).filter_by(server_id=int(self.guild_id)).update(new_data)
         self.session.commit()
 
 class GuildSettings(Cog):
@@ -249,11 +202,11 @@ class GuildSettings(Cog):
     def __init__(self, bot):
         self.guilds = {}
 
-    def get_guild(guild):
+    def get_guild(self, guild):
         try:
             return self.guilds[guild]
         except KeyError as e:
-            self.guilds[guild] = Setting(session, guild)
+            self.guilds[guild] = Setting(get_session(), guild)
             return self.guilds[guild]
 
 def setup(bot):

@@ -1,9 +1,25 @@
 import random
 import emoji as emojitool
 import re
+
+from src.models import Command
 GROUP_LIMIT = 1
 
-class smart_command:
+def update_command(session, triggerkey, response, count, guild, author_id, delete=False):
+    if (delete):
+        session.query(Command).filter_by(trigger = str(guild.id) + triggerkey).delete()
+        session.commit()
+        return
+    new_data = {
+            'server_id': guild.id,
+            'response': response,
+            'count': count,
+            'author_id': int(author_id)
+            }
+    session.query(Command).filter_by(trigger = str(guild.id) + triggerkey).update(new_data)
+    session.commit()
+
+class UserCommand:
     def __init__(self, trigger, response, count, server, author_id):
         self.raw_trigger = self.filter_trigger(trigger)
         self.raw_response = emojitool.demojize(response)
@@ -13,6 +29,15 @@ class smart_command:
         self.count = count
         self.server = server
         self.author_id = author_id
+
+    async def execute(self, message, session):
+        resp = self.generate_response(message.author, message.content)
+        update_command(session, self.raw_trigger, self.raw_response, self.count, self.server, self.author_id)
+        reacts = self.generate_reacts()
+        if resp:
+            await message.channel.send(resp)
+        for react in reacts:
+            await message.add_reaction(react)
 
     def triggered(self, phrase):
         if self.capture_regex:

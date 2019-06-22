@@ -1,5 +1,5 @@
 import discord
-class list_embed:
+class ListEmbed:
     def __init__(self, title, description, author=None):
         self.title = title
         self.description = description
@@ -14,7 +14,7 @@ class list_embed:
         self.color = 0x5998ff
 
     def add(self, title, body):
-        self.list_items.append((title, body))
+        self.list_items.append((str(title), str(body)))
      
     def get_embed(self):
         em = discord.Embed(title=self.title, description=self.description, colour=self.color)

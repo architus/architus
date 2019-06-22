@@ -4,6 +4,8 @@ import re
 from discord.ext.commands import Cog
 from discord.ext import commands
 
+from src.list_embed import ListEmbed
+
 TRASH = u"\U0001F5D1"
 OPEN_FOLDER = u"\U0001F4C2"
 BOT_FACE = u"\U0001F916"
@@ -13,7 +15,6 @@ SWORDS= u"\U00002694"
 HAMMER_PICK = u"\U00002692"
 HAMMER = u"\U0001F528"
 
-#class settings_command(abstract_command):
 class Settings(Cog):
 
     def __init__(self, bot):
@@ -24,13 +25,21 @@ class Settings(Cog):
         return self.bot.get_cog('GuildSettings')
 
     @commands.command()
+    async def roleids(self, ctx):
+        lem = ListEmbed(ctx.channel.guild.name, '')
+        lem.name = "Role IDs"
+        for role in ctx.guild.roles:
+            lem.add(role.name, role.id)
+        await ctx.channel.send(embed=lem.get_embed())
+
+    @commands.command()
     async def settings(self, ctx):
         settings = self.guild_settings.get_guild(ctx.guild)
         if ctx.author.id not in settings.admins_ids:
             ctx.channel.send('nope, sorry')
             return True
 
-        msg = await ctx.channel.send(embed=await self.get_embed())
+        msg = await ctx.channel.send(embed=await self.get_embed(ctx))
 
         await msg.add_reaction("⭐")
         await msg.add_reaction(TRASH)
@@ -43,7 +52,6 @@ class Settings(Cog):
         await msg.add_reaction(HAMMER)
 
         while True:
-            #TODO
             react, user = await self.bot.wait_for('reaction_add', check=lambda r,u: r.message.id == msg.id and u == ctx.author)
             e = react.emoji
             print(e)
@@ -65,14 +73,13 @@ class Settings(Cog):
                 await self.gulag_threshold(ctx)
             elif e == HAMMER:
                 await self.gulag_severity(ctx)
-            await msg.edit(embed=await self.get_embed())
+            await msg.edit(embed=await self.get_embed(ctx))
 
         return True
 
     async def starboard_threshold(self, ctx):
         await ctx.channel.send('⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
-        #TODO
-        msg = await self.bot.wait_for_message(author=ctx.author)
+        msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         self.guild_settings.get_guild(ctx.guild).starboard_threshold = abs(int(msg.content))
         try:
             resp = "Threshold set"
@@ -82,8 +89,7 @@ class Settings(Cog):
 
     async def repost_deletes(self, ctx):
         await ctx.channel.send('🗑️ If true, deleted messages will be reposted immediately. Enter `true` or `false` to modify it:')
-        #TODO
-        msg = await self.client.wait_for_message(author=self.author)
+        msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         resp = "Setting updated"
         settings = self.guild_settings.get_guild(ctx.guild)
         if msg.content in ['1','True','true','yes', 'y']:
@@ -92,11 +98,11 @@ class Settings(Cog):
             settings.repost_del_msg = False
         else:
             resp = "Setting unchanged"
-        await self.channel.send(resp)
+        await ctx.channel.send(resp)
 
     async def manage_emojis(self, ctx):
-        await self.channel.send('📂 If true, less popular emojis will be cycled in and out as needed, effectively allowing greater than 50 emojis. Enter `true` or `false` to modify it:')
-        msg = await self.client.wait_for('message', check=lambda m: m.author == self.author)
+        await ctx.channel.send('📂 If true, less popular emojis will be cycled in and out as needed, effectively allowing greater than 50 emojis. Enter `true` or `false` to modify it:')
+        msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         resp = "Setting updated"
         settings = self.guild_settings.get_guild(ctx.guild)
         if msg.content in ['1','True','true','yes', 'y']:
@@ -106,12 +112,11 @@ class Settings(Cog):
         else:
             resp = "Setting unchanged"
 
-        await self.channel.send(resp)
+        await ctx.channel.send(resp)
 
     async def bot_commands(self, ctx):
-        await self.channel.send("🤖 Some verbose commands are limited to these channels. Mention channels to toggle them:")
-        #TODO
-        msg = await self.client.wait_for_message(author=self.author)
+        await ctx.channel.send("🤖 Some verbose commands are limited to these channels. Mention channels to toggle them:")
+        msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         settings = self.guild_settings.get_guild(ctx.guild)
         bc_channels = settings.bot_commands_channels
         new_channels = msg.channel_mentions
@@ -125,25 +130,24 @@ class Settings(Cog):
             else:
                 bc_channels.append(channel.id)
             settings.bot_commands_channels = bc_channels
-        await self.channel.send(resp)
+        await ctx.channel.send(resp)
 
     async def default_role(self, ctx):
-        await self.channel.send("🛡 New members will be automatically moved into this role. Enter a role id (`!roleids`) to change:")
+        await ctx.channel.send("🛡 New members will be automatically moved into this role. Enter a role id (`!roleids`) to change:")
         def check(msg):
-            return msg.content != '!roleids'
-        #TODO
-        msg = await self.client.wait_for_message(author=self.author, check=check)
+            return msg.content != '!roleids' and msg.author == ctx.author
+        msg = await self.bot.wait_for('message', check=check)
         settings = self.guild_settings.get_guild(ctx.guild)
-        if discord.utils.get(self.server.roles, id=msg.content):
+        if discord.utils.get(ctx.guild.roles, id=int(msg.content)):
             settings.default_role_id = msg.content
             resp = "Default role updated"
         else:
             resp = "Default role unchanged"
-        await self.channel.send(resp)
+        await ctx.channel.send(resp)
 
     async def admins(self, ctx):
-        await self.channel.send("🔐 These members have access to more bot functions such as `!purge` and setting longer commands. Mention a member to toggle:")
-        msg = await self.client.wait_for_message(author=self.author)
+        await ctx.channel.send("🔐 These members have access to more bot functions such as `!purge` and setting longer commands. Mention a member to toggle:")
+        msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         resp = "Admins unchanged"
         settings = self.guild_settings.get_guild(ctx.guild)
         if msg.mentions:
@@ -152,19 +156,19 @@ class Settings(Cog):
                 settings.admins_ids.remove(msg.mentions[0].id)
             else:
                 settings.admins_ids += [msg.mentions[0].id]
-        await self.channel.send(resp)
+        await ctx.channel.send(resp)
 
     async def roles(self, ctx):
         def check(msg):
-            return msg.content != '!roleids'
-        await self.channel.send("⚔ These are the roles that any member can join at will. Enter a list of role ids (`!roleids`) to toggle. Optionally enter a nickname for the role in the format `nickname::roleid` if the role's name is untypable:")
-        msg = await self.client.wait_for_message(author=self.author, check=check)
+            return msg.content != '!roleids' and msg.author == ctx.author
+        await ctx.channel.send("⚔ These are the roles that any member can join at will. Enter a list of role ids (`!roleids`) to toggle. Optionally enter a nickname for the role in the format `nickname::roleid` if the role's name is untypable:")
+        msg = await self.bot.wait_for('message', check=check)
         pattern = re.compile("((?P<nick>\w+)::)?(?P<id>\d{18})")
         new_roles = []
         settings = self.guild_settings.get_guild(ctx.guild)
         roles = settings.roles_dict
         for match in re.finditer(pattern, msg.content):
-            role = discord.utils.get(self.server.roles, id=match.group('id'))
+            role = discord.utils.get(ctx.guild.roles, id=int(match.group('id')))
             if match.group('nick') and role:
                 new_roles.append((match.group('nick').lower(), role.id))
             elif role:
@@ -182,34 +186,35 @@ class Settings(Cog):
                 roles[role[0]] = role[1]
 
         settings.roles_dict = roles
-        await self.channel.send(resp)
+        await ctx.channel.send(resp)
 
     async def gulag_threshold(self, ctx):
-        await self.channel.send(HAMMER_PICK + ' This is the number of reacts a gulag vote must get to be pass. Enter a number to modify it:')
-        msg = await self.client.wait_for_message(author=self.author)
+        await ctx.channel.send(HAMMER_PICK + ' This is the number of reacts a gulag vote must get to be pass. Enter a number to modify it:')
+        msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         settings = self.guild_settings.get_guild(ctx.guild)
         try:
             settings.gulag_threshold = abs(int(msg.content))
             resp = "Threshold set"
         except:
             resp = "Threshold unchanged"
-        await self.channel.send(resp)
-    async def gulag_severity(self):
-        await self.channel.send(HAMMER + ' This is the number of minutes a member will be confined to gulag. Half again per extra vote. Enter a number to modify it:')
-        msg = await self.client.wait_for_message(author=self.author)
+        await ctx.channel.send(resp)
+    async def gulag_severity(self, ctx):
+        await ctx.channel.send(HAMMER + ' This is the number of minutes a member will be confined to gulag. Half again per extra vote. Enter a number to modify it:')
+        settings = self.guild_settings.get_guild(ctx.guild)
+        msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         try:
             settings.gulag_severity = abs(int(msg.content))
             resp = "Severity set"
-        except:
+        except ValueError:
             resp = "Severity unchanged"
-        await self.channel.send(resp)
+        await ctx.channel.send(resp)
 
-    async def get_embed(self):
+    async def get_embed(self, ctx):
         settings = self.guild_settings.get_guild(ctx.guild)
         admin_names = list(set([(await self.bot.fetch_user(u)).name for u in settings.admins_ids]))
-        roles_names = [r.mention for r in [discord.utils.get(self.server.roles, id=i) for i in settings.roles_dict.values()] if r] or ['None']
-        bot_commandses = [c.mention for c in [discord.utils.get(self.server.channels, id=i) for i in settings.bot_commands_channels] if c] or ['None']
-        default_role = discord.utils.get(self.server.roles, id=settings.default_role_id)
+        roles_names = [r.mention for r in [discord.utils.get(ctx.guild.roles, id=i) for i in settings.roles_dict.values()] if r] or ['None']
+        bot_commandses = [c.mention for c in [discord.utils.get(ctx.guild.channels, id=i) for i in settings.bot_commands_channels] if c] or ['None']
+        default_role = discord.utils.get(ctx.guild.roles, id=settings.default_role_id)
 
         em = discord.Embed(title="⚙ Settings", description="Select an item for more info, or to change it", colour=0xc1c1ff)
         em.set_author(name='Aut-Bot Server Settings', icon_url='')
