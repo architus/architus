@@ -6,8 +6,12 @@ import json
 import zmq
 import os
 import secrets
+from datetime import datetime, timedelta
 
-from src.config import client_secret
+from src.config import client_id, client_secret, get_session
+from src.models import AppSession
+
+session = get_session()
 
 application = Flask(__name__)
 
@@ -60,16 +64,23 @@ class user(CustomResource):
         return "not implemented", 418
 
 
+def commit_new_tokens(autbot_token, discord_token, refresh_token, expires_in):
+    time = datetime.now() + timedelta(seconds=int(expires_in) - 60)
+    new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time)
+    session.add(new_appsession)
+    session.commit()
+
+
 @application.route('/token_exchange', methods=['POST'])
-def post():
+def token_exchange():
+    print(os.getpid())
     parser = reqparse.RequestParser()
     parser.add_argument('code')
     args = parser.parse_args()
     API_ENDPOINT = 'https://discordapp.com/api/v6'
-    CLIENT_ID = '448546825532866560'
     REDIRECT_URI = 'https://aut-bot.com/home'
     data = {
-        'client_id': CLIENT_ID,
+        'client_id': client_id,
         'client_secret': client_secret,
         'grant_type': 'authorization_code',
         'code': args['code'],
@@ -82,13 +93,20 @@ def post():
     r = requests.post('%s/oauth2/token' % API_ENDPOINT, data=data, headers=headers)
     resp_data = r.json()
     if r.status_code == 200:
+        print(resp_data)
+
+        discord_token = resp_data['access_token']
+        autbot_token = secrets.token_urlsafe()
+        commit_new_tokens(autbot_token, discord_token, resp_data['refresh_token'], resp_data['expires_in'])
+
+        headers['Authorization'] = f"Bearer {discord_token}"
         print("trying to get me")
-        headers['Authorization'] = "Bearer " + resp_data['access_token']
         r = requests.get('%s/users/@me' % API_ENDPOINT, headers=headers)
         if r.status_code == 200:
             resp_data = r.json()
-            return json.dumps({'access_token': secrets.token_urlsafe(), 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']})
-    return "nope", 401
+            print(resp_data)
+            return json.dumps({'access_token': autbot_token, 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']}), 200
+    return "invalid code", 401
 
 
 if __name__ == '__main__':

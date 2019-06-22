@@ -1,5 +1,5 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, ForeignKey, Integer, BigInteger, Float, Text
+from sqlalchemy import Column, ForeignKey, Integer, BigInteger, Float, Text, DateTime
 
 Base = declarative_base()
 
@@ -49,16 +49,23 @@ class Settings(Base):
         self.server_id = server_id
         self.json_blob = json_blob
     
-class Role(Base):
-    __tablename__ = 'tb_roles'
-    target_role_id = Column('target_role_id', BigInteger, primary_key=True)
-    server_id = Column('server_id', BigInteger)
-    required_role_id = Column('required_role_id', BigInteger)
+class AppSession(Base):
+    __tablename__ = 'tb_session'
+    autbot_access_token = Column('autbot_access_token', Text, primary_key=True)
+    dicord_access_token = Column('discord_access_token', Text)
+    discord_refresh_token = Column('discord_refresh_token', Text)
+    discord_expiration = Column('discord_expiration', DateTime)
+    autbot_expiration = Column('autbot_expiration', DateTime)
+    last_login = Column('last_login', DateTime)
 
-    def __init__(self, server_id, target_role_id, required_role_id):
-        self.server_id = server_id
-        self.target_role_id = target_role_id
-        self.required_role_id = required_role_id
+    def __init__(self, autbot_access_token, dicord_access_token, discord_refresh_token, discord_expiration, autbot_expiration, last_login=None):
+
+        self.autbot_access_token = autbot_access_token
+        self.dicord_access_token = dicord_access_token
+        self.discord_refresh_token = discord_refresh_token
+        self.discord_expiration  = discord_expiration
+        self.autbot_expiration = autbot_expiration
+        self.last_login = last_login
 
 class Command(Base):
     __tablename__ = 'tb_commands'

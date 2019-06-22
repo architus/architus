@@ -19,15 +19,19 @@ except Exception as e:
     print(e)
     print('error reading .secret_token, make it you aut')
 
-try:
-    engine = create_engine("postgresql://{}:{}@localhost/autbot".format(db_user, db_pass))
-    Session = sessionmaker(bind=engine)
-    session = Session()
+def get_session():
+    print("creating postgres session")
+    try:
+        engine = create_engine("postgresql://{}:{}@localhost/autbot".format(db_user, db_pass))
+        Session = sessionmaker(bind=engine)
+        session = Session()
 
-except Exception as e:
-    session = None
-    print('failed to connect to database')
-    print(e)
+    except Exception as e:
+        session = None
+        print('failed to connect to database')
+        print(e)
+    return session
+session = get_session()
 
 default_cmds = {}
 #for command in command_modules.__all__:
