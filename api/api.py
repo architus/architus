@@ -1,5 +1,6 @@
 from flask import Flask, redirect
 from flask_restful import Api, Resource, reqparse
+from flask_cors import CORS
 import requests
 import time
 import json
@@ -14,6 +15,7 @@ from src.models import AppSession
 session = get_session()
 
 application = Flask(__name__)
+cors = CORS(application)
 
 #context = zmq.Context()
 #master_socket = context.socket(zmq.REQ)
