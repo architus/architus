@@ -25,6 +25,7 @@ def login():
 
 class CustomResource(Resource):
     def __init__(self, q=None):
+        self.session = get_session()
         self.q = q
         ctx = zmq.Context()
         self.topic = str(os.getpid())
@@ -65,20 +66,38 @@ class Interpret(CustomResource):
             return resp, 200
         return resp, 204
 
+def authenticate(session, headers):
+    try:
+        autbot_token = headers['Authorization']
+    except KeyError:
+        return False
+    rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
+    for row in rows:
+        if datetime.now() < row.autbot_expiration:
+            return row.discord_access_token
+    return False
+
+class Coggers(CustomResource):
+
+    def get(self, extension):
+        discord_token = authenticate(self.session, request.headers)
+        if discord_token:
+            data, code = discord_identify_request(discord_token)
+            if data['id'] == '214037134477230080':
+                self.enqueue({'method': "reload_extension", 'args': [extension]})
+                resp = self.recv()
+                return {}, 204
+        return {"message": "401: not johnyburd"}, 401
+
 class identify(Resource):
 
     def get(self):
         session = get_session()
         headers = request.headers
-        try:
-            autbot_token = headers['Authorization']
-        except KeyError:
-            return "missing token", 401
-        rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
-        for row in rows:
-            if datetime.now() < row.autbot_expiration:
-                data, code = discord_identify_request(row.discord_access_token)
-                return data, code
+        print(headers)
+        discord_token = authenticate(session, headers)
+        if discord_token:
+            return discord_identify_request(discord_token)
 
         return "token invalid or expired", 401
 
@@ -102,7 +121,6 @@ def discord_identify_request(token):
 
 @application.route('/token_exchange', methods=['POST'])
 def token_exchange():
-    print(os.getpid())
     parser = reqparse.RequestParser()
     parser.add_argument('code')
     args = parser.parse_args()
@@ -119,6 +137,7 @@ def token_exchange():
     }
     r = requests.post('%s/oauth2/token' % API_ENDPOINT, data=data, headers=headers)
     resp_data = r.json()
+    print(r.status_code)
     if r.status_code == 200:
         print(resp_data)
 

@@ -54,9 +54,10 @@ class SetCommand(commands.Cog):
 
             if not any(command == oldcommand for oldcommand in user_commands[ctx.guild.id]) and not len(command.raw_trigger) == 0 and command.raw_response not in ['remove', 'author']:
                 user_commands[ctx.guild.id].append(command)
-                new_command = Command(str(ctx.guild.id) + command.raw_trigger, command.raw_response, command.count, ctx.guild.id, ctx.author.id)
-                self.session.add(new_command)
-                self.session.commit()
+                if ctx.guild.id != 0:
+                    new_command = Command(str(ctx.guild.id) + command.raw_trigger, command.raw_response, command.count, ctx.guild.id, ctx.author.id)
+                    self.session.add(new_command)
+                    self.session.commit()
                 msg = 'command set'
             elif parser.group(2).strip() == "remove":
                 msg = 'no command with that trigger'
