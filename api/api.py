@@ -19,22 +19,6 @@ REDIRECT_URI = 'https://aut-bot.com/home'
 application = Flask(__name__)
 cors = CORS(application)
 
-#context = zmq.Context()
-#master_socket = context.socket(zmq.REQ)
-#print("conneting...")
-#master_socket.connect('tcp://127.0.0.1:7100')
-
-def request_socket(ctx):
-    print("requesting port")
-    master_socket.send_string("socket pls")
-    port = master_socket.recv()
-    print("got port " + str(port))
-    port = int.from_bytes(port, byteorder='little')
-    socket = ctx.socket(zmq.REQ)
-    socket.connect(f'tcp://127.0.0.1:{port}')
-    return socket
-
-
 @application.route('/login')
 def login():
     return redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Faut-bot.com%2Fhome&response_type=code&scope=identify')
@@ -45,7 +29,7 @@ class CustomResource(Resource):
         ctx = zmq.Context()
         self.topic = str(os.getpid())
         self.sub = ctx.socket(zmq.SUB)
-        self.sub.connect("tcp://127.0.0.1:7208")
+        self.sub.connect("tcp://127.0.0.1:7200")
         self.sub.setsockopt(zmq.SUBSCRIBE, self.topic.encode())
 
     def enqueue(self, call):
@@ -59,13 +43,44 @@ class CustomResource(Resource):
 class user(CustomResource):
 
     def get(self, name):
-        print("sending from api.py")
-        self.enqueue({'method': "fetch_user_dict", 'arg': name})
+        self.enqueue({'method': "fetch_user_dict", 'args': [name]})
         name = self.recv()
         return name, 200
 
     def post(self, name):
         return "not implemented", 418
+
+class Interpret(CustomResource):
+
+    def post(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('message')
+        args = parser.parse_args()
+        if not 'message' in args:
+            return 400
+        self.enqueue({'method': "interpret", 'args': [args['message']]})
+        resp = self.recv()
+        print(resp)
+        if resp['response']:
+            return resp, 200
+        return resp, 204
+
+class identify(Resource):
+
+    def get(self):
+        session = get_session()
+        headers = request.headers
+        try:
+            autbot_token = headers['Authorization']
+        except KeyError:
+            return "missing token", 401
+        rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
+        for row in rows:
+            if datetime.now() < row.autbot_expiration:
+                data, code = discord_identify_request(row.discord_access_token)
+                return data, code
+
+        return "token invalid or expired", 401
 
 
 def commit_tokens(autbot_token, discord_token, refresh_token, expires_in):
@@ -74,22 +89,6 @@ def commit_tokens(autbot_token, discord_token, refresh_token, expires_in):
     new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, datetime.now())
     session.add(new_appsession)
     session.commit()
-
-@application.route('/identify', methods=['GET'])
-def identify():
-    session = get_session()
-    headers = request.headers
-    try:
-        autbot_token = headers['Authorization']
-    except KeyError:
-        return "missing token", 401
-    rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
-    for row in rows:
-        if datetime.now() < row.autbot_expiration:
-            data, code = discord_identify_request(row.discord_access_token)
-            return json.dumps(data), code
-
-    return "token invalid or expired", 401
 
 
 def discord_identify_request(token):

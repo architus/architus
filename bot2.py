@@ -24,27 +24,21 @@ class CoolBot(Bot):
     async def test(ctx):
         print(ctx.message.content)
 
-    async def fetch_user_dict(self, id):
-        usr = await self.fetch_user(int(id))
-        avatar = usr.avatar_url or usr.default_avatar_url
-        return json.dumps({'name' : usr.name, 'avatar_url' : str(avatar)})
-
-
     @asyncio.coroutine
     def poll_requests(self, ctx):
         pub = ctx.socket(zmq.PUB)
-        pub.bind("tcp://127.0.0.1:7208")
+        pub.bind("tcp://127.0.0.1:7200")
         while True:
-            if hasattr(self, 'q') and not self.q.empty():
-                #msg = yield from sub.recv_json()
+            if not self.q.empty():
                 msg = json.loads(self.q.get())
                 self.loop.create_task(self.handle_request(pub, msg))
             yield from asyncio.sleep(.01)
 
     @asyncio.coroutine
     def handle_request(self, pub, msg):
+        api = self.get_cog('Api')
         try:
-            resp = (yield from getattr(self, msg['method'])(msg['arg']))
+            resp = (yield from getattr(api, msg['method'])(*msg['args']))
         except Exception as e:
             print(f"caught {e} while handling {msg['topic']}s request")
             resp = '{"message": "' + str(e) + '"}'
@@ -93,6 +87,7 @@ coolbot.load_extension('src.commands.settings_command')
 coolbot.load_extension('src.commands.quote_command')
 coolbot.load_extension('src.commands.set_command')
 coolbot.load_extension('src.commands.play_command')
+coolbot.load_extension('src.api.api')
 coolbot.load_extension('src.guild_settings')
 ctx = zmq.asyncio.Context()
 coolbot.loop.create_task(coolbot.poll_requests(ctx))

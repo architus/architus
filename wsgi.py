@@ -1,6 +1,6 @@
 from api.api import application
 from flask_restful import Api
-from api.api import user
+from api.api import user, identify, Interpret
 from multiprocessing import Process, Pipe, Queue
 #from asyncio import Queue
 import bot2
@@ -14,6 +14,8 @@ print("wsgi loaded")
 q = Queue()
 api = Api(application)
 api.add_resource(user, "/user/<string:name>", resource_class_kwargs={'q' : q})
+api.add_resource(identify, "/identify")
+api.add_resource(Interpret, "/interpret", resource_class_kwargs={'q' : q})
 
 coolbot.q = q
 p = Process(target=coolbot.run, args=(secret_token,))
