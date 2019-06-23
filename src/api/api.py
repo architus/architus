@@ -57,7 +57,8 @@ class Api(Cog):
             data = json.loads(await websocket.recv())
             resp = await self.interpret(
                     data['guild_id'],
-                    data['message']
+                    data['message'],
+                    data['message_id']
             )
         except Exception as e:
             traceback.print_exc()
