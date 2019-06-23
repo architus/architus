@@ -83,7 +83,7 @@ coolbot.load_extension('src.api.api')
 coolbot.load_extension('src.guild_settings')
 ctx = zmq.asyncio.Context()
 coolbot.loop.create_task(coolbot.poll_requests(ctx))
-start_server = websockets.serve(coolbot.get_cog("Api").handle_socket, 'localhost', 8300)
+start_server = websockets.serve(coolbot.get_cog("Api").handle_socket, '0.0.0.0', 8300)
 asyncio.async(start_server)
 
 if __name__ == '__main__':
