@@ -41,7 +41,7 @@ class CustomResource(Resource):
         return json.loads(self.sub.recv().decode().replace(self.topic + ' ', ''))
 
 
-class user(CustomResource):
+class User(CustomResource):
 
     def get(self, name):
         self.enqueue({'method': "fetch_user_dict", 'args': [name]})
@@ -95,7 +95,7 @@ class Coggers(CustomResource):
                 return {}, 204
         return {"message": "401: not johnyburd"}, 401
 
-class identify(Resource):
+class Identify(Resource):
 
     def get(self):
         session = get_session()

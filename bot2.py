@@ -83,7 +83,8 @@ coolbot.load_extension('src.api.api')
 coolbot.load_extension('src.guild_settings')
 ctx = zmq.asyncio.Context()
 coolbot.loop.create_task(coolbot.poll_requests(ctx))
-#coolbot.loop.create_task(websockets.serve(coolbot.get_cog("Api").handle_socket, 'localhost', 8765))
+start_server = websockets.serve(coolbot.get_cog("Api").handle_socket, 'localhost', 8300)
+asyncio.async(start_server)
 
 if __name__ == '__main__':
     from src.config import secret_token
