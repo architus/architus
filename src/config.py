@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 secret_token = None
 db_user = None
 db_pass = None
+sessions = {}
 
 try:
     lines = [line.rstrip('\n') for line in open('.secret_token')]
@@ -19,12 +20,15 @@ except Exception as e:
     print(e)
     print('error reading .secret_token, make it you aut')
 
-def get_session():
+def get_session(pid=None):
     print("creating postgres session")
+    if pid in sessions:
+        return sessions[pid]
     try:
         engine = create_engine("postgresql://{}:{}@localhost/autbot".format(db_user, db_pass))
         Session = sessionmaker(bind=engine)
         session = Session()
+        sessions[pid] = session
 
     except Exception as e:
         session = None

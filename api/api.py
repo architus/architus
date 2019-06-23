@@ -25,7 +25,7 @@ def login():
 
 class CustomResource(Resource):
     def __init__(self, q=None):
-        self.session = get_session()
+        self.session = get_session(os.getpid())
         self.q = q
         ctx = zmq.Context()
         self.topic = str(os.getpid())
@@ -98,7 +98,7 @@ class Coggers(CustomResource):
 class Identify(Resource):
 
     def get(self):
-        session = get_session()
+        session = get_session(os.getpid())
         headers = request.headers
         print(headers)
         discord_token = authenticate(session, headers)
@@ -110,7 +110,7 @@ class Identify(Resource):
 class ListGuilds(Resource):
 
     def get(self):
-        session = get_session()
+        session = get_session(os.getpid())
         headers = request.headers
         print(headers)
         discord_token = authenticate(session, headers)
@@ -126,7 +126,7 @@ class ListGuilds(Resource):
 
 
 def commit_tokens(autbot_token, discord_token, refresh_token, expires_in):
-    session = get_session()
+    session = get_session(os.getpid())
     time = datetime.now() + timedelta(seconds=int(expires_in) - 60)
     new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, datetime.now())
     session.add(new_appsession)
