@@ -21,7 +21,7 @@ cors = CORS(application)
 
 @application.route('/login')
 def login():
-    return redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Faut-bot.com%2Fhome&response_type=code&scope=identify')
+    return redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Faut-bot.com%2Fhome&response_type=code&scope=guilds%20identify')
 
 class CustomResource(Resource):
     def __init__(self, q=None):
@@ -98,6 +98,23 @@ class identify(Resource):
         discord_token = authenticate(session, headers)
         if discord_token:
             return discord_identify_request(discord_token)
+
+        return "token invalid or expired", 401
+
+class ListGuilds(Resource):
+
+    def get(self):
+        session = get_session()
+        headers = request.headers
+        print(headers)
+        discord_token = authenticate(session, headers)
+        if discord_token:
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': f"Bearer {discord_token}"
+            }
+            r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
+            return r.json(), r.status_code
 
         return "token invalid or expired", 401
 

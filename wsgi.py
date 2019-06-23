@@ -1,6 +1,6 @@
 from api.api import application
 from flask_restful import Api
-from api.api import user, identify, Interpret, Coggers
+from api.api import user, identify, Interpret, Coggers, ListGuilds
 from multiprocessing import Process, Pipe, Queue
 #from asyncio import Queue
 import bot2
@@ -15,6 +15,7 @@ q = Queue()
 api = Api(application)
 api.add_resource(user, "/user/<string:name>", resource_class_kwargs={'q' : q})
 api.add_resource(identify, "/identify")
+api.add_resource(ListGuilds, "/guilds")
 api.add_resource(Interpret, "/interpret", resource_class_kwargs={'q' : q})
 api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q' : q})
 

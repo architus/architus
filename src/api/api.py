@@ -11,12 +11,13 @@ class MockRole(object):
     pass
 
 class MockChannel(object):
-    def __init__(self, sends):
+    def __init__(self, sends, reactions):
         self.sends = sends
+        self.reactions = reactions
     async def send(self, *args):
         for thing in args:
             self.sends.append(thing)
-        return MockMessage(self.sends)
+        return MockMessage(self.sends, self.reactions)
 
 class MockGuild(object):
     def __init__(self):
@@ -25,22 +26,24 @@ class MockGuild(object):
         self.owner = MockMember()
         self.default_role = MockRole()
         self.default_role.mention = "@everyone"
+        self.emojis = []
 
     def get_member(self, *args):
         return None
 mock_guild = MockGuild()
 
 class MockMessage(object):
-    def __init__(self, sends, content=None):
+    def __init__(self, sends, reactions, content=None):
         self.id = 0
         self.sends = sends
-        self._state = MockChannel(sends)
+        self.reactions = reactions
+        self._state = MockChannel(sends, reactions)
         self.guild = mock_guild
         self.author = MockMember()
-        self.channel = MockChannel(sends)
+        self.channel = MockChannel(sends, reactions)
         self.content = content
-    async def add_reaction(self, *args):
-        pass
+    async def add_reaction(self, emoji):
+        self.reactions.append(emoji)
 
 class Api(Cog):
 
@@ -77,7 +80,8 @@ class Api(Cog):
                 command = cmd
                 break
         sends = []
-        mock_message = MockMessage(sends, content=message)
+        reactions = []
+        mock_message = MockMessage(sends, reactions, content=message)
         if command:
             ctx = Context(**{
                 'message': mock_message,
@@ -92,7 +96,7 @@ class Api(Cog):
                 if (command.triggered(mock_message.content)):
                     await command.execute(mock_message, self.bot.session)
                     break
-        return json.dumps({'response': '\n'.join(sends)})
+        return json.dumps({'response': '\n'.join(sends), 'reactions': '\n'.join(reactions)})
 
 
 def setup(bot):
