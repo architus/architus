@@ -51,6 +51,11 @@ class user(CustomResource):
     def post(self, name):
         return "not implemented", 418
 
+class Invite(Resource):
+
+    def get(self, guild_id):
+        return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}&response_type=code&redirect_uri=https://aut-bot.com/home&permissions=2134207679')
+
 class Interpret(CustomResource):
 
     def post(self):
