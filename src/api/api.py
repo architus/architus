@@ -52,10 +52,15 @@ class Api(Cog):
         self.bot = bot
         self.fake_messages = {}
 
-    async def handle_socket(websocket, path):
-        name = await websocket.recv()
-        print(f"< {name}")
-        await websocket.send("HELLO")
+    async def handle_socket(self, websocket, path):
+        try:
+            data = json.loads(await websocket.recv())
+            resp = await self.interpret(data['guild_id'], data['message'])
+        except Exception as e:
+            traceback.print_exc()
+            print(f"caught {e} while handling websocket request")
+            resp = {'message': str(e)}
+        await websocket.send(json.dumps(resp))
 
     @asyncio.coroutine
     def handle_request(self, pub, msg):
@@ -69,8 +74,7 @@ class Api(Cog):
 
     async def fetch_user_dict(self, id):
         usr = await self.bot.fetch_user(int(id))
-        avatar = usr.avatar_url or usr.default_avatar_url
-        return json.dumps({'name': usr.name, 'avatar_url': str(avatar)})
+        return json.dumps({'name': usr.name, 'avatar': usr.avatar})
 
     async def reload_extension(self, extension_name):
         name = extension_name.replace('-', '.')
