@@ -113,9 +113,6 @@ class Play(commands.Cog):
         player = self.players[ctx.guild]
         await player.skip()
 
-
-
-
     @commands.command()
     async def notplay(self, ctx, url):
         opts = {

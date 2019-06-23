@@ -1,69 +1,54 @@
-from src.commands.abstract_command import abstract_command
-from src.list_embed import list_embed, dank_embed
+from src.list_embed import ListEmbed, dank_embed
+from discord.ext import commands
 import re
 import discord
 
-class role_command(abstract_command):
+class Roles(commands.Cog):
 
-    def __init__(self):
-        super().__init__("role", aliases=['rank', 'join', 'roles'])
+    def __init__(self, bot):
+        self.bot = bot
 
-    async def exec_cmd(self, **kwargs):
-        settings = kwargs['settings']
-        self.roles_dict = settings.roles_dict
-        roles_dict = self.roles_dict
-        arg = self.content.split(' ')
-        member = self.author
-        if (len(arg) < 2):
+    @property
+    def guild_settings(self):
+        return self.bot.get_cog('GuildSettings')
+
+    @commands.command(aliases=['rank', 'join', 'roles'])
+    async def role(self, ctx, *arg):
+        '''Assign yourself a role `!roles` to see joinable roles'''
+        settings = self.guild_settings.get_guild(ctx.guild)
+        roles_dict = settings.roles_dict
+        member = ctx.author
+        if (len(arg) < 1):
             requested_role = 'list'
         else:
-            del arg[0]
             requested_role = ' '.join(arg)
 
         if (requested_role == 'list'):
-            lembed = list_embed('Available Roles', '`!role [role]`', self.client.user)
+            lembed = ListEmbed('Available Roles', '`!role [role]`', self.bot.user)
             roles = "Available roles:\n"
             for nick, channelid in roles_dict.items():
-                role = discord.utils.get(self.server.roles, id=channelid)
+                role = discord.utils.get(ctx.guild.roles, id=channelid)
                 lembed.add(nick, role.mention)
-            await self.channel.send(embed=lembed.get_embed())
+            await ctx.channel.send(embed=lembed.get_embed())
+
         elif requested_role in roles_dict:
             #filtered = filter(lambda role: role.name == ROLES_DICT[requested_role], member.server.role_hierarchy)
-            role = discord.utils.get(self.server.roles, id=roles_dict[requested_role.lower()])
+            role = discord.utils.get(ctx.guild.roles, id=roles_dict[requested_role.lower()])
             action = 'Added'
             prep = 'to'
             try:
                 if (role in member.roles):
-                    await self.client.remove_roles(member, role)
+                    await member.remove_roles(role, reason="User requested not role")
                     action = 'Removed'
                     prep = 'from'
                 else:
-                    await self.client.add_roles(member, role)
+                    await member.add_roles(role, reason="User request role")
             except:
-                await self.channel.send("Could not add %s to %s." % (self.author.mention, requested_role))
+                await ctx.channel.send("Could not add %s to %s." % (ctx.author.mention, requested_role))
             else:
-                await self.channel.send("%s %s %s %s." % (action, self.author.mention, prep, requested_role))
+                await ctx.channel.send("%s %s %s %s." % (action, ctx.author.mention, prep, requested_role))
         else:
-            await self.channel.send("I don't know that role, %s" % self.author.mention)
+            await ctx.channel.send("I don't know that role, %s" % ctx.author.mention)
 
-        return True
-
-    def get_help(self, **kwargs):
-        #lembed = list_embed('Available Roles', '`!role [role]`', self.client.user)
-        settings = kwargs['settings']
-        self.roles_dict = settings.roles_dict
-        help_txt = "Available Roles:\n```"
-        roles = "Available roles:\n"
-        for nick, channelid in self.roles_dict.items():
-            role = discord.utils.get(settings.server.roles, id=channelid)
-            #lembed.add(nick, role.mention)
-            help_txt += '{0:15} {1}'.format('`' + nick + '`', role.mention) + '\n'
-
-        #return lembed.get_embed()
-        return help_txt + '```\nUse the nickname in the left column'
-
-    def get_brief(self):
-        return "assign yourself a role"
-
-    def get_usage(self):
-        return "<role>"
+def setup(bot):
+    bot.add_cog(Roles(bot))
