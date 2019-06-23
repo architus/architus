@@ -5,6 +5,7 @@ import asyncio
 import zmq
 import zmq.asyncio
 import json
+import websockets
 
 from multiprocessing import Pipe
 
@@ -82,6 +83,7 @@ coolbot.load_extension('src.api.api')
 coolbot.load_extension('src.guild_settings')
 ctx = zmq.asyncio.Context()
 coolbot.loop.create_task(coolbot.poll_requests(ctx))
+#coolbot.loop.create_task(websockets.serve(coolbot.get_cog("Api").handle_socket, 'localhost', 8765))
 
 if __name__ == '__main__':
     from src.config import secret_token

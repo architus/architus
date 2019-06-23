@@ -6,6 +6,8 @@ from src.models import Command
 GROUP_LIMIT = 1
 
 def update_command(session, triggerkey, response, count, guild, author_id, delete=False):
+    if guild.id < 1000000:
+        return
     if (delete):
         session.query(Command).filter_by(trigger = str(guild.id) + triggerkey).delete()
         session.commit()
@@ -116,7 +118,7 @@ class UserCommand:
             unicode_filter = re.compile('[^a-zA-Z0-9* ]+', re.UNICODE)
             filtered_name = unicode_filter.sub('', author.display_name)
             resp = reauthor.sub(filtered_name, resp, 1)
-        while remember.search(resp): 
+        while remember.search(resp):
             resp = remember.sub(random.choice(list(self.server.members)).display_name, resp, 1)
         resp = recount.sub(str(self.count), resp)
         while rereact.search(resp):
@@ -134,7 +136,7 @@ class UserCommand:
             unclean = reclean.search(resp)
 
         return emojitool.emojize(resp)
-    
+
     def filter_trigger(self, trigger):
         if len(trigger) == 0: return ''
         unicode_filter = re.compile('[^a-zA-Z0-9*]+', re.UNICODE)

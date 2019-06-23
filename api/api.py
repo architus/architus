@@ -61,10 +61,11 @@ class Interpret(CustomResource):
     def post(self):
         parser = reqparse.RequestParser()
         parser.add_argument('message')
+        parser.add_argument('guild_id')
         args = parser.parse_args()
-        if not 'message' in args:
+        if 'message' not in args or 'guild_id' not in args:
             return 400
-        self.enqueue({'method': "interpret", 'args': [args['message']]})
+        self.enqueue({'method': "interpret", 'args': [args['guild_id'], args['message']]})
         resp = self.recv()
         print(resp)
         if 'response' in resp:

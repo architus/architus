@@ -54,7 +54,7 @@ class SetCommand(commands.Cog):
 
             if not any(command == oldcommand for oldcommand in user_commands[ctx.guild.id]) and not len(command.raw_trigger) == 0 and command.raw_response not in ['remove', 'author']:
                 user_commands[ctx.guild.id].append(command)
-                if ctx.guild.id != 0:
+                if ctx.guild.id > 1000000000:
                     new_command = Command(str(ctx.guild.id) + command.raw_trigger, command.raw_response, command.count, ctx.guild.id, ctx.author.id)
                     self.session.add(new_command)
                     self.session.commit()
@@ -94,7 +94,7 @@ class SetCommand(commands.Cog):
         await ctx.channel.send(msg)
 
 def update_command(session, triggerkey, response, count, guild, author_id, delete=False):
-    if guild.id == 0:
+    if guild.id < 1000000000:
         return
     if delete:
         session.query(Command).filter_by(trigger=str(guild.id) + triggerkey).delete()

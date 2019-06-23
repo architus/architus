@@ -1,6 +1,8 @@
 import json
 import traceback
 import asyncio
+import secrets
+import websockets
 from discord.ext.commands import Cog, Context
 
 
@@ -17,12 +19,12 @@ class MockChannel(object):
     async def send(self, *args):
         for thing in args:
             self.sends.append(thing)
-        return MockMessage(self.sends, self.reactions)
+        return MockMessage(self.sends, self.reactions, 0)
 
 class MockGuild(object):
-    def __init__(self):
+    def __init__(self, id):
         self.region = 'us-east'
-        self.id = 0
+        self.id = int(id)
         self.owner = MockMember()
         self.default_role = MockRole()
         self.default_role.mention = "@everyone"
@@ -30,15 +32,14 @@ class MockGuild(object):
 
     def get_member(self, *args):
         return None
-mock_guild = MockGuild()
 
 class MockMessage(object):
-    def __init__(self, sends, reactions, content=None):
+    def __init__(self, sends, reactions, guild_id, content=None):
         self.id = 0
         self.sends = sends
         self.reactions = reactions
         self._state = MockChannel(sends, reactions)
-        self.guild = mock_guild
+        self.guild = MockGuild(guild_id)
         self.author = MockMember()
         self.channel = MockChannel(sends, reactions)
         self.content = content
@@ -49,6 +50,12 @@ class Api(Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.fake_messages = {}
+
+    async def handle_socket(websocket, path):
+        name = await websocket.recv()
+        print(f"< {name}")
+        await websocket.send("HELLO")
 
     @asyncio.coroutine
     def handle_request(self, pub, msg):
@@ -71,9 +78,9 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return json.dumps({})
 
-    async def interpret(self, message):
+    async def interpret(self, guild_id, message):
         args = message.split()
-        self.bot.user_commands.setdefault(0, [])
+        self.bot.user_commands.setdefault(int(guild_id), [])
         command = None
         for cmd in self.bot.commands:
             if args[0][1:] in cmd.aliases + [cmd.name]:
@@ -81,7 +88,7 @@ class Api(Cog):
                 break
         sends = []
         reactions = []
-        mock_message = MockMessage(sends, reactions, content=message)
+        mock_message = MockMessage(sends, reactions, guild_id, content=message)
         if command:
             ctx = Context(**{
                 'message': mock_message,
@@ -96,7 +103,15 @@ class Api(Cog):
                 if (command.triggered(mock_message.content)):
                     await command.execute(mock_message, self.bot.session)
                     break
-        return json.dumps({'response': '\n'.join(sends), 'reactions': '\n'.join(reactions)})
+        resp = {
+            'response': '\n'.join(sends),
+            'reactions': reactions,
+            'id': secrets.randbits(32),
+            'guild_id': guild_id
+        }
+        self.fake_messages[resp['id']] = resp
+        print(resp)
+        return json.dumps(resp)
 
 
 def setup(bot):
