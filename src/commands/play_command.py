@@ -1,50 +1,56 @@
 from src.commands.abstract_command import abstract_command
 import youtube_dl
 from discord.ext import commands
+from src.guild_player import GuildPlayer
 import re
 import functools
 import discord
 
-class play_command(abstract_command):
+class Play(commands.Cog):
 
-    def __init__(self):
-        super().__init__("play", aliases=['notplay'])
+    def __init__(self, bot):
+        self.bot = bot
+        self.players = {}
 
-    async def exec_cmd(self, **kwargs):
+    @property
+    def guild_settings(self):
+        return self.bot.get_cog('GuildSettings')
 
-        players = kwargs['players']
-        settings = kwargs['settings']
+    @commands.command()
+    async def play(self, ctx, url):
+        '''Add a song to the queue or play immediately. Supports youtube and spotify links.'''
+
+        if ctx.guild not in self.players:
+            self.players[ctx.guild] = GuildPlayer(self.bot)
+        player = self.players[ctx.guild]
+        settings = self.guild_settings.get_guild(ctx.guild)
 
         if not settings.music_enabled:
             return True
 
-        player = players[self.server.id]
-        async with self.channel.typing():
+        async with ctx.channel.typing():
             if not discord.opus.is_loaded():
                 discord.opus.load_opus('res/libopus.so')
             if not (player.is_connected()):
-                voice = await self.client.join_voice_channel(self.author.voice.voice_channel)
+                voice = await ctx.author.voice.channel.connect()
                 player.voice = voice
             else:
-                player.voice.move_to(self.author.voice.voice_channel)
+                await player.voice.move_to(ctx.author.voice.channel)
 
-            arg = self.content.split(' ')
-            add = arg[0] != '!playnow' and (player.q or (player.player and player.player.is_playing()))
+            arg = ctx.message.content.split(' ')
+            add = arg[0] != '!playnow' and (player.q or (player.voice and player.voice.is_playing()))
             message = ''
             if (len(arg) > 1):
                 if ('/playlist/' in arg[1]):
-                    try:
-                        urls = await player.add_spotify_playlist(arg[1])
-                        message = "Queuing \"" + urls[0] + "\"."
-                        del urls[0]
-                        await player.add_url(urls[0])
-                        name = await player.play()
-                        for track in urls:
-                            await player.add_url(track)
-                        if (name):
-                            message += "\n🎶 **Playing:** *%s*" % name
-                    except:
-                        message = "something went badly wrong please spam my creator with pings"
+                    urls = await player.add_spotify_playlist(arg[1])
+                    message = "Queuing \"" + urls[0] + "\"."
+                    del urls[0]
+                    await player.add_url(urls[0])
+                    name = await player.play()
+                    for track in urls:
+                        await player.add_url(track)
+                    if (name):
+                        message += "\n🎶 **Playing:** *%s*" % name
                 elif ('/track/' in arg[1]):
                     if (add):
                         name = await player.add_url(arg[1])
@@ -64,8 +70,6 @@ class play_command(abstract_command):
                         name = await player.play()
                         if (name):
                             message = "🎶 **Playing:** *%s*" % name
-                elif ('town' in arg[1] or 'encounter' in arg[1] or 'boss' in arg[1] or 'exploration' in arg[1]):
-                    message = "Please pass in the url of the playlist."
                 else:
                     del arg[0]
                     url = await player.get_youtube_url(' '.join(arg))
@@ -85,27 +89,35 @@ class play_command(abstract_command):
                     if (name):
                         message = "🎶 **Now playing:** *%s*" % name
 
+        await ctx.channel.send(message)
 
+    @commands.command(aliases=['q'])
+    async def queue(self, ctx):
+        '''List songs in queue'''
+        if ctx.guild not in self.players:
+            self.players[ctx.guild] = GuildPlayer(self.bot)
+        player = self.players[ctx.guild]
+        settings = self.guild_settings.get_guild(ctx.guild)
 
-        #print ('q ' + str(len(player.q)))
-        #for song in list(player.q):
-            #print ('song: ' + song)
+        if not settings.music_enabled:
+            return
 
-        await self.channel.send(message)
-        
-        return True
-        
-
-    def get_help(self, **kwargs):
-        return "Add a song to the queue or play immediately. Supports youtube and spotify links."
-
-class PlayCommand(commands.Cog):
-
-    def __init__(self, bot):
-        self.bot = bot
+        await ctx.channel.send(embed=player.qembed())
 
     @commands.command()
-    async def play(self, ctx, url):
+    async def skip(self, ctx):
+        '''Skip a song'''
+        if ctx.guild not in self.players:
+            self.players[ctx.guild] = GuildPlayer(self.bot)
+        print("hello?")
+        player = self.players[ctx.guild]
+        await player.skip()
+
+
+
+
+    @commands.command()
+    async def notplay(self, ctx, url):
         opts = {
             'format': 'webm[abr>0]/bestaudio/best',
             'prefer_ffmpeg': False
@@ -122,4 +134,4 @@ class PlayCommand(commands.Cog):
         await ctx.send(download_url)
 
 def setup(bot):
-    bot.add_cog(PlayCommand(bot))
+    bot.add_cog(Play(bot))

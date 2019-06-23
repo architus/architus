@@ -1,7 +1,7 @@
 import os, random
 import youtube_dl
-from threading import Thread
-import multiprocessing as mp
+#from threading import Thread
+import functools
 
 import discord
 #from queue import Queue
@@ -12,15 +12,13 @@ import asyncio
 import aiohttp
 #import urllib2
 from bs4 import BeautifulSoup
-from src.list_embed import list_embed
+from src.list_embed import ListEmbed as list_embed
 
-
-
-class smart_player:
-    def __init__(self, client):
-        self.client = client
+class GuildPlayer:
+    def __init__(self, bot):
+        print("creating new smart player")
+        self.bot = bot
         self.q = deque()
-        self.player = None
         self.voice = None
         self.name = ''
 
@@ -45,30 +43,32 @@ class smart_player:
     async def play(self):
         if (self.voice == None or len(self.q) == 0):
             return ''
-        if (self.player and self.player.is_playing()):
+        if (self.voice and self.voice.is_playing()):
             return await self.skip()
         self.stop()
-        self.name = ''
-        url = self.q.pop().url
+        song = self.q.pop()
+        url = song.url
+        self.name = song.title
         print("starting " + url)
         if ('spotify' in url):
             url = await self.spotify_to_youtube(url)
             self.name = url['name']
             url = url['url']
-        try:
-            options = "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
-            self.player = await self.voice.create_ytdl_player(url, before_options=options, ytdl_options={'--prefer-insecure'}, after=self.agane)
-            self.player.volume = 0.30
-            self.player.start()
-            if not self.name:
-                self.name = self.player.title
-            return self.name
-        except Exception as e:
-            print("couldn't create player")
-            print(e)
-            if (self.player):
-                print(self.player.error)
-        return ''
+
+        opts = {
+            'format': 'webm[abr>0]/bestaudio/best',
+            'prefer_ffmpeg': False
+        }
+        ydl = youtube_dl.YoutubeDL(opts)
+        func = functools.partial(ydl.extract_info, url, download=False)
+        info = await self.bot.loop.run_in_executor(None, func)
+        if "entries" in info:
+            info = info['entries'][0]
+
+        download_url = info['url']
+        print(download_url)
+        self.voice.play(discord.FFmpegPCMAudio(download_url), after=self.agane)
+        return 'hello'
 
     async def add_spotify_playlist(self, url):
         urls = []
@@ -93,6 +93,7 @@ class smart_player:
         return urls
 
     async def spotify_to_youtube(self, url):
+        '''convert spotify track to youtube url by searching for 'song - artist'''
         info = {}
         data = spotify_tools.generate_metadata(url)
         info['name'] = data['name']
@@ -108,6 +109,7 @@ class smart_player:
         self.q.append(Song(url))
 
     async def get_youtube_url(self, search):
+        '''scrape video url from search paramaters'''
         async with aiohttp.ClientSession() as session:
             query = urllib.parse.quote(search)
             url = "https://www.youtube.com/results?search_query=" + query
@@ -125,41 +127,35 @@ class smart_player:
         return ''
 
     def stop(self):
-        if (self.player == None):
+        if (self.voice == None):
             return
-        self.player.stop()
+        self.voice.stop()
 
     def pause(self):
-        if (self.player == None):
+        if (self.voice == None):
             return
-        self.player.pause()
+        self.voice.pause()
     def resume(self):
-        if (self.player == None):
+        if (self.voice == None):
             return
-        self.player.resume()
+        self.voice.resume()
     async def skip(self):
-        if (self.player == None):
+        if (self.voice == None):
+            print("no voice")
             return
-        old_name = self.name
         if (len(self.q) < 1):
             print("len was less than 1")
             await self.voice.disconnect()
             return ''
         self.stop()
-        #while (old_name == self.name):
-        count = 0
-        while (not self.name or self.name == old_name) and count < 20:
-            await asyncio.sleep(.5)
-            print(self.name)
-            count += 1
-        return self.name
-    #return await self.play()
+        return self.q[-1].title
+
     def clearq(self):
         self.q.clear()
 
     def qembed(self):
         name = self.name or "None"
-        lem = list_embed("Currently Playing:", "*%s*" % name, self.client.user)
+        lem = list_embed("Currently Playing:", "*%s*" % name, self.bot.user)
         lem.color = 0x6600ff
         lem.icon_url = ''
         lem.name = "Song Queue"
@@ -172,7 +168,6 @@ class smart_player:
         return self.voice != None and self.voice.is_connected()
 
     def agane(self):
-        #coro = self.client.send_message(self.client.get_channel('436189230390050830'), 'Song is done!')
         if self.playing_file:
             return
 
@@ -180,16 +175,15 @@ class smart_player:
             coro = self.voice.disconnect()
         else:
             coro = self.play()
-        fut = discord.compat.run_coroutine_threadsafe(coro, self.client.loop)
+        fut = discord.compat.run_coroutine_threadsafe(coro, self.bot.loop)
         try:
             fut.result()
         except:
             print('error')
-            # an error happened sending the message
-            pass
-        #await self.play()
+
 
 class Song:
+    '''Represents a spotify or youtube url'''
     def __init__(self, url):
         self.url = url
         self._title = None
@@ -197,7 +191,8 @@ class Song:
 
     @property
     def title(self):
-        if self._title: return self._title
+        if self._title:
+            return self._title
 
         if self.spotify:
             data = spotify_tools.generate_metadata(self.url)

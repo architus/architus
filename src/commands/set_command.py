@@ -24,7 +24,7 @@ class SetCommand(commands.Cog):
                 self.bot.user_commands[ctx.guild.id].remove(oldcommand)
                 update_command(self.session, oldcommand.raw_trigger, '', 0, ctx.guild, ctx.author.id, delete=True)
                 msg = 'removed `' + oldcommand.raw_trigger + "::" + oldcommand.raw_response + '`'
-        await ctx.send(msg)
+        await ctx.channel.send(msg)
 
 
     @commands.command()
@@ -43,7 +43,7 @@ class SetCommand(commands.Cog):
                 if botcommands:
                     await ctx.channel.send(botcommands.mention + '?')
                     return
-        parser = re.search('!set (.+)::(.+)', ctx.message.content, re.IGNORECASE)
+        parser = re.search('!set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
         msg = "try actually reading the syntax"
         if parser and (len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and ctx.guild.default_role.mention not in parser.group(2) or from_admin):
             try:
@@ -86,7 +86,7 @@ class SetCommand(commands.Cog):
             else:
                 for oldcommand in user_commands[ctx.guild.id]:
                     if oldcommand == command:
-                        msg = f'Remove `{oldcommand.raw_trigger}` first'
+                        msg = f'Remove `{oldcommand.raw_trigger}` first (`!remove`)'
         elif parser and len(parser.group(2)) >= 200:
             msg = 'too long, sorry. ask an admin to set it'
         elif parser and len(parser.group(1)) > 1:

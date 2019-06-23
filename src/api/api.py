@@ -19,7 +19,7 @@ class MockChannel(object):
     async def send(self, *args):
         for thing in args:
             self.sends.append(thing)
-        return MockMessage(self.sends, self.reactions, 0)
+        return MockMessage(0, self.sends, self.reactions, 0)
 
 class MockGuild(object):
     def __init__(self, id):
@@ -34,8 +34,8 @@ class MockGuild(object):
         return None
 
 class MockMessage(object):
-    def __init__(self, sends, reactions, guild_id, content=None):
-        self.id = 0
+    def __init__(self, id, sends, reactions, guild_id, content=None):
+        self.id = id
         self.sends = sends
         self.reactions = reactions
         self._state = MockChannel(sends, reactions)
@@ -44,7 +44,7 @@ class MockMessage(object):
         self.channel = MockChannel(sends, reactions)
         self.content = content
     async def add_reaction(self, emoji):
-        self.reactions.append(emoji)
+        self.reactions.append((self.id, emoji))
 
 class Api(Cog):
 
@@ -55,7 +55,10 @@ class Api(Cog):
     async def handle_socket(self, websocket, path):
         try:
             data = json.loads(await websocket.recv())
-            resp = await self.interpret(data['guild_id'], data['message'])
+            resp = await self.interpret(
+                    data['guild_id'],
+                    data['message']
+            )
         except Exception as e:
             traceback.print_exc()
             print(f"caught {e} while handling websocket request")
@@ -82,18 +85,28 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return json.dumps({})
 
-    async def interpret(self, guild_id, message):
-        args = message.split()
-        self.bot.user_commands.setdefault(int(guild_id), [])
+    async def interpret(self, guild_id, message, message_id):
+        self.fake_messages[guild_id] = {
+            'content': message,
+            'reactions': [],
+            'message_id': message_id,
+            'guild_id': guild_id,
+        }
+
+        # search for builtin commands
         command = None
+        args = message.split()
         for cmd in self.bot.commands:
             if args[0][1:] in cmd.aliases + [cmd.name]:
                 command = cmd
                 break
         sends = []
         reactions = []
-        mock_message = MockMessage(sends, reactions, guild_id, content=message)
+        mock_message = MockMessage(message_id, sends, reactions, guild_id, content=message)
+
+        self.bot.user_commands.setdefault(int(guild_id), [])
         if command:
+            # found builtin command, creating fake context
             ctx = Context(**{
                 'message': mock_message,
                 'bot': self.bot,
@@ -103,19 +116,22 @@ class Api(Cog):
             })
             await ctx.invoke(command, *args[1:])
         else:
+            # check for user set commands in this "guild"
             for command in self.bot.user_commands[mock_message.guild.id]:
                 if (command.triggered(mock_message.content)):
                     await command.execute(mock_message, self.bot.session)
                     break
+        new_id = secrets.randbits(24) | 1
         resp = {
-            'response': '\n'.join(sends),
-            'reactions': reactions,
-            'id': secrets.randbits(32),
-            'guild_id': guild_id
+            'content': '\n'.join(sends),
+            'reactions': [(new_id if r[0] == 0 else message_id, r[1]) for r in reactions],
+            'id': new_id,
+            'guild_id': guild_id,
         }
         self.fake_messages[resp['id']] = resp
-        print(resp)
-        return json.dumps(resp)
+        dumps = json.dumps(resp)
+        self.fake_messages[resp['id']]['from_autbot'] = True
+        return dumps
 
 
 def setup(bot):
