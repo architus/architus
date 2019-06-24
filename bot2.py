@@ -21,9 +21,14 @@ class CoolBot(Bot):
         self.session = get_session()
         super().__init__(**kwargs)
 
-    @commands.command()
-    async def test(ctx):
-        print(ctx.message.content)
+    def run(self, token, q=None):
+        self.q = q
+
+        ctx = zmq.asyncio.Context()
+        self.loop.create_task(self.poll_requests(ctx))
+        start_server = websockets.serve(self.get_cog("Api").handle_socket, '0.0.0.0', 8300)
+        asyncio.async(start_server)
+        super().run(token)
 
     @asyncio.coroutine
     def poll_requests(self, ctx):
@@ -82,10 +87,6 @@ coolbot.load_extension('src.commands.messagecount_command')
 coolbot.load_extension('src.commands.role_command')
 coolbot.load_extension('src.api.api')
 coolbot.load_extension('src.guild_settings')
-ctx = zmq.asyncio.Context()
-coolbot.loop.create_task(coolbot.poll_requests(ctx))
-start_server = websockets.serve(coolbot.get_cog("Api").handle_socket, '0.0.0.0', 8300)
-asyncio.async(start_server)
 
 if __name__ == '__main__':
     from src.config import secret_token

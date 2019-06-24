@@ -16,10 +16,10 @@ from src.models import AppSession
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 REDIRECT_URI = 'https://aut-bot.com/home'
 
-application = Flask(__name__)
-cors = CORS(application)
+app = Flask(__name__)
+cors = CORS(app)
 
-@application.route('/login')
+@app.route('/login')
 def login():
     return redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Faut-bot.com%2Fhome&response_type=code&scope=guilds%20identify')
 
@@ -145,7 +145,7 @@ def discord_identify_request(token):
     return r.json(), r.status_code
 
 
-@application.route('/token_exchange', methods=['POST'])
+@app.route('/token_exchange', methods=['POST'])
 def token_exchange():
     parser = reqparse.RequestParser()
     parser.add_argument('code')
@@ -178,3 +178,13 @@ def token_exchange():
             print(resp_data)
             return json.dumps({'access_token': autbot_token, 'expires_in': expires_in, 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']}), 200
     return "invalid code", 401
+
+def app_factory(q):
+    api = Api(app)
+    api.add_resource(User, "/user/<string:name>", resource_class_kwargs={'q' : q})
+    api.add_resource(Identify, "/identify")
+    api.add_resource(ListGuilds, "/guilds")
+    api.add_resource(Invite, "/invite/<string:guild_id>")
+    api.add_resource(Interpret, "/interpret", resource_class_kwargs={'q' : q})
+    api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q' : q})
+    return app
