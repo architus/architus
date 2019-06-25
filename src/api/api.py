@@ -126,13 +126,13 @@ class Api(Cog):
         resp = {
             'content': '\n'.join(sends),
             'reactions': [(new_id if r[0] == 0 else message_id, r[1]) for r in reactions],
-            'id': new_id,
+            'message_id': new_id,
             'guild_id': guild_id,
+            '_module': 'interpret'
         }
-        self.fake_messages[resp['id']] = resp
-        dumps = json.dumps(resp)
-        self.fake_messages[resp['id']]['from_autbot'] = True
-        return dumps
+        self.fake_messages[resp['message_id']] = resp
+        self.fake_messages[resp['message_id']]['from_autbot'] = True
+        return resp
 
 
 def setup(bot):
