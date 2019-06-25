@@ -29,7 +29,10 @@ class CoolBot(Bot):
 
         ctx = zmq.asyncio.Context()
         self.loop.create_task(self.poll_requests(ctx))
-        start_server = websockets.serve(self.get_cog("Api").handle_socket, '0.0.0.0', 8300)
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
+
+        start_server = websockets.serve(self.get_cog("Api").handle_socket, '0.0.0.0', 8300, ssl=ssl_context)
         asyncio.async(start_server)
         super().run(token)
 
