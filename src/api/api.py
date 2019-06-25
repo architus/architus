@@ -53,18 +53,19 @@ class Api(Cog):
         self.fake_messages = {}
 
     async def handle_socket(self, websocket, path):
-        try:
-            data = json.loads(await websocket.recv())
-            resp = await self.interpret(
-                    data['guild_id'],
-                    data['message'],
-                    data['message_id']
-            )
-        except Exception as e:
-            traceback.print_exc()
-            print(f"caught {e} while handling websocket request")
-            resp = {'message': str(e)}
-        await websocket.send(json.dumps(resp))
+        while True:
+            try:
+                data = json.loads(await websocket.recv())
+                resp = await self.interpret(
+                        data['guild_id'],
+                        data['message'],
+                        data['message_id']
+                )
+            except Exception as e:
+                traceback.print_exc()
+                print(f"caught {e} while handling websocket request")
+                resp = {'message': str(e)}
+            await websocket.send(json.dumps(resp))
 
     @asyncio.coroutine
     def handle_request(self, pub, msg):
