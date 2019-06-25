@@ -6,12 +6,15 @@ import zmq
 import zmq.asyncio
 import json
 import websockets
+from pytz import timezone
 
 from multiprocessing import Pipe
 
 from src.user_command import UserCommand
 from src.config import get_session
 from src.models import Command
+
+starboarded_messages = []
 
 
 class CoolBot(Bot):
@@ -41,8 +44,16 @@ class CoolBot(Bot):
                 self.loop.create_task(api.handle_request(pub, msg))
             yield from asyncio.sleep(.01)
 
+    async def on_reaction_add(self, react, user):
+        if user == self.user:
+            return
+        settings = self.guild_settings.get_guild(react.message.guild, session=self.session)
+        if settings.starboard_emoji in str(react.emoji):
+            if react.count == settings.starboard_threshold:
+                await self.starboard_post(react.message, react.message.guild)
+
     async def on_message(self, msg):
-        print('Message from {0.author}: {0.content}'.format(msg))
+        print('Message from {0.author} in {0.guild.name}: {0.content}'.format(msg))
 
         if msg.author == self.user:
             return
@@ -73,6 +84,26 @@ class CoolBot(Bot):
                         command.author_id))
         for guild, cmds in self.user_commands.items():
             self.user_commands[guild].sort()
+
+    @property
+    def guild_settings(self):
+        return self.get_cog('GuildSettings')
+
+    async def starboard_post(self, message, guild):
+        starboard_ch = discord.utils.get(guild.text_channels, name='starboard')
+        if message.id in starboarded_messages or not starboard_ch or message.author == self.user:
+            return
+        print("Starboarding message: " + message.content)
+        starboarded_messages.append(message.id)
+        utc = message.created_at.replace(tzinfo=timezone('UTC'))
+        est = utc.astimezone(timezone('US/Eastern'))
+        em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
+        em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
+        if message.embeds:
+            em.set_image(url=message.embeds[0].url)
+        elif message.attachments:
+            em.set_image(url=message.attachments[0].url)
+        await starboard_ch.send(embed=em)
 
 BOT_PREFIX = ("?", "!")
 coolbot = CoolBot(command_prefix=BOT_PREFIX)
