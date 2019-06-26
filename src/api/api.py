@@ -57,6 +57,7 @@ class Api(Cog):
         while True:
             try:
                 data = json.loads(await websocket.recv())
+                print(data)
                 resp = await self.interpret(
                         data['guild_id'],
                         data['message'],
@@ -120,7 +121,6 @@ class Api(Cog):
             })
             #ctx.send = mock_channel.send_message
             async def send(content):
-                print(content)
                 sends.append(content)
             ctx.send = send
             await ctx.invoke(command, *args[1:])
@@ -140,7 +140,8 @@ class Api(Cog):
         }
         self.fake_messages[resp['message_id']] = resp
         self.fake_messages[resp['message_id']]['from_autbot'] = True
-        print(resp)
+        if resp['content']:
+            print(resp)
         return resp
 
 
