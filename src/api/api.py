@@ -117,7 +117,7 @@ class Api(Cog):
         if command:
             # found builtin command, creating fake context
             ctx = Context(**{
-                'message': mock_message,
+                'content': mock_message,
                 'bot': self.bot,
                 'args': args[1:],
                 'prefix': message[0],
@@ -136,14 +136,14 @@ class Api(Cog):
                     break
         new_id = secrets.randbits(24) | 1
         resp = {
+            '_module': 'interpret',
             'content': '\n'.join(sends),
-            'reactions': [(new_id if r[0] == 0 else message_id, r[1]) for r in reactions],
+            'added_reactions': [(new_id if r[0] == 0 else message_id, r[1]) for r in reactions],
             'message_id': new_id,
+            'edit': False,
             'guild_id': guild_id,
-            '_module': 'interpret'
         }
         self.fake_messages[resp['message_id']] = resp
-        self.fake_messages[resp['message_id']]['from_autbot'] = True
         if resp['content']:
             print(resp)
         return resp
