@@ -9,7 +9,7 @@ from discord.ext.commands import Cog, Context
 class MockMember(object):
     def __init__(self, id=0):
         self.id = id
-        self.mention = "@<%_CLIENT_ID_%>"
+        self.mention = "<@%_CLIENT_ID_%>"
 class MockRole(object):
     pass
 

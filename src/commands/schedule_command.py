@@ -190,7 +190,7 @@ class EventCog(Cog):
             return 'Etc/UTC'
 
     def render_schedule_text(self, title_str, parsed_time, yes, no, maybe):
-        return "**__%s__**\n**Time: **%s\n:white_check_mark: **Yes (%d):%s**\n:x: **No (%d):%s**\n:shrug: **Maybe (%d):%s**" % (
+        return "**__%s__**\n**Time:** %s\n:white_check_mark: **Yes (%d):** %s\n:x: **No (%d):** %s\n:shrug: **Maybe (%d):** %s" % (
                 title_str.strip(),
                 parsed_time.strftime("%b %d %I:%M%p %Z"),
                 len(yes), ' '.join([u.mention for u in yes]),
