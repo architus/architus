@@ -68,7 +68,7 @@ class Api(Cog):
                     traceback.print_exc()
                     print(f"caught {e} while handling websocket request")
                     resp = {'message': str(e)}
-                    await websocket.send(json.dumps(resp))
+                await websocket.send(json.dumps(resp))
             except websockets.exceptions.ConnectionClosed:
                 print("Websocket connection closed")
                 return
