@@ -6,6 +6,7 @@ import zmq
 import zmq.asyncio
 import json
 import websockets
+import ssl
 from pytz import timezone
 
 from multiprocessing import Pipe
@@ -29,11 +30,14 @@ class CoolBot(Bot):
 
         ctx = zmq.asyncio.Context()
         self.loop.create_task(self.poll_requests(ctx))
-        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
+        try:
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
 
-        start_server = websockets.serve(self.get_cog("Api").handle_socket, '0.0.0.0', 8300, ssl=ssl_context)
-        asyncio.async(start_server)
+            start_server = websockets.serve(self.get_cog("Api").handle_socket, '0.0.0.0', 8300, ssl=ssl_context)
+            asyncio.async(start_server)
+        except FileNotFoundError:
+            print("SSL certs not found, websockets disabled")
         super().run(token)
 
     @asyncio.coroutine

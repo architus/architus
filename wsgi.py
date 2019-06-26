@@ -12,3 +12,6 @@ application = app_factory(q)
 
 p = Process(name="autbot", target=coolbot.run, args=(secret_token,), kwargs={'q': q})
 p.start()
+
+if __name__ == '__main__':
+    application.run()

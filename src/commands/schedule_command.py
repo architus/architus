@@ -190,8 +190,8 @@ class EventCog(Cog):
             return 'Etc/UTC'
 
     def render_schedule_text(self, title_str, parsed_time, yes, no, maybe):
-        return "**__%s__**\n**Time: **%s\n:white_check_mark: **Yes (%d): %s**\n:x: **No (%d): %s**\n:shrug: **Maybe (%d): %s**" % (
-                title_str,
+        return "**__%s__**\n**Time: **%s\n:white_check_mark: **Yes (%d):%s**\n:x: **No (%d):%s**\n:shrug: **Maybe (%d):%s**" % (
+                title_str.strip(),
                 parsed_time.strftime("%b %d %I:%M%p %Z"),
                 len(yes), ' '.join([u.mention for u in yes]),
                 len(no), ' '.join([u.mention for u in no]),
@@ -199,7 +199,7 @@ class EventCog(Cog):
         )
 
     def render_poll_text(self, title, options, votes):
-        text = f"**__{title}__**\n"
+        text = f"**__{title.strip()}__**\n"
         i = 0
         for option in options:
             text += "%s **%s (%d)**: %s\n" % (

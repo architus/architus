@@ -7,8 +7,9 @@ from discord.ext.commands import Cog, Context
 
 
 class MockMember(object):
-    def __init__(self):
-        self.id = 0
+    def __init__(self, id=0):
+        self.id = id
+        self.mention = "@<%_CLIENT_ID_%>"
 class MockRole(object):
     pass
 
@@ -70,7 +71,7 @@ class Api(Cog):
     @asyncio.coroutine
     def handle_request(self, pub, msg):
         try:
-            resp = yield from getattr(self, msg['method'])(*msg['args'])
+            resp = json.dumps((yield from getattr(self, msg['method'])(*msg['args'])))
         except Exception as e:
             traceback.print_exc()
             print(f"caught {e} while handling {msg['topic']}s request")
@@ -79,13 +80,13 @@ class Api(Cog):
 
     async def fetch_user_dict(self, id):
         usr = await self.bot.fetch_user(int(id))
-        return json.dumps({'name': usr.name, 'avatar': usr.avatar})
+        return {'name': usr.name, 'avatar': usr.avatar}
 
     async def reload_extension(self, extension_name):
         name = extension_name.replace('-', '.')
         print(f"reloading extention: {name}")
         self.bot.reload_extension(name)
-        return json.dumps({})
+        return {}
 
     async def interpret(self, guild_id, message, message_id):
         self.fake_messages[guild_id] = {
@@ -105,6 +106,7 @@ class Api(Cog):
         sends = []
         reactions = []
         mock_message = MockMessage(message_id, sends, reactions, guild_id, content=message)
+        mock_channel = MockChannel(sends, reactions)
 
         self.bot.user_commands.setdefault(int(guild_id), [])
         if command:
@@ -116,6 +118,11 @@ class Api(Cog):
                 'prefix': message[0],
                 'command': command,
             })
+            #ctx.send = mock_channel.send_message
+            async def send(content):
+                print(content)
+                sends.append(content)
+            ctx.send = send
             await ctx.invoke(command, *args[1:])
         else:
             # check for user set commands in this "guild"
@@ -133,6 +140,7 @@ class Api(Cog):
         }
         self.fake_messages[resp['message_id']] = resp
         self.fake_messages[resp['message_id']]['from_autbot'] = True
+        print(resp)
         return resp
 
 
