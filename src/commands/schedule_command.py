@@ -53,13 +53,15 @@ class EventCog(Cog):
     async def on_reaction_add(self, react, user):
         if not user.bot and react.message.id in self.schedule_messages:
             event = self.schedule_messages[react.message.id]
-            if str(react.emoji) in [self.YES_EMOJI, self.NO_EMOJI, self.MAYBE_EMOJI]:
-                with suppress(KeyError):
-                    event.yes.remove(user)
-                with suppress(KeyError):
-                    event.no.remove(user)
-                with suppress(KeyError):
-                    event.maybe.remove(user)
+            with suppress(KeyError):
+                event.yes.remove(user)
+            with suppress(KeyError):
+                event.no.remove(user)
+            with suppress(KeyError):
+                event.maybe.remove(user)
+            for r in react.message.reactions:
+                if r != react:
+                    await r.remove(user)
 
             if self.YES_EMOJI in str(react.emoji):
                 event.yes.add(user)
@@ -72,19 +74,20 @@ class EventCog(Cog):
 
         elif not user.bot and react.message.id in self.poll_messages:
             event = self.poll_messages[react.message.id]
-            try:
-                i = self.ANSWERS.index(str(react.emoji))
-            except ValueError:
-                return
-            event.votes[i].append(user)
+            for r in react.message.reactions:
+                try:
+                    i = self.ANSWERS.index(str(r.emoji))
+                    event.votes[i] = [u for u in await r.users().flatten() if u != self.bot.user]
+                except ValueError:
+                    continue
             await react.message.edit(
-                    content=self.render_poll_text(event.title, event.options, event.votes))
+                content=self.render_poll_text(event.title, event.options, event.votes))
 
 
     @commands.Cog.listener()
     async def on_reaction_remove(self, react, user):
 
-        if not user.bot and react.message.id in self.schedule_messages:
+        if not user.bot and react.message.id in self.schedule_messages and False:
             event = self.schedule_messages[react.message.id]
             with suppress(KeyError):
                 if self.YES_EMOJI in str(react.emoji):
@@ -97,14 +100,7 @@ class EventCog(Cog):
                     content=self.render_schedule_text(event.title_str, event.parsed_time, event.yes, event.no, event.maybe))
 
         elif not user.bot and react.message.id in self.poll_messages:
-            event = self.poll_messages[react.message.id]
-            try:
-                i = self.ANSWERS.index(str(react.emoji))
-            except ValueError:
-                return
-            event.votes[i].remove(user)
-            await react.message.edit(
-                    content=self.render_poll_text(event.title, event.options, event.votes))
+            await self.on_reaction_add(react, user)
 
 
     async def prompt_date(self, ctx, author):
@@ -190,7 +186,14 @@ class EventCog(Cog):
             return 'Etc/UTC'
 
     def render_schedule_text(self, title_str, parsed_time, yes, no, maybe):
-        return "**__%s__**\n**Time:** %s\n:white_check_mark: **Yes (%d):** %s\n:x: **No (%d):** %s\n:shrug: **Maybe (%d):** %s" % (
+        print("**__%s__**\n**Time:** %s\n:white_check_mark: **Yes (%d):** %s\n:x: **No (%d):** %s\n:shrug: **Maybe (%d):** %s" % (
+                title_str.strip(),
+                parsed_time.strftime("%b %d %I:%M%p %Z"),
+                len(yes), ' '.join([u.mention for u in yes]),
+                len(no), ' '.join([u.mention for u in no]),
+                len(maybe), ' '.join([u.mention for u in maybe])
+        ))
+        return "**__%s__**\n**Time:** %s\n:white_check_mark: Yes (%d): %s\n:x: No (%d): %s\n:shrug: Maybe (%d): %s" % (
                 title_str.strip(),
                 parsed_time.strftime("%b %d %I:%M%p %Z"),
                 len(yes), ' '.join([u.mention for u in yes]),

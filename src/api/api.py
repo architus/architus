@@ -56,18 +56,22 @@ class Api(Cog):
     async def handle_socket(self, websocket, path):
         while True:
             try:
-                data = json.loads(await websocket.recv())
-                print(data)
-                resp = await self.interpret(
-                        data['guild_id'],
-                        data['message'],
-                        data['message_id']
-                )
-            except Exception as e:
-                traceback.print_exc()
-                print(f"caught {e} while handling websocket request")
-                resp = {'message': str(e)}
-            await websocket.send(json.dumps(resp))
+                try:
+                    data = json.loads(await websocket.recv())
+                    print(data)
+                    resp = await self.interpret(
+                            data['guild_id'],
+                            data['message'],
+                            data['message_id']
+                    )
+                except Exception as e:
+                    traceback.print_exc()
+                    print(f"caught {e} while handling websocket request")
+                    resp = {'message': str(e)}
+                    await websocket.send(json.dumps(resp))
+            except websockets.exceptions.ConnectionClosed:
+                print("Websocket connection closed")
+                return
 
     @asyncio.coroutine
     def handle_request(self, pub, msg):
