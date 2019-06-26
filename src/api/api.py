@@ -61,7 +61,7 @@ class Api(Cog):
                     print(data)
                     resp = await self.interpret(
                             data['guild_id'],
-                            data['message'],
+                            data['content'],
                             data['message_id']
                     )
                 except Exception as e:
@@ -117,7 +117,7 @@ class Api(Cog):
         if command:
             # found builtin command, creating fake context
             ctx = Context(**{
-                'content': mock_message,
+                'message': mock_message,
                 'bot': self.bot,
                 'args': args[1:],
                 'prefix': message[0],
@@ -134,7 +134,7 @@ class Api(Cog):
                 if (command.triggered(mock_message.content)):
                     await command.execute(mock_message, self.bot.session)
                     break
-        new_id = secrets.randbits(24) | 1
+        new_id = secrets.randbits(24) | 1 if content else None
         resp = {
             '_module': 'interpret',
             'content': '\n'.join(sends),
