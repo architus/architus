@@ -123,6 +123,7 @@ coolbot.load_extension('src.commands.set_command')
 coolbot.load_extension('src.commands.play_command')
 coolbot.load_extension('src.commands.messagecount_command')
 coolbot.load_extension('src.commands.role_command')
+coolbot.load_extension('src.commands.gulag_command')
 coolbot.load_extension('src.api.api')
 coolbot.load_extension('src.guild_settings')
 

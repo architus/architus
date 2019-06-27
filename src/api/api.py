@@ -67,7 +67,7 @@ class Api(Cog):
                 except Exception as e:
                     traceback.print_exc()
                     print(f"caught {e} while handling websocket request")
-                    resp = {'message': str(e)}
+                    resp = {'content': f"caught {e} while handling websocket request"}
                 await websocket.send(json.dumps(resp))
             except websockets.exceptions.ConnectionClosed:
                 print("Websocket connection closed")
@@ -134,7 +134,7 @@ class Api(Cog):
                 if (command.triggered(mock_message.content)):
                     await command.execute(mock_message, self.bot.session)
                     break
-        new_id = secrets.randbits(24) | 1 if content else None
+        new_id = secrets.randbits(24) | 1 if sends else None
         resp = {
             '_module': 'interpret',
             'content': '\n'.join(sends),
