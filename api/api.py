@@ -160,6 +160,12 @@ def token_exchange():
             return json.dumps({'access_token': autbot_token, 'expires_in': expires_in, 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']}), 200
     return "invalid code", 401
 
+
+@app.route('/status', methods=['GET'])
+def status():
+    return "all systems operational", 204
+
+
 def app_factory(q):
     api = Api(app)
     api.add_resource(User, "/user/<string:name>", resource_class_kwargs={'q' : q})
