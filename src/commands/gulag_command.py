@@ -1,6 +1,8 @@
 import src.generate.gulag as gulaggen
 from discord.ext import commands
+from contextlib import suppress
 import time
+import asyncio
 import discord
 
 class Gulag(commands.Cog):
@@ -20,7 +22,8 @@ class Gulag(commands.Cog):
         filtered = filter(lambda role: role.name == "kulak", server.roles)
         try:
             gulag_role = next(filtered)
-            gulag_emoji = self.get_custom_emoji(server, "gulag")
+            gulag_emoji = discord.utils.get(server.emojis, name="gulag")
+            assert gulag_emoji is not None
         except:
             print("gulag role/emoji not found")
             await ctx.channel.send("Please create a role called `kulak` and an emoji called `gulag` to use this feature.")
@@ -38,12 +41,14 @@ class Gulag(commands.Cog):
         msg = await ctx.channel.send("%d more %s's to gulag %s" % (settings.gulag_threshold, gulag_emoji, comrade.display_name))
         await msg.add_reaction(gulag_emoji)
         while time.time() < t_end:
-            res = await self.bot.wait_for('reaction', timeout=5, check=lambda r,u: r.message == msg and r.emoji == gulag_emoji)
+            user = None
+            with suppress(asyncio.TimeoutError):
+                react, user = await self.bot.wait_for('reaction_add', timeout=5, check=lambda r,u: r.message.id == msg.id and r.emoji.id == gulag_emoji.id)
             #print(t_end - time.time())
-            if res and res.user not in user_list and res.user != self.bot.user:
-                user_list.append(res.user)
+            if user and user not in user_list and user != self.bot.user:
+                user_list.append(user)
                 for user in user_list: print (user.display_name)
-                await msg.edit("%d more %s's to gulag %s" % (max(0,(settings.gulag_threshold - len(user_list))), gulag_emoji, comrade.display_name))
+                await msg.edit(content="{0} more {1}'s to gulag {2}".format(max(0,(settings.gulag_threshold - len(user_list))), gulag_emoji, comrade.display_name))
                 t_end += int((settings.gulag_severity / 2) * 60)
             if len(user_list) >= settings.gulag_threshold and not gulag_role in comrade.roles:
                 try:
@@ -58,20 +63,16 @@ class Gulag(commands.Cog):
                 else:
                     await ctx.channel.send("gulag'd " + comrade.display_name)
 
-                    timer_msg = await self.channel.send("⏰ %d seconds" % (settings.gulag_severity * 60))
-                    #TODO
-                    timer_msg_gulag = await (discord.utils.get(server.text_channels, name='gulag')).send("⏰ %d seconds, %s" % (settings.gulag_severity * 60, comrade.display_name))
-                    await comrade.add_roles(gulag_role)
+                timer_msg = await ctx.channel.send("⏰ %d seconds" % (settings.gulag_severity * 60))
+                #TODO
+                timer_msg_gulag = await (discord.utils.get(server.text_channels, name='gulag')).send("⏰ %d seconds, %s" % (settings.gulag_severity * 60, comrade.display_name))
+                await comrade.add_roles(gulag_role)
 
-                    if comrade.voice.voice_channel and not comrade.voice.voice_channel.is_private:
-                        #TODO
-                        try: await self.move_member(comrade, discord.utils.get(self.server.voice_channels, name='gulag'))
-                        except: pass
-                    t_end = time.time() + int(60 * settings.gulag_severity)
+                t_end = time.time() + int(60 * settings.gulag_severity)
 
             elif timer_msg or timer_msg_gulag:
-                await timer_msg.edit("⏰ %d seconds" % (max(0, t_end-time.time())))
-                await timer_msg_gulag.edit("⏰ %d seconds, %s" % (max(0, t_end-time.time()), comrade.display_name))
+                await timer_msg.edit(content="⏰ %d seconds" % (max(0, t_end-time.time())))
+                await timer_msg_gulag.edit(content="⏰ %d seconds, %s" % (max(0, t_end-time.time()), comrade.display_name))
 
         await comrade.remove_roles(gulag_role)
         print('ungulag\'d ' + comrade.display_name)
