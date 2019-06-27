@@ -35,9 +35,10 @@ class CoolBot(Bot):
             ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
 
             start_server = websockets.serve(self.get_cog("Api").handle_socket, '0.0.0.0', 8300, ssl=ssl_context)
-            asyncio.async(start_server)
         except FileNotFoundError:
-            print("SSL certs not found, websockets disabled")
+            print("SSL certs not found, websockets running in insecure mode")
+            start_server = websockets.serve(self.get_cog("Api").handle_socket, '0.0.0.0', 8300)
+        asyncio.async(start_server)
         super().run(token)
 
     @asyncio.coroutine

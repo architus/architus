@@ -56,25 +56,6 @@ class Invite(Resource):
     def get(self, guild_id):
         return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}&response_type=code&redirect_uri=https://aut-bot.com/home&permissions=2134207679')
 
-class Interpret(CustomResource):
-
-    def post(self):
-        parser = reqparse.RequestParser()
-        parser.add_argument('message')
-        parser.add_argument('guild_id')
-        parser.add_argument('message_id')
-        args = parser.parse_args()
-        if any(key not in args for key in ('message', 'message_id', 'guild_id')):
-            return 400
-        self.enqueue({
-            'method': "interpret",
-            'args': [args['guild_id'], args['message'], args['message_id']]
-        })
-        resp = self.recv()
-        if 'content' in resp:
-            return resp, 200
-        return resp, 204
-
 def authenticate(session, headers):
     try:
         autbot_token = headers['Authorization']
@@ -185,6 +166,5 @@ def app_factory(q):
     api.add_resource(Identify, "/identify")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Invite, "/invite/<string:guild_id>")
-    api.add_resource(Interpret, "/interpret", resource_class_kwargs={'q' : q})
     api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q' : q})
     return app

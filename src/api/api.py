@@ -3,13 +3,14 @@ import traceback
 import asyncio
 import secrets
 import websockets
-from discord.ext.commands import Cog, Context
+from discord.ext.commands import Cog, Context, MinimalHelpCommand
 
 
 class MockMember(object):
     def __init__(self, id=0):
         self.id = id
         self.mention = "<@%_CLIENT_ID_%>"
+        self.display_name = "bad guy"
 class MockRole(object):
     pass
 
@@ -27,6 +28,7 @@ class MockGuild(object):
         self.region = 'us-east'
         self.id = int(id)
         self.owner = MockMember()
+        self.me = MockMember()
         self.default_role = MockRole()
         self.default_role.mention = "@everyone"
         self.emojis = []
@@ -58,12 +60,11 @@ class Api(Cog):
             try:
                 try:
                     data = json.loads(await websocket.recv())
-                    print(data)
-                    resp = await self.interpret(
-                            data['guild_id'],
-                            data['content'],
-                            data['message_id']
-                    )
+                    print("recv: " + str(data))
+                    if data['_module'] == 'interpret':
+                        resp = await self.interpret(**data)
+                    else:
+                        resp = {'content': "Unknown module"}
                 except Exception as e:
                     traceback.print_exc()
                     print(f"caught {e} while handling websocket request")
@@ -93,9 +94,9 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return {}
 
-    async def interpret(self, guild_id, message, message_id):
+    async def interpret(self, guild_id=None, content=None, message_id=None, allowed_commands=None, **k):
         self.fake_messages[guild_id] = {
-            'content': message,
+            'content': content,
             'reactions': [],
             'message_id': message_id,
             'guild_id': guild_id,
@@ -103,14 +104,16 @@ class Api(Cog):
 
         # search for builtin commands
         command = None
-        args = message.split()
-        for cmd in self.bot.commands:
+        args = content.split()
+        possible_commands = [cmd for cmd in self.bot.commands if cmd.name in allowed_commands]
+        for cmd in possible_commands:
             if args[0][1:] in cmd.aliases + [cmd.name]:
                 command = cmd
                 break
+
         sends = []
         reactions = []
-        mock_message = MockMessage(message_id, sends, reactions, guild_id, content=message)
+        mock_message = MockMessage(message_id, sends, reactions, guild_id, content=content)
         mock_channel = MockChannel(sends, reactions)
 
         self.bot.user_commands.setdefault(int(guild_id), [])
@@ -120,14 +123,20 @@ class Api(Cog):
                 'message': mock_message,
                 'bot': self.bot,
                 'args': args[1:],
-                'prefix': message[0],
+                'prefix': content[0],
                 'command': command,
+                'invoked_with': args[0]
             })
-            #ctx.send = mock_channel.send_message
-            async def send(content):
-                sends.append(content)
-            ctx.send = send
+            ctx.send = lambda content: sends.append(content)
             await ctx.invoke(command, *args[1:])
+        elif args[0][1:] == 'help':
+            for cmd in possible_commands:
+                try:
+                    if args[1] in cmd.aliases or args[1] == cmd.name:
+                        sends.append(f'`{args[1]} - {cmd.help}`')
+                        break
+                except IndexError:
+                    sends.append(f'`{cmd.name} - {cmd.help}`')
         else:
             # check for user set commands in this "guild"
             for command in self.bot.user_commands[mock_message.guild.id]:
@@ -144,6 +153,7 @@ class Api(Cog):
             'guild_id': guild_id,
         }
         self.fake_messages[resp['message_id']] = resp
+        #self.fake_messages = self.fake_messages[-50:]
         if resp['content']:
             print(resp)
         return resp
