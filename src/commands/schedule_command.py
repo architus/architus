@@ -119,6 +119,7 @@ class EventCog(Cog):
 
     @commands.command()
     async def schedule(self, ctx, *argst):
+        '''Start an event poll'''
         args = list(argst)
         print(args)
         # event bot's id

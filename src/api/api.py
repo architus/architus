@@ -130,13 +130,16 @@ class Api(Cog):
             ctx.send = lambda content: sends.append(content)
             await ctx.invoke(command, *args[1:])
         elif args[0][1:] == 'help':
+            help_text = '```'
             for cmd in possible_commands:
                 try:
                     if args[1] in cmd.aliases or args[1] == cmd.name:
-                        sends.append(f'`{args[1]} - {cmd.help}`')
+                        help_text += f'{args[1]} - {cmd.help}'
                         break
                 except IndexError:
-                    sends.append(f'`{cmd.name} - {cmd.help}`')
+                    help_text += '{}: {:>5}\n'.format(cmd.name, cmd.help)
+                    
+            sends.append(help_text + '```')
         else:
             # check for user set commands in this "guild"
             for command in self.bot.user_commands[mock_message.guild.id]:
