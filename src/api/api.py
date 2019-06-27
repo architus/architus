@@ -94,7 +94,7 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return {}
 
-    async def interpret(self, guild_id=None, content=None, message_id=None, allowed_commands=None, **k):
+    async def interpret(self, guild_id=None, content=None, message_id=None, allowed_commands=None, silent=False, **k):
         self.fake_messages[guild_id] = {
             'content': content,
             'reactions': [],
@@ -130,22 +130,27 @@ class Api(Cog):
             ctx.send = lambda content: sends.append(content)
             await ctx.invoke(command, *args[1:])
         elif args[0][1:] == 'help':
-            help_text = '```'
+            help_text = ''
             for cmd in possible_commands:
                 try:
                     if args[1] in cmd.aliases or args[1] == cmd.name:
-                        help_text += f'{args[1]} - {cmd.help}'
+                        help_text += f'```{args[1]} - {cmd.help}```'
                         break
                 except IndexError:
-                    help_text += '{}: {:>5}\n'.format(cmd.name, cmd.help)
+                    help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
                     
-            sends.append(help_text + '```')
+            sends.append(help_text)
         else:
             # check for user set commands in this "guild"
             for command in self.bot.user_commands[mock_message.guild.id]:
                 if (command.triggered(mock_message.content)):
                     await command.execute(mock_message, self.bot.session)
                     break
+
+        # Prevent response sending for silent requests
+        if silent:
+            sends = []
+
         new_id = secrets.randbits(24) | 1 if sends else None
         resp = {
             '_module': 'interpret',
