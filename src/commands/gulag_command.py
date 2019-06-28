@@ -73,6 +73,8 @@ class Gulag(commands.Cog):
             elif timer_msg or timer_msg_gulag:
                 await timer_msg.edit(content="⏰ %d seconds" % (max(0, t_end-time.time())))
                 await timer_msg_gulag.edit(content="⏰ %d seconds, %s" % (max(0, t_end-time.time()), comrade.display_name))
+        if gulag_role not in comrade.roles:
+            await msg.edit(content=f"Vote for {comrade.display_name} failed to pass")
 
         await comrade.remove_roles(gulag_role)
         print('ungulag\'d ' + comrade.display_name)
