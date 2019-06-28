@@ -36,18 +36,37 @@ class MockGuild(object):
     def get_member(self, *args):
         return None
 
+class MockReact(object):
+    def __init__(self, message, emoji, user):
+        self.message = message
+        self.emoji = emoji
+        self.count = 1
+        self.users = [user]
+
 class MockMessage(object):
-    def __init__(self, id, sends, reactions, guild_id, content=None):
+    def __init__(self, id, sends, reaction_sends, guild_id, content=None):
         self.id = id
         self.sends = sends
-        self.reactions = reactions
+        self.reaction_sends = reaction_sends
         self._state = MockChannel(sends, reactions)
         self.guild = MockGuild(guild_id)
         self.author = MockMember()
         self.channel = MockChannel(sends, reactions)
         self.content = content
-    async def add_reaction(self, emoji):
-        self.reactions.append((self.id, emoji))
+        self.reactions = []
+    async def add_reaction(self, emoji, bot=True):
+        user = MockMember()
+        if bot:
+            self.reaction_sends.append((self.id, emoji))
+            user = self.bot
+        for react in self.reactions:
+            if emoji == react.emoji:
+                react.users.append(user)
+                return react
+        else:
+            react = MockReact(self, emoji, user)
+            self.reactions.append(react)
+            return react
 
 class Api(Cog):
 
@@ -94,74 +113,77 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return {}
 
-    async def interpret(self, guild_id=None, content=None, message_id=None, allowed_commands=None, silent=False, **k):
-        self.fake_messages[guild_id] = {
-            'content': content,
-            'reactions': [],
-            'message_id': message_id,
-            'guild_id': guild_id,
-        }
-
-        # search for builtin commands
-        command = None
-        args = content.split()
-        possible_commands = [cmd for cmd in self.bot.commands if cmd.name in allowed_commands]
-        for cmd in possible_commands:
-            if args[0][1:] in cmd.aliases + [cmd.name]:
-                command = cmd
-                break
-
+    async def interpret(self, guild_id=None, content=None, message_id=None, added_reactions=None, allowed_commands=None, silent=False, **k):
         sends = []
         reactions = []
-        mock_message = MockMessage(message_id, sends, reactions, guild_id, content=content)
-        mock_channel = MockChannel(sends, reactions)
+        edit = False
 
-        self.bot.user_commands.setdefault(int(guild_id), [])
-        if command:
-            # found builtin command, creating fake context
-            ctx = Context(**{
-                'message': mock_message,
-                'bot': self.bot,
-                'args': args[1:],
-                'prefix': content[0],
-                'command': command,
-                'invoked_with': args[0]
-            })
-            ctx.send = lambda content: sends.append(content)
-            await ctx.invoke(command, *args[1:])
-        elif args[0][1:] == 'help':
-            help_text = ''
+        if content:
+            # search for builtin commands
+            command = None
+            args = content.split()
+            possible_commands = [cmd for cmd in self.bot.commands if cmd.name in allowed_commands]
             for cmd in possible_commands:
-                try:
-                    if args[1] in cmd.aliases or args[1] == cmd.name:
-                        help_text += f'```{args[1]} - {cmd.help}```'
-                        break
-                except IndexError:
-                    help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
-                    
-            sends.append(help_text)
-        else:
-            # check for user set commands in this "guild"
-            for command in self.bot.user_commands[mock_message.guild.id]:
-                if (command.triggered(mock_message.content)):
-                    await command.execute(mock_message, self.bot.session)
+                if args[0][1:] in cmd.aliases + [cmd.name]:
+                    command = cmd
                     break
 
-        # Prevent response sending for silent requests
-        if silent:
-            sends = []
+            mock_message = MockMessage(message_id, sends, reactions, guild_id, content=content)
+            mock_channel = MockChannel(sends, reactions)
 
-        new_id = secrets.randbits(24) | 1 if sends else None
+            self.bot.user_commands.setdefault(int(guild_id), [])
+            if command:
+                # found builtin command, creating fake context
+                ctx = Context(**{
+                    'message': mock_message,
+                    'bot': self.bot,
+                    'args': args[1:],
+                    'prefix': content[0],
+                    'command': command,
+                    'invoked_with': args[0]
+                })
+                ctx.send = lambda content: sends.append(content)
+                await ctx.invoke(command, *args[1:])
+            elif args[0][1:] == 'help':
+                help_text = ''
+                for cmd in possible_commands:
+                    try:
+                        if args[1] in cmd.aliases or args[1] == cmd.name:
+                            help_text += f'```{args[1]} - {cmd.help}```'
+                            break
+                    except IndexError:
+                        help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
+                        
+                sends.append(help_text)
+            else:
+                # check for user set commands in this "guild"
+                for command in self.bot.user_commands[mock_message.guild.id]:
+                    if (command.triggered(mock_message.content)):
+                        await command.execute(mock_message, self.bot.session)
+                        break
+
+            # Prevent response sending for silent requests
+            if silent:
+                sends = ()
+
+            resp_id = secrets.randbits(24) | 1 if sends else None
+        elif added_reactions:
+            edit = True
+            for react in added_reactions:
+                fkmsg = self.fake_messages[guild_id][react[0]]
+                fkmsg.sends = sends
+                react = fkmsg.add_reaction(react[1], bot=False)
+                self.bot.get_cog("EventCog").on_reaction_add(react, MockMember())
+        elif removed_reactions:
+            pass
         resp = {
             '_module': 'interpret',
             'content': '\n'.join(sends),
-            'added_reactions': [(new_id if r[0] == 0 else message_id, r[1]) for r in reactions],
-            'message_id': new_id,
-            'edit': False,
+            'added_reactions': [(resp_id if r[0] == 0 else message_id, r[1]) for r in reactions],
+            'message_id': resp_id,
+            'edit': edit,
             'guild_id': guild_id,
         }
-        self.fake_messages[resp['message_id']] = resp
-        #self.fake_messages = self.fake_messages[-50:]
         if resp['content']:
             print(resp)
         return resp
