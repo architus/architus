@@ -160,7 +160,7 @@ class EventCog(Cog):
     @commands.command()
     async def poll(self, ctx, *args):
         '''Starts a poll with some pretty formatting. Supports up to 10 options'''
-        pattern = re.compile('!poll (?P<title>(?:\S+[^\s,] )+)(?P<options>.*$)')
+        pattern = re.compile('.poll (?P<title>(?:\S*[^\s,] )+)(?P<options>.*$)')
         match = pattern.search(unidecode(ctx.message.content))
         if not match: return
 
