@@ -1,35 +1,41 @@
-from src.commands.abstract_command import abstract_command
 import discord
+from discord.ext import commands
+from contextlib import suppress
 
-class purge_command(abstract_command):
+@commands.command()
+async def purge(ctx, *args):
+    '''
+    Purge a channel of a user's messages
+    optionally include member id, channel, or message limit
+    '''
+    settings = ctx.bot.get_cog('GuildSettings').get_guild(ctx.guild)
+    user = ctx.bot.user
 
-    def __init__(self):
-        super().__init__("purge")
+    for arg in args:
+        with suppress(ValueError):
+            user = ctx.guild.get_member(int(arg))
+            if user:
+                break
+    else:
+        user = ctx.bot.user
 
-    async def exec_cmd(self, **kwargs):
-        settings = kwargs['settings']
-        user = self.client.user
+    for arg in args:
+        with suppress(ValueError):
+            if int(arg) < 100000:
+                count = int(arg)
+    else:
         count = 100
-        channel = self.channel
-        if len(self.args) > 1:
-            user = self.server.get_member(self.args[1])
-            if not user: return
-        if len(self.args) > 2:
-            count = min(int(self.args[2]), 100000)
-        if len(self.args) > 3:
-            if not self.message.channel_mentions: return
-            channel = self.message.channel_mentions[0]
-        await self.client.send_typing(self.channel)
-        if (self.author.id in settings.admins_ids):
-            deleted = await self.client.purge_from(channel, limit=count, check=lambda m: m.author==user)
-            await self.client.send_message(self.channel, 'Deleted {} message(s)'.format(len(deleted)))
+
+    channel = ctx.channel
+    if ctx.message.channel_mentions:
+        channel = ctx.message.channel_mentions[0]
+
+    async with ctx.channel.typing():
+        if (ctx.author.id in settings.admins_ids):
+            deleted = await channel.purge(limit=count, check=lambda m: m.author==user)
+            await ctx.send('Deleted {} message(s)'.format(len(deleted)))
         else:
-            await self.client.send_message(self.channel, 'lul %s' % self.author.mention)
+            await ctx.send(f'lul {ctx.author.mention}')
 
-        return True
-
-    def get_help(self, **kwargs):
-        return "Purge a channel of a user's messages"
-
-    def get_usage(self):
-        return "[memberid [number of messages to filter [target channel mention]]]"
+def setup(bot):
+    bot.add_command(purge)
