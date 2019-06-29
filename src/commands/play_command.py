@@ -114,7 +114,7 @@ class Play(commands.Cog):
         if name:
             await ctx.channel.send(f"🎶 **Now playing:** *{name}*")
         else:
-            await ctx.channel.send("No songs left. goodbye"
+            await ctx.channel.send("No songs left. goodbye")
 
     @commands.command()
     async def clear(self, ctx):

@@ -1,20 +1,67 @@
 from discord.ext import commands
 import random, string, os
 import src.generate.wordcount as wordcount_gen
-from discord import ChannelType
 import discord
-IMAGE_CHANNEL_ID = 577523623355613235
+import json
 
-class MessageCount(commands.Cog):
+IMAGE_CHANNEL_ID = 577523623355613235
+LINHS_ID = 81231616772411392
+
+class MessageStats(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
         self._cache = None
+        with open('res/words/words.json') as f:
+            self.dictionary = json.loads(f.read())
 
     @property
     def cache(self):
         self._cache = self._cache or {guild: {} for guild in self.bot.guilds}
         return self._cache
+
+    @commands.Cog.listener()
+    async def on_message(self, msg):
+        try:
+            self.cache[msg.guild]['messages'][msg.channel].append(msg)
+        except (KeyError, AttributeError):
+            pass
+
+
+    @commands.command()
+    async def spellcheck(self, ctx, victim: discord.Member):
+        '''Checks the spelling of a user'''
+        ctxchannel = ctx.channel
+        cache = self.cache
+        cache[ctxchannel.guild].setdefault('messages', {})
+        blacklist = []
+        blacklist.append(discord.utils.get(ctx.guild.text_channels, name='bot-commands'))
+        blacklist.append(discord.utils.get(ctx.guild.text_channels, name='private-bot-commands'))
+        correct_words = 0
+        words = 1
+        async with ctxchannel.typing():
+            for channel in ctx.guild.text_channels:
+                try:
+                    if not channel in blacklist:
+                        if not channel in cache[ctxchannel.guild]['messages'].keys() or not cache[ctxchannel.guild]['messages'][channel]:
+                            print("reloading cache for " + channel.name)
+                            iterator = [log async for log in channel.history(limit=7500)]
+                            logs = list(iterator)
+                            cache[ctxchannel.guild]['messages'][channel] = logs
+                        msgs = cache[ctxchannel.guild]['messages'][channel]
+                        for msg in msgs:
+                            if msg.author == victim:
+                                for word in msg.clean_content.split():
+                                    if word[0] == '!':
+                                        continue
+                                    words += 1
+                                    if word in self.dictionary and len(word) > 1 or word in ['a','i', 'A', 'I']:
+                                        correct_words += 1
+                except Exception as e:
+                    print(e)
+        linh_modifier = 10 if victim.id == LINHS_ID else 0
+        await ctx.channel.send("{0:.1f}% out of the {1:,} scanned words sent by {2} are spelled correctly".format(
+            ((correct_words/words)*100) - linh_modifier, words, victim.display_name))
 
     @commands.command()
     async def messagecount(self, ctx, *args):
@@ -60,4 +107,4 @@ class MessageCount(commands.Cog):
         os.remove(f"res/word{key}.png")
 
 def setup(bot):
-    bot.add_cog(MessageCount(bot))
+    bot.add_cog(MessageStats(bot))
