@@ -5,6 +5,8 @@ import random
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from collections import namedtuple
+import matplotlib
+matplotlib.use('agg')
 
 
 COLORS = ['b','g','r','c','m','k']
