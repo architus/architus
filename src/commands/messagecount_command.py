@@ -83,6 +83,7 @@ class MessageCount(commands.Cog):
             except Exception as e:
                 print(e)
         
+        print(channel_message_counts)
         await ctx.send(str(channel_message_counts))
 
     async def add_message_to_counter(self, msg, counter):
