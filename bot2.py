@@ -80,6 +80,7 @@ class CoolBot(Bot):
         await self.change_presence(activity=discord.Activity(name="the tragedy of darth plagueis the wise", type=3))
 
     async def on_guild_join(self, guild):
+        print(" -- JOINED NEW GUILD: {guild.name} -- ")
         self.user_commands.setdefault(guild.id, [])
 
     async def initialize_user_commands(self):

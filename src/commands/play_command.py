@@ -1,4 +1,3 @@
-from src.commands.abstract_command import abstract_command
 import youtube_dl
 from discord.ext import commands
 from src.guild_player import GuildPlayer

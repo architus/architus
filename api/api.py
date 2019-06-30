@@ -14,7 +14,9 @@ from src.config import client_id, client_secret, get_session
 from src.models import AppSession
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
-REDIRECT_URI = 'https://aut-bot.com/app'
+#REDIRECT_URI = 'https://aut-bot.com/app'
+REDIRECT_URI = 'http://localhost:5000/home'
+
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -95,7 +97,7 @@ class Identify(Resource):
 
         return "token invalid or expired", 401
 
-class ListGuilds(Resource):
+class ListGuilds(CustomResource):
 
     def get(self):
         session = get_session(os.getpid())
@@ -108,7 +110,12 @@ class ListGuilds(Resource):
                 'Authorization': f"Bearer {discord_token}"
             }
             r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
-            return r.json(), r.status_code
+            if r.status_code == 200:
+                self.enqueue({'method': "tag_autbot_guilds", 'args': [r.json()]})
+                resp = self.recv()
+            else:
+                resp = r.json
+            return resp, r.status_code
 
         return "token invalid or expired", 401
 
@@ -162,7 +169,7 @@ def token_exchange():
         if status_code == 200:
             print(resp_data)
             return json.dumps({'access_token': autbot_token, 'expires_in': expires_in, 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']}), 200
-    return "invalid code", 401
+    return json.dumps(resp_data), r.status_code
 
 
 @app.route('/status', methods=['GET'])
@@ -174,7 +181,7 @@ def app_factory(q):
     api = Api(app)
     api.add_resource(User, "/user/<string:name>", resource_class_kwargs={'q' : q})
     api.add_resource(Identify, "/identify")
-    api.add_resource(ListGuilds, "/guilds")
+    api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q' : q})
     api.add_resource(Invite, "/invite/<string:guild_id>")
     api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q' : q})
     return app

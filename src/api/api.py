@@ -137,6 +137,12 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return {}
 
+    async def tag_autbot_guilds(self, guild_list):
+        autbot_guilds = [g.id for g in self.bot.guilds]
+        for guild in guild_list:
+            guild['has_autbot'] = int(guild['id']) in autbot_guilds
+        return guild_list
+
     async def interpret(
             self,
             guild_id=None,
