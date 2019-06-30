@@ -23,10 +23,13 @@ class CoolBot(Bot):
     def __init__(self, **kwargs):
         self.user_commands = {}
         self.session = get_session()
+        self.guild_counter = (0, 0)
         super().__init__(**kwargs)
 
     def run(self, token, q=None):
         self.q = q
+
+        self.loop.create_task(self.list_guilds())
 
         ctx = zmq.asyncio.Context()
         self.loop.create_task(self.poll_requests(ctx))
@@ -100,6 +103,20 @@ class CoolBot(Bot):
     @property
     def guild_settings(self):
         return self.get_cog('GuildSettings')
+
+    async def list_guilds(self):
+        await self.wait_until_ready()
+        while not self.is_closed():
+            print("Current guilds:")
+            guild_counter = 0
+            user_counter = 0
+            for guild in self.guilds:
+                print("{} - {} ({})".format(guild.name, guild.id, guild.member_count))
+                guild_counter += 1
+                user_counter += guild.member_count
+            self.guild_counter = (guild_counter, user_counter)
+
+            await asyncio.sleep(600)
 
     async def starboard_post(self, message, guild):
         starboard_ch = discord.utils.get(guild.text_channels, name='starboard')
