@@ -23,6 +23,10 @@ cors = CORS(app)
 def login():
     return redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Faut-bot.com%2Fapp&response_type=code&scope=identify%20guilds')
 
+@app.route('/issue')
+def issue():
+    return redirect('https://github.com/aut-bot-com/autbot/issues/new')
+
 class CustomResource(Resource):
     def __init__(self, q=None):
         self.session = get_session(os.getpid())
