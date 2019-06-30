@@ -78,14 +78,14 @@ class MessageCount(commands.Cog):
                         msgs = cache[ctxchannel.guild]['messages'][channel]
                         channel_counter = {}
                         for msg in msgs:
-                            await add_message_to_counter(msg, channel_counter)
+                            await self.add_message_to_counter(msg, channel_counter)
                         channel_message_counts.setdefault(channel, channel_counter)
             except Exception as e:
                 print(e)
         
         await ctx.send(str(channel_message_counts))
 
-    async def add_message_to_counter(msg, counter):
+    async def add_message_to_counter(self, msg, counter):
         creation_datetime = msg.created_at
         year = creation_datetime.year
         month = creation_datetime.month
@@ -93,7 +93,7 @@ class MessageCount(commands.Cog):
         hour = creation_datetime.hour
         count_dict = {}
         counter.setdefault(year, {})
-        counter.setdefault('count', 0
+        counter.setdefault('count', 0)
         counter[year].setdefault(month, {})
         counter[year].setdefault('count', 0)
         counter[year][month].setdefault(day, {})
