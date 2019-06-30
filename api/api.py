@@ -57,6 +57,11 @@ class User(CustomResource):
     def post(self, name):
         return "not implemented", 418
 
+class GuildCounter(CustomResource):
+    def get(self):
+        self.enqueue({'method': "guild_counter", 'args': []})
+        return self.recv(), 200
+
 class Invite(Resource):
 
     def get(self, guild_id):
@@ -182,6 +187,7 @@ def app_factory(q):
     api.add_resource(User, "/user/<string:name>", resource_class_kwargs={'q' : q})
     api.add_resource(Identify, "/identify")
     api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q' : q})
+    api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q' : q})
     api.add_resource(Invite, "/invite/<string:guild_id>")
     api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q' : q})
     return app

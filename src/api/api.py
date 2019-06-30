@@ -127,6 +127,9 @@ class Api(Cog):
             resp = '{"message": "' + str(e) + '"}'
         yield from pub.send((str(msg['topic']) + ' ' + str(resp)).encode())
 
+    async def guild_counter(self):
+        return {'guild_count': len(self.bot.guilds), 'user_count': 0}
+
     async def fetch_user_dict(self, id):
         usr = await self.bot.fetch_user(int(id))
         return {'name': usr.name, 'avatar': usr.avatar}
