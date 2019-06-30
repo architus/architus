@@ -59,5 +59,50 @@ class MessageCount(commands.Cog):
 
         os.remove(f"res/word{key}.png")
 
+    @commands.command()
+    async def activity_over_time(self, ctx, *args):
+        ctxchannel = ctx.channel
+        cache = self.cache
+        cache[ctxchannel.guild].setdefault('messages', {})
+        blacklist = []
+        word_counts = {}
+        channel_message_counts = {}
+        for channel in ctx.guild.text_channels:  
+            try:
+                if not channel in blacklist:
+                    if not channel in cache[ctxchannel.guild]['messages'].keys() or not cache[ctxchannel.guild]['messages'][channel]:
+                        print("reloading cache for " + channel.name)
+                        iterator = [log async for log in channel.history(limit=1000000)]
+                        logs = list(iterator)
+                        cache[ctxchannel.guild]['messages'][channel] = logs
+                        msgs = cache[ctxchannel.guild]['messages'][channel]
+                        channel_counter = {}
+                        for msg in msgs:
+                            await add_message_to_counter(msg, channel_counter)
+                        channel_message_counts.setdefault(channel, channel_counter)
+            except Exception as e:
+                print(e)
+        
+        await ctx.send(str(channel_message_counts))
+
+    async def add_message_to_counter(msg, counter):
+        creation_datetime = msg.created_at
+        year = creation_datetime.year
+        month = creation_datetime.month
+        day = creation_datetime.day
+        hour = creation_datetime.hour
+        count_dict = {}
+        counter.setdefault(year, {})
+        counter.setdefault('count', 0
+        counter[year].setdefault(month, {})
+        counter[year].setdefault('count', 0)
+        counter[year][month].setdefault(day, {})
+        counter[year][month].setdefault('count', 0)
+        counter[year][month][day].setdefault(hour, 0)
+        counter[year]['count'] += 1
+        counter[year][month]['count'] += 1
+        counter[year][month][day]['count'] += 1
+        counter[year][month][day][hour] += 1
+
 def setup(bot):
     bot.add_cog(MessageCount(bot))
