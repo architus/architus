@@ -60,7 +60,7 @@ class MessageCount(commands.Cog):
         os.remove(f"res/word{key}.png")
 
     @commands.command()
-    async def activity_over_time(self, ctx, *args):
+    async def activity(self, ctx, *args):
         ctxchannel = ctx.channel
         cache = self.cache
         cache[ctxchannel.guild].setdefault('messages', {})
