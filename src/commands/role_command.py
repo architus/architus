@@ -12,6 +12,17 @@ class Roles(commands.Cog):
     def guild_settings(self):
         return self.bot.get_cog('GuildSettings')
 
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        print("%s joined guild: %s" % (member.name, member.guild.name))
+        settings = self.guild_settings.get_guild(member.guild)
+        try:
+            default_role = discord.utils.get(member.guild.roles, id=settings.default_role_id)
+            await member.add_roles(default_role)
+        except:
+            print("could not add %s to %s" % (member.display_name, 'default role'))
+
+
     @commands.command(aliases=['rank', 'join', 'roles'])
     async def role(self, ctx, *arg):
         '''Assign yourself a role `!roles` to see joinable roles'''
