@@ -14,8 +14,8 @@ from src.config import client_id, client_secret, get_session
 from src.models import AppSession
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
-#REDIRECT_URI = 'https://aut-bot.com/app'
-REDIRECT_URI = 'http://localhost:5000/home'
+REDIRECT_URI = 'https://aut-bot.com/app'
+#REDIRECT_URI = 'http://localhost:5000/home'
 
 
 app = Flask(__name__)
