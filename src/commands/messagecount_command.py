@@ -27,6 +27,10 @@ class MessageStats(commands.Cog):
         except (KeyError, AttributeError):
             pass
 
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        self.cache.setdefault(ctxchannel.guild, {})
+
 
     @commands.command()
     async def spellcheck(self, ctx, victim: discord.Member):

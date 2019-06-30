@@ -79,6 +79,9 @@ class CoolBot(Bot):
         print('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(name="the tragedy of darth plagueis the wise", type=3))
 
+    async def on_guild_join(self, guild):
+        self.user_commands.setdefault(guild.id, [])
+
     async def initialize_user_commands(self):
         command_list = self.session.query(Command).all()
         for guild in self.guilds:
