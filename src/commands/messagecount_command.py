@@ -99,6 +99,8 @@ class MessageCount(commands.Cog):
         counter[year][month].setdefault(day, {})
         counter[year][month].setdefault('count', 0)
         counter[year][month][day].setdefault(hour, 0)
+        counter[year][month][day].setdefault('count', 0)
+        counter['count'] += 1
         counter[year]['count'] += 1
         counter[year][month]['count'] += 1
         counter[year][month][day]['count'] += 1
