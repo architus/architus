@@ -65,7 +65,6 @@ class MessageCount(commands.Cog):
         cache = self.cache
         cache[ctxchannel.guild].setdefault('messages', {})
         blacklist = []
-        word_counts = {}
         channel_message_counts = {}
         for channel in ctx.guild.text_channels:  
             try:
@@ -92,7 +91,6 @@ class MessageCount(commands.Cog):
         month = creation_datetime.month
         day = creation_datetime.day
         hour = creation_datetime.hour
-        count_dict = {}
         counter.setdefault(year, {})
         counter.setdefault('count', 0)
         counter[year].setdefault(month, {})
