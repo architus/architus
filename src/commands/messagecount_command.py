@@ -79,7 +79,7 @@ class MessageCount(commands.Cog):
                         channel_counter = {}
                         for msg in msgs:
                             await self.add_message_to_counter(msg, channel_counter)
-                        channel_message_counts.setdefault(channel, channel_counter)
+                        channel_message_counts.setdefault(channel.id, channel_counter)
             except Exception as e:
                 print(e)
         
