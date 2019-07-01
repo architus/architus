@@ -14,7 +14,8 @@ from src.config import client_id, client_secret, get_session
 from src.models import AppSession
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
-REDIRECT_URI = 'https://aut-bot.com/app'
+#REDIRECT_URI = 'https://aut-bot.com/app'
+REDIRECT_URI = 'https://api.aut-bot.com/redirect'
 #REDIRECT_URI = 'http://localhost:5000/home'
 
 
@@ -25,17 +26,20 @@ redirects = {}
 
 @app.route('/login')
 def login():
-    nonce = secrets.randbits(24)
-    redirects[nonce] = request.args.get('return')
+    nonce = str(secrets.randbits(24))
+    redirects[nonce] = request.args.get('return') or 'https://aut-bot.com/app'
+    print(redirects[nonce])
     response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Fapi.aut-bot.com%2Fredirect&response_type=code&scope=identify%20guilds')
-    response.set_cookie('redirect-nonce', str(nonce))
+    response.set_cookie('redirect-nonce', nonce)
     return response
 
 @app.route('/redirect')
 def redirect_thing():
     redirect_url = redirects[request.cookies.get('redirect-nonce')]
-    print(f"REDIRECTING TO: {redirect_url}")
-    return redirect(redirect_url)
+    code = request.args.get('code')
+    resp = redirect(redirect_url)
+    resp.args.set('code', code)
+    return resp
 
 @app.route('/issue')
 def issue():
