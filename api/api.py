@@ -21,9 +21,21 @@ REDIRECT_URI = 'https://aut-bot.com/app'
 app = Flask(__name__)
 cors = CORS(app)
 
+redirects = {}
+
 @app.route('/login')
 def login():
-    return redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Faut-bot.com%2Fapp&response_type=code&scope=identify%20guilds')
+    nonce = secrets.randbits(24)
+    redirects[nonce] = request.args.get('return')
+    response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Fapi.aut-bot.com%2Fredirect&response_type=code&scope=identify%20guilds')
+    response.headers['redirect-nonce'] = nonce
+    return response
+
+@app.route('/redirect')
+def redirect_thing():
+    redirect_url = redirects[request.headers['redirect-nonce']]
+    print(f"REDIRECTING TO: {redirect_url}")
+    return redirect(redirect_url)
 
 @app.route('/issue')
 def issue():
