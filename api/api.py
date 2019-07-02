@@ -193,11 +193,12 @@ def token_exchange():
         discord_token = resp_data['access_token']
         autbot_token = secrets.token_urlsafe()
         expires_in = resp_data['expires_in']
+        refresh_token = resp_data['refresh_token']
 
         resp_data, status_code = discord_identify_request(discord_token)
         if status_code == 200:
             print(resp_data)
-            commit_tokens(autbot_token, discord_token, resp_data['refresh_token'], expires_in, resp_data['id'])
+            commit_tokens(autbot_token, discord_token, refresh_token, expires_in, resp_data['id'])
             return json.dumps({
                 'access_token': autbot_token,
                 'expires_in': expires_in,
