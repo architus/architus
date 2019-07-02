@@ -1,10 +1,7 @@
-from src.commands.abstract_command import abstract_command
-import youtube_dl
 from discord.ext import commands
 from src.guild_player import GuildPlayer
-import re
-import functools
 import discord
+
 
 class Play(commands.Cog):
 
@@ -56,7 +53,7 @@ class Play(commands.Cog):
                         name = await player.add_url(arg[1])
                         message = '**Queued:** *%s*' % name
                     else:
-                        await player.add_url_now(arg[1]);
+                        await player.add_url_now(arg[1])
                         name = await player.play()
                         if (name):
                             message = "🎶 **Now playing:** *%s*" % name
@@ -109,26 +106,22 @@ class Play(commands.Cog):
         '''Skip a song'''
         if ctx.guild not in self.players:
             self.players[ctx.guild] = GuildPlayer(self.bot)
-        print("hello?")
         player = self.players[ctx.guild]
-        await player.skip()
+        name = await player.skip()
+        if name:
+            await ctx.channel.send(f"🎶 **Now playing:** *{name}*")
+        else:
+            await ctx.channel.send("No songs left. goodbye")
 
     @commands.command()
-    async def notplay(self, ctx, url):
-        opts = {
-            'format': 'webm[abr>0]/bestaudio/best',
-            'prefer_ffmpeg': False
-        }
-        ydl = youtube_dl.YoutubeDL(opts)
-        func = functools.partial(ydl.extract_info, url, download=False)
-        info = await self.bot.loop.run_in_executor(None, func)
-        if "entries" in info:
-            info = info['entries'][0]
+    async def clear(self, ctx):
+        '''Clear all songs from queue'''
+        if ctx.guild not in self.players:
+            self.players[ctx.guild] = GuildPlayer(self.bot)
+        player = self.players[ctx.guild]
+        await ctx.channel.send("Removed %d songs from queue." % len(player.q))
+        player.clearq()
 
-        download_url = info['url']
-        vc = await ctx.author.voice.channel.connect()
-        vc.play(discord.FFmpegPCMAudio(download_url), after=lambda e: print('done', e))
-        await ctx.send(download_url)
 
 def setup(bot):
     bot.add_cog(Play(bot))

@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from pytz import timezone
 
+
 @commands.command()
 async def quote(ctx, message: discord.Message):
     '''Quotes a previous message in a pretty format. Use url or id.'''
@@ -19,6 +20,7 @@ async def quote(ctx, message: discord.Message):
     except (IndexError, KeyError):
         print("tried to attach image, couldn't")
     await ctx.channel.send(embed=em)
+
 
 def setup(bot):
     bot.add_command(quote)

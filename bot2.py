@@ -1,5 +1,4 @@
 import discord
-from discord.ext import commands
 from discord.ext.commands import Bot
 import asyncio
 import zmq
@@ -8,8 +7,6 @@ import json
 import websockets
 import ssl
 from pytz import timezone
-
-from multiprocessing import Pipe
 
 from src.user_command import UserCommand
 from src.config import get_session
@@ -23,10 +20,13 @@ class CoolBot(Bot):
     def __init__(self, **kwargs):
         self.user_commands = {}
         self.session = get_session()
+        self.guild_counter = (0, 0)
         super().__init__(**kwargs)
 
     def run(self, token, q=None):
         self.q = q
+
+        self.loop.create_task(self.list_guilds())
 
         ctx = zmq.asyncio.Context()
         self.loop.create_task(self.poll_requests(ctx))
@@ -79,6 +79,10 @@ class CoolBot(Bot):
         print('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(name="the tragedy of darth plagueis the wise", type=3))
 
+    async def on_guild_join(self, guild):
+        print(" -- JOINED NEW GUILD: {guild.name} -- ")
+        self.user_commands.setdefault(guild.id, [])
+
     async def initialize_user_commands(self):
         command_list = self.session.query(Command).all()
         for guild in self.guilds:
@@ -86,16 +90,30 @@ class CoolBot(Bot):
         for command in command_list:
             self.user_commands.setdefault(command.server_id, [])
             self.user_commands[command.server_id].append(UserCommand(
-                        command.trigger.replace(str(command.server_id), '', 1),
-                        command.response, command.count,
-                        self.get_guild(command.server_id),
-                        command.author_id))
+                command.trigger.replace(str(command.server_id), '', 1),
+                command.response, command.count,
+                self.get_guild(command.server_id),
+                command.author_id))
         for guild, cmds in self.user_commands.items():
             self.user_commands[guild].sort()
 
     @property
     def guild_settings(self):
         return self.get_cog('GuildSettings')
+
+    async def list_guilds(self):
+        await self.wait_until_ready()
+        while not self.is_closed():
+            print("Current guilds:")
+            guild_counter = 0
+            user_counter = 0
+            for guild in self.guilds:
+                print("{} - {} ({})".format(guild.name, guild.id, guild.member_count))
+                guild_counter += 1
+                user_counter += guild.member_count
+            self.guild_counter = (guild_counter, user_counter)
+
+            await asyncio.sleep(600)
 
     async def starboard_post(self, message, guild):
         starboard_ch = discord.utils.get(guild.text_channels, name='starboard')
@@ -113,6 +131,7 @@ class CoolBot(Bot):
             em.set_image(url=message.attachments[0].url)
         await starboard_ch.send(embed=em)
 
+
 BOT_PREFIX = ("?", "!")
 coolbot = CoolBot(command_prefix=BOT_PREFIX)
 
@@ -122,6 +141,7 @@ coolbot.load_extension('src.commands.settings_command')
 coolbot.load_extension('src.commands.quote_command')
 coolbot.load_extension('src.commands.set_command')
 coolbot.load_extension('src.commands.play_command')
+coolbot.load_extension('src.commands.purge_command')
 coolbot.load_extension('src.commands.messagecount_command')
 coolbot.load_extension('src.commands.role_command')
 coolbot.load_extension('src.commands.gulag_command')
@@ -132,4 +152,3 @@ coolbot.load_extension('src.guild_settings')
 if __name__ == '__main__':
     from src.config import secret_token
     coolbot.run(secret_token)
-

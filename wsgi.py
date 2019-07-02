@@ -2,9 +2,8 @@ from api.api import app_factory
 from multiprocessing import Process, Queue
 from src.config import secret_token
 from bot2 import coolbot
-import zmq
 
-#export PYTHON=python3.6; uwsgi --ini config_uwsgi.ini --http :5061 --wsgi-file wsgi.py
+# export PYTHON=python3.6; uwsgi --ini config_uwsgi.ini --http :5061 --wsgi-file wsgi.py
 print("WSGI LOADED")
 
 q = Queue()

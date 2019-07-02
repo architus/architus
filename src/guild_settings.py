@@ -6,6 +6,7 @@ from discord.ext.commands import Cog
 
 RYTHMS_ID = 235088799074484224
 
+
 class Setting:
 
     def __init__(self, session, guild):
@@ -16,7 +17,8 @@ class Setting:
 
     @property
     def music_enabled(self) -> bool:
-        return self._settings_dict['music_enabled'] if 'music_enabled' in self._settings_dict else not bool(self.guild.get_member(RYTHMS_ID))
+        return self._settings_dict['music_enabled'] if 'music_enabled' in self._settings_dict else not bool(
+            self.guild.get_member(RYTHMS_ID))
 
     @music_enabled.setter
     def music_enabled(self, new_music_enabled: bool):
@@ -63,7 +65,7 @@ class Setting:
     def roles_dict(self) -> dict:
         roles = self._settings_dict['roles_dict'] if 'roles_dict' in self._settings_dict else {}
         # TODO db migration for str ids. can remove after every server has updated
-        return { k:int(v) for k, v in roles.items()}
+        return {k: int(v) for k, v in roles.items()}
 
     @roles_dict.setter
     def roles_dict(self, roles_dict: dict):
@@ -85,7 +87,7 @@ class Setting:
 
     @bot_commands_channels.setter
     def bot_commands_channels(self, new_bot_commands: list):
-        print (new_bot_commands)
+        print(new_bot_commands)
         self._settings_dict['bot_commands'] = new_bot_commands
         self._update_db()
 
@@ -184,18 +186,19 @@ class Setting:
         settings_row = None
         try:
             settings_row = self.session.query(Settings).filter_by(server_id=int(guild_id)).one()
-        except NoResultFound as e:
+        except NoResultFound:
             new_guild = Settings(int(self.guild_id), json.dumps({}))
             self.session.add(new_guild)
         return json.loads(settings_row.json_blob) if settings_row else {}
 
     def _update_db(self):
         new_data = {
-            'server_id' : int(self.guild_id),
-            'json_blob' : json.dumps(self._settings_dict)
+            'server_id': int(self.guild_id),
+            'json_blob': json.dumps(self._settings_dict)
         }
         self.session.query(Settings).filter_by(server_id=int(self.guild_id)).update(new_data)
         self.session.commit()
+
 
 class GuildSettings(Cog):
 
@@ -205,9 +208,10 @@ class GuildSettings(Cog):
     def get_guild(self, guild, session=None):
         try:
             return self.guilds[guild]
-        except KeyError as e:
+        except KeyError:
             self.guilds[guild] = Setting(session or get_session(), guild)
             return self.guilds[guild]
+
 
 def setup(bot):
     bot.add_cog(GuildSettings(bot))
