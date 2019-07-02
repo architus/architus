@@ -1,18 +1,14 @@
-import os, random
 import youtube_dl
-#from threading import Thread
 import functools
-
 import discord
-#from queue import Queue
 from collections import deque
 import src.spotify_tools as spotify_tools
 import urllib
 import asyncio
 import aiohttp
-#import urllib2
 from bs4 import BeautifulSoup
 from src.list_embed import ListEmbed as list_embed
+
 
 class GuildPlayer:
     def __init__(self, bot):
@@ -27,21 +23,21 @@ class GuildPlayer:
     async def play_file(self, filepath):
         self.playing_file = True
         self.stop()
-        if (self.voice == None):
+        if self.voice is None:
             return
-        #if (self.player and self.player.is_playing()):
-            #return await self.skip()
+        # if (self.player and self.player.is_playing()):
+            # return await self.skip()
 
         try:
             self.player = self.voice.create_ffmpeg_player(filepath, after=self.agane)
-            self.player.start();
+            self.player.start()
         except Exception as e:
             print(e)
         self.playing_file = False
         return True
 
     async def play(self):
-        if (self.voice == None or len(self.q) == 0):
+        if (self.voice is None or len(self.q) == 0):
             return ''
         if (self.voice and self.voice.is_playing()):
             return await self.skip()
@@ -84,8 +80,10 @@ class GuildPlayer:
                 try:
                     track_url = track['external_urls']['spotify']
                     urls.append(track_url)
-                except KeyError: pass
+                except KeyError:
+                    pass
             if tracks['next']:
+                # TODO
                 tracks = spotify.next(tracks)
             else:
                 break
@@ -115,10 +113,11 @@ class GuildPlayer:
             url = "https://www.youtube.com/results?search_query=" + query
             async with session.get(url) as resp:
                 html = await resp.read()
+
                 def get_video(html):
                     soup = BeautifulSoup(html, 'lxml')
-                    print (soup.findAll(attrs={'class':'yt-uix-tile-link'}, limit=2))
-                    for video in soup.findAll(attrs={'class':'yt-uix-tile-link'}):
+                    print(soup.findAll(attrs={'class': 'yt-uix-tile-link'}, limit=2))
+                    for video in soup.findAll(attrs={'class': 'yt-uix-tile-link'}):
                         if ('googleadservices' not in video['href']):
                             return 'https://www.youtube.com' + video['href']
                 loop = asyncio.get_event_loop()
@@ -127,20 +126,22 @@ class GuildPlayer:
         return ''
 
     def stop(self):
-        if (self.voice == None):
+        if self.voice is None:
             return
         self.voice.stop()
 
     def pause(self):
-        if (self.voice == None):
+        if self.voice is None:
             return
         self.voice.pause()
+
     def resume(self):
-        if (self.voice == None):
+        if self.voice is None:
             return
         self.voice.resume()
+
     async def skip(self):
-        if (self.voice == None):
+        if self.voice is None:
             print("no voice")
             return
         if (len(self.q) < 1):
@@ -165,7 +166,7 @@ class GuildPlayer:
         return lem.get_embed()
 
     def is_connected(self):
-        return self.voice != None and self.voice.is_connected()
+        return self.voice is not None and self.voice.is_connected()
 
     def agane(self):
         if self.playing_file:
@@ -178,8 +179,9 @@ class GuildPlayer:
         fut = discord.compat.run_coroutine_threadsafe(coro, self.bot.loop)
         try:
             fut.result()
-        except:
-            print('error')
+        except Exception as e:
+            print(e)
+            print('error playing next thing')
 
 
 class Song:

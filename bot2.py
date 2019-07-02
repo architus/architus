@@ -1,5 +1,4 @@
 import discord
-from discord.ext import commands
 from discord.ext.commands import Bot
 import asyncio
 import zmq
@@ -8,8 +7,6 @@ import json
 import websockets
 import ssl
 from pytz import timezone
-
-from multiprocessing import Pipe
 
 from src.user_command import UserCommand
 from src.config import get_session
@@ -93,10 +90,10 @@ class CoolBot(Bot):
         for command in command_list:
             self.user_commands.setdefault(command.server_id, [])
             self.user_commands[command.server_id].append(UserCommand(
-                        command.trigger.replace(str(command.server_id), '', 1),
-                        command.response, command.count,
-                        self.get_guild(command.server_id),
-                        command.author_id))
+                command.trigger.replace(str(command.server_id), '', 1),
+                command.response, command.count,
+                self.get_guild(command.server_id),
+                command.author_id))
         for guild, cmds in self.user_commands.items():
             self.user_commands[guild].sort()
 
@@ -134,6 +131,7 @@ class CoolBot(Bot):
             em.set_image(url=message.attachments[0].url)
         await starboard_ch.send(embed=em)
 
+
 BOT_PREFIX = ("?", "!")
 coolbot = CoolBot(command_prefix=BOT_PREFIX)
 
@@ -154,4 +152,3 @@ coolbot.load_extension('src.guild_settings')
 if __name__ == '__main__':
     from src.config import secret_token
     coolbot.run(secret_token)
-

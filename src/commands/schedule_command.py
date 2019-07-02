@@ -1,13 +1,11 @@
-import time
-import datetime
 import pytz
-import discord
 import dateutil.parser
 import re
 from unidecode import unidecode
 from contextlib import suppress
 from discord.ext.commands import Cog
 from discord.ext import commands
+
 
 class ScheduleEvent(object):
     def __init__(self, msg, title, time_str):
@@ -18,12 +16,14 @@ class ScheduleEvent(object):
         self.no = set()
         self.maybe = set()
 
+
 class PollEvent(object):
     def __init__(self, msg, title, options, votes):
         self.msg = msg
         self.title = title
         self.options = options
         self.votes = votes
+
 
 class EventCog(Cog):
 
@@ -32,16 +32,16 @@ class EventCog(Cog):
     MAYBE_EMOJI = '🤷'
 
     ANSWERS = [
-            '\N{DIGIT ZERO}\N{COMBINING ENCLOSING KEYCAP}',
-            '\N{DIGIT ONE}\N{COMBINING ENCLOSING KEYCAP}',
-            '\N{DIGIT TWO}\N{COMBINING ENCLOSING KEYCAP}',
-            '\N{DIGIT THREE}\N{COMBINING ENCLOSING KEYCAP}',
-            '\N{DIGIT FOUR}\N{COMBINING ENCLOSING KEYCAP}',
-            '\N{DIGIT FIVE}\N{COMBINING ENCLOSING KEYCAP}',
-            '\N{DIGIT SIX}\N{COMBINING ENCLOSING KEYCAP}',
-            '\N{DIGIT SEVEN}\N{COMBINING ENCLOSING KEYCAP}',
-            '\N{DIGIT EIGHT}\N{COMBINING ENCLOSING KEYCAP}',
-            '\N{DIGIT NINE}\N{COMBINING ENCLOSING KEYCAP}'
+        '\N{DIGIT ZERO}\N{COMBINING ENCLOSING KEYCAP}',
+        '\N{DIGIT ONE}\N{COMBINING ENCLOSING KEYCAP}',
+        '\N{DIGIT TWO}\N{COMBINING ENCLOSING KEYCAP}',
+        '\N{DIGIT THREE}\N{COMBINING ENCLOSING KEYCAP}',
+        '\N{DIGIT FOUR}\N{COMBINING ENCLOSING KEYCAP}',
+        '\N{DIGIT FIVE}\N{COMBINING ENCLOSING KEYCAP}',
+        '\N{DIGIT SIX}\N{COMBINING ENCLOSING KEYCAP}',
+        '\N{DIGIT SEVEN}\N{COMBINING ENCLOSING KEYCAP}',
+        '\N{DIGIT EIGHT}\N{COMBINING ENCLOSING KEYCAP}',
+        '\N{DIGIT NINE}\N{COMBINING ENCLOSING KEYCAP}'
     ]
 
     def __init__(self, bot):
@@ -70,7 +70,7 @@ class EventCog(Cog):
             elif self.MAYBE_EMOJI in str(react.emoji):
                 event.maybe.add(user)
             await react.message.edit(
-                    content=self.render_schedule_text(event.title_str, event.parsed_time, event.yes, event.no, event.maybe))
+                content=self.render_schedule_text(event.title_str, event.parsed_time, event.yes, event.no, event.maybe))
 
         elif not user.bot and react.message.id in self.poll_messages:
             event = self.poll_messages[react.message.id]
@@ -82,7 +82,6 @@ class EventCog(Cog):
                     continue
             await react.message.edit(
                 content=self.render_poll_text(event.title, event.options, event.votes))
-
 
     @commands.Cog.listener()
     async def on_reaction_remove(self, react, user):
@@ -97,18 +96,17 @@ class EventCog(Cog):
                 elif self.MAYBE_EMOJI in str(react.emoji):
                     event.maybe.remove(user)
             await react.message.edit(
-                    content=self.render_schedule_text(event.title_str, event.parsed_time, event.yes, event.no, event.maybe))
+                content=self.render_schedule_text(event.title_str, event.parsed_time, event.yes, event.no, event.maybe))
 
         elif not user.bot and react.message.id in self.poll_messages:
             await self.on_reaction_add(react, user)
-
 
     async def prompt_date(self, ctx, author):
         await ctx.channel.send("what time?")
         time_msg = await self.bot.wait_for('message', timeout=30, check=lambda m: m.author == author)
         try:
             return dateutil.parser.parse(time_msg.clean_content)
-        except:
+        except Exception:
             await ctx.channel.send("not sure what that means")
             return None
 
@@ -128,7 +126,7 @@ class EventCog(Cog):
             return
         region = ctx.guild.region
         tz = pytz.timezone(self.get_timezone(region))
-        ct = datetime.datetime.now(tz=tz)
+        # ct = datetime.datetime.now(tz=tz)
         title = []
         parsed_time = None
         for i in range(len(args)):
@@ -160,9 +158,10 @@ class EventCog(Cog):
     @commands.command()
     async def poll(self, ctx, *args):
         '''Starts a poll with some pretty formatting. Supports up to 10 options'''
-        pattern = re.compile('.poll (?P<title>(?:\S*[^\s,] )+)(?P<options>.*$)')
+        pattern = re.compile(r'.poll (?P<title>(?:\S*[^\s,] )+)(?P<options>.*$)')
         match = pattern.search(unidecode(ctx.message.content))
-        if not match: return
+        if not match:
+            return
 
         votes = [[] for x in range(10)]
         options = [o.lstrip() for o in match.group('options').split(",")[:10]]
@@ -188,18 +187,18 @@ class EventCog(Cog):
 
     def render_schedule_text(self, title_str, parsed_time, yes, no, maybe):
         print("**__%s__**\n**Time:** %s\n:white_check_mark: **Yes (%d):** %s\n:x: **No (%d):** %s\n:shrug: **Maybe (%d):** %s" % (
-                title_str.strip(),
-                parsed_time.strftime("%b %d %I:%M%p %Z"),
-                len(yes), ' '.join([u.mention for u in yes]),
-                len(no), ' '.join([u.mention for u in no]),
-                len(maybe), ' '.join([u.mention for u in maybe])
+            title_str.strip(),
+            parsed_time.strftime("%b %d %I:%M%p %Z"),
+            len(yes), ' '.join([u.mention for u in yes]),
+            len(no), ' '.join([u.mention for u in no]),
+            len(maybe), ' '.join([u.mention for u in maybe])
         ))
         return "**__%s__**\n**Time:** %s\n:white_check_mark: Yes (%d): %s\n:x: No (%d): %s\n:shrug: Maybe (%d): %s" % (
-                title_str.strip(),
-                parsed_time.strftime("%b %d %I:%M%p %Z"),
-                len(yes), ' '.join([u.mention for u in yes]),
-                len(no), ' '.join([u.mention for u in no]),
-                len(maybe), ' '.join([u.mention for u in maybe])
+            title_str.strip(),
+            parsed_time.strftime("%b %d %I:%M%p %Z"),
+            len(yes), ' '.join([u.mention for u in yes]),
+            len(no), ' '.join([u.mention for u in no]),
+            len(maybe), ' '.join([u.mention for u in maybe])
         )
 
     def render_poll_text(self, title, options, votes):
@@ -213,6 +212,7 @@ class EventCog(Cog):
             )
             i += 1
         return text
+
 
 def setup(bot):
     bot.add_cog(EventCog(bot))

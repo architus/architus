@@ -1,7 +1,7 @@
 from collections import deque
-from discord import message
 from src.list_embed import list_embed
 from pytz import timezone
+
 
 class smart_message:
     def __init__(self, message):
@@ -25,6 +25,7 @@ class smart_message:
 
     def has_popup(self):
         return self.popup is not None
+
     def add_popup(self):
         title = "last %d edits" % (len(self.edits))
         lem = list_embed(title, self.ogtime.strftime("%m-%d %I:%M %p"), self.most_recent.author)
@@ -33,13 +34,13 @@ class smart_message:
             lem.add(est.strftime("%I:%M:%S %p"), edit.content)
         return lem.get_embed()
 
-
     def get_datetime(self, timestamp):
-        if (timestamp == None):
+        if timestamp is None:
             return timestamp
         utc = timestamp.replace(tzinfo=timezone('UTC'))
         est = utc.astimezone(timezone('US/Eastern'))
         return est
+
 
 class dumb_message:
     def __init__(self, message, author, mid, timestamp):

@@ -1,4 +1,3 @@
-import time
 import discord
 import re
 from discord.ext.commands import Cog
@@ -11,9 +10,10 @@ OPEN_FOLDER = u"\U0001F4C2"
 BOT_FACE = u"\U0001F916"
 SHIELD = u"\U0001F6E1"
 LOCK_KEY = u"\U0001F510"
-SWORDS= u"\U00002694"
+SWORDS = u"\U00002694"
 HAMMER_PICK = u"\U00002692"
 HAMMER = u"\U0001F528"
+
 
 class Settings(Cog):
 
@@ -52,7 +52,8 @@ class Settings(Cog):
         await msg.add_reaction(HAMMER)
 
         while True:
-            react, user = await self.bot.wait_for('reaction_add', check=lambda r,u: r.message.id == msg.id and u == ctx.author)
+            react, user = await self.bot.wait_for(
+                'reaction_add', check=lambda r, u: r.message.id == msg.id and u == ctx.author)
             e = react.emoji
             print(e)
             if e == '⭐':
@@ -78,21 +79,23 @@ class Settings(Cog):
         return True
 
     async def starboard_threshold(self, ctx):
-        await ctx.channel.send('⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
+        await ctx.channel.send(
+            '⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
         msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         self.guild_settings.get_guild(ctx.guild).starboard_threshold = abs(int(msg.content))
         try:
             resp = "Threshold set"
-        except:
+        except Exception:
             resp = "Threshold unchanged"
         await ctx.channel.send(resp)
 
     async def repost_deletes(self, ctx):
-        await ctx.channel.send('🗑️ If true, deleted messages will be reposted immediately. Enter `true` or `false` to modify it:')
+        await ctx.channel.send(
+            '🗑️ If true, deleted messages will be reposted immediately. Enter `true` or `false` to modify it:')
         msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         resp = "Setting updated"
         settings = self.guild_settings.get_guild(ctx.guild)
-        if msg.content in ['1','True','true','yes', 'y']:
+        if msg.content in ['1', 'True', 'true', 'yes', 'y']:
             settings.repost_del_msg = True
         elif msg.content in ['0', 'False', 'false', 'no']:
             settings.repost_del_msg = False
@@ -105,7 +108,7 @@ class Settings(Cog):
         msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
         resp = "Setting updated"
         settings = self.guild_settings.get_guild(ctx.guild)
-        if msg.content in ['1','True','true','yes', 'y']:
+        if msg.content in ['1', 'True', 'true', 'yes', 'y']:
             settings.manage_emojis = True
         elif msg.content in ['0', 'False', 'false', 'no']:
             settings.manage_emojis = False
@@ -134,6 +137,7 @@ class Settings(Cog):
 
     async def default_role(self, ctx):
         await ctx.channel.send("🛡 New members will be automatically moved into this role. Enter a role id (`!roleids`) to change:")
+
         def check(msg):
             return msg.content != '!roleids' and msg.author == ctx.author
         msg = await self.bot.wait_for('message', check=check)
@@ -163,7 +167,7 @@ class Settings(Cog):
             return msg.content != '!roleids' and msg.author == ctx.author
         await ctx.channel.send("⚔ These are the roles that any member can join at will. Enter a list of role ids (`!roleids`) to toggle. Optionally enter a nickname for the role in the format `nickname::roleid` if the role's name is untypable:")
         msg = await self.bot.wait_for('message', check=check)
-        pattern = re.compile("((?P<nick>\w+)::)?(?P<id>\d{18})")
+        pattern = re.compile(r"((?P<nick>\w+)::)?(?P<id>\d{18})")
         new_roles = []
         settings = self.guild_settings.get_guild(ctx.guild)
         roles = settings.roles_dict
@@ -176,12 +180,12 @@ class Settings(Cog):
         resp = "Roles unchanged"
         for role in new_roles:
             resp = "Roles updated"
-            if role[1] in roles.values(): # if role already in dict
+            if role[1] in roles.values():  # if role already in dict
                 if role[0] not in roles:  # in dict with a different nick
-                    roles = { k:v for k, v in roles.items() if v != role[1] }
+                    roles = {k: v for k, v in roles.items() if v != role[1]}
                     roles[role[0]] = role[1]
                 else:                     # in dict with the same nick
-                    roles = { k:v for k, v in roles.items() if v != role[1] }
+                    roles = {k: v for k, v in roles.items() if v != role[1]}
             else:                         # new role
                 roles[role[0]] = role[1]
 
@@ -195,9 +199,10 @@ class Settings(Cog):
         try:
             settings.gulag_threshold = abs(int(msg.content))
             resp = "Threshold set"
-        except:
+        except Exception:
             resp = "Threshold unchanged"
         await ctx.channel.send(resp)
+
     async def gulag_severity(self, ctx):
         await ctx.channel.send(HAMMER + ' This is the number of minutes a member will be confined to gulag. Half again per extra vote. Enter a number to modify it:')
         settings = self.guild_settings.get_guild(ctx.guild)
@@ -228,6 +233,7 @@ class Settings(Cog):
         em.add_field(name=HAMMER + ' Gulag Severity', value='Current value: %d' % settings.gulag_severity, inline=True)
         em.add_field(name='⚔ Joinable Roles', value='Current value: %s' % ', '.join(roles_names), inline=True)
         return em
+
 
 def setup(bot):
     bot.add_cog(Settings(bot))

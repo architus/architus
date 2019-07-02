@@ -1,9 +1,7 @@
-import youtube_dl
 from discord.ext import commands
 from src.guild_player import GuildPlayer
-import re
-import functools
 import discord
+
 
 class Play(commands.Cog):
 
@@ -55,7 +53,7 @@ class Play(commands.Cog):
                         name = await player.add_url(arg[1])
                         message = '**Queued:** *%s*' % name
                     else:
-                        await player.add_url_now(arg[1]);
+                        await player.add_url_now(arg[1])
                         name = await player.play()
                         if (name):
                             message = "🎶 **Now playing:** *%s*" % name
@@ -123,6 +121,7 @@ class Play(commands.Cog):
         player = self.players[ctx.guild]
         await ctx.channel.send("Removed %d songs from queue." % len(player.q))
         player.clearq()
+
 
 def setup(bot):
     bot.add_cog(Play(bot))
