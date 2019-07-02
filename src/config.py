@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-#from src.commands import *
-#import src.commands as command_modules
+# from src.commands import *
+# import src.commands as command_modules
 
 secret_token = None
 db_user = None
@@ -20,6 +20,7 @@ except Exception as e:
     print(e)
     print('error reading .secret_token, make it you aut')
 
+
 def get_session(pid=None):
     if pid in sessions:
         return sessions[pid]
@@ -35,9 +36,6 @@ def get_session(pid=None):
         print('failed to connect to database')
         print(e)
     return session
-session = get_session()
 
-default_cmds = {}
-#for command in command_modules.__all__:
-    #if command != 'abstract_command':
-        #default_cmds[command.replace('_command', '')] = getattr(globals()[command], command)()
+
+session = get_session()

@@ -2,28 +2,28 @@ from flask import Flask, redirect, request
 from flask_restful import Api, Resource, reqparse
 from flask_cors import CORS
 import requests
-import time
 import json
 import zmq
 import os
 import secrets
 from datetime import datetime, timedelta
-from sqlalchemy.exc import IntegrityError
 
 from src.config import client_id, client_secret, get_session
 from src.models import AppSession
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
-#REDIRECT_URI = 'https://aut-bot.com/app'
+# REDIRECT_URI = 'https://aut-bot.com/app'
 REDIRECT_URI = 'https://api.aut-bot.com/redirect'
-#REDIRECT_URI = 'http://localhost:5000/home'
+# REDIRECT_URI = 'http://localhost:5000/home'
 
 app = Flask(__name__)
 cors = CORS(app)
 
+
 @app.route('/issue')
 def issue():
     return redirect('https://github.com/aut-bot-com/autbot/issues/new')
+
 
 class CustomResource(Resource):
     def __init__(self, q=None):
@@ -42,24 +42,29 @@ class CustomResource(Resource):
     def recv(self):
         return json.loads(self.sub.recv().decode().replace(self.topic + ' ', ''))
 
+
 class Login(CustomResource):
     def get(self):
         nonce = str(secrets.randbits(24))
-        #redirects[nonce] = request.args.get('return') or 'https://aut-bot.com/app'
-        self.enqueue({'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://aut-bot.com/app']})
+        # redirects[nonce] = request.args.get('return') or 'https://aut-bot.com/app'
+        self.enqueue(
+            {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://aut-bot.com/app']})
         self.recv()
-        response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Fapi.aut-bot.com%2Fredirect&response_type=code&scope=identify%20guilds')
+        response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=\
+            https%3A%2F%2Fapi.aut-bot.com%2Fredirect&response_type=code&scope=identify%20guilds')
         response.set_cookie('redirect-nonce', nonce)
         return response
 
+
 class RedirectCallback(CustomResource):
     def get(self):
-        #redirect_url = redirects[request.cookies.get('redirect-nonce')]
+        # redirect_url = redirects[request.cookies.get('redirect-nonce')]
         self.enqueue({'method': "get_callback", 'args': [request.cookies.get('redirect-nonce')]})
         redirect_url = self.recv()['content']
         code = request.args.get('code')
         resp = redirect(f"{redirect_url}?code={code}")
         return resp
+
 
 class User(CustomResource):
 
@@ -71,15 +76,19 @@ class User(CustomResource):
     def post(self, name):
         return "not implemented", 418
 
+
 class GuildCounter(CustomResource):
     def get(self):
         self.enqueue({'method': "guild_counter", 'args': []})
         return self.recv(), 200
 
+
 class Invite(Resource):
 
     def get(self, guild_id):
-        return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}&response_type=code&redirect_uri=https://aut-bot.com/home&permissions=2134207679')
+        return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}\
+            &response_type=code&redirect_uri=https://aut-bot.com/home&permissions=2134207679')
+
 
 def authenticate(session, headers):
     try:
@@ -92,6 +101,7 @@ def authenticate(session, headers):
             return row.discord_access_token
     return False
 
+
 class Coggers(CustomResource):
 
     def get(self, extension):
@@ -100,9 +110,10 @@ class Coggers(CustomResource):
             data, code = discord_identify_request(discord_token)
             if data['id'] == '214037134477230080':
                 self.enqueue({'method': "reload_extension", 'args': [extension]})
-                resp = self.recv()
+                self.recv()
                 return {}, 204
         return {"message": "401: not johnyburd"}, 401
+
 
 class Identify(Resource):
 
@@ -115,6 +126,7 @@ class Identify(Resource):
             return discord_identify_request(discord_token)
 
         return "token invalid or expired", 401
+
 
 class ListGuilds(CustomResource):
 
@@ -155,6 +167,7 @@ def discord_identify_request(token):
     r = requests.get('%s/users/@me' % API_ENDPOINT, headers=headers)
     return r.json(), r.status_code
 
+
 @app.route('/token_exchange', methods=['POST'])
 def token_exchange():
     parser = reqparse.RequestParser()
@@ -186,7 +199,14 @@ def token_exchange():
         resp_data, status_code = discord_identify_request(discord_token)
         if status_code == 200:
             print(resp_data)
-            return json.dumps({'access_token': autbot_token, 'expires_in': expires_in, 'username': resp_data['username'], 'discriminator': resp_data['discriminator'], 'avatar': resp_data['avatar'], 'id': resp_data['id']}), 200
+            return json.dumps({
+                'access_token': autbot_token,
+                'expires_in': expires_in,
+                'username': resp_data['username'],
+                'discriminator': resp_data['discriminator'],
+                'avatar': resp_data['avatar'],
+                'id': resp_data['id']
+            }), 200
     return json.dumps(resp_data), r.status_code
 
 
@@ -197,12 +217,12 @@ def status():
 
 def app_factory(q):
     api = Api(app)
-    api.add_resource(User, "/user/<string:name>", resource_class_kwargs={'q' : q})
+    api.add_resource(User, "/user/<string:name>", resource_class_kwargs={'q': q})
     api.add_resource(Identify, "/identify")
-    api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q' : q})
-    api.add_resource(Login, "/login", resource_class_kwargs={'q' : q})
-    api.add_resource(RedirectCallback, "/redirect", resource_class_kwargs={'q' : q})
-    api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q' : q})
+    api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q': q})
+    api.add_resource(Login, "/login", resource_class_kwargs={'q': q})
+    api.add_resource(RedirectCallback, "/redirect", resource_class_kwargs={'q': q})
+    api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q': q})
     api.add_resource(Invite, "/invite/<string:guild_id>")
-    api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q' : q})
+    api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q': q})
     return app

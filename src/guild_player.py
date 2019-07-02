@@ -84,7 +84,8 @@ class GuildPlayer:
                     pass
             if tracks['next']:
                 # TODO
-                tracks = spotify.next(tracks)
+                # tracks = spotify.next(tracks)
+                pass
             else:
                 break
 
