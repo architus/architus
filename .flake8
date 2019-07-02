@@ -10,3 +10,4 @@ exclude =
     ./src/commands/schedule_command.py
     ./src/spotify_tools.py
     ./src/generate/*
+    .venv/*

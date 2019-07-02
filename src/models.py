@@ -61,9 +61,10 @@ class AppSession(Base):
     discord_expiration = Column('discord_expiration', DateTime)
     autbot_expiration = Column('autbot_expiration', DateTime)
     last_login = Column('last_login', DateTime)
+    discord_id = Column('discord_id', BigInteger)
 
     def __init__(self, autbot_access_token, discord_access_token,
-                 discord_refresh_token, discord_expiration, autbot_expiration, last_login=None):
+                 discord_refresh_token, discord_expiration, autbot_expiration, discord_id, last_login=None):
 
         self.autbot_access_token = autbot_access_token
         self.discord_access_token = discord_access_token
@@ -71,6 +72,7 @@ class AppSession(Base):
         self.discord_expiration = discord_expiration
         self.autbot_expiration = autbot_expiration
         self.last_login = last_login
+        self.discord_id = discord_id
 
 
 class Command(Base):

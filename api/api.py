@@ -151,10 +151,10 @@ class ListGuilds(CustomResource):
         return "token invalid or expired", 401
 
 
-def commit_tokens(autbot_token, discord_token, refresh_token, expires_in):
+def commit_tokens(autbot_token, discord_token, refresh_token, expires_in, discord_id):
     session = get_session(os.getpid())
     time = datetime.now() + timedelta(seconds=int(expires_in) - 60)
-    new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, datetime.now())
+    new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, discord_id, datetime.now())
     session.add(new_appsession)
     session.commit()
 
@@ -193,12 +193,11 @@ def token_exchange():
         discord_token = resp_data['access_token']
         autbot_token = secrets.token_urlsafe()
         expires_in = resp_data['expires_in']
-        commit_tokens(autbot_token, discord_token, resp_data['refresh_token'], expires_in)
 
-        print("trying to get me")
         resp_data, status_code = discord_identify_request(discord_token)
         if status_code == 200:
             print(resp_data)
+            commit_tokens(autbot_token, discord_token, resp_data['refresh_token'], expires_in, resp_data['id'])
             return json.dumps({
                 'access_token': autbot_token,
                 'expires_in': expires_in,
