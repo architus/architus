@@ -97,6 +97,7 @@ class Api(Cog):
     def __init__(self, bot):
         self.bot = bot
         self.fake_messages = {}
+        self.callback_urls = {}
 
     async def handle_socket(self, websocket, path):
         while True:
@@ -126,6 +127,16 @@ class Api(Cog):
             print(f"caught {e} while handling {msg['topic']}s request")
             resp = '{"message": "' + str(e) + '"}'
         yield from pub.send((str(msg['topic']) + ' ' + str(resp)).encode())
+
+    async def store_callback(self, nonce=None, url=None):
+        assert nonce and url
+        self.callback_urls[nonce] = url
+        return {"content": True}
+
+    async def get_callback(self, nonce=None):
+        resp = {"content": self.callback_urls[nonce]}
+        self.callback_urls[nonce] = None
+        return resp
 
     async def guild_counter(self):
         return {'guild_count': self.bot.guild_counter[0], 'user_count': self.bot.guild_counter[1]}

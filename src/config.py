@@ -21,9 +21,9 @@ except Exception as e:
     print('error reading .secret_token, make it you aut')
 
 def get_session(pid=None):
-    print("creating postgres session")
     if pid in sessions:
         return sessions[pid]
+    print("creating postgres session")
     try:
         engine = create_engine("postgresql://{}:{}@localhost/autbot".format(db_user, db_pass))
         Session = sessionmaker(bind=engine)

@@ -18,28 +18,8 @@ API_ENDPOINT = 'https://discordapp.com/api/v6'
 REDIRECT_URI = 'https://api.aut-bot.com/redirect'
 #REDIRECT_URI = 'http://localhost:5000/home'
 
-
 app = Flask(__name__)
 cors = CORS(app)
-
-redirects = {}
-
-@app.route('/login')
-def login():
-    nonce = str(secrets.randbits(24))
-    redirects[nonce] = request.args.get('return') or 'https://aut-bot.com/app'
-    print(redirects[nonce])
-    response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Fapi.aut-bot.com%2Fredirect&response_type=code&scope=identify%20guilds')
-    response.set_cookie('redirect-nonce', nonce)
-    return response
-
-@app.route('/redirect')
-def redirect_thing():
-    redirect_url = redirects[request.cookies.get('redirect-nonce')]
-    code = request.args.get('code')
-    resp = redirect(redirect_url)
-    resp.args.set('code', code)
-    return resp
 
 @app.route('/issue')
 def issue():
@@ -62,6 +42,24 @@ class CustomResource(Resource):
     def recv(self):
         return json.loads(self.sub.recv().decode().replace(self.topic + ' ', ''))
 
+class Login(CustomResource):
+    def get(self):
+        nonce = str(secrets.randbits(24))
+        #redirects[nonce] = request.args.get('return') or 'https://aut-bot.com/app'
+        self.enqueue({'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://aut-bot.com/app']})
+        self.recv()
+        response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=https%3A%2F%2Fapi.aut-bot.com%2Fredirect&response_type=code&scope=identify%20guilds')
+        response.set_cookie('redirect-nonce', nonce)
+        return response
+
+class RedirectCallback(CustomResource):
+    def get(self):
+        #redirect_url = redirects[request.cookies.get('redirect-nonce')]
+        self.enqueue({'method': "get_callback", 'args': [request.cookies.get('redirect-nonce')]})
+        redirect_url = self.recv()['content']
+        code = request.args.get('code')
+        resp = redirect(f"{redirect_url}?code={code}")
+        return resp
 
 class User(CustomResource):
 
@@ -203,6 +201,8 @@ def app_factory(q):
     api.add_resource(User, "/user/<string:name>", resource_class_kwargs={'q' : q})
     api.add_resource(Identify, "/identify")
     api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q' : q})
+    api.add_resource(Login, "/login", resource_class_kwargs={'q' : q})
+    api.add_resource(RedirectCallback, "/redirect", resource_class_kwargs={'q' : q})
     api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q' : q})
     api.add_resource(Invite, "/invite/<string:guild_id>")
     api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q' : q})
