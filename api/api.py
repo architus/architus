@@ -155,7 +155,6 @@ def discord_identify_request(token):
     r = requests.get('%s/users/@me' % API_ENDPOINT, headers=headers)
     return r.json(), r.status_code
 
-
 @app.route('/token_exchange', methods=['POST'])
 def token_exchange():
     parser = reqparse.RequestParser()
