@@ -50,8 +50,8 @@ class Login(CustomResource):
         self.enqueue(
             {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://aut-bot.com/app']})
         self.recv()
-        response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri=\
-            https%3A%2F%2Fapi.aut-bot.com%2Fredirect&response_type=code&scope=identify%20guilds')
+        response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri='
+            'https%3A%2F%2Fapi.aut-bot.com%2Fredirect&response_type=code&scope=identify%20guilds')
         response.set_cookie('redirect-nonce', nonce)
         return response
 
