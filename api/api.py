@@ -98,20 +98,18 @@ def authenticate(session, headers):
     rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
     for row in rows:
         if datetime.now() < row.autbot_expiration:
-            return row.discord_access_token
+            return row
     return False
 
 
 class Coggers(CustomResource):
 
     def get(self, extension):
-        discord_token = authenticate(self.session, request.headers)
-        if discord_token:
-            data, code = discord_identify_request(discord_token)
-            if data['id'] == '214037134477230080':
-                self.enqueue({'method': "reload_extension", 'args': [extension]})
-                self.recv()
-                return {}, 204
+        discord_id = authenticate(self.session, request.headers).discord_id
+        if discord_id and discord_id == 214037134477230080:
+            self.enqueue({'method': "reload_extension", 'args': [extension]})
+            self.recv()
+            return {}, 204
         return {"message": "401: not johnyburd"}, 401
 
 
@@ -121,7 +119,7 @@ class Identify(Resource):
         session = get_session(os.getpid())
         headers = request.headers
         print(headers)
-        discord_token = authenticate(session, headers)
+        discord_token = authenticate(session, headers).discord_access_token
         if discord_token:
             return discord_identify_request(discord_token)
 
@@ -134,7 +132,8 @@ class ListGuilds(CustomResource):
         session = get_session(os.getpid())
         headers = request.headers
         print(headers)
-        discord_token = authenticate(session, headers)
+        row = authenticate(session, headers)
+        discord_token = row.discord_access_token
         if discord_token:
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -142,7 +141,7 @@ class ListGuilds(CustomResource):
             }
             r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
             if r.status_code == 200:
-                self.enqueue({'method': "tag_autbot_guilds", 'args': [r.json()]})
+                self.enqueue({'method': "tag_autbot_guilds", 'args': [r.json(), row.discord_id]})
                 resp = self.recv()
             else:
                 resp = r.json

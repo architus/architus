@@ -80,10 +80,13 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return {}
 
-    async def tag_autbot_guilds(self, guild_list):
-        autbot_guilds = [g.id for g in self.bot.guilds]
-        for guild in guild_list:
-            guild['has_autbot'] = int(guild['id']) in autbot_guilds
+    async def tag_autbot_guilds(self, guild_list, user_id):
+        guild_settings = self.bot.get_cog("GuildSettings")
+        for guild_dict in guild_list:
+            guild = self.bot.get_guild(int(guild_dict['id']))
+            settings = guild_settings.get_guild(guild, self.bot.session)
+            guild_dict['has_autbot'] = guild is not None
+            guild_dict['autbot_admin'] = bool(settings) and user_id in settings.admins_ids
         return guild_list
 
     async def interpret(

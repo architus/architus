@@ -206,6 +206,8 @@ class GuildSettings(Cog):
         self.guilds = {}
 
     def get_guild(self, guild, session=None):
+        if guild is None:
+            return None
         try:
             return self.guilds[guild]
         except KeyError:
