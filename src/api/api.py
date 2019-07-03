@@ -48,8 +48,9 @@ class Api(Cog):
     async def store_callback(self, nonce=None, url=None):
         assert nonce and url
         if not any(re.match(pattern, url) for pattern in (
-                r'https:\/\/[A-Za-z0-9-]{3,24}--aut-bot\.netlify\.com\/app',
+                r'https:\/\/[A-Fa-f0-9]{24}--aut-bot\.netlify\.com\/app',
                 r'https:\/\/deploy-preview-[0-9]+--aut-bot\.netlify\.com\/app',
+                r'https:\/\/staging\.aut-bot.com\/app',
                 r'https:\/\/aut-bot.com\/app',
                 r'http:\/\/localhost:3000\/app')):
             url = CALLBACK_URL
