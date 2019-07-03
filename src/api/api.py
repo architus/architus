@@ -58,11 +58,7 @@ class Api(Cog):
         return {"content": True}
 
     async def get_callback(self, nonce=None):
-        try:
-            url = self.callback_urls[nonce]
-        except KeyError:
-            print("couldn't find callback url, returning default")
-            url = CALLBACK_URL
+        url = self.callback_urls.get(nonce, CALLBACK_URL)
         resp = {"content": url}
         self.callback_urls[nonce] = None
         return resp

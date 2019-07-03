@@ -75,6 +75,20 @@ class AppSession(Base):
         self.discord_id = discord_id
 
 
+class Log(Base):
+    __tablename__ = 'tb_logs'
+    guild_id = Column('guild_id', BigInteger, primary_key=True)
+    type = Column('type', Text, primary_key=True)
+    message_id = Column('message_id', BigInteger)
+    content = Column('content', Text, primary_key=True)
+
+    def __init__(self, guild_id, type, content, message_id=None):
+        self.guild_id = guild_id
+        self.type = type
+        self.content = content
+        self.message_id = message_id
+
+
 class Command(Base):
     __tablename__ = 'tb_commands'
     trigger = Column('trigger', Text, primary_key=True)

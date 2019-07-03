@@ -56,12 +56,20 @@ class Login(CustomResource):
         return response
 
 
+class Invite(CustomResource):
+    def get(self, guild_id):
+        return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}'
+                        '&response_type=code&redirect_uri=https://api.aut-bot.com/redirect&permissions=2134207679')
+
+
 class RedirectCallback(CustomResource):
     def get(self):
         # redirect_url = redirects[request.cookies.get('redirect-nonce')]
         self.enqueue({'method': "get_callback", 'args': [request.cookies.get('redirect-nonce')]})
         redirect_url = self.recv()['content']
         code = request.args.get('code')
+        print(request.args.get('permissions'))
+        print(request.args.get('guild_id'))
         resp = redirect(f"{redirect_url}?code={code}")
         return resp
 
