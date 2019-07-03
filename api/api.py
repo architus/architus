@@ -25,6 +25,18 @@ def issue():
     return redirect('https://github.com/aut-bot-com/autbot/issues/new')
 
 
+def authenticate(session, headers):
+    try:
+        autbot_token = headers['Authorization']
+    except KeyError:
+        return None
+    rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
+    for row in rows:
+        if datetime.now() < row.autbot_expiration:
+            return row
+    return None
+
+
 class CustomResource(Resource):
     def __init__(self, q=None):
         self.session = get_session(os.getpid())
@@ -63,8 +75,11 @@ class Invite(CustomResource):
 
 
 class RedirectCallback(CustomResource):
+    '''
+    Hit by discord returning from auth.
+    collects the return url from the cookie and sends the user back where they came from
+    '''
     def get(self):
-        # redirect_url = redirects[request.cookies.get('redirect-nonce')]
         self.enqueue({'method': "get_callback", 'args': [request.cookies.get('redirect-nonce')]})
         redirect_url = self.recv()['content']
         code = request.args.get('code')
@@ -75,7 +90,6 @@ class RedirectCallback(CustomResource):
 
 
 class User(CustomResource):
-
     def get(self, name):
         self.enqueue({'method': "fetch_user_dict", 'args': [name]})
         name = self.recv()
@@ -91,27 +105,27 @@ class GuildCounter(CustomResource):
         return self.recv(), 200
 
 
+class Settings(CustomResource):
+    def get(self, guild_id, setting):
+        # discord_id = authenticate(self.session, request.headers).discord_id
+        self.enqueue({'method': "settings_access", 'args': [guild_id, setting, None]})
+        return self.recv(), 200
+
+    def post(self, guild_id, setting):
+        # parser = reqparse.RequestParser()
+        # parser.add_argument('value')
+        # args = parser.parse_args()
+        return 400
+
+
 class Invite(Resource):
-
     def get(self, guild_id):
-        return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}\
-            &response_type=code&redirect_uri=https://aut-bot.com/home&permissions=2134207679')
-
-
-def authenticate(session, headers):
-    try:
-        autbot_token = headers['Authorization']
-    except KeyError:
-        return False
-    rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
-    for row in rows:
-        if datetime.now() < row.autbot_expiration:
-            return row
-    return False
+        return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}'
+                        '&response_type=code&redirect_uri=https://aut-bot.com/home&permissions=2134207679')
 
 
 class Coggers(CustomResource):
-
+    '''provide an endpoint to reload cogs in the bot'''
     def get(self, extension):
         discord_id = authenticate(self.session, request.headers).discord_id
         if discord_id and discord_id == 214037134477230080:
@@ -225,6 +239,7 @@ def status():
 def app_factory(q):
     api = Api(app)
     api.add_resource(User, "/user/<string:name>", resource_class_kwargs={'q': q})
+    api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", resource_class_kwargs={'q': q})
     api.add_resource(Identify, "/identify")
     api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q': q})
     api.add_resource(Login, "/login", resource_class_kwargs={'q': q})

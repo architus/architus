@@ -76,6 +76,14 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return {}
 
+    async def settings_access(self, guild_id=None, setting=None, value=None):
+        guild_settings = self.bot.get_cog("GuildSettings")
+        guild = self.bot.get_guild(guild_id)
+        settings = guild_settings.get_guild(guild, self.bot.session)
+        if hasattr(settings, setting):
+            return {'value': getattr(settings, setting)}
+        return {'value': "unknown setting"}
+
     async def tag_autbot_guilds(self, guild_list, user_id):
         guild_settings = self.bot.get_cog("GuildSettings")
         for guild_dict in guild_list:
