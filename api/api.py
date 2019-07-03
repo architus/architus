@@ -92,7 +92,7 @@ class RedirectCallback(CustomResource):
         perms = request.args.get('permissions')
         guild_id = request.args.get('guild_id')
 
-        if code:
+        if code and not perms:
             redirect_url += f"?code={code}"
         if perms:
             redirect_url += f"?permissions={perms}"

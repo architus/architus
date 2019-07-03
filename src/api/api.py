@@ -59,9 +59,8 @@ class Api(Cog):
         return {"content": True}
 
     async def get_callback(self, nonce=None):
-        url = self.callback_urls.get(nonce, CALLBACK_URL)
+        url = self.callback_urls.pop(nonce, CALLBACK_URL)
         resp = {"content": url}
-        self.callback_urls[nonce] = None
         return resp
 
     async def guild_counter(self):
