@@ -70,8 +70,14 @@ class Login(CustomResource):
 
 class Invite(CustomResource):
     def get(self, guild_id):
-        return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}'
+        nonce = str(secrets.randbits(24))
+        self.enqueue(
+            {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://aut-bot.com/app']})
+        self.recv()
+        response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}'
                         '&response_type=code&redirect_uri=https://api.aut-bot.com/redirect&permissions=2134207679')
+        response.set_cookie('redirect-nonce', nonce)
+        return response
 
 
 class RedirectCallback(CustomResource):
@@ -83,9 +89,17 @@ class RedirectCallback(CustomResource):
         self.enqueue({'method': "get_callback", 'args': [request.cookies.get('redirect-nonce')]})
         redirect_url = self.recv()['content']
         code = request.args.get('code')
-        print(request.args.get('permissions'))
-        print(request.args.get('guild_id'))
-        resp = redirect(f"{redirect_url}?code={code}")
+        perms = request.args.get('permissions')
+        guild_id = request.args.get('guild_id')
+
+        if code:
+            redirect_url += f"?code={code}"
+        if perms:
+            redirect_url += f"?permissions={perms}"
+        if guild_id:
+            redirect_url += f"?guild_id={guild_id}"
+
+        resp = redirect(redirect_url)
         return resp
 
 
@@ -121,7 +135,7 @@ class Settings(CustomResource):
 class Invite(Resource):
     def get(self, guild_id):
         return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}'
-                        '&response_type=code&redirect_uri=https://aut-bot.com/home&permissions=2134207679')
+                        '&response_type=code&redirect_uri=https://api.aut-bot.com/redirect&permissions=2134207679')
 
 
 class Coggers(CustomResource):
