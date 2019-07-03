@@ -144,7 +144,7 @@ class ListGuilds(CustomResource):
                 self.enqueue({'method': "tag_autbot_guilds", 'args': [r.json(), row.discord_id]})
                 resp = self.recv()
             else:
-                resp = r.json
+                resp = r.json()
             return resp, r.status_code
 
         return "token invalid or expired", 401
