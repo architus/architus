@@ -15,7 +15,8 @@ class emoji_manager():
         self.guild = guild
         self.deletable_messages = deletable_messages
         self._priorities = list(self.guild.emojis)
-        os.makedirs(EMOJI_DIR + '/' + str(self.guild.id))
+        if not os.path.exists(EMOJI_DIR + '/' + str(self.guild.id)):
+            os.makedirs(EMOJI_DIR + '/' + str(self.guild.id))
 
     @property
     def max_emojis(self):
