@@ -6,6 +6,7 @@ import zmq.asyncio
 import json
 import websockets
 import ssl
+import os
 from pytz import timezone
 
 from src.user_command import UserCommand
@@ -135,16 +136,9 @@ class CoolBot(Bot):
 BOT_PREFIX = ("?", "!")
 coolbot = CoolBot(command_prefix=BOT_PREFIX)
 
-coolbot.load_extension('src.commands.schedule_command')
-coolbot.load_extension('src.commands.eight_ball_command')
-coolbot.load_extension('src.commands.settings_command')
-coolbot.load_extension('src.commands.quote_command')
-coolbot.load_extension('src.commands.set_command')
-coolbot.load_extension('src.commands.play_command')
-coolbot.load_extension('src.commands.purge_command')
-coolbot.load_extension('src.commands.messagecount_command')
-coolbot.load_extension('src.commands.role_command')
-coolbot.load_extension('src.commands.gulag_command')
+for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
+    coolbot.load_extension(f"src.ext.{ext[:-3]}")
+
 coolbot.load_extension('src.emoji_manager')
 coolbot.load_extension('src.api.api')
 coolbot.load_extension('src.guild_settings')
