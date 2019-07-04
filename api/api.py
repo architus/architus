@@ -74,8 +74,11 @@ class Invite(CustomResource):
         self.enqueue(
             {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://aut-bot.com/app']})
         self.recv()
-        response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}'
-                        '&response_type=code&redirect_uri=https://api.aut-bot.com/redirect&permissions=2134207679')
+        response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}'
+                            '&scope=bot&guild_id={guild_id}'
+                            '&response_type=code'
+                            '&redirect_uri=https://api.aut-bot.com/redirect'
+                            '&permissions=2134207679')
         response.set_cookie('redirect-nonce', nonce)
         return response
 
@@ -130,12 +133,6 @@ class Settings(CustomResource):
         # parser.add_argument('value')
         # args = parser.parse_args()
         return 400
-
-
-class Invite(Resource):
-    def get(self, guild_id):
-        return redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}&scope=bot&guild_id={guild_id}'
-                        '&response_type=code&redirect_uri=https://api.aut-bot.com/redirect&permissions=2134207679')
 
 
 class Coggers(CustomResource):

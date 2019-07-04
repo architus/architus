@@ -50,7 +50,7 @@ class Api(Cog):
         if not any(re.match(pattern, url) for pattern in (
                 r'https:\/\/[A-Fa-f0-9]{24}--aut-bot\.netlify\.com\/app',
                 r'https:\/\/deploy-preview-[0-9]+--aut-bot\.netlify\.com\/app',
-                r'https:\/\/staging\.aut-bot.com\/app',
+                r'https:\/\/develop\.aut-bot.com\/app',
                 r'https:\/\/aut-bot.com\/app',
                 r'http:\/\/localhost:3000\/app')):
             url = CALLBACK_URL
