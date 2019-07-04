@@ -9,6 +9,8 @@ import aiohttp
 from bs4 import BeautifulSoup
 from src.list_embed import ListEmbed as list_embed
 
+import subprocess
+
 
 class GuildPlayer:
     def __init__(self, bot):
@@ -29,7 +31,7 @@ class GuildPlayer:
             # return await self.skip()
 
         try:
-            self.player = self.voice.create_ffmpeg_player(filepath, after=self.agane)
+            self.player = self.voice.create_ffmpeg_player(filepath, after=self.agane, stderr=subprocess.STDOUT)
             self.player.start()
         except Exception as e:
             print(e)
@@ -53,7 +55,7 @@ class GuildPlayer:
 
         opts = {
             'format': 'webm[abr>0]/bestaudio/best',
-            'prefer_ffmpeg': False
+            'prefer_ffmpeg': True
         }
         ydl = youtube_dl.YoutubeDL(opts)
         func = functools.partial(ydl.extract_info, url, download=False)
@@ -62,6 +64,7 @@ class GuildPlayer:
             info = info['entries'][0]
 
         download_url = info['url']
+        print("download_url")
         print(download_url)
         self.voice.play(discord.FFmpegPCMAudio(download_url), after=self.agane)
         return 'hello'
@@ -115,14 +118,11 @@ class GuildPlayer:
             async with session.get(url) as resp:
                 html = await resp.read()
 
-                def get_video(html):
-                    soup = BeautifulSoup(html, 'lxml')
-                    print(soup.findAll(attrs={'class': 'yt-uix-tile-link'}, limit=2))
-                    for video in soup.findAll(attrs={'class': 'yt-uix-tile-link'}):
-                        if ('googleadservices' not in video['href']):
-                            return 'https://www.youtube.com' + video['href']
-                loop = asyncio.get_event_loop()
-                return await loop.run_in_executor(None, get_video, html)
+                soup = BeautifulSoup(html.decode('utf-8'), 'lxml')
+                #print(soup.findAll(attrs={'class': 'yt-uix-tile-link'}, limit=2))
+                for video in soup.findAll(attrs={'class': 'yt-uix-tile-link'}):
+                    if ('googleadservices' not in video['href']):
+                        return 'https://www.youtube.com' + video['href']
 
         return ''
 
@@ -169,7 +169,7 @@ class GuildPlayer:
     def is_connected(self):
         return self.voice is not None and self.voice.is_connected()
 
-    def agane(self):
+    def agane(self, trash):
         if self.playing_file:
             return
 
@@ -177,7 +177,7 @@ class GuildPlayer:
             coro = self.voice.disconnect()
         else:
             coro = self.play()
-        fut = discord.compat.run_coroutine_threadsafe(coro, self.bot.loop)
+        fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
         try:
             fut.result()
         except Exception as e:
