@@ -16,6 +16,9 @@ HAMMER = u"\U0001F528"
 
 
 class Settings(Cog):
+    '''
+    Manage server specific aut-bot settings
+    '''
 
     def __init__(self, bot):
         self.bot = bot
@@ -24,8 +27,9 @@ class Settings(Cog):
     def guild_settings(self):
         return self.bot.get_cog('GuildSettings')
 
-    @commands.command()
+    @commands.command(hidden=True)
     async def roleids(self, ctx):
+        '''Shows the discord id for every role in your server'''
         lem = ListEmbed(ctx.channel.guild.name, '')
         lem.name = "Role IDs"
         for role in ctx.guild.roles:
@@ -34,6 +38,7 @@ class Settings(Cog):
 
     @commands.command()
     async def settings(self, ctx):
+        '''Open an interactive settings dialog'''
         settings = self.guild_settings.get_guild(ctx.guild)
         if ctx.author.id not in settings.admins_ids:
             ctx.channel.send('nope, sorry')

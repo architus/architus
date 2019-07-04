@@ -25,7 +25,10 @@ class PollEvent(object):
         self.votes = votes
 
 
-class EventCog(Cog):
+class EventCog(Cog, name="Events"):
+    '''
+    Special messages that track the number of participants
+    '''
 
     YES_EMOJI = '✅'
     NO_EMOJI = '❌'
@@ -117,7 +120,10 @@ class EventCog(Cog):
 
     @commands.command()
     async def schedule(self, ctx, *argst):
-        '''Start an event poll'''
+        '''
+        Start an event poll.
+        Timezone is based on your servers voice zone.
+        '''
         args = list(argst)
         print(args)
         # event bot's id
@@ -157,7 +163,10 @@ class EventCog(Cog):
 
     @commands.command()
     async def poll(self, ctx, *args):
-        '''Starts a poll with some pretty formatting. Supports up to 10 options'''
+        '''
+        Starts a poll with some pretty formatting.
+        Supports up to 10 options
+        '''
         pattern = re.compile(r'.poll (?P<title>(?:\S*[^\s,] )+)(?P<options>.*$)')
         match = pattern.search(unidecode(ctx.message.content))
         if not match:

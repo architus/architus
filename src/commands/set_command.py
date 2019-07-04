@@ -6,7 +6,7 @@ import re
 import discord
 
 
-class SetCommand(commands.Cog):
+class SetCog(commands.Cog, name="Auto Responses"):
 
     def __init__(self, bot):
         self.bot = bot
@@ -18,7 +18,7 @@ class SetCommand(commands.Cog):
 
     @commands.command()
     async def remove(self, ctx, trigger):
-        '''remove a user command'''
+        '''Remove a user command.'''
         msg = 'no command with that trigger'
         for oldcommand in self.bot.user_commands[ctx.guild.id]:
             if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
@@ -111,4 +111,4 @@ def update_command(session, triggerkey, response, count, guild, author_id, delet
 
 
 def setup(bot):
-    bot.add_cog(SetCommand(bot))
+    bot.add_cog(SetCog(bot))

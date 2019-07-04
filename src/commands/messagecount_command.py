@@ -7,7 +7,7 @@ import json
 IMAGE_CHANNEL_ID = 577523623355613235
 LINHS_ID = 81231616772411392
 
-class MessageStats(commands.Cog):
+class MessageStats(commands.Cog, name="Server Statistics"):
 
     def __init__(self, bot):
         self.bot = bot

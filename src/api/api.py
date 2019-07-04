@@ -177,7 +177,7 @@ class Api(Cog):
                 fkmsg = self.fake_messages[guild_id][react[0]]
                 fkmsg.sends = sends
                 react = await fkmsg.remove_reaction(react[1])
-                await self.bot.get_cog("EventCog").on_reaction_remove(react, MockMember())
+                await self.bot.get_cog("Events").on_reaction_remove(react, MockMember())
         resp = {
             '_module': 'interpret',
             'content': '\n'.join(sends),
