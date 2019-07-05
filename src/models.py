@@ -94,7 +94,7 @@ class Command(Base):
     trigger = Column('trigger', Text, primary_key=True)
     response = Column('response', Text)
     count = Column('count', BigInteger)
-    server_id = Column('server_id', BigInteger)
+    server_id = Column('server_id', BigInteger, primary_key=True)
     author_id = Column('author_id', BigInteger)
 
     def __init__(self, trigger, response, count, server_id, author_id):

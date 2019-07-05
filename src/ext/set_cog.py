@@ -1,6 +1,5 @@
 from discord.ext import commands
-from src.models import Command
-from src.user_command import UserCommand, VaguePatternError, update_command
+from src.user_command import UserCommand, VaguePatternError, LongTriggerException, ShortTriggerException, ResponseKeywordException, DuplicatedTriggerException, update_command
 from src.config import get_session
 import re
 import discord
@@ -47,58 +46,27 @@ class SetCog(commands.Cog, name="Auto Responses"):
                 if botcommands:
                     await ctx.channel.send(botcommands.mention + '?')
                     return
+
         parser = re.search('!set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
         msg = "try actually reading the syntax"
-        if parser and (len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and ctx.guild.default_role.mention
-                       not in parser.group(2) or from_admin):
+        if parser:
             try:
-                command = UserCommand(parser.group(1), parser.group(2), 0, ctx.guild, ctx.author.id)
+                command = UserCommand(self.session, parser.group(1), parser.group(2), 0, ctx.guild, ctx.author.id, new=True)
             except VaguePatternError:
-                await self.channel.send("let's try making that a little more specific please")
-                return
-
-            if self.validate(ctx.guild.id, command):
-                user_commands[ctx.guild.id].append(command)
-                if ctx.guild.id > 1000000000:
-                    new_command = Command(str(ctx.guild.id) + command.raw_trigger, command.raw_response,
-                                          command.count, ctx.guild.id, ctx.author.id)
-                    self.session.add(new_command)
-                    self.session.commit()
-                msg = 'command set'
-            elif parser.group(2).strip() == "remove":
-                msg = 'no command with that trigger'
-                for oldcommand in user_commands[ctx.guild.id]:
-                    if oldcommand == command:
-                        user_commands[ctx.guild.id].remove(oldcommand)
-                        update_command(self.session, oldcommand.raw_trigger, '', 0,
-                                       ctx.guild, ctx.author.id, delete=True)
-                        msg = 'removed `' + oldcommand.raw_trigger + "::" + oldcommand.raw_response + '`'
-                        msg += "\nthis syntax is deprecated and will go away soon."
-                        msg += f" try using `!remove {oldcommand.raw_trigger}` next time"
-            elif parser.group(2).strip() == "list":
-                for oldcommand in user_commands[ctx.guild.id]:
-                    if oldcommand == command:
-                        msg = f"`{oldcommand}`"
-                        break
-                else:
-                    msg = 'no command with that trigger'
-            elif parser.group(2).strip() == "author":
-                msg = 'no command with that trigger'
-                for oldcommand in user_commands[ctx.guild.id]:
-                    if oldcommand == command:
-                        try:
-                            usr = await self.bot.fetch_user(int(oldcommand.author_id))
-                            msg = usr.name + '#' + usr.discriminator
-                        except Exception:
-                            msg = 'idk'
+                msg = "let's try making that a little more specific please"
+            except (LongTriggerException, ShortTriggerException) as e:
+                msg = str(e)
+            except ResponseKeywordException:
+                if parser.group(2).strip() == "remove":
+                    msg = "please use `!remove` instead"
+                elif parser.group(2).strip() in ("author", "list"):
+                    msg = f"please check https://aut-bot.com/app/{ctx.guild.id}/responses"
+            except DuplicatedTriggerException as e:
+                msg = "That's a dupe idiot"
             else:
-                for oldcommand in user_commands[ctx.guild.id]:
-                    if oldcommand == command:
-                        msg = f'Remove `{oldcommand.raw_trigger}` first (`!remove`)'
-        elif parser and len(parser.group(2)) >= 200:
-            msg = 'too long, sorry. ask an admin to set it'
-        elif parser and len(parser.group(1)) > 1:
-            msg = 'too short'
+                user_commands[ctx.guild.id].append(command)
+                msg = 'command set'
+
         await ctx.channel.send(msg)
 
 
