@@ -15,6 +15,7 @@ class Api(Cog):
         self.bot = bot
         self.fake_messages = {}
         self.callback_urls = {}
+        self.user_dicts = {}
 
     async def handle_socket(self, websocket, path):
         while True:
@@ -67,7 +68,7 @@ class Api(Cog):
         return {'guild_count': self.bot.guild_counter[0], 'user_count': self.bot.guild_counter[1]}
 
     async def fetch_user_dict(self, id):
-        usr = await self.bot.fetch_user(int(id))
+        usr = self.user_dicts.setdefault(id, await self.bot.fetch_user(int(id)))
         return {
             'name': usr.name,
             'avatar': usr.avatar,
