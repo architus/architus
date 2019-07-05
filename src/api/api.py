@@ -68,7 +68,10 @@ class Api(Cog):
         return {'guild_count': self.bot.guild_counter[0], 'user_count': self.bot.guild_counter[1]}
 
     async def fetch_user_dict(self, id):
-        usr = self.user_dicts.setdefault(id, await self.bot.fetch_user(int(id)))
+        if id in self.user_dicts:
+            usr = self.user_dicts[id]
+        else:
+            self.user_dicts = await self.bot.fetch_user(int(id))
         return {
             'name': usr.name,
             'avatar': usr.avatar,
