@@ -124,6 +124,7 @@ class GuildCounter(CustomResource):
 
 class AutoResponses(CustomResource):
     def get(self, guild_id):
+        # TODO this should probably be authenticated
         if authenticate(self.session, request.headers) is None and False:
             return "not authorized", 401
         rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
@@ -131,7 +132,7 @@ class AutoResponses(CustomResource):
         authors = {}
         for cmd in rows:
             commands.append({
-                'trigger': cmd.trigger,
+                'trigger': cmd.trigger.replace(str(cmd.server_id), "", 1),
                 'response': cmd.response,
                 'count': cmd.count,
                 'author_id': cmd.author_id
@@ -145,6 +146,22 @@ class AutoResponses(CustomResource):
             'commands': commands
         }
         return resp, 200
+
+    def post(self, guild_id):
+        row = authenticate(self.session, request.headers)
+        if row is None:
+            return "not authorized", 401
+        user_id = row.discord_id
+
+        parser = reqparse.RequestParser()
+        parser.add_argument('trigger')
+        parser.add_argument('response')
+        args = parser.parse_args()
+        if args.get('trigger') is None or args.get('response') is None:
+            return "Malformed request", 400
+
+        self.enqueue({'method': "set_response", 'args': [user_id, guild_id, args.get('trigger'), args.get('response')]})
+        return self.recv(), 200
 
 
 class Settings(CustomResource):
@@ -279,7 +296,7 @@ def app_factory(q):
     api.add_resource(Identify, "/identify")
     api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q': q})
     api.add_resource(Login, "/login", resource_class_kwargs={'q': q})
-    api.add_resource(AutoResponses, "/auto_responses/<int:guild_id>", resource_class_kwargs={'q': q})
+    api.add_resource(AutoResponses, "/responses/<int:guild_id>", resource_class_kwargs={'q': q})
     api.add_resource(RedirectCallback, "/redirect", resource_class_kwargs={'q': q})
     api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q': q})
     api.add_resource(Invite, "/invite/<string:guild_id>")

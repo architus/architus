@@ -222,7 +222,7 @@ class ShortTriggerException(Exception):
     pass
 
 
-class LongTriggerException(Exception):
+class LongResponseException(Exception):
     pass
 
 

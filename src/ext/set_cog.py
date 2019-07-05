@@ -1,5 +1,5 @@
 from discord.ext import commands
-from src.user_command import UserCommand, VaguePatternError, LongTriggerException, ShortTriggerException, ResponseKeywordException, DuplicatedTriggerException, update_command
+from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException, ResponseKeywordException, DuplicatedTriggerException, update_command
 from src.config import get_session
 import re
 import discord

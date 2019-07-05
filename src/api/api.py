@@ -5,6 +5,7 @@ import secrets
 import websockets
 import re
 from discord.ext.commands import Cog, Context
+from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException, ResponseKeywordException, DuplicatedTriggerException, update_command
 
 CALLBACK_URL = "https://aut-bot.com/app"
 
@@ -65,6 +66,25 @@ class Api(Cog):
 
     async def guild_counter(self):
         return {'guild_count': self.bot.guild_counter[0], 'user_count': self.bot.guild_counter[1]}
+
+    async def set_response(self, user_id, guild_id, trigger, response):
+        guild = self.bot.get_guild(int(guild_id))
+        try:
+            command = UserCommand(self.bot.session, trigger, response, 0, guild, user_id, new=True)
+        except VaguePatternError:
+            msg = "Capture group too broad."
+        except LongResponseException:
+            msg = "Response is too long."
+        except ShortTriggerException as e:
+            msg = "Trigger is too short."
+        except ResponseKeywordException:
+            msg = "That response is protected, please use another."
+        except DuplicatedTriggerException as e:
+            msg = "Remove duplicated trigger first."
+        else:
+            self.bot.user_commands[guild_id].append(command)
+            msg = 'Sucessfully Set'
+        return {'message': msg}
 
     async def fetch_user_dict(self, id):
         usr = self.bot.get_user(int(id))
