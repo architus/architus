@@ -3,11 +3,8 @@ max_line_length = 120
 ignore = W606,W503
 exclude =
     bot.py
-    ./src/commands/settings_command.py
-    ./src/commands/say_command.py
-    ./src/commands/set_command.py
-    ./src/commands/messagecount_command.py
-    ./src/commands/schedule_command.py
+    ./src/ext/settings_cog.py
+    ./src/ext/say_command.py
     ./src/spotify_tools.py
     ./src/generate/*
     .venv/*

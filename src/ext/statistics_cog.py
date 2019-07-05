@@ -1,11 +1,14 @@
 from discord.ext import commands
-import random, string, os
+import random
+import string
+import os
 import src.generate.wordcount as wordcount_gen
 import discord
 import json
 
 IMAGE_CHANNEL_ID = 577523623355613235
 LINHS_ID = 81231616772411392
+
 
 class MessageStats(commands.Cog, name="Server Statistics"):
 
@@ -29,8 +32,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        self.cache.setdefault(ctxchannel.guild, {})
-
+        self.cache.setdefault(guild, {})
 
     @commands.command()
     async def spellcheck(self, ctx, victim: discord.Member):
@@ -46,8 +48,9 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         async with ctxchannel.typing():
             for channel in ctx.guild.text_channels:
                 try:
-                    if not channel in blacklist:
-                        if not channel in cache[ctxchannel.guild]['messages'].keys() or not cache[ctxchannel.guild]['messages'][channel]:
+                    if channel not in blacklist:
+                        if channel not in cache[ctxchannel.guild]['messages'].keys()\
+                                or not cache[ctxchannel.guild]['messages'][channel]:
                             print("reloading cache for " + channel.name)
                             iterator = [log async for log in channel.history(limit=7500)]
                             logs = list(iterator)
@@ -59,13 +62,13 @@ class MessageStats(commands.Cog, name="Server Statistics"):
                                     if word[0] == '!':
                                         continue
                                     words += 1
-                                    if word in self.dictionary and len(word) > 1 or word in ['a','i', 'A', 'I']:
+                                    if word in self.dictionary and len(word) > 1 or word in ['a', 'i', 'A', 'I']:
                                         correct_words += 1
                 except Exception as e:
                     print(e)
         linh_modifier = 10 if victim.id == LINHS_ID else 0
         await ctx.channel.send("{0:.1f}% out of the {1:,} scanned words sent by {2} are spelled correctly".format(
-            ((correct_words/words)*100) - linh_modifier, words, victim.display_name))
+            ((correct_words / words) * 100) - linh_modifier, words, victim.display_name))
 
     @commands.command()
     async def messagecount(self, ctx, *args):
@@ -80,16 +83,17 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         async with ctxchannel.typing():
             for channel in ctx.guild.text_channels:
                 try:
-                    if not channel in blacklist:
-                        if not channel in cache[ctxchannel.guild]['messages'].keys() or not cache[ctxchannel.guild]['messages'][channel]:
+                    if channel not in blacklist:
+                        if channel not in cache[ctxchannel.guild]['messages'].keys()\
+                                or not cache[ctxchannel.guild]['messages'][channel]:
                             print("reloading cache for " + channel.name)
                             iterator = [log async for log in channel.history(limit=1000000)]
                             logs = list(iterator)
                             cache[ctxchannel.guild]['messages'][channel] = logs
                         msgs = cache[ctxchannel.guild]['messages'][channel]
                         for msg in msgs:
-                            message_counts[msg.author] = (message_counts[msg.author] if msg.author in message_counts else 0) + 1
-                            word_counts[msg.author] = (word_counts[msg.author] if msg.author in word_counts else 0) + len(msg.clean_content.split())
+                            message_counts[msg.author] = message_counts.get(msg.author, 0) + 1
+                            word_counts[msg.author] = word_counts.get(msg.author, 0) + len(msg.clean_content.split())
                 except Exception as e:
                     print(e)
 
@@ -104,11 +108,13 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         em.set_image(url=msg.attachments[0].url)
         em.color = 0x7b8fb7
         if victim:
-            em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(victim.display_name, word_counts[victim], message_counts[victim]), icon_url=victim.avatar_url)
+            em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
+                victim.display_name, word_counts[victim], message_counts[victim]), icon_url=victim.avatar_url)
 
         await ctx.channel.send(embed=em)
 
         os.remove(f"res/word{key}.png")
+
 
 def setup(bot):
     bot.add_cog(MessageStats(bot))

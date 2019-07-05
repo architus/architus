@@ -119,7 +119,7 @@ class GuildPlayer:
                 html = await resp.read()
 
                 soup = BeautifulSoup(html.decode('utf-8'), 'lxml')
-                #print(soup.findAll(attrs={'class': 'yt-uix-tile-link'}, limit=2))
+                # print(soup.findAll(attrs={'class': 'yt-uix-tile-link'}, limit=2))
                 for video in soup.findAll(attrs={'class': 'yt-uix-tile-link'}):
                     if ('googleadservices' not in video['href']):
                         return 'https://www.youtube.com' + video['href']
