@@ -1,6 +1,6 @@
 from discord.ext import commands
 from src.models import Command
-from src.user_command import UserCommand, VaguePatternError
+from src.user_command import UserCommand, VaguePatternError, update_command
 from src.config import get_session
 import re
 import discord
@@ -100,22 +100,6 @@ class SetCog(commands.Cog, name="Auto Responses"):
         elif parser and len(parser.group(1)) > 1:
             msg = 'too short'
         await ctx.channel.send(msg)
-
-
-def update_command(session, triggerkey, response, count, guild, author_id, delete=False):
-    if guild.id < 1000000000:
-        return
-    if delete:
-        session.query(Command).filter_by(trigger=str(guild.id) + triggerkey).delete()
-    else:
-        new_data = {
-            'server_id': guild.id,
-            'response': response,
-            'count': count,
-            'author_id': int(author_id)
-        }
-        session.query(Command).filter_by(trigger=str(guild.id) + triggerkey).update(new_data)
-    session.commit()
 
 
 def setup(bot):
