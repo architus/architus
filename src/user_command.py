@@ -24,14 +24,14 @@ def update_command(session, triggerkey, response, count, guild, author_id, delet
 
 
 class UserCommand:
-    def __init__(self, trigger, response, count, server, author_id):
+    def __init__(self, trigger, response, count, guild, author_id):
         self.raw_trigger = self.filter_trigger(trigger)
         self.raw_response = emojitool.demojize(response)
         self.capture_regex = ''
         if '*' in trigger:
             self.capture_regex = self.generate_capture_regex()
         self.count = count
-        self.server = server
+        self.server = guild
         self.author_id = author_id
 
     async def execute(self, message, session):
