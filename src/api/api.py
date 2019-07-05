@@ -68,7 +68,11 @@ class Api(Cog):
 
     async def fetch_user_dict(self, id):
         usr = await self.bot.fetch_user(int(id))
-        return {'name': usr.name, 'avatar': usr.avatar}
+        return {
+            'name': usr.name,
+            'avatar': usr.avatar,
+            'discriminator': usr.discriminator
+        }
 
     async def reload_extension(self, extension_name):
         name = extension_name.replace('-', '.')

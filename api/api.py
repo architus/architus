@@ -9,7 +9,7 @@ import secrets
 from datetime import datetime, timedelta
 
 from src.config import client_id, client_secret, get_session
-from src.models import AppSession
+from src.models import AppSession, Command
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://aut-bot.com/app'
@@ -120,6 +120,31 @@ class GuildCounter(CustomResource):
     def get(self):
         self.enqueue({'method': "guild_counter", 'args': []})
         return self.recv(), 200
+
+
+class AutoResponses(CustomResource):
+    def get(self, guild_id):
+        if authenticate(self.session, request.headers) is None and False:
+            return "not authorized", 401
+        rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
+        commands = []
+        authors = {}
+        for cmd in rows:
+            commands.append({
+                'trigger': cmd.trigger,
+                'response': cmd.response,
+                'count': cmd.count,
+                'author_id': cmd.author_id
+            })
+            if cmd.author_id not in authors:
+                self.enqueue({'method': "fetch_user_dict", 'args': [cmd.author_id]})
+                authors[cmd.author_id] = self.recv()
+
+        resp = {
+            'authors': authors,
+            'commands': commands
+        }
+        return resp, 200
 
 
 class Settings(CustomResource):
@@ -254,6 +279,7 @@ def app_factory(q):
     api.add_resource(Identify, "/identify")
     api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q': q})
     api.add_resource(Login, "/login", resource_class_kwargs={'q': q})
+    api.add_resource(AutoResponses, "/auto_responses/<int:guild_id>", resource_class_kwargs={'q': q})
     api.add_resource(RedirectCallback, "/redirect", resource_class_kwargs={'q': q})
     api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q': q})
     api.add_resource(Invite, "/invite/<string:guild_id>")
