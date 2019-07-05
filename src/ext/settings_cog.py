@@ -161,10 +161,12 @@ class Settings(Cog):
         settings = self.guild_settings.get_guild(ctx.guild)
         if msg.mentions:
             resp = "Admins updated"
+            admin_ids = settings.admin_ids
             if msg.mentions[0].id in settings.admins_ids:
-                settings.admins_ids.remove(msg.mentions[0].id)
+                admin_ids.remove(msg.mentions[0].id)
             else:
-                settings.admins_ids += [msg.mentions[0].id]
+                admin_ids.append(msg.mentions[0].id)
+            settings.admin_ids = admin_ids
         await ctx.channel.send(resp)
 
     async def roles(self, ctx):
