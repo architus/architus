@@ -7,7 +7,7 @@ import re
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException, ResponseKeywordException, DuplicatedTriggerException, update_command
 
-CALLBACK_URL = "https://aut-bot.com/app"
+CALLBACK_URL = "https://archit.us/app"
 
 
 class Api(Cog):
@@ -49,10 +49,10 @@ class Api(Cog):
     async def store_callback(self, nonce=None, url=None):
         assert nonce and url
         if not any(re.match(pattern, url) for pattern in (
-                r'https:\/\/[A-Fa-f0-9]{24}--aut-bot\.netlify\.com\/app',
-                r'https:\/\/deploy-preview-[0-9]+--aut-bot\.netlify\.com\/app',
-                r'https:\/\/develop\.aut-bot.com\/app',
-                r'https:\/\/aut-bot.com\/app',
+                r'https:\/\/[A-Fa-f0-9]{24}--architus\.netlify\.com\/app',
+                r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
+                r'https:\/\/develop\.archit\.us\/app',
+                r'https:\/\/archit\.us\/app',
                 r'http:\/\/localhost:3000\/app')):
             url = CALLBACK_URL
 
@@ -115,8 +115,8 @@ class Api(Cog):
         for guild_dict in guild_list:
             guild = self.bot.get_guild(int(guild_dict['id']))
             settings = guild_settings.get_guild(guild, self.bot.session)
-            guild_dict['has_autbot'] = guild is not None
-            guild_dict['autbot_admin'] = bool(settings) and user_id in settings.admins_ids
+            guild_dict['has_architus'] = guild is not None
+            guild_dict['architus_admin'] = bool(settings) and user_id in settings.admins_ids
         return guild_list
 
     async def interpret(

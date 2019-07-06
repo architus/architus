@@ -13,7 +13,7 @@ from src.models import AppSession, Command
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://aut-bot.com/app'
-REDIRECT_URI = 'https://api.aut-bot.com/redirect'
+REDIRECT_URI = 'https://api.archit.us/redirect'
 # REDIRECT_URI = 'http://localhost:5000/home'
 
 app = Flask(__name__)
@@ -60,10 +60,10 @@ class Login(CustomResource):
         nonce = str(secrets.randbits(24))
         # redirects[nonce] = request.args.get('return') or 'https://aut-bot.com/app'
         self.enqueue(
-            {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://aut-bot.com/app']})
+            {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://archit.us/app']})
         self.recv()
         response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri='
-                            'https%3A%2F%2Fapi.aut-bot.com%2Fredirect&response_type=code&scope=identify%20guilds')
+                            'https%3A%2F%2Fapi.archit.us%2Fredirect&response_type=code&scope=identify%20guilds')
         response.set_cookie('redirect-nonce', nonce)
         return response
 
@@ -72,12 +72,12 @@ class Invite(CustomResource):
     def get(self, guild_id):
         nonce = str(secrets.randbits(24))
         self.enqueue(
-            {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://aut-bot.com/app']})
+            {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://archit.us/app']})
         self.recv()
         response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}'
                             '&scope=bot&guild_id={guild_id}'
                             '&response_type=code'
-                            '&redirect_uri=https://api.aut-bot.com/redirect'
+                            '&redirect_uri=https://api.archit.us/redirect'
                             '&permissions=2134207679')
         response.set_cookie('redirect-nonce', nonce)
         return response

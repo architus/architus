@@ -54,7 +54,7 @@ class SetCog(commands.Cog, name="Auto Responses"):
                 command = UserCommand(self.session, parser.group(1), parser.group(2), 0, ctx.guild, ctx.author.id, new=True)
             except VaguePatternError:
                 msg = "let's try making that a little more specific please"
-            except (LongTriggerException, ShortTriggerException) as e:
+            except (LongResponseException, ShortTriggerException) as e:
                 msg = str(e)
             except ResponseKeywordException:
                 if parser.group(2).strip() == "remove":
