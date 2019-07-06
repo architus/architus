@@ -15,7 +15,7 @@
 
 ## Invite
 
-You can invite architus to your discord server with [this link][https://api.archit.us/invite/0] or through the web-interface.
+You can invite architus to your discord server with [this link](https://api.archit.us/invite/0) or through the web-interface.
 
 ## Installing
 
