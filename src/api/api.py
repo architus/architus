@@ -86,6 +86,16 @@ class Api(Cog):
             msg = 'Sucessfully Set'
         return {'message': msg}
 
+    async def delete_response(self, user_id, guild_id, trigger):
+        guild = self.bot.get_guild(int(guild_id))
+
+        for oldcommand in self.bot.user_commands[guild_id]:
+            if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
+                self.bot.user_commands[guild_id].remove(oldcommand)
+                update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
+                return {'message': "Successfully Deleted"}
+        return {'message': "No such command."}
+
     async def fetch_user_dict(self, id):
         usr = self.bot.get_user(int(id))
         if usr is None:

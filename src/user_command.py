@@ -43,12 +43,11 @@ class UserCommand:
                 self.session.rollback()
                 raise DuplicatedTriggerException(self.raw_trigger)
 
-
     def validate_new_command(self):
-        if len(self.raw_trigger) < 1:
+        if len(self.raw_trigger) < 2:
             raise ShortTriggerException("Please use a longer trigger")
         if len(self.raw_response) > 200:
-            raise LongTriggerException("That response is too long, ask an admin to set it")
+            raise LongResponseException("That response is too long, ask an admin to set it")
         if self.raw_response in ("author", "list", "remove"):
             raise ResponseKeywordException()
         # if user has too many commands?
