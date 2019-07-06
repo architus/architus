@@ -75,7 +75,7 @@ class Invite(CustomResource):
             {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://archit.us/app']})
         self.recv()
         response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}'
-                            '&scope=bot&guild_id={guild_id}'
+                            f'&scope=bot&guild_id={guild_id}'
                             '&response_type=code'
                             '&redirect_uri=https://api.archit.us/redirect'
                             '&permissions=2134207679')

@@ -177,7 +177,7 @@ class Api(Cog):
                 # check for user set commands in this "guild"
                 for command in self.bot.user_commands[mock_message.guild.id]:
                     if (command.triggered(mock_message.content)):
-                        await command.execute(mock_message, self.bot.session)
+                        await command.execute(mock_message)
                         break
 
             # Prevent response sending for silent requests
@@ -195,7 +195,7 @@ class Api(Cog):
                 fkmsg = self.fake_messages[guild_id][react[0]]
                 fkmsg.sends = sends
                 react = await fkmsg.add_reaction(react[1], bot=False)
-                await self.bot.get_cog("EventCog").on_reaction_add(react, MockMember())
+                await self.bot.get_cog("Events").on_reaction_add(react, MockMember())
         elif removed_reactions:
             edit = True
             resp_id = removed_reactions[0][0]
