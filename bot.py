@@ -1,5 +1,6 @@
 import discord
 from discord.ext.commands import Bot
+from datetime import datetime
 import asyncio
 import zmq
 import zmq.asyncio
@@ -10,6 +11,7 @@ import os
 from pytz import timezone
 
 from src.user_command import UserCommand
+from src.smart_message import smart_message
 from src.config import get_session
 from src.models import Command
 
@@ -22,6 +24,7 @@ class CoolBot(Bot):
         self.user_commands = {}
         self.session = get_session()
         self.guild_counter = (0, 0)
+        self.tracked_messages = {}
         super().__init__(**kwargs)
 
     def run(self, token, q=None):
@@ -60,6 +63,30 @@ class CoolBot(Bot):
         if settings.starboard_emoji in str(react.emoji):
             if react.count == settings.starboard_threshold:
                 await self.starboard_post(react.message, react.message.guild)
+
+        if settings.edit_emoji in str(react.emoji):
+            sm = self.tracked_messages.get(react.message.id)
+            if sm:
+                await sm.add_popup(react.message.channel)
+
+    async def on_reaction_remove(self, react, user):
+        settings = self.guild_settings.get_guild(react.message.guild, session=self.session)
+        if settings.edit_emoji in str(react.emoji) and react.count == 0:
+            sm = self.tracked_messages[react.message.id]
+            await sm.delete_popup()
+
+    async def on_message_edit(self, before, after):
+        if before.author == self.user:
+            return
+
+        sm = self.tracked_messages.get(before.id)
+        # have to manually give datetime.now() cause discord.py is broken
+        if sm and sm.add_edit(before, after, datetime.now()):
+            await sm.edit_popup()
+            return
+        sm = smart_message(before)
+        sm.add_edit(before, after, datetime.now())
+        self.tracked_messages[before.id] = sm
 
     async def on_message(self, msg):
         print('Message from {0.author} in {0.guild.name}: {0.content}'.format(msg))
