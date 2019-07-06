@@ -137,17 +137,24 @@ class EventCog(Cog, name="Events"):
         parsed_time = None
         for i in range(len(args)):
             with suppress(ValueError):
+                print(" ".join(args))
                 parsed_time = dateutil.parser.parse(' '.join(args))
-                parsed_time = tz.localize(parsed_time)
+                #parsed_time = tz.localize(parsed_time)
+                break
+            with suppress(ValueError):
+                print(" ".join(args))
+                parsed_time = dateutil.parser.parse(' '.join(args[:-1]))
+                #parsed_time = tz.localize(parsed_time)
+                print("deleted something from the end")
                 break
             title.append(args[0])
             del args[0]
-
-        if not parsed_time:
+        else:
             parsed_time = await self.prompt_date(ctx, ctx.author)
             if not parsed_time:
                 return
             parsed_time = tz.localize(parsed_time)
+
         if len(title) == 0:
             title_str = await self.prompt_title(ctx, ctx.author)
             if not title_str:
