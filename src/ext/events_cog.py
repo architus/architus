@@ -139,12 +139,12 @@ class EventCog(Cog, name="Events"):
             with suppress(ValueError):
                 print(" ".join(args))
                 parsed_time = dateutil.parser.parse(' '.join(args))
-                #parsed_time = tz.localize(parsed_time)
+                # parsed_time = tz.localize(parsed_time)
                 break
             with suppress(ValueError):
                 print(" ".join(args))
                 parsed_time = dateutil.parser.parse(' '.join(args[:-1]))
-                #parsed_time = tz.localize(parsed_time)
+                # parsed_time = tz.localize(parsed_time)
                 print("deleted something from the end")
                 break
             title.append(args[0])
