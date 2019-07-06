@@ -299,6 +299,6 @@ def app_factory(q):
     api.add_resource(AutoResponses, "/responses/<int:guild_id>", resource_class_kwargs={'q': q})
     api.add_resource(RedirectCallback, "/redirect", resource_class_kwargs={'q': q})
     api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q': q})
-    api.add_resource(Invite, "/invite/<string:guild_id>")
+    api.add_resource(Invite, "/invite/<int:guild_id>", resource_class_kwargs={'q': q})
     api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q': q})
     return app
