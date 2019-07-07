@@ -68,10 +68,11 @@ class GuildPlayer:
             'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
         }
         ffmpeg_options = {
-            'options': '-vn'
+            'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+
         }
         ydl = youtube_dl.YoutubeDL(opts)
-        func = functools.partial(ydl.extract_info, url, download=False)
+        func = functools.partial(ydl.extract_info, url, download=True)
         info = await self.bot.loop.run_in_executor(None, func)
         if "entries" in info:
             info = info['entries'][0]
