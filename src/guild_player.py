@@ -54,8 +54,21 @@ class GuildPlayer:
             url = url['url']
 
         opts = {
-            'format': 'webm[abr>0]/bestaudio/best',
-            'prefer_ffmpeg': True
+            'prefer_ffmpeg': True,
+            'format': 'bestaudio/best',
+            'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+            'restrictfilenames': True,
+            'noplaylist': True,
+            'nocheckcertificate': True,
+            'ignoreerrors': False,
+            'logtostderr': False,
+            'quiet': True,
+            'no_warnings': True,
+            'default_search': 'auto',
+            'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+        }
+        ffmpeg_options = {
+            'options': '-vn'
         }
         ydl = youtube_dl.YoutubeDL(opts)
         func = functools.partial(ydl.extract_info, url, download=False)
@@ -66,7 +79,7 @@ class GuildPlayer:
         download_url = info['url']
         print("download_url")
         print(download_url)
-        self.voice.play(discord.FFmpegPCMAudio(download_url), after=self.agane)
+        self.voice.play(discord.FFmpegPCMAudio(download_url, **ffmpeg_options), after=self.agane)
         return 'hello'
 
     async def add_spotify_playlist(self, url):
