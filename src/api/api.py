@@ -106,6 +106,15 @@ class Api(Cog):
             'discriminator': usr.discriminator
         }
 
+    async def get_emoji(self, id):
+        e = self.bot.get_emoji(int(id))
+        if e is None:
+            return None
+        return {
+            'name': e.name,
+            'url': str(e.url)
+        }
+
     async def reload_extension(self, extension_name):
         name = extension_name.replace('-', '.')
         print(f"reloading extention: {name}")

@@ -5,6 +5,7 @@ import requests
 import json
 import zmq
 import os
+import re
 import secrets
 from datetime import datetime, timedelta
 
@@ -130,6 +131,8 @@ class AutoResponses(CustomResource):
         rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
         commands = []
         authors = {}
+        emojis = {}
+        p = re.compile(r"<:\S+:(?P<emoji_id>\d{15,30})\>")
         for cmd in rows:
             commands.append({
                 'trigger': cmd.trigger.replace(str(cmd.server_id), "", 1),
@@ -137,12 +140,17 @@ class AutoResponses(CustomResource):
                 'count': cmd.count,
                 'author_id': cmd.author_id
             })
+            match = p.search(cmd.response)
+            if match and match.group("emoji_id") not in emojis:
+                self.enqueue({'method': "get_emoji", 'args': [match.group("emoji_id")]})
+                emojis[match.group("emoji_id")] = self.recv()
             if cmd.author_id not in authors:
                 self.enqueue({'method': "fetch_user_dict", 'args': [cmd.author_id]})
                 authors[cmd.author_id] = self.recv()
 
         resp = {
             'authors': authors,
+            'emojis': emojis,
             'commands': commands
         }
         return resp, 200
