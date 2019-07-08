@@ -4,3 +4,4 @@ python:
 install:
     - pip install flake8
 script: make style
+cache: pip

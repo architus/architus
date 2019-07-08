@@ -5,6 +5,7 @@ from collections import deque
 import src.spotify_tools as spotify_tools
 import urllib
 import asyncio
+import os
 import aiohttp
 from bs4 import BeautifulSoup
 from src.list_embed import ListEmbed as list_embed
@@ -54,19 +55,36 @@ class GuildPlayer:
             url = url['url']
 
         opts = {
-            'format': 'webm[abr>0]/bestaudio/best',
-            'prefer_ffmpeg': True
+            'prefer_ffmpeg': True,
+            'format': 'bestaudio/best',
+            'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+            'restrictfilenames': True,
+            'noplaylist': True,
+            'nocheckcertificate': True,
+            'ignoreerrors': False,
+            'logtostderr': False,
+            'quiet': True,
+            'no_warnings': True,
+            'default_search': 'auto',
+            'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+        }
+        ffmpeg_options = {
+            'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+
         }
         ydl = youtube_dl.YoutubeDL(opts)
-        func = functools.partial(ydl.extract_info, url, download=False)
+        func = functools.partial(ydl.extract_info, url, download=True)
         info = await self.bot.loop.run_in_executor(None, func)
         if "entries" in info:
             info = info['entries'][0]
 
-        download_url = info['url']
+        #download_url = info['url']
+        download_url = ydl.prepare_filename(info)
         print("download_url")
         print(download_url)
-        self.voice.play(discord.FFmpegPCMAudio(download_url), after=self.agane)
+        self.voice.play(discord.FFmpegPCMAudio(download_url, **ffmpeg_options), after=self.agane)
+        await asyncio.sleep(2)
+        os.remove(download_url)
         return 'hello'
 
     async def add_spotify_playlist(self, url):
