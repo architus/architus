@@ -155,7 +155,7 @@ class AutoResponses(CustomResource):
                 'trigger': cmd.trigger.replace(str(cmd.server_id), "", 1),
                 'response': cmd.response,
                 'count': cmd.count,
-                'author_id': cmd.author_id
+                'author_id': str(cmd.author_id)
             })
             match = p.search(cmd.response)
             if match and str(match.group("emoji_id")) not in emojis:
