@@ -10,7 +10,7 @@ import secrets
 from datetime import datetime, timedelta
 
 from src.config import client_id, client_secret, get_session
-from src.models import AppSession, Command
+from src.models import AppSession, Command, Log
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://aut-bot.com/app'
@@ -123,6 +123,23 @@ class GuildCounter(CustomResource):
         return self.recv(), 200
 
 
+class Logs(CustomResource):
+    def get(self, guild_id):
+        # TODO this should probably be authenticated
+        if authenticate(self.session, request.headers) is None and False:
+            return "not authorized", 401
+        rows = self.session.query(Log).filter(Log.guild_id == guild_id).all()
+        logs = []
+        for log in rows:
+            logs.append({
+                'type': log.type,
+                'content': log.content,
+                'user_id': log.user_id,
+                'timestamp': log.timestamp.isoformat()
+            })
+        return logs, 200
+
+
 class AutoResponses(CustomResource):
     def get(self, guild_id):
         # TODO this should probably be authenticated
@@ -141,12 +158,12 @@ class AutoResponses(CustomResource):
                 'author_id': cmd.author_id
             })
             match = p.search(cmd.response)
-            if match and match.group("emoji_id") not in emojis:
+            if match and str(match.group("emoji_id")) not in emojis:
                 self.enqueue({'method': "get_emoji", 'args': [match.group("emoji_id")]})
-                emojis[match.group("emoji_id")] = self.recv()
-            if cmd.author_id not in authors:
+                emojis[str(match.group("emoji_id"))] = self.recv()
+            if str(cmd.author_id) not in authors:
                 self.enqueue({'method': "fetch_user_dict", 'args': [cmd.author_id]})
-                authors[cmd.author_id] = self.recv()
+                authors[str(cmd.author_id)] = self.recv()
 
         resp = {
             'authors': authors,
@@ -320,6 +337,7 @@ def app_factory(q):
     api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q': q})
     api.add_resource(Login, "/login", resource_class_kwargs={'q': q})
     api.add_resource(AutoResponses, "/responses/<int:guild_id>", resource_class_kwargs={'q': q})
+    api.add_resource(Logs, "/logs/<int:guild_id>", resource_class_kwargs={'q': q})
     api.add_resource(RedirectCallback, "/redirect", resource_class_kwargs={'q': q})
     api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q': q})
     api.add_resource(Invite, "/invite/<int:guild_id>", resource_class_kwargs={'q': q})
