@@ -1,7 +1,7 @@
 import twitter
 from discord.ext import commands
-from src.config import twitter_consumer_key 
-from src.config import twitter_consumer_secret 
+from src.config import twitter_consumer_key
+from src.config import twitter_consumer_secret
 from src.config import twitter_access_token_key
 from src.config import twitter_access_token_secret
 
