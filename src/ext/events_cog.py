@@ -25,7 +25,10 @@ class PollEvent(object):
         self.votes = votes
 
 
-class EventCog(Cog):
+class EventCog(Cog, name="Events"):
+    '''
+    Special messages that track the number of participants
+    '''
 
     YES_EMOJI = '✅'
     NO_EMOJI = '❌'
@@ -117,7 +120,10 @@ class EventCog(Cog):
 
     @commands.command()
     async def schedule(self, ctx, *argst):
-        '''Start an event poll'''
+        '''
+        Start an event poll.
+        Timezone is based on your servers voice zone.
+        '''
         args = list(argst)
         print(args)
         # event bot's id
@@ -131,17 +137,24 @@ class EventCog(Cog):
         parsed_time = None
         for i in range(len(args)):
             with suppress(ValueError):
+                print(" ".join(args))
                 parsed_time = dateutil.parser.parse(' '.join(args))
-                parsed_time = tz.localize(parsed_time)
+                # parsed_time = tz.localize(parsed_time)
+                break
+            with suppress(ValueError):
+                print(" ".join(args))
+                parsed_time = dateutil.parser.parse(' '.join(args[:-1]))
+                # parsed_time = tz.localize(parsed_time)
+                print("deleted something from the end")
                 break
             title.append(args[0])
             del args[0]
-
-        if not parsed_time:
+        else:
             parsed_time = await self.prompt_date(ctx, ctx.author)
             if not parsed_time:
                 return
             parsed_time = tz.localize(parsed_time)
+
         if len(title) == 0:
             title_str = await self.prompt_title(ctx, ctx.author)
             if not title_str:
@@ -157,7 +170,10 @@ class EventCog(Cog):
 
     @commands.command()
     async def poll(self, ctx, *args):
-        '''Starts a poll with some pretty formatting. Supports up to 10 options'''
+        '''
+        Starts a poll with some pretty formatting.
+        Supports up to 10 options
+        '''
         pattern = re.compile(r'.poll (?P<title>(?:\S*[^\s,] )+)(?P<options>.*$)')
         match = pattern.search(unidecode(ctx.message.content))
         if not match:
@@ -186,13 +202,6 @@ class EventCog(Cog):
             return 'Etc/UTC'
 
     def render_schedule_text(self, title_str, parsed_time, yes, no, maybe):
-        print("**__%s__**\n**Time:** %s\n:white_check_mark: **Yes (%d):** %s\n:x: **No (%d):** %s\n:shrug: **Maybe (%d):** %s" % (
-            title_str.strip(),
-            parsed_time.strftime("%b %d %I:%M%p %Z"),
-            len(yes), ' '.join([u.mention for u in yes]),
-            len(no), ' '.join([u.mention for u in no]),
-            len(maybe), ' '.join([u.mention for u in maybe])
-        ))
         return "**__%s__**\n**Time:** %s\n:white_check_mark: Yes (%d): %s\n:x: No (%d): %s\n:shrug: Maybe (%d): %s" % (
             title_str.strip(),
             parsed_time.strftime("%b %d %I:%M%p %Z"),

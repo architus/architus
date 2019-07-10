@@ -92,9 +92,19 @@ class Setting:
         self._update_db()
 
     @property
+    def admin_ids(self) -> list:
+        '''stupid alias'''
+        return self.admins_ids
+
+    @property
     def admins_ids(self) -> list:
         default_admins = [self.guild.owner.id, 214037134477230080]
-        return default_admins + self._settings_dict['admins'] if 'admins' in self._settings_dict else default_admins
+        return default_admins + [int(a) for a in self._settings_dict.get('admins', [])]
+
+    @admin_ids.setter
+    def admin_ids(self, new_admins: list):
+        '''stupid alias'''
+        self.admins_ids = new_admins
 
     @admins_ids.setter
     def admins_ids(self, new_admins: list):
@@ -206,6 +216,8 @@ class GuildSettings(Cog):
         self.guilds = {}
 
     def get_guild(self, guild, session=None):
+        if guild is None:
+            return None
         try:
             return self.guilds[guild]
         except KeyError:

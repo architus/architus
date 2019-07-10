@@ -61,9 +61,10 @@ class AppSession(Base):
     discord_expiration = Column('discord_expiration', DateTime)
     autbot_expiration = Column('autbot_expiration', DateTime)
     last_login = Column('last_login', DateTime)
+    discord_id = Column('discord_id', BigInteger)
 
     def __init__(self, autbot_access_token, discord_access_token,
-                 discord_refresh_token, discord_expiration, autbot_expiration, last_login=None):
+                 discord_refresh_token, discord_expiration, autbot_expiration, discord_id, last_login=None):
 
         self.autbot_access_token = autbot_access_token
         self.discord_access_token = discord_access_token
@@ -71,6 +72,21 @@ class AppSession(Base):
         self.discord_expiration = discord_expiration
         self.autbot_expiration = autbot_expiration
         self.last_login = last_login
+        self.discord_id = discord_id
+
+
+class Log(Base):
+    __tablename__ = 'tb_logs'
+    guild_id = Column('guild_id', BigInteger, primary_key=True)
+    type = Column('type', Text, primary_key=True)
+    message_id = Column('message_id', BigInteger)
+    content = Column('content', Text, primary_key=True)
+
+    def __init__(self, guild_id, type, content, message_id=None):
+        self.guild_id = guild_id
+        self.type = type
+        self.content = content
+        self.message_id = message_id
 
 
 class Command(Base):
