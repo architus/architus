@@ -1,6 +1,9 @@
 import twitter
 from discord.ext import commands
-from src.config import twitter_consumer_key, twitter_consumer_secret, twitter_access_token_key, twitter_access_token_secret
+from src.config import twitter_consumer_key 
+from src.config import twitter_consumer_secret 
+from src.config import twitter_access_token_key
+from src.config import twitter_access_token_secret
 
 
 api = twitter.Api(consumer_key=twitter_consumer_key,

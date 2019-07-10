@@ -66,7 +66,7 @@ class GuildPlayer:
             'quiet': True,
             'no_warnings': True,
             'default_search': 'auto',
-            'source_address': '0.0.0.0' # bind to ipv4 since ipv6 addresses cause issues sometimes
+            'source_address': '0.0.0.0'  # bind to ipv4 since ipv6 addresses cause issues sometimes
         }
         ffmpeg_options = {
             'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
