@@ -9,7 +9,7 @@ api = twitter.Api(consumer_key='uhs3HzukyZvni2VU8rv5lmCk3',
 
 @commands.command(aliases=['ajax', 'masters', 'beat'])
 async def ajax_masters(ctx):
-    #user = 'Ajaxbeat'
+    # user = 'Ajaxbeat'
     id = '1143094150717304832'
     statuses = api.GetUserTimeline(user_id=id, count=1, exclude_replies=True, include_rts=False)
     msg = 'https://twitter.com/Ajaxbeat/status/' + statuses[0].id_str
