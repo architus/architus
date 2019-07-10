@@ -3,7 +3,10 @@ from src.guild_player import GuildPlayer
 import discord
 
 
-class Play(commands.Cog):
+class Play(commands.Cog, name="Music Player"):
+    '''
+    Can join voice and play beautiful noises
+    '''
 
     def __init__(self, bot):
         self.bot = bot
@@ -15,7 +18,10 @@ class Play(commands.Cog):
 
     @commands.command()
     async def play(self, ctx, url):
-        '''Add a song to the queue or play immediately. Supports youtube and spotify links.'''
+        '''
+        Add a song to the music queue.
+        Supports youtube and spotify links.
+        '''
 
         if ctx.guild not in self.players:
             self.players[ctx.guild] = GuildPlayer(self.bot)
@@ -90,7 +96,7 @@ class Play(commands.Cog):
 
     @commands.command(aliases=['q'])
     async def queue(self, ctx):
-        '''List songs in queue'''
+        '''List songs in queue.'''
         if ctx.guild not in self.players:
             self.players[ctx.guild] = GuildPlayer(self.bot)
         player = self.players[ctx.guild]
@@ -115,7 +121,7 @@ class Play(commands.Cog):
 
     @commands.command()
     async def clear(self, ctx):
-        '''Clear all songs from queue'''
+        '''Clear all songs from queue.'''
         if ctx.guild not in self.players:
             self.players[ctx.guild] = GuildPlayer(self.bot)
         player = self.players[ctx.guild]

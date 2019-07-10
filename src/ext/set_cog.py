@@ -6,7 +6,7 @@ import re
 import discord
 
 
-class SetCommand(commands.Cog):
+class SetCog(commands.Cog, name="Auto Responses"):
 
     def __init__(self, bot):
         self.bot = bot
@@ -18,7 +18,7 @@ class SetCommand(commands.Cog):
 
     @commands.command()
     async def remove(self, ctx, trigger):
-        '''remove a user command'''
+        '''Remove a user command.'''
         msg = 'no command with that trigger'
         for oldcommand in self.bot.user_commands[ctx.guild.id]:
             if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
@@ -26,6 +26,10 @@ class SetCommand(commands.Cog):
                 update_command(self.session, oldcommand.raw_trigger, '', 0, ctx.guild, ctx.author.id, delete=True)
                 msg = 'removed `' + oldcommand.raw_trigger + "::" + oldcommand.raw_response + '`'
         await ctx.channel.send(msg)
+
+    def validate(self, guild_id, command):
+        return not any(command == oldcommand for oldcommand in self.bot.user_commands[guild_id])\
+            and not len(command.raw_trigger) == 0 and command.raw_response not in ['remove', 'author']
 
     @commands.command()
     async def set(self, ctx, *args):
@@ -45,17 +49,19 @@ class SetCommand(commands.Cog):
                     return
         parser = re.search('!set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
         msg = "try actually reading the syntax"
-        if parser and (len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and ctx.guild.default_role.mention not in parser.group(2) or from_admin):
+        if parser and (len(parser.group(2)) <= 200 and len(parser.group(1)) > 1 and ctx.guild.default_role.mention
+                       not in parser.group(2) or from_admin):
             try:
                 command = UserCommand(parser.group(1), parser.group(2), 0, ctx.guild, ctx.author.id)
             except VaguePatternError:
                 await self.channel.send("let's try making that a little more specific please")
                 return
 
-            if not any(command == oldcommand for oldcommand in user_commands[ctx.guild.id]) and not len(command.raw_trigger) == 0 and command.raw_response not in ['remove', 'author']:
+            if self.validate(ctx.guild.id, command):
                 user_commands[ctx.guild.id].append(command)
                 if ctx.guild.id > 1000000000:
-                    new_command = Command(str(ctx.guild.id) + command.raw_trigger, command.raw_response, command.count, ctx.guild.id, ctx.author.id)
+                    new_command = Command(str(ctx.guild.id) + command.raw_trigger, command.raw_response,
+                                          command.count, ctx.guild.id, ctx.author.id)
                     self.session.add(new_command)
                     self.session.commit()
                 msg = 'command set'
@@ -64,9 +70,11 @@ class SetCommand(commands.Cog):
                 for oldcommand in user_commands[ctx.guild.id]:
                     if oldcommand == command:
                         user_commands[ctx.guild.id].remove(oldcommand)
-                        update_command(self.session, oldcommand.raw_trigger, '', 0, ctx.guild, ctx.author.id, delete=True)
+                        update_command(self.session, oldcommand.raw_trigger, '', 0,
+                                       ctx.guild, ctx.author.id, delete=True)
                         msg = 'removed `' + oldcommand.raw_trigger + "::" + oldcommand.raw_response + '`'
-                        msg += f"\nthis syntax is deprecated and will go away soon. try using `!remove {oldcommand.raw_trigger}` next time"
+                        msg += "\nthis syntax is deprecated and will go away soon."
+                        msg += f" try using `!remove {oldcommand.raw_trigger}` next time"
             elif parser.group(2).strip() == "list":
                 for oldcommand in user_commands[ctx.guild.id]:
                     if oldcommand == command:
@@ -111,4 +119,4 @@ def update_command(session, triggerkey, response, count, guild, author_id, delet
 
 
 def setup(bot):
-    bot.add_cog(SetCommand(bot))
+    bot.add_cog(SetCog(bot))

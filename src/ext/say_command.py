@@ -1,9 +1,8 @@
-from src.commands.abstract_command import abstract_command
 import os, random, string, asyncio
 from gtts import gTTS
 import discord
 
-class say_command(abstract_command):
+class say_command():
 
     def __init__(self):
         super().__init__("say")
@@ -38,3 +37,6 @@ class say_command(abstract_command):
         return "<message>"
     def get_brief(self):
         return "Say a message in voice channel"
+
+def setup(bot):
+    pass

@@ -48,8 +48,9 @@ class Api(Cog):
     async def store_callback(self, nonce=None, url=None):
         assert nonce and url
         if not any(re.match(pattern, url) for pattern in (
-                r'https:\/\/[A-Za-z0-9-]{3,24}--aut-bot\.netlify\.com\/app',
+                r'https:\/\/[A-Fa-f0-9]{24}--aut-bot\.netlify\.com\/app',
                 r'https:\/\/deploy-preview-[0-9]+--aut-bot\.netlify\.com\/app',
+                r'https:\/\/develop\.aut-bot.com\/app',
                 r'https:\/\/aut-bot.com\/app',
                 r'http:\/\/localhost:3000\/app')):
             url = CALLBACK_URL
@@ -58,21 +59,22 @@ class Api(Cog):
         return {"content": True}
 
     async def get_callback(self, nonce=None):
-        try:
-            url = self.callback_urls[nonce]
-        except KeyError:
-            print("couldn't find callback url, returning default")
-            url = CALLBACK_URL
+        url = self.callback_urls.pop(nonce, CALLBACK_URL)
         resp = {"content": url}
-        self.callback_urls[nonce] = None
         return resp
 
     async def guild_counter(self):
         return {'guild_count': self.bot.guild_counter[0], 'user_count': self.bot.guild_counter[1]}
 
     async def fetch_user_dict(self, id):
-        usr = await self.bot.fetch_user(int(id))
-        return {'name': usr.name, 'avatar': usr.avatar}
+        usr = self.bot.get_user(int(id))
+        if usr is None:
+            return None
+        return {
+            'name': usr.name,
+            'avatar': usr.avatar,
+            'discriminator': usr.discriminator
+        }
 
     async def reload_extension(self, extension_name):
         name = extension_name.replace('-', '.')
@@ -80,10 +82,21 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return {}
 
-    async def tag_autbot_guilds(self, guild_list):
-        autbot_guilds = [g.id for g in self.bot.guilds]
-        for guild in guild_list:
-            guild['has_autbot'] = int(guild['id']) in autbot_guilds
+    async def settings_access(self, guild_id=None, setting=None, value=None):
+        guild_settings = self.bot.get_cog("GuildSettings")
+        guild = self.bot.get_guild(guild_id)
+        settings = guild_settings.get_guild(guild, self.bot.session)
+        if hasattr(settings, setting):
+            return {'value': getattr(settings, setting)}
+        return {'value': "unknown setting"}
+
+    async def tag_autbot_guilds(self, guild_list, user_id):
+        guild_settings = self.bot.get_cog("GuildSettings")
+        for guild_dict in guild_list:
+            guild = self.bot.get_guild(int(guild_dict['id']))
+            settings = guild_settings.get_guild(guild, self.bot.session)
+            guild_dict['has_autbot'] = guild is not None
+            guild_dict['autbot_admin'] = bool(settings) and user_id in settings.admins_ids
         return guild_list
 
     async def interpret(
@@ -170,7 +183,7 @@ class Api(Cog):
                 fkmsg = self.fake_messages[guild_id][react[0]]
                 fkmsg.sends = sends
                 react = await fkmsg.remove_reaction(react[1])
-                await self.bot.get_cog("EventCog").on_reaction_remove(react, MockMember())
+                await self.bot.get_cog("Events").on_reaction_remove(react, MockMember())
         resp = {
             '_module': 'interpret',
             'content': '\n'.join(sends),
