@@ -78,7 +78,7 @@ class GuildPlayer:
         if "entries" in info:
             info = info['entries'][0]
 
-        #download_url = info['url']
+        # download_url = info['url']
         download_url = ydl.prepare_filename(info)
         print("download_url")
         print(download_url)
