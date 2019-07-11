@@ -1,18 +1,17 @@
-import os, random
 import youtube_dl
-#from threading import Thread
 import functools
-
 import discord
-#from queue import Queue
 from collections import deque
 import src.spotify_tools as spotify_tools
 import urllib
 import asyncio
+import os
 import aiohttp
-#import urllib2
 from bs4 import BeautifulSoup
 from src.list_embed import ListEmbed as list_embed
+
+import subprocess
+
 
 class GuildPlayer:
     def __init__(self, bot):
@@ -27,21 +26,21 @@ class GuildPlayer:
     async def play_file(self, filepath):
         self.playing_file = True
         self.stop()
-        if (self.voice == None):
+        if self.voice is None:
             return
-        #if (self.player and self.player.is_playing()):
-            #return await self.skip()
+        # if (self.player and self.player.is_playing()):
+            # return await self.skip()
 
         try:
-            self.player = self.voice.create_ffmpeg_player(filepath, after=self.agane)
-            self.player.start();
+            self.player = self.voice.create_ffmpeg_player(filepath, after=self.agane, stderr=subprocess.STDOUT)
+            self.player.start()
         except Exception as e:
             print(e)
         self.playing_file = False
         return True
 
     async def play(self):
-        if (self.voice == None or len(self.q) == 0):
+        if (self.voice is None or len(self.q) == 0):
             return ''
         if (self.voice and self.voice.is_playing()):
             return await self.skip()
@@ -56,18 +55,36 @@ class GuildPlayer:
             url = url['url']
 
         opts = {
-            'format': 'webm[abr>0]/bestaudio/best',
-            'prefer_ffmpeg': False
+            'prefer_ffmpeg': True,
+            'format': 'bestaudio/best',
+            'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
+            'restrictfilenames': True,
+            'noplaylist': True,
+            'nocheckcertificate': True,
+            'ignoreerrors': False,
+            'logtostderr': False,
+            'quiet': True,
+            'no_warnings': True,
+            'default_search': 'auto',
+            'source_address': '0.0.0.0'  # bind to ipv4 since ipv6 addresses cause issues sometimes
+        }
+        ffmpeg_options = {
+            'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+
         }
         ydl = youtube_dl.YoutubeDL(opts)
-        func = functools.partial(ydl.extract_info, url, download=False)
+        func = functools.partial(ydl.extract_info, url, download=True)
         info = await self.bot.loop.run_in_executor(None, func)
         if "entries" in info:
             info = info['entries'][0]
 
-        download_url = info['url']
+        # download_url = info['url']
+        download_url = ydl.prepare_filename(info)
+        print("download_url")
         print(download_url)
-        self.voice.play(discord.FFmpegPCMAudio(download_url), after=self.agane)
+        self.voice.play(discord.FFmpegPCMAudio(download_url, **ffmpeg_options), after=self.agane)
+        await asyncio.sleep(2)
+        os.remove(download_url)
         return 'hello'
 
     async def add_spotify_playlist(self, url):
@@ -84,9 +101,12 @@ class GuildPlayer:
                 try:
                     track_url = track['external_urls']['spotify']
                     urls.append(track_url)
-                except KeyError: pass
+                except KeyError:
+                    pass
             if tracks['next']:
-                tracks = spotify.next(tracks)
+                # TODO
+                # tracks = spotify.next(tracks)
+                pass
             else:
                 break
 
@@ -115,32 +135,32 @@ class GuildPlayer:
             url = "https://www.youtube.com/results?search_query=" + query
             async with session.get(url) as resp:
                 html = await resp.read()
-                def get_video(html):
-                    soup = BeautifulSoup(html, 'lxml')
-                    print (soup.findAll(attrs={'class':'yt-uix-tile-link'}, limit=2))
-                    for video in soup.findAll(attrs={'class':'yt-uix-tile-link'}):
-                        if ('googleadservices' not in video['href']):
-                            return 'https://www.youtube.com' + video['href']
-                loop = asyncio.get_event_loop()
-                return await loop.run_in_executor(None, get_video, html)
+
+                soup = BeautifulSoup(html.decode('utf-8'), 'lxml')
+                # print(soup.findAll(attrs={'class': 'yt-uix-tile-link'}, limit=2))
+                for video in soup.findAll(attrs={'class': 'yt-uix-tile-link'}):
+                    if ('googleadservices' not in video['href']):
+                        return 'https://www.youtube.com' + video['href']
 
         return ''
 
     def stop(self):
-        if (self.voice == None):
+        if self.voice is None:
             return
         self.voice.stop()
 
     def pause(self):
-        if (self.voice == None):
+        if self.voice is None:
             return
         self.voice.pause()
+
     def resume(self):
-        if (self.voice == None):
+        if self.voice is None:
             return
         self.voice.resume()
+
     async def skip(self):
-        if (self.voice == None):
+        if self.voice is None:
             print("no voice")
             return
         if (len(self.q) < 1):
@@ -165,9 +185,9 @@ class GuildPlayer:
         return lem.get_embed()
 
     def is_connected(self):
-        return self.voice != None and self.voice.is_connected()
+        return self.voice is not None and self.voice.is_connected()
 
-    def agane(self):
+    def agane(self, trash):
         if self.playing_file:
             return
 
@@ -175,11 +195,12 @@ class GuildPlayer:
             coro = self.voice.disconnect()
         else:
             coro = self.play()
-        fut = discord.compat.run_coroutine_threadsafe(coro, self.bot.loop)
+        fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
         try:
             fut.result()
-        except:
-            print('error')
+        except Exception as e:
+            print(e)
+            print('error playing next thing')
 
 
 class Song:

@@ -5,21 +5,23 @@ import re
 from src.models import Command
 GROUP_LIMIT = 1
 
+
 def update_command(session, triggerkey, response, count, guild, author_id, delete=False):
     if guild.id < 1000000:
         return
     if (delete):
-        session.query(Command).filter_by(trigger = str(guild.id) + triggerkey).delete()
+        session.query(Command).filter_by(trigger=str(guild.id) + triggerkey).delete()
         session.commit()
         return
     new_data = {
-            'server_id': guild.id,
-            'response': response,
-            'count': count,
-            'author_id': int(author_id)
-            }
-    session.query(Command).filter_by(trigger = str(guild.id) + triggerkey).update(new_data)
+        'server_id': guild.id,
+        'response': response,
+        'count': count,
+        'author_id': int(author_id)
+    }
+    session.query(Command).filter_by(trigger=str(guild.id) + triggerkey).update(new_data)
     session.commit()
+
 
 class UserCommand:
     def __init__(self, trigger, response, count, server, author_id):
@@ -49,7 +51,7 @@ class UserCommand:
             return self.raw_trigger == self.filter_trigger(phrase)
 
     def generate_reacts(self):
-        rereact = re.compile("\[(:.+?:)\]")
+        rereact = re.compile(r"\[(:.+?:)\]")
         matches = rereact.findall(self.raw_response)
         emojis = []
         for match in matches:
@@ -58,7 +60,7 @@ class UserCommand:
 
     def get_custom_emoji(self, emojistr):
         for emoji in self.server.emojis:
-            if ':'+emoji.name+':' == emojistr:
+            if ':' + emoji.name + ':' == emojistr:
                 return emoji
         return emojitool.emojize(emojistr, use_aliases=True)
 
@@ -88,21 +90,21 @@ class UserCommand:
             else:
                 cap = ''
 
-        #self.generate_capture_regex()
+        # self.generate_capture_regex()
         self.count += 1
         resp = self.raw_response
-        renoun = re.compile("\[noun\]", re.IGNORECASE)
-        readj = re.compile("\[adj\]", re.IGNORECASE)
-        readv = re.compile("\[adv\]", re.IGNORECASE)
-        recapture = re.compile("\[capture\]", re.IGNORECASE)
-        reowl = re.compile("\[owl\]", re.IGNORECASE)
-        recount = re.compile("\[count\]", re.IGNORECASE)
-        remember = re.compile("\[member\]", re.IGNORECASE)
-        reauthor = re.compile("\[author\]", re.IGNORECASE)
-        relist = re.compile("\[([^,]+(,.*?)+)\]", re.IGNORECASE)
-        rereact = re.compile("\[:.*:\]")
+        renoun = re.compile(r"\[noun\]", re.IGNORECASE)
+        readj = re.compile(r"\[adj\]", re.IGNORECASE)
+        readv = re.compile(r"\[adv\]", re.IGNORECASE)
+        recapture = re.compile(r"\[capture\]", re.IGNORECASE)
+        reowl = re.compile(r"\[owl\]", re.IGNORECASE)
+        recount = re.compile(r"\[count\]", re.IGNORECASE)
+        remember = re.compile(r"\[member\]", re.IGNORECASE)
+        reauthor = re.compile(r"\[author\]", re.IGNORECASE)
+        relist = re.compile(r"\[([^,]+(,.*?)+)\]", re.IGNORECASE)
+        rereact = re.compile(r"\[:.*:\]")
 
-        reclean = re.compile("@((:?everyone)|(:?channel)|(:?here))", re.IGNORECASE)
+        reclean = re.compile(r"@((:?everyone)|(:?channel)|(:?here))", re.IGNORECASE)
 
         while renoun.search(resp):
             resp = renoun.sub(get_noun(), resp, 1)
@@ -138,7 +140,8 @@ class UserCommand:
         return emojitool.emojize(resp)
 
     def filter_trigger(self, trigger):
-        if len(trigger) == 0: return ''
+        if len(trigger) == 0:
+            return ''
         unicode_filter = re.compile('[^a-zA-Z0-9*]+', re.UNICODE)
         filtered_trigger = unicode_filter.sub('', trigger)
         if (trigger[0] == '!' or trigger[0] == '?'):
@@ -146,13 +149,17 @@ class UserCommand:
         return filtered_trigger.lower()
 
     def __eq__(self, other):
-        return self.raw_trigger.replace('*','') == other.raw_trigger.replace('*','')
+        return self.raw_trigger.replace('*', '') == other.raw_trigger.replace('*', '')
+
     def __str__(self):
         return self.raw_trigger + '::' + self.raw_response
+
     def __gt__(self, other):
         return '*' in self.raw_trigger and '*' not in other.raw_trigger
+
     def __lt__(self, other):
         return '*' in other.raw_trigger and '*' not in self.raw_trigger
+
 
 def get_noun():
     fname = "res/words/nouns.txt"
@@ -161,12 +168,14 @@ def get_noun():
         nouns = list(set(noun.strip() for noun in f))
     return random.choice(nouns)
 
+
 def get_adv():
     fname = "res/words/adverbs.txt"
     advs = []
     with open(fname) as f:
         advs = list(set(adv.strip() for adv in f))
     return random.choice(advs)
+
 
 def get_adj():
     fname = "res/words/adjectives.txt"
@@ -175,6 +184,7 @@ def get_adj():
         adjs = list(set(adj.strip() for adj in f))
     return random.choice(adjs)
 
+
 def get_owl():
     fname = "res/words/owl.txt"
     owls = []
@@ -182,11 +192,6 @@ def get_owl():
         owls = list(set(owl.strip() for owl in f))
     return random.choice(owls)
 
+
 class VaguePatternError(Exception):
     pass
-
-#print(get_adj() + " " + get_noun())
-#sc = smart_command("no u !@#$", "raines has sucked a [aDj] [Noun] [count] times [:dansgame:]", 10, None)
-#print(sc.raw_trigger)
-#print(sc.generate_response())
-#print(sc.triggered('no  !!!!!!!!!!!!!!u!!!'))

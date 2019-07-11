@@ -3,76 +3,18 @@ import traceback
 import asyncio
 import secrets
 import websockets
-from discord.ext.commands import Cog, Context, MinimalHelpCommand
+import re
+from discord.ext.commands import Cog, Context
 
+CALLBACK_URL = "https://aut-bot.com/app"
 
-class MockMember(object):
-    def __init__(self, id=0):
-        self.id = id
-        self.mention = "<@%_CLIENT_ID_%>"
-        self.display_name = "bad guy"
-class MockRole(object):
-    pass
-
-class MockChannel(object):
-    def __init__(self, sends, reactions):
-        self.sends = sends
-        self.reactions = reactions
-    async def send(self, *args):
-        for thing in args:
-            self.sends.append(thing)
-        return MockMessage(0, self.sends, self.reactions, 0)
-
-class MockGuild(object):
-    def __init__(self, id):
-        self.region = 'us-east'
-        self.id = int(id)
-        self.owner = MockMember()
-        self.me = MockMember()
-        self.default_role = MockRole()
-        self.default_role.mention = "@everyone"
-        self.emojis = []
-
-    def get_member(self, *args):
-        return None
-
-class MockReact(object):
-    def __init__(self, message, emoji, user):
-        self.message = message
-        self.emoji = emoji
-        self.count = 1
-        self.users = [user]
-
-class MockMessage(object):
-    def __init__(self, id, sends, reaction_sends, guild_id, content=None):
-        self.id = id
-        self.sends = sends
-        self.reaction_sends = reaction_sends
-        self._state = MockChannel(sends, reactions)
-        self.guild = MockGuild(guild_id)
-        self.author = MockMember()
-        self.channel = MockChannel(sends, reactions)
-        self.content = content
-        self.reactions = []
-    async def add_reaction(self, emoji, bot=True):
-        user = MockMember()
-        if bot:
-            self.reaction_sends.append((self.id, emoji))
-            user = self.bot
-        for react in self.reactions:
-            if emoji == react.emoji:
-                react.users.append(user)
-                return react
-        else:
-            react = MockReact(self, emoji, user)
-            self.reactions.append(react)
-            return react
 
 class Api(Cog):
 
     def __init__(self, bot):
         self.bot = bot
         self.fake_messages = {}
+        self.callback_urls = {}
 
     async def handle_socket(self, websocket, path):
         while True:
@@ -103,9 +45,36 @@ class Api(Cog):
             resp = '{"message": "' + str(e) + '"}'
         yield from pub.send((str(msg['topic']) + ' ' + str(resp)).encode())
 
+    async def store_callback(self, nonce=None, url=None):
+        assert nonce and url
+        if not any(re.match(pattern, url) for pattern in (
+                r'https:\/\/[A-Fa-f0-9]{24}--aut-bot\.netlify\.com\/app',
+                r'https:\/\/deploy-preview-[0-9]+--aut-bot\.netlify\.com\/app',
+                r'https:\/\/develop\.aut-bot.com\/app',
+                r'https:\/\/aut-bot.com\/app',
+                r'http:\/\/localhost:3000\/app')):
+            url = CALLBACK_URL
+
+        self.callback_urls[nonce] = url
+        return {"content": True}
+
+    async def get_callback(self, nonce=None):
+        url = self.callback_urls.pop(nonce, CALLBACK_URL)
+        resp = {"content": url}
+        return resp
+
+    async def guild_counter(self):
+        return {'guild_count': self.bot.guild_counter[0], 'user_count': self.bot.guild_counter[1]}
+
     async def fetch_user_dict(self, id):
-        usr = await self.bot.fetch_user(int(id))
-        return {'name': usr.name, 'avatar': usr.avatar}
+        usr = self.bot.get_user(int(id))
+        if usr is None:
+            return None
+        return {
+            'name': usr.name,
+            'avatar': usr.avatar,
+            'discriminator': usr.discriminator
+        }
 
     async def reload_extension(self, extension_name):
         name = extension_name.replace('-', '.')
@@ -113,10 +82,38 @@ class Api(Cog):
         self.bot.reload_extension(name)
         return {}
 
-    async def interpret(self, guild_id=None, content=None, message_id=None, added_reactions=None, allowed_commands=None, silent=False, **k):
+    async def settings_access(self, guild_id=None, setting=None, value=None):
+        guild_settings = self.bot.get_cog("GuildSettings")
+        guild = self.bot.get_guild(guild_id)
+        settings = guild_settings.get_guild(guild, self.bot.session)
+        if hasattr(settings, setting):
+            return {'value': getattr(settings, setting)}
+        return {'value': "unknown setting"}
+
+    async def tag_autbot_guilds(self, guild_list, user_id):
+        guild_settings = self.bot.get_cog("GuildSettings")
+        for guild_dict in guild_list:
+            guild = self.bot.get_guild(int(guild_dict['id']))
+            settings = guild_settings.get_guild(guild, self.bot.session)
+            guild_dict['has_autbot'] = guild is not None
+            guild_dict['autbot_admin'] = bool(settings) and user_id in settings.admins_ids
+        return guild_list
+
+    async def interpret(
+            self,
+            guild_id=None,
+            content=None,
+            message_id=None,
+            added_reactions=(),
+            removed_reactions=(),
+            allowed_commands=(),
+            silent=False,
+            **k):
         sends = []
         reactions = []
         edit = False
+        self.fake_messages.setdefault(guild_id, {})
+        resp_id = secrets.randbits(24) | 1
 
         if content:
             # search for builtin commands
@@ -128,8 +125,9 @@ class Api(Cog):
                     command = cmd
                     break
 
-            mock_message = MockMessage(message_id, sends, reactions, guild_id, content=content)
-            mock_channel = MockChannel(sends, reactions)
+            mock_message = MockMessage(self.bot, message_id, sends, reactions, guild_id, content=content,
+                                       resp_id=resp_id)
+            self.fake_messages[guild_id][message_id] = mock_message
 
             self.bot.user_commands.setdefault(int(guild_id), [])
             if command:
@@ -153,7 +151,7 @@ class Api(Cog):
                             break
                     except IndexError:
                         help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
-                        
+
                 sends.append(help_text)
             else:
                 # check for user set commands in this "guild"
@@ -163,23 +161,33 @@ class Api(Cog):
                         break
 
             # Prevent response sending for silent requests
-            if silent:
+            if silent or not sends:
                 sends = ()
+                resp_id = None
+            else:
+                mock_message = MockMessage(self.bot, resp_id, sends, reactions, guild_id, content='\n'.join(sends))
+                self.fake_messages[guild_id][resp_id] = mock_message
 
-            resp_id = secrets.randbits(24) | 1 if sends else None
         elif added_reactions:
             edit = True
+            resp_id = added_reactions[0][0]
             for react in added_reactions:
                 fkmsg = self.fake_messages[guild_id][react[0]]
                 fkmsg.sends = sends
-                react = fkmsg.add_reaction(react[1], bot=False)
-                self.bot.get_cog("EventCog").on_reaction_add(react, MockMember())
+                react = await fkmsg.add_reaction(react[1], bot=False)
+                await self.bot.get_cog("EventCog").on_reaction_add(react, MockMember())
         elif removed_reactions:
-            pass
+            edit = True
+            resp_id = removed_reactions[0][0]
+            for react in removed_reactions:
+                fkmsg = self.fake_messages[guild_id][react[0]]
+                fkmsg.sends = sends
+                react = await fkmsg.remove_reaction(react[1])
+                await self.bot.get_cog("Events").on_reaction_remove(react, MockMember())
         resp = {
             '_module': 'interpret',
             'content': '\n'.join(sends),
-            'added_reactions': [(resp_id if r[0] == 0 else message_id, r[1]) for r in reactions],
+            'added_reactions': [(r[0], r[1]) for r in reactions],
             'message_id': resp_id,
             'edit': edit,
             'guild_id': guild_id,
@@ -187,6 +195,101 @@ class Api(Cog):
         if resp['content']:
             print(resp)
         return resp
+
+
+class MockMember(object):
+    def __init__(self, id=0):
+        self.id = id
+        self.mention = "<@%_CLIENT_ID_%>"
+        self.display_name = "bad guy"
+        self.bot = False
+
+
+class MockRole(object):
+    pass
+
+
+class MockChannel(object):
+    def __init__(self, bot, sends, reactions, resp_id):
+        self.bot = bot
+        self.sends = sends
+        self.reactions = reactions
+        self.resp_id = resp_id
+
+    async def send(self, *args):
+        for thing in args:
+            self.sends.append(thing)
+        return MockMessage(self.bot, self.resp_id, self.sends, self.reactions, 0)
+
+
+class MockGuild(object):
+    def __init__(self, id):
+        self.region = 'us-east'
+        self.id = int(id)
+        self.owner = MockMember()
+        self.me = MockMember()
+        self.default_role = MockRole()
+        self.default_role.mention = "@everyone"
+        self.emojis = []
+
+    def get_member(self, *args):
+        return None
+
+
+class MockReact(object):
+    def __init__(self, message, emoji, user):
+        self.message = message
+        self.emoji = emoji
+        self.count = 1
+        self._users = [user]
+
+    def users(self):
+        class user:
+            pass
+        u = user()
+
+        async def flatten():
+            return self._users
+        u.flatten = flatten
+        return u
+
+
+class MockMessage(object):
+    def __init__(self, bot, id, sends, reaction_sends, guild_id, content=None, resp_id=0):
+        self.bot = bot
+        self.id = id
+        self.sends = sends
+        self.reaction_sends = reaction_sends
+        self._state = MockChannel(bot, sends, reaction_sends, resp_id)
+        self.guild = MockGuild(guild_id)
+        self.author = MockMember()
+        self.channel = MockChannel(bot, sends, reaction_sends, resp_id)
+        self.content = content
+        self.reactions = []
+
+    async def add_reaction(self, emoji, bot=True):
+        user = MockMember()
+        if bot:
+            self.reaction_sends.append((self.id, emoji))
+            user = self.bot
+        for react in self.reactions:
+            if emoji == react.emoji:
+                react._users.append(user)
+                return react
+        else:
+            react = MockReact(self, emoji, user)
+            self.reactions.append(react)
+            return react
+
+    async def remove_reaction(self, emoji):
+        for react in self.reactions:
+            if emoji == react.emoji:
+                react._users = [self.bot.user]
+                return react
+
+    async def edit(self, content=None):
+        print("EDIT " + content)
+        self.sends.append(content)
 
 
 def setup(bot):
