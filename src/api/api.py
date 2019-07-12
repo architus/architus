@@ -5,7 +5,8 @@ import secrets
 import websockets
 import re
 from discord.ext.commands import Cog, Context
-from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException, ResponseKeywordException, DuplicatedTriggerException, update_command
+from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
+from sr.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 
 CALLBACK_URL = "https://archit.us/app"
 
@@ -75,11 +76,11 @@ class Api(Cog):
             msg = "Capture group too broad."
         except LongResponseException:
             msg = "Response is too long."
-        except ShortTriggerException as e:
+        except ShortTriggerException:
             msg = "Trigger is too short."
         except ResponseKeywordException:
             msg = "That response is protected, please use another."
-        except DuplicatedTriggerException as e:
+        except DuplicatedTriggerException:
             msg = "Remove duplicated trigger first."
         else:
             self.bot.user_commands[guild_id].append(command)
