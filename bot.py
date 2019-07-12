@@ -99,7 +99,7 @@ class CoolBot(Bot):
         # check for user commands
         for command in self.user_commands[msg.guild.id]:
             if (command.triggered(msg.content)):
-                await command.execute(msg, self.session)
+                await command.execute(msg)
                 break
 
     async def on_ready(self):
@@ -118,6 +118,7 @@ class CoolBot(Bot):
         for command in command_list:
             self.user_commands.setdefault(command.server_id, [])
             self.user_commands[command.server_id].append(UserCommand(
+                self.session,
                 command.trigger.replace(str(command.server_id), '', 1),
                 command.response, command.count,
                 self.get_guild(command.server_id),

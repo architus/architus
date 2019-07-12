@@ -1,7 +1,7 @@
 import random
 import emoji as emojitool
 import re
-
+from sqlalchemy.exc import IntegrityError
 from src.models import Command
 GROUP_LIMIT = 1
 
@@ -24,19 +24,39 @@ def update_command(session, triggerkey, response, count, guild, author_id, delet
 
 
 class UserCommand:
-    def __init__(self, trigger, response, count, server, author_id):
+    def __init__(self, session, trigger, response, count, guild, author_id, new=False):
+        self.session = session
         self.raw_trigger = self.filter_trigger(trigger)
         self.raw_response = emojitool.demojize(response)
         self.capture_regex = ''
         if '*' in trigger:
             self.capture_regex = self.generate_capture_regex()
         self.count = count
-        self.server = server
+        self.server = guild
         self.author_id = author_id
+        if new and self.validate_new_command() and guild.id > 1000000:
+            try:
+                new_command = Command(str(guild.id) + self.raw_trigger, self.raw_response, count, guild.id, author_id)
+                self.session.add(new_command)
+                self.session.commit()
+            except IntegrityError:
+                self.session.rollback()
+                raise DuplicatedTriggerException(self.raw_trigger)
 
-    async def execute(self, message, session):
+    def validate_new_command(self):
+        if len(self.raw_trigger) < 2:
+            raise ShortTriggerException("Please use a longer trigger")
+        if len(self.raw_response) > 200:
+            raise LongResponseException("That response is too long, ask an admin to set it")
+        if self.raw_response in ("author", "list", "remove"):
+            raise ResponseKeywordException()
+        # if user has too many commands?
+        # language filter?
+        return True
+
+    async def execute(self, message):
         resp = self.generate_response(message.author, message.content)
-        update_command(session, self.raw_trigger, self.raw_response, self.count, self.server, self.author_id)
+        update_command(self.session, self.raw_trigger, self.raw_response, self.count, self.server, self.author_id)
         reacts = self.generate_reacts()
         if resp:
             await message.channel.send(resp)
@@ -194,4 +214,20 @@ def get_owl():
 
 
 class VaguePatternError(Exception):
+    pass
+
+
+class ShortTriggerException(Exception):
+    pass
+
+
+class LongResponseException(Exception):
+    pass
+
+
+class DuplicatedTriggerException(Exception):
+    pass
+
+
+class ResponseKeywordException(Exception):
     pass

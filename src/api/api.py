@@ -5,8 +5,10 @@ import secrets
 import websockets
 import re
 from discord.ext.commands import Cog, Context
+from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
+from sr.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 
-CALLBACK_URL = "https://aut-bot.com/app"
+CALLBACK_URL = "https://archit.us/app"
 
 
 class Api(Cog):
@@ -48,10 +50,10 @@ class Api(Cog):
     async def store_callback(self, nonce=None, url=None):
         assert nonce and url
         if not any(re.match(pattern, url) for pattern in (
-                r'https:\/\/[A-Fa-f0-9]{24}--aut-bot\.netlify\.com\/app',
-                r'https:\/\/deploy-preview-[0-9]+--aut-bot\.netlify\.com\/app',
-                r'https:\/\/develop\.aut-bot.com\/app',
-                r'https:\/\/aut-bot.com\/app',
+                r'https:\/\/[A-Fa-f0-9]{24}--architus\.netlify\.com\/app',
+                r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
+                r'https:\/\/develop\.archit\.us\/app',
+                r'https:\/\/archit\.us\/app',
                 r'http:\/\/localhost:3000\/app')):
             url = CALLBACK_URL
 
@@ -66,6 +68,35 @@ class Api(Cog):
     async def guild_counter(self):
         return {'guild_count': self.bot.guild_counter[0], 'user_count': self.bot.guild_counter[1]}
 
+    async def set_response(self, user_id, guild_id, trigger, response):
+        guild = self.bot.get_guild(int(guild_id))
+        try:
+            command = UserCommand(self.bot.session, trigger, response, 0, guild, user_id, new=True)
+        except VaguePatternError:
+            msg = "Capture group too broad."
+        except LongResponseException:
+            msg = "Response is too long."
+        except ShortTriggerException:
+            msg = "Trigger is too short."
+        except ResponseKeywordException:
+            msg = "That response is protected, please use another."
+        except DuplicatedTriggerException:
+            msg = "Remove duplicated trigger first."
+        else:
+            self.bot.user_commands[guild_id].append(command)
+            msg = 'Sucessfully Set'
+        return {'message': msg}
+
+    async def delete_response(self, user_id, guild_id, trigger):
+        guild = self.bot.get_guild(int(guild_id))
+
+        for oldcommand in self.bot.user_commands[guild_id]:
+            if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
+                self.bot.user_commands[guild_id].remove(oldcommand)
+                update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
+                return {'message': "Successfully Deleted"}
+        return {'message': "No such command."}
+
     async def fetch_user_dict(self, id):
         usr = self.bot.get_user(int(id))
         if usr is None:
@@ -74,6 +105,15 @@ class Api(Cog):
             'name': usr.name,
             'avatar': usr.avatar,
             'discriminator': usr.discriminator
+        }
+
+    async def get_emoji(self, id):
+        e = self.bot.get_emoji(int(id))
+        if e is None:
+            return None
+        return {
+            'name': e.name,
+            'url': str(e.url)
         }
 
     async def reload_extension(self, extension_name):
@@ -95,8 +135,8 @@ class Api(Cog):
         for guild_dict in guild_list:
             guild = self.bot.get_guild(int(guild_dict['id']))
             settings = guild_settings.get_guild(guild, self.bot.session)
-            guild_dict['has_autbot'] = guild is not None
-            guild_dict['autbot_admin'] = bool(settings) and user_id in settings.admins_ids
+            guild_dict['has_architus'] = guild is not None
+            guild_dict['architus_admin'] = bool(settings) and user_id in settings.admins_ids
         return guild_list
 
     async def interpret(
@@ -157,7 +197,7 @@ class Api(Cog):
                 # check for user set commands in this "guild"
                 for command in self.bot.user_commands[mock_message.guild.id]:
                     if (command.triggered(mock_message.content)):
-                        await command.execute(mock_message, self.bot.session)
+                        await command.execute(mock_message)
                         break
 
             # Prevent response sending for silent requests
@@ -175,7 +215,7 @@ class Api(Cog):
                 fkmsg = self.fake_messages[guild_id][react[0]]
                 fkmsg.sends = sends
                 react = await fkmsg.add_reaction(react[1], bot=False)
-                await self.bot.get_cog("EventCog").on_reaction_add(react, MockMember())
+                await self.bot.get_cog("Events").on_reaction_add(react, MockMember())
         elif removed_reactions:
             edit = True
             resp_id = removed_reactions[0][0]

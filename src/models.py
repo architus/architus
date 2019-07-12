@@ -80,13 +80,17 @@ class Log(Base):
     guild_id = Column('guild_id', BigInteger, primary_key=True)
     type = Column('type', Text, primary_key=True)
     message_id = Column('message_id', BigInteger)
+    user_id = Column('user_id', BigInteger)
     content = Column('content', Text, primary_key=True)
+    timestamp = Column('timestamp', DateTime)
 
-    def __init__(self, guild_id, type, content, message_id=None):
+    def __init__(self, guild_id, type, content, user_id, message_id, timestamp):
         self.guild_id = guild_id
         self.type = type
         self.content = content
         self.message_id = message_id
+        self.timestamp = timestamp
+        self.user_id = user_id
 
 
 class Command(Base):
@@ -94,7 +98,7 @@ class Command(Base):
     trigger = Column('trigger', Text, primary_key=True)
     response = Column('response', Text)
     count = Column('count', BigInteger)
-    server_id = Column('server_id', BigInteger)
+    server_id = Column('server_id', BigInteger, primary_key=True)
     author_id = Column('author_id', BigInteger)
 
     def __init__(self, trigger, response, count, server_id, author_id):
