@@ -5,6 +5,7 @@ from src.config import scraper_token
 
 import asyncio
 import discord
+import re
 
 
 class ScrimScraper(Bot):
@@ -60,9 +61,13 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        last_author = {}
         while True:
             while not self.q.empty():
                 item = self.q.get()
+                if item['author'] == last_author:
+                    continue
+                last_author = item['author']
                 for guild in self.bot.guilds:
                     if self.is_in_range(item):
                         settings = self.guild_settings.get_guild(guild)
@@ -73,7 +78,8 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
             await asyncio.sleep(15)
 
     def is_in_range(self, item):
-        return '4' in item['content']
+        pattern = re.compile(r"\s4")
+        return bool(pattern.search(item['content']))
 
     def get_embed(self, item):
         em = discord.Embed(title='#' + item['channel']['name'], description=item['content'], colour=0x800080)
@@ -85,8 +91,9 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
 
 
 def teardown(bot):
-    print("Terminating scraper bot")
-    p.terminate()
+    pass
+    # print("Terminating scraper bot")
+    # p.terminate()
 
 def setup(bot):
     bot.add_cog(ScrimFinderCog(bot))
