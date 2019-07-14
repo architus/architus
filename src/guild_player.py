@@ -85,7 +85,7 @@ class GuildPlayer:
         self.voice.play(discord.FFmpegPCMAudio(download_url, **ffmpeg_options), after=self.agane)
         await asyncio.sleep(2)
         os.remove(download_url)
-        return 'hello'
+        return self.name
 
     async def add_spotify_playlist(self, url):
         urls = []
