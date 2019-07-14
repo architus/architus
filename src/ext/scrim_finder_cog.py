@@ -60,13 +60,14 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
         while True:
             while not self.q.empty():
                 item = self.q.get()
-                if self.is_in_range(item):
-                    guild = self.bot.get_guild(item['guild']['id'])
-                    settings = self.guild_settings.get_guild(guild)
-
-                    channel = self.bot.get_channel(settings.scrim_channel_id)
-                    await channel.send(embed=self.get_embed(item))
-            await asyncio.sleep(5)
+                for guild in self.bot.guilds:
+                    if self.is_in_range(item):
+                        settings = self.guild_settings.get_guild(guild)
+                        if settings:
+                            channel = self.bot.get_channel(settings.scrim_channel_id)
+                            if channel:
+                                await channel.send(embed=self.get_embed(item))
+            await asyncio.sleep(15)
 
     def is_in_range(self, item):
         return '4' in item['content']
