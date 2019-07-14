@@ -27,6 +27,9 @@ class ScrimScraper(Bot):
                     'id': msg.guild.id,
                     'name': msg.guild.name,
                     'url': str(msg.guild.icon_url)
+                },
+                'channel': {
+                    'name': msg.channel.name
                 }
             }
             self.q.put(info)
@@ -73,7 +76,7 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
         return '4' in item['content']
 
     def get_embed(self, item):
-        em = discord.Embed(title="LFS Scrim", description=item['content'], colour=0x800080)
+        em = discord.Embed(title='#' + item['channel']['name'], description=item['content'], colour=0x800080)
         em.set_author(name=item['guild']['name'], icon_url=item['guild']['url'])
         name = f"{item['author']['name']}#{item['author']['discriminator']}"
         em.set_footer(text=name, icon_url=item['author']['url'])
