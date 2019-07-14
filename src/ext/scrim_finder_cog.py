@@ -35,7 +35,7 @@ class ScrimScraper(Bot):
         return "lfs" in msg.content.lower()
 
     def is_na_listing(self, msg):
-        return 'na' in msg.channel.name.lower()
+        return 'na' in msg.channel.name.lower() or 'na' in msg.content.lower()
 
 
 
