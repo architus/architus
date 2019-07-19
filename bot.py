@@ -6,7 +6,6 @@ import zmq
 import zmq.asyncio
 import json
 import websockets
-import ssl
 import os
 from pytz import timezone
 
@@ -34,15 +33,6 @@ class CoolBot(Bot):
 
         ctx = zmq.asyncio.Context()
         self.loop.create_task(self.poll_requests(ctx))
-        try:
-            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
-
-            start_server = websockets.serve(self.get_cog("Api").handle_socket, '0.0.0.0', 8300, ssl=ssl_context)
-        except FileNotFoundError:
-            print("SSL certs not found, websockets running in insecure mode")
-            start_server = websockets.serve(self.get_cog("Api").handle_socket, '0.0.0.0', 8300)
-        asyncio.async(start_server)
         super().run(token)
 
     @asyncio.coroutine
@@ -50,11 +40,14 @@ class CoolBot(Bot):
         api = self.get_cog('Api')
         pub = ctx.socket(zmq.PUB)
         pub.bind("tcp://127.0.0.1:7200")
-        while True:
-            if not self.q.empty():
-                msg = json.loads(self.q.get())
-                self.loop.create_task(api.handle_request(pub, msg))
-            yield from asyncio.sleep(.01)
+        if self.q is not None:
+            while True:
+                if not self.q.empty():
+                    msg = json.loads(self.q.get())
+                    self.loop.create_task(api.handle_request(pub, msg))
+                yield from asyncio.sleep(.01)
+        else:
+            print("No ipc queue was found, I hope the api isn't supposed to be running")
 
     async def on_reaction_add(self, react, user):
         if user == self.user:

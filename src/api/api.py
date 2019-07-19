@@ -1,9 +1,11 @@
 import json
 import traceback
+import ssl
 import asyncio
 import secrets
 import websockets
 import re
+import discord
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
@@ -17,13 +19,30 @@ class Api(Cog):
         self.bot = bot
         self.fake_messages = {}
         self.callback_urls = {}
+        self.bot.socket_task = None
+
+        self.start_socket_listener()
+
+    def start_socket_listener(self):
+        print("Starting websocket listener")
+        try:
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
+
+            start_server = websockets.serve(self.handle_socket, '0.0.0.0', 8300, ssl=ssl_context)
+        except FileNotFoundError:
+            print("SSL certs not found, websockets running in insecure mode")
+            start_server = websockets.serve(self.handle_socket, '0.0.0.0', 8300)
+
+        self.bot.socket_task = asyncio.async(start_server)
 
     async def handle_socket(self, websocket, path):
         while True:
             try:
                 try:
+                    self = self.bot.get_cog("Api")
                     data = json.loads(await websocket.recv())
-                    print("recv: " + str(data))
+                    print("recvd: " + str(data))
                     if data['_module'] == 'interpret':
                         resp = await self.interpret(**data)
                     else:
@@ -40,7 +59,7 @@ class Api(Cog):
     @asyncio.coroutine
     def handle_request(self, pub, msg):
         try:
-            resp = json.dumps((yield from getattr(self, msg['method'])(*msg['args'])))
+            resp = json.dumps((yield from getattr(self.bot.get_cog("Api"), msg['method'])(*msg['args'])))
         except Exception as e:
             traceback.print_exc()
             print(f"caught {e} while handling {msg['topic']}s request")
@@ -116,11 +135,17 @@ class Api(Cog):
             'url': str(e.url)
         }
 
+    async def get_extensions(self):
+        return {'extensions': [k for k in self.bot.extensions.keys()]}
+
     async def reload_extension(self, extension_name):
         name = extension_name.replace('-', '.')
-        print(f"reloading extention: {name}")
-        self.bot.reload_extension(name)
-        return {}
+        try:
+            self.bot.reload_extension(name)
+        except discord.ext.commands.errors.ExtensionNotLoaded as e:
+            print(e)
+            return {"message": f"Extension Not Loaded: {e}", "status_code": 503}
+        return {"message": "Reload signal sent"}
 
     async def settings_access(self, guild_id=None, setting=None, value=None):
         guild_settings = self.bot.get_cog("GuildSettings")
@@ -187,10 +212,10 @@ class Api(Cog):
                 for cmd in possible_commands:
                     try:
                         if args[1] in cmd.aliases or args[1] == cmd.name:
-                            help_text += f'```{args[1]} - {cmd.help}```'
+                            help_text += f'```hi{args[1]} - {cmd.help}```'
                             break
                     except IndexError:
-                        help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
+                        help_text += '```load_cert_chain{}: {:>5}```\n'.format(cmd.name, cmd.help)
 
                 sends.append(help_text)
             else:

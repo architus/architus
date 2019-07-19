@@ -53,7 +53,9 @@ class CustomResource(Resource):
         self.q.put(json.dumps(call))
 
     def recv(self):
-        return json.loads(self.sub.recv().decode().replace(self.topic + ' ', ''))
+        data = json.loads(self.sub.recv().decode().replace(self.topic + ' ', ''))
+        sc = data.pop("status_code", 200)
+        return data, sc
 
 
 class Login(CustomResource):
@@ -91,7 +93,7 @@ class RedirectCallback(CustomResource):
     '''
     def get(self):
         self.enqueue({'method': "get_callback", 'args': [request.cookies.get('redirect-nonce')]})
-        redirect_url = self.recv()['content']
+        redirect_url = self.recv()[0]['content']
         code = request.args.get('code')
         perms = request.args.get('permissions')
         guild_id = request.args.get('guild_id')
@@ -110,7 +112,7 @@ class RedirectCallback(CustomResource):
 class User(CustomResource):
     def get(self, name):
         self.enqueue({'method': "fetch_user_dict", 'args': [name]})
-        name = self.recv()
+        name, sc = self.recv()
         return name, 200
 
     def post(self, name):
@@ -120,7 +122,7 @@ class User(CustomResource):
 class GuildCounter(CustomResource):
     def get(self):
         self.enqueue({'method': "guild_counter", 'args': []})
-        return self.recv(), 200
+        return self.recv()
 
 
 class Logs(CustomResource):
@@ -160,10 +162,10 @@ class AutoResponses(CustomResource):
             match = p.search(cmd.response)
             if match and str(match.group("emoji_id")) not in emojis:
                 self.enqueue({'method': "get_emoji", 'args': [match.group("emoji_id")]})
-                emojis[str(match.group("emoji_id"))] = self.recv()
+                emojis[str(match.group("emoji_id"))], sc = self.recv()
             if str(cmd.author_id) not in authors:
                 self.enqueue({'method': "fetch_user_dict", 'args': [cmd.author_id]})
-                authors[str(cmd.author_id)] = self.recv()
+                authors[str(cmd.author_id)], sc = self.recv()
 
         resp = {
             'authors': authors,
@@ -186,7 +188,7 @@ class AutoResponses(CustomResource):
             return "Malformed request", 400
 
         self.enqueue({'method': "set_response", 'args': [user_id, guild_id, args.get('trigger'), args.get('response')]})
-        return self.recv(), 200
+        return self.recv()
 
     def delete(self, guild_id):
         row = authenticate(self.session, request.headers)
@@ -201,14 +203,14 @@ class AutoResponses(CustomResource):
             return "Malformed request", 400
 
         self.enqueue({'method': "delete_response", 'args': [user_id, guild_id, args.get('trigger')]})
-        return self.recv(), 200
+        return self.recv()
 
 
 class Settings(CustomResource):
     def get(self, guild_id, setting):
         # discord_id = authenticate(self.session, request.headers).discord_id
         self.enqueue({'method': "settings_access", 'args': [guild_id, setting, None]})
-        return self.recv(), 200
+        return self.recv()
 
     def post(self, guild_id, setting):
         # parser = reqparse.RequestParser()
@@ -219,12 +221,19 @@ class Settings(CustomResource):
 
 class Coggers(CustomResource):
     '''provide an endpoint to reload cogs in the bot'''
-    def get(self, extension):
-        discord_id = authenticate(self.session, request.headers).discord_id
-        if discord_id and discord_id == 214037134477230080:
+    def get(self, extension=None):
+        row = authenticate(self.session, request.headers)
+        if row and row.discord_id == 214037134477230080:
+            self.enqueue({'method': "get_extensions", 'args': []})
+            return self.recv()
+        return {"message": "401: not johnyburd"}, 401
+
+    def post(self, extension):
+        row = authenticate(self.session, request.headers)
+        if row and row.discord_id == 214037134477230080:
             self.enqueue({'method': "reload_extension", 'args': [extension]})
-            self.recv()
-            return {}, 204
+            resp, sc = self.recv()
+            return resp, sc
         return {"message": "401: not johnyburd"}, 401
 
 
@@ -257,7 +266,7 @@ class ListGuilds(CustomResource):
             r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
             if r.status_code == 200:
                 self.enqueue({'method': "tag_autbot_guilds", 'args': [r.json(), row.discord_id]})
-                resp = self.recv()
+                resp, sc = self.recv()
             else:
                 resp = r.json()
             return resp, r.status_code
@@ -341,5 +350,5 @@ def app_factory(q):
     api.add_resource(RedirectCallback, "/redirect", resource_class_kwargs={'q': q})
     api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q': q})
     api.add_resource(Invite, "/invite/<int:guild_id>", resource_class_kwargs={'q': q})
-    api.add_resource(Coggers, "/coggers/<string:extension>", resource_class_kwargs={'q': q})
+    api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers", resource_class_kwargs={'q': q})
     return app
