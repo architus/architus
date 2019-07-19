@@ -160,8 +160,8 @@ class Api(Cog):
         for guild_dict in guild_list:
             guild = self.bot.get_guild(int(guild_dict['id']))
             settings = guild_settings.get_guild(guild, self.bot.session)
-            guild_dict['has_architus'] = guild is not None
-            guild_dict['architus_admin'] = bool(settings) and user_id in settings.admins_ids
+            guild_dict['has_autbot'] = guild is not None
+            guild_dict['autbot_admin'] = bool(settings) and user_id in settings.admins_ids
         return guild_list
 
     async def interpret(
