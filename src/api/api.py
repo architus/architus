@@ -6,7 +6,7 @@ import websockets
 import re
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
-from sr.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
+from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 
 CALLBACK_URL = "https://archit.us/app"
 
@@ -135,8 +135,8 @@ class Api(Cog):
         for guild_dict in guild_list:
             guild = self.bot.get_guild(int(guild_dict['id']))
             settings = guild_settings.get_guild(guild, self.bot.session)
-            guild_dict['has_architus'] = guild is not None
-            guild_dict['architus_admin'] = bool(settings) and user_id in settings.admins_ids
+            guild_dict['has_autbot'] = guild is not None
+            guild_dict['autbot_admin'] = bool(settings) and user_id in settings.admins_ids
         return guild_list
 
     async def interpret(
