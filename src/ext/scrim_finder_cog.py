@@ -42,7 +42,6 @@ class ScrimScraper(Bot):
         return 'na' in msg.channel.name.lower() or 'na' in msg.content.lower()
 
 
-
 class ScrimFinderCog(Cog, name="Scrim Finder"):
     '''Scans some servers for 4k+ scrims'''
 
@@ -89,11 +88,11 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
         return em
 
 
-
 def teardown(bot):
     pass
     # print("Terminating scraper bot")
     # p.terminate()
+
 
 def setup(bot):
     bot.add_cog(ScrimFinderCog(bot))
