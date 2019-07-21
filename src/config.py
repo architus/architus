@@ -19,6 +19,7 @@ try:
     twitter_consumer_secret = lines[6]
     twitter_access_token_key = lines[7]
     twitter_access_token_secret = lines[8]
+    scraper_token = lines[9]
 
 except Exception as e:
     print(e)
