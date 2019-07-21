@@ -128,7 +128,7 @@ class Logs(CustomResource):
         # TODO this should probably be authenticated
         if authenticate(self.session, request.headers) is None and False:
             return "not authorized", 401
-        rows = self.session.query(Log).filter(Log.guild_id == guild_id).all()
+        rows = self.session.query(Log).filter(Log.guild_id == guild_id).limit(200).all()
         logs = []
         for log in rows:
             logs.append({
@@ -137,7 +137,7 @@ class Logs(CustomResource):
                 'user_id': log.user_id,
                 'timestamp': log.timestamp.isoformat()
             })
-        return logs, 200
+        return json.dumps({"logs": logs}), 200
 
 
 class AutoResponses(CustomResource):

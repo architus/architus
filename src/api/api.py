@@ -6,7 +6,7 @@ import websockets
 import re
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
-from sr.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
+from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 
 CALLBACK_URL = "https://archit.us/app"
 

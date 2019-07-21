@@ -22,6 +22,8 @@ class LogCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
+        if before.content == after.content or before.author.id == self.bot.user.id:
+            return
         self.insert_row(
             before.channel.guild.id,
             LogCog.MSG_EDIT,
