@@ -47,7 +47,7 @@ class Api(Cog):
                     resp = await self.interpret(**data)
                 else:
                     resp = {'content': "Unknown module"}
-            except websockets.connections.ConnectionClosed:
+            except websockets.exceptions.ConnectionClosed:
                 print("Websocket connection to {websocket.remote_address} closed. goodbye.")
                 return
             except Exception as e:
@@ -353,7 +353,7 @@ class MockMessage(object):
                 return react
 
     async def edit(self, content=None):
-        print("EDIT " + content)
+        # print("EDIT " + content)
         self.sends.append(content)
 
 
