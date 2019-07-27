@@ -48,7 +48,7 @@ class Api(Cog):
                 else:
                     resp = {'content': "Unknown module"}
             except websockets.exceptions.ConnectionClosed:
-                print("Websocket connection to {websocket.remote_address} closed. goodbye.")
+                print(f"Websocket connection to {websocket.remote_address} closed. goodbye.")
                 return
             except Exception as e:
                 traceback.print_exc()
