@@ -24,7 +24,7 @@ class Api(Cog):
         self.start_socket_listener()
 
     def start_socket_listener(self):
-        print("Starting websocket listener")
+        print("Starting websocket listener on port 8300")
         try:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
@@ -37,24 +37,24 @@ class Api(Cog):
         self.bot.socket_task = asyncio.async(start_server)
 
     async def handle_socket(self, websocket, path):
+        print(f"Started websocket connection with {websocket.remote_address}")
         while True:
             try:
-                try:
-                    self = self.bot.get_cog("Api")
-                    data = json.loads(await websocket.recv())
-                    print("recvd: " + str(data))
-                    if data['_module'] == 'interpret':
-                        resp = await self.interpret(**data)
-                    else:
-                        resp = {'content': "Unknown module"}
-                except Exception as e:
-                    traceback.print_exc()
-                    print(f"caught {e} while handling websocket request")
-                    resp = {'content': f"caught {e} while handling websocket request"}
-                await websocket.send(json.dumps(resp))
-            except websockets.exceptions.ConnectionClosed:
-                print("Websocket connection closed")
+                self = self.bot.get_cog("Api")
+                data = json.loads(await websocket.recv())
+                # print("recvd: " + str(data))
+                if data['_module'] == 'interpret':
+                    resp = await self.interpret(**data)
+                else:
+                    resp = {'content': "Unknown module"}
+            except websockets.connections.ConnectionClosed:
+                print("Websocket connection to {websocket.remote_address} closed. goodbye.")
                 return
+            except Exception as e:
+                traceback.print_exc()
+                print(f"caught {e} while handling websocket request")
+                resp = {'content': f"caught {e} while handling websocket request"}
+            await websocket.send(json.dumps(resp))
 
     @asyncio.coroutine
     def handle_request(self, pub, msg):
@@ -215,7 +215,7 @@ class Api(Cog):
                             help_text += f'```hi{args[1]} - {cmd.help}```'
                             break
                     except IndexError:
-                        help_text += '```load_cert_chain{}: {:>5}```\n'.format(cmd.name, cmd.help)
+                        help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
 
                 sends.append(help_text)
             else:
@@ -257,8 +257,8 @@ class Api(Cog):
             'edit': edit,
             'guild_id': guild_id,
         }
-        if resp['content']:
-            print(resp)
+        # if resp['content']:
+        #   print(resp)
         return resp
 
 

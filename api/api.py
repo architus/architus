@@ -54,7 +54,12 @@ class CustomResource(Resource):
 
     def recv(self):
         data = json.loads(self.sub.recv().decode().replace(self.topic + ' ', ''))
-        sc = data.pop("status_code", 200)
+        try:
+            sc = data.pop("status_code", 200)
+        except TypeError:
+            sc = 200
+        except AttributeError:
+            sc = 200
         return data, sc
 
 
@@ -130,13 +135,13 @@ class Logs(CustomResource):
         # TODO this should probably be authenticated
         if authenticate(self.session, request.headers) is None and False:
             return "not authorized", 401
-        rows = self.session.query(Log).filter(Log.guild_id == guild_id).limit(200).all()
+        rows = self.session.query(Log).filter(Log.guild_id == guild_id).order_by(Log.timestamp.desc()).limit(400).all()
         logs = []
         for log in rows:
             logs.append({
                 'type': log.type,
                 'content': log.content,
-                'user_id': log.user_id,
+                'user_id': str(log.user_id),
                 'timestamp': log.timestamp.isoformat()
             })
         return json.dumps({"logs": logs}), 200
