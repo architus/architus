@@ -37,7 +37,7 @@ class CoolBot(Bot):
     def api_entry(self, ctx):
         api = self.get_cog('Api')
         socket = ctx.socket(zmq.REP)
-        socket.connect(f"tcp://127.0.0.1:6300")
+        socket.connect(f"tcp://ipc:6300")
         while True:
             tasks = yield from socket.recv_multipart()
             for task in (t.decode() for t in tasks):

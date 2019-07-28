@@ -9,8 +9,8 @@ import re
 import secrets
 from datetime import datetime, timedelta
 
-from src.config import client_id, client_secret, get_session
-from src.models import AppSession, Command, Log
+from config import client_id, client_secret, get_session
+from models import AppSession, Command, Log
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://aut-bot.com/app'
@@ -22,13 +22,11 @@ cors = CORS(app)
 
 def get_db():
     if 'db' not in g:
-        engine = create_engine("postgresql://{}:{}@localhost/autbot".format(db_user, db_pass))
-        Session = sessionmaker(bind=engine)
-        g.db = Session()
+        g.db = get_session()
     return g.db
 
 @app.teardown_appcontext
-def teardown_db():
+def teardown_db(arg):
     db = g.pop('db', None)
     if db is not None:
         db.close()
@@ -55,7 +53,7 @@ class CustomResource(Resource):
         self.session = get_db()
         ctx = zmq.Context()
         self.socket = ctx.socket(zmq.REQ)
-        self.socket.connect('tcp://127.0.0.1:7300')
+        self.socket.connect('tcp://ipc:7300')
 
     def enqueue(self, call):
         self.socket.send(json.dumps(call).encode())
