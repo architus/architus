@@ -64,7 +64,8 @@ class Api(Cog):
             traceback.print_exc()
             print(f"caught {e} while handling {msg['topic']}s request")
             resp = '{"message": "' + str(e) + '"}'
-        yield from pub.send((str(msg['topic']) + ' ' + str(resp)).encode())
+        #yield from pub.send(f"{msg['topic']} {resp}".encode())
+        yield from pub.send(str(resp).encode())
 
     async def store_callback(self, nonce=None, url=None):
         assert nonce and url
