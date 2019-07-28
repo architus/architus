@@ -1,4 +1,4 @@
-from flask import Flask, redirect, request
+from flask import Flask, redirect, request, g
 from flask_restful import Api, Resource, reqparse
 from flask_cors import CORS
 import requests
@@ -20,6 +20,18 @@ REDIRECT_URI = 'https://api.archit.us/redirect'
 app = Flask(__name__)
 cors = CORS(app)
 
+def get_db():
+    if 'db' not in g:
+        engine = create_engine("postgresql://{}:{}@localhost/autbot".format(db_user, db_pass))
+        Session = sessionmaker(bind=engine)
+        g.db = Session()
+    return g.db
+
+@app.teardown_appcontext
+def teardown_db():
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
 
 @app.route('/issue')
 def issue():
@@ -40,7 +52,7 @@ def authenticate(session, headers):
 
 class CustomResource(Resource):
     def __init__(self):
-        self.session = get_session(os.getpid())
+        self.session = get_db()
         ctx = zmq.Context()
         self.socket = ctx.socket(zmq.REQ)
         self.socket.connect('tcp://127.0.0.1:7300')
@@ -67,7 +79,7 @@ class Login(CustomResource):
         self.enqueue(
             {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://archit.us/app']})
         self.recv()
-        response = redirect('https://discordapp.com/api/oauth2/authorize?client_id=448546825532866560&redirect_uri='
+        response = redirect('https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
                             'https%3A%2F%2Fapi.archit.us%2Fredirect&response_type=code&scope=identify%20guilds')
         response.set_cookie('redirect-nonce', nonce)
         return response
@@ -259,7 +271,7 @@ class Coggers(CustomResource):
 class Identify(Resource):
 
     def get(self):
-        session = get_session(os.getpid())
+        session = get_db()
         headers = request.headers
         print(headers)
         discord_token = authenticate(session, headers).discord_access_token
@@ -293,7 +305,7 @@ class ListGuilds(CustomResource):
 
 
 def commit_tokens(autbot_token, discord_token, refresh_token, expires_in, discord_id):
-    session = get_session(os.getpid())
+    session = get_db()
     time = datetime.now() + timedelta(seconds=int(expires_in) - 60)
     new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, discord_id, datetime.now())
     session.add(new_appsession)

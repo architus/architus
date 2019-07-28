@@ -1,5 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+import yaml
 # from src.commands import *
 # import src.commands as command_modules
 
@@ -9,21 +10,23 @@ db_pass = None
 sessions = {}
 
 try:
-    lines = [line.rstrip('\n') for line in open('.secret_token')]
-    secret_token = lines[0]
-    db_user = lines[1]
-    db_pass = lines[2]
-    client_id = lines[3]
-    client_secret = lines[4]
-    twitter_consumer_key = lines[5]
-    twitter_consumer_secret = lines[6]
-    twitter_access_token_key = lines[7]
-    twitter_access_token_secret = lines[8]
-    scraper_token = lines[9]
+    with open('.secrets.yaml') as f:
+        data = yaml.safe_load(f)
+
+    secret_token = data['bot_token']
+    db_user = data['db_user']
+    db_pass = data['db_pass']
+    client_id = data['client_id']
+    client_secret = data['client_secret']
+    twitter_consumer_key = data['twitter_consumer_key']
+    twitter_consumer_secret = data['twitter_consumer_secret']
+    twitter_access_token_key = data['twitter_access_token_key']
+    twitter_access_token_secret = data['twitter_access_token_secret']
+    scraper_token = data['sraper_bot_token']
 
 except Exception as e:
     print(e)
-    print('error reading .secret_token, make it you aut')
+    print('error reading .secrets.yaml, make it you aut')
 
 
 def get_session(pid=None):
