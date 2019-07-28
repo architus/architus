@@ -1,6 +1,6 @@
 .venv/*
 emojis/*
-*.secret_token
+*.secrets.yaml
 *.pkl
 __py*
 res/foo.*

@@ -27,16 +27,15 @@ services:
       - "443:443"
     networks:
       - webnet
-  db:
+  postgres:
     image: johnyburd/db:latest
-    restart: always
-    environment:
-      POSTGRES_USER: autbot
-      POSTGRES_PASSWORD: example
-      POSTGRES_DB: autbot
+    restart-policy:
+      condition: on-failure
     deploy:
       placement:
         constraints: [node.role == manager]
+    ports:
+      - "5432:5432"
     networks:
       - webnet
   ipc:

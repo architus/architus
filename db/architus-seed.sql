@@ -1,3 +1,6 @@
+-- docker won't automatically create this user so we have to add it manually
+CREATE ROLE postgres WITH SUPERUSER;
+
 --
 -- PostgreSQL database dump
 --
