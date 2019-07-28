@@ -13,7 +13,7 @@ services:
     networks:
       - webnet
   api:
-    image: johnyburd/api
+    image: johnyburd/api:latest
     deploy:
       replicas: 1
       restart_policy:
@@ -23,14 +23,15 @@ services:
           cpus: "1"
           memory: 500M
     ports:
-      - "80:80"
-      - "443:443"
+      - "5000:5000"
     networks:
       - webnet
   postgres:
     image: johnyburd/db:latest
-    restart-policy:
-      condition: on-failure
+    environment:
+      POSTGRES_USER: autbot
+      POSTGRES_PASSWORD: autism
+      POSTGRES_DB: autbot
     deploy:
       placement:
         constraints: [node.role == manager]
