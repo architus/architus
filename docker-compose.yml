@@ -1,17 +1,30 @@
 version: "3"
 services:
-  web:
-    image: johnyburd/getstarted:two
+  bot:
+    image: johnyburd/bot
     deploy:
-      replicas: 5
+      replicas: 1
       restart_policy:
         condition: on-failure
       resources:
         limits:
-          cpus: "0.1"
-          memory: 50M
+          cpus: "1"
+          memory: 500M
+    networks:
+      - webnet
+  api:
+    image: johnyburd/api
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "1"
+          memory: 500M
     ports:
       - "80:80"
+      - "443:443"
     networks:
       - webnet
   db:
