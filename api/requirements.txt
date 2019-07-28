@@ -1,0 +1,6 @@
+Flask>=1.0.3
+Flask-Cors>=3.0.8
+Flask-RESTful>=0.3.7
+requests>=2.21.0
+zmq==0.0.0
+pyzmq==18.0.1

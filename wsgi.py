@@ -6,7 +6,6 @@ from bot import coolbot
 # export PYTHON=python3.6; uwsgi --ini config_uwsgi.ini --http :5061 --wsgi-file wsgi.py
 print("WSGI LOADED")
 
-q = Queue()
 application = app_factory(q)
 
 p = Process(name="autbot", target=coolbot.run, args=(secret_token,), kwargs={'q': q})

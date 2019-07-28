@@ -2,31 +2,18 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 9.5.14
--- Dumped by pg_dump version 9.5.14
+-- Dumped from database version 11.2
+-- Dumped by pg_dump version 11.2
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
 SET check_function_bodies = false;
 SET client_min_messages = warning;
 SET row_security = off;
-
---
--- Name: plpgsql; Type: EXTENSION; Schema: -; Owner: 
---
-
-CREATE EXTENSION IF NOT EXISTS plpgsql WITH SCHEMA pg_catalog;
-
-
---
--- Name: EXTENSION plpgsql; Type: COMMENT; Schema: -; Owner: 
---
-
-COMMENT ON EXTENSION plpgsql IS 'PL/pgSQL procedural language';
-
 
 SET default_tablespace = '';
 
@@ -61,6 +48,22 @@ CREATE TABLE public.tb_commands (
 ALTER TABLE public.tb_commands OWNER TO postgres;
 
 --
+-- Name: tb_logs; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.tb_logs (
+    guild_id bigint NOT NULL,
+    type text NOT NULL,
+    message_id bigint,
+    content text NOT NULL,
+    "timestamp" timestamp without time zone,
+    user_id bigint
+);
+
+
+ALTER TABLE public.tb_logs OWNER TO postgres;
+
+--
 -- Name: tb_roles; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -72,6 +75,23 @@ CREATE TABLE public.tb_roles (
 
 
 ALTER TABLE public.tb_roles OWNER TO postgres;
+
+--
+-- Name: tb_session; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.tb_session (
+    autbot_access_token text NOT NULL,
+    discord_access_token text NOT NULL,
+    discord_refresh_token text NOT NULL,
+    discord_expiration timestamp without time zone NOT NULL,
+    autbot_expiration timestamp without time zone NOT NULL,
+    last_login timestamp without time zone,
+    discord_id bigint NOT NULL
+);
+
+
+ALTER TABLE public.tb_session OWNER TO postgres;
 
 --
 -- Name: tb_settings; Type: TABLE; Schema: public; Owner: postgres
@@ -124,21 +144,14 @@ ALTER SEQUENCE public.tb_users_user_id_seq OWNED BY public.tb_users.user_id;
 
 
 --
--- Name: user_id; Type: DEFAULT; Schema: public; Owner: autbot
+-- Name: tb_users user_id; Type: DEFAULT; Schema: public; Owner: autbot
 --
 
 ALTER TABLE ONLY public.tb_users ALTER COLUMN user_id SET DEFAULT nextval('public.tb_users_user_id_seq'::regclass);
 
 
 --
--- Name: tb_users_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: autbot
---
-
-SELECT pg_catalog.setval('public.tb_users_user_id_seq', 98, true);
-
-
---
--- Name: tb_admins_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: tb_admins tb_admins_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.tb_admins
@@ -146,7 +159,7 @@ ALTER TABLE ONLY public.tb_admins
 
 
 --
--- Name: tb_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: tb_commands tb_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.tb_commands
@@ -154,7 +167,7 @@ ALTER TABLE ONLY public.tb_commands
 
 
 --
--- Name: tb_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: tb_roles tb_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.tb_roles
@@ -162,7 +175,15 @@ ALTER TABLE ONLY public.tb_roles
 
 
 --
--- Name: tb_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: tb_session tb_session_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tb_session
+    ADD CONSTRAINT tb_session_pkey PRIMARY KEY (autbot_access_token);
+
+
+--
+-- Name: tb_settings tb_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.tb_settings
@@ -170,7 +191,7 @@ ALTER TABLE ONLY public.tb_settings
 
 
 --
--- Name: tb_users_pkey; Type: CONSTRAINT; Schema: public; Owner: autbot
+-- Name: tb_users tb_users_pkey; Type: CONSTRAINT; Schema: public; Owner: autbot
 --
 
 ALTER TABLE ONLY public.tb_users
@@ -178,22 +199,9 @@ ALTER TABLE ONLY public.tb_users
 
 
 --
--- Name: SCHEMA public; Type: ACL; Schema: -; Owner: postgres
---
-
-REVOKE ALL ON SCHEMA public FROM PUBLIC;
-REVOKE ALL ON SCHEMA public FROM postgres;
-GRANT ALL ON SCHEMA public TO postgres;
-GRANT ALL ON SCHEMA public TO PUBLIC;
-
-
---
 -- Name: TABLE tb_admins; Type: ACL; Schema: public; Owner: postgres
 --
 
-REVOKE ALL ON TABLE public.tb_admins FROM PUBLIC;
-REVOKE ALL ON TABLE public.tb_admins FROM postgres;
-GRANT ALL ON TABLE public.tb_admins TO postgres;
 GRANT ALL ON TABLE public.tb_admins TO autbot;
 
 
@@ -201,39 +209,35 @@ GRANT ALL ON TABLE public.tb_admins TO autbot;
 -- Name: TABLE tb_commands; Type: ACL; Schema: public; Owner: postgres
 --
 
-REVOKE ALL ON TABLE public.tb_commands FROM PUBLIC;
-REVOKE ALL ON TABLE public.tb_commands FROM postgres;
-GRANT ALL ON TABLE public.tb_commands TO postgres;
 GRANT ALL ON TABLE public.tb_commands TO autbot;
+
+
+--
+-- Name: TABLE tb_logs; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.tb_logs TO autbot;
 
 
 --
 -- Name: TABLE tb_roles; Type: ACL; Schema: public; Owner: postgres
 --
 
-REVOKE ALL ON TABLE public.tb_roles FROM PUBLIC;
-REVOKE ALL ON TABLE public.tb_roles FROM postgres;
-GRANT ALL ON TABLE public.tb_roles TO postgres;
 GRANT ALL ON TABLE public.tb_roles TO autbot;
+
+
+--
+-- Name: TABLE tb_session; Type: ACL; Schema: public; Owner: postgres
+--
+
+GRANT ALL ON TABLE public.tb_session TO autbot;
 
 
 --
 -- Name: TABLE tb_settings; Type: ACL; Schema: public; Owner: postgres
 --
 
-REVOKE ALL ON TABLE public.tb_settings FROM PUBLIC;
-REVOKE ALL ON TABLE public.tb_settings FROM postgres;
-GRANT ALL ON TABLE public.tb_settings TO postgres;
 GRANT ALL ON TABLE public.tb_settings TO autbot;
-
-
---
--- Name: TABLE tb_users; Type: ACL; Schema: public; Owner: autbot
---
-
-REVOKE ALL ON TABLE public.tb_users FROM PUBLIC;
-REVOKE ALL ON TABLE public.tb_users FROM autbot;
-GRANT ALL ON TABLE public.tb_users TO autbot;
 
 
 --

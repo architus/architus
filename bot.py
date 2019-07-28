@@ -26,28 +26,22 @@ class CoolBot(Bot):
         self.tracked_messages = {}
         super().__init__(**kwargs)
 
-    def run(self, token, q=None):
-        self.q = q
-
+    def run(self, token):
         self.loop.create_task(self.list_guilds())
 
         ctx = zmq.asyncio.Context()
-        self.loop.create_task(self.poll_requests(ctx))
+        self.loop.create_task(self.api_entry(ctx))
         super().run(token)
 
     @asyncio.coroutine
-    def poll_requests(self, ctx):
+    def api_entry(self, ctx):
         api = self.get_cog('Api')
-        pub = ctx.socket(zmq.PUB)
-        pub.bind("tcp://127.0.0.1:7200")
-        if self.q is not None:
-            while True:
-                if not self.q.empty():
-                    msg = json.loads(self.q.get())
-                    self.loop.create_task(api.handle_request(pub, msg))
-                yield from asyncio.sleep(.01)
-        else:
-            print("No ipc queue was found, I hope the api isn't supposed to be running")
+        socket = ctx.socket(zmq.REP)
+        socket.connect(f"tcp://127.0.0.1:6300")
+        while True:
+            tasks = yield from socket.recv_multipart()
+            for task in (t.decode() for t in tasks):
+                self.loop.create_task(api.handle_request(socket, json.loads(task)))
 
     async def on_reaction_add(self, react, user):
         if user == self.user:

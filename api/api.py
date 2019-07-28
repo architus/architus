@@ -23,7 +23,7 @@ cors = CORS(app)
 
 @app.route('/issue')
 def issue():
-    return redirect('https://github.com/aut-bot-com/autbot/issues/new')
+    return redirect('https://github.com/architus/architus/issues/new')
 
 
 def authenticate(session, headers):
@@ -39,27 +39,24 @@ def authenticate(session, headers):
 
 
 class CustomResource(Resource):
-    def __init__(self, q=None):
+    def __init__(self):
         self.session = get_session(os.getpid())
-        self.q = q
         ctx = zmq.Context()
-        self.topic = str(os.getpid())
-        self.sub = ctx.socket(zmq.SUB)
-        self.sub.connect("tcp://127.0.0.1:7200")
-        self.sub.setsockopt(zmq.SUBSCRIBE, self.topic.encode())
+        self.socket = ctx.socket(zmq.REQ)
+        self.socket.connect('tcp://127.0.0.1:7300')
 
     def enqueue(self, call):
-        call['topic'] = self.topic
-        self.q.put(json.dumps(call))
+        self.socket.send(json.dumps(call).encode())
 
     def recv(self):
-        data = json.loads(self.sub.recv().decode().replace(self.topic + ' ', ''))
+        data = json.loads(self.socket.recv().decode())
         try:
             sc = data.pop("status_code", 200)
         except TypeError:
             sc = 200
         except AttributeError:
             sc = 200
+        print(f"{self.topic} recv data from bot")
         return data, sc
 
 
@@ -275,10 +272,9 @@ class Identify(Resource):
 class ListGuilds(CustomResource):
 
     def get(self):
-        session = get_session(os.getpid())
         headers = request.headers
         print(headers)
-        row = authenticate(session, headers)
+        row = authenticate(self.session, headers)
         discord_token = row.discord_access_token
         if discord_token:
             headers = {
@@ -360,17 +356,17 @@ def status():
     return "all systems operational", 204
 
 
-def app_factory(q):
+def app_factory():
     api = Api(app)
-    api.add_resource(User, "/user/<string:name>", resource_class_kwargs={'q': q})
-    api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", resource_class_kwargs={'q': q})
+    api.add_resource(User, "/user/<string:name>")
+    api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>")
     api.add_resource(Identify, "/identify")
-    api.add_resource(ListGuilds, "/guilds", resource_class_kwargs={'q': q})
-    api.add_resource(Login, "/login", resource_class_kwargs={'q': q})
-    api.add_resource(AutoResponses, "/responses/<int:guild_id>", resource_class_kwargs={'q': q})
-    api.add_resource(Logs, "/logs/<int:guild_id>", resource_class_kwargs={'q': q})
-    api.add_resource(RedirectCallback, "/redirect", resource_class_kwargs={'q': q})
-    api.add_resource(GuildCounter, "/guild_count", resource_class_kwargs={'q': q})
-    api.add_resource(Invite, "/invite/<int:guild_id>", resource_class_kwargs={'q': q})
-    api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers", resource_class_kwargs={'q': q})
+    api.add_resource(ListGuilds, "/guilds")
+    api.add_resource(Login, "/login")
+    api.add_resource(AutoResponses, "/responses/<int:guild_id>")
+    api.add_resource(Logs, "/logs/<int:guild_id>")
+    api.add_resource(RedirectCallback, "/redirect")
+    api.add_resource(GuildCounter, "/guild_count")
+    api.add_resource(Invite, "/invite/<int:guild_id>")
+    api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
     return app
