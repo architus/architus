@@ -9,7 +9,7 @@ db_user = None
 db_pass = None
 sessions = {}
 
-DB_HOST = '127.0.0.1'
+DB_HOST = 'postgres'
 DB_PORT = 5432
 
 try:
