@@ -69,7 +69,7 @@ class Api(Cog):
     async def store_callback(self, nonce=None, url=None):
         assert nonce and url
         if not any(re.match(pattern, url) for pattern in (
-                r'https:\/\/[A-Fa-f0-9]{24}--architus\.netlify\.com\/app',
+                r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
                 r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
                 r'https:\/\/develop\.archit\.us\/app',
                 r'https:\/\/archit\.us\/app',
@@ -106,6 +106,15 @@ class Api(Cog):
             msg = 'Sucessfully Set'
         return {'message': msg}
 
+    async def is_member(self, user_id, guild_id, admin=False):
+        '''check if user is a member or admin of the given guild'''
+        guild = self.bot.get_guild(int(guild_id))
+        guild_settings = self.bot.get_cog("GuildSettings")
+        if not guild:
+            return False
+        settings = guild_settings.get_guild(guild, self.bot.session)
+        return {'member': bool(guild.get_member(int(user_id)) and (not admin or int(user_id) in settings.admins_ids)}
+
     async def delete_response(self, user_id, guild_id, trigger):
         guild = self.bot.get_guild(int(guild_id))
 
@@ -114,7 +123,7 @@ class Api(Cog):
                 self.bot.user_commands[guild_id].remove(oldcommand)
                 update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
                 return {'message': "Successfully Deleted"}
-        return {'message': "No such command."}
+        return {'message': "No such command.", 'status_code': 400}
 
     async def fetch_user_dict(self, id):
         usr = self.bot.get_user(int(id))

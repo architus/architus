@@ -210,6 +210,23 @@ class AutoResponses(CustomResource):
         self.enqueue({'method': "delete_response", 'args': [user_id, guild_id, args.get('trigger')]})
         return self.recv()
 
+    def patch(self, guild_id):
+        row = authenticate(self.session, request.headers)
+        if row is None:
+            return "not authorized", 401
+        user_id = row.discord_id
+        parser = reqparse.RequestParser()
+        parser.add_argument('trigger')
+        parser.add_argument('response')
+        args = parser.parse_args()
+        if args.get('trigger') is None or args.get('response') is None:
+            return "Malformed request", 400
+
+        self.enqueue({'method': "delete_response", 'args': [user_id, guild_id, args.get('trigger')]})
+        self.recv()
+        self.enqueue({'method': "set_response", 'args': [user_id, guild_id, args.get('trigger'), args.get('response')]})
+        return self.recv()
+
 
 class Settings(CustomResource):
     def get(self, guild_id, setting):
