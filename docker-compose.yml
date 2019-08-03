@@ -3,7 +3,7 @@ services:
   bot:
     image: johnyburd/bot
     deploy:
-      replicas: 1
+      replicas: 5
       restart_policy:
         condition: on-failure
       resources:
@@ -47,6 +47,20 @@ services:
     ports:
       - "7300:7300"
       - "6300:6300"
+      - "7200:7200"
+      - "6200:6200"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - webnet
+  manager:
+    image: johnyburd/manager:latest
+    deploy:
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "5300:5300"
     deploy:
       placement:
         constraints: [node.role == manager]

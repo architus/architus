@@ -7,6 +7,7 @@ import zmq.asyncio
 import json
 import websockets
 import os
+import time
 from pytz import timezone
 
 from src.user_command import UserCommand
@@ -15,9 +16,12 @@ from src.config import get_session
 from src.models import Command
 
 starboarded_messages = []
+shard_id = None
+num_shards = None
+MANAGER_URI = "ws://manager:5300"
 
 
-class CoolBot(Bot):
+class Architus(Bot):
 
     def __init__(self, **kwargs):
         self.user_commands = {}
@@ -36,12 +40,22 @@ class CoolBot(Bot):
     @asyncio.coroutine
     def api_entry(self, ctx):
         api = self.get_cog('Api')
-        socket = ctx.socket(zmq.REP)
-        socket.connect(f"tcp://ipc:6300")
+        sub = ctx.socket(zmq.SUB)
+        sub.connect(f"tcp://ipc:6200")
+        pub = ctx.socket(zmq.PUB)
+        pub.connect(f"tcp://ipc:7300")
+
+        print('setting sockopt')
+        sub.setsockopt_string(zmq.SUBSCRIBE, str(shard_id))
+
         while True:
-            tasks = yield from socket.recv_multipart()
-            for task in (t.decode() for t in tasks):
-                self.loop.create_task(api.handle_request(socket, json.loads(task)))
+            try:
+                task = (yield from sub.recv_string())[len(str(shard_id)) + 1:]
+                print(f"shard {shard_id} got task {task}")
+            except Exception as e:
+                print(f"Malformed ipc request or something: {e}")
+                continue
+            self.loop.create_task(api.handle_request(pub, json.loads(task)))
 
     async def on_reaction_add(self, react, user):
         if user == self.user:
@@ -92,7 +106,7 @@ class CoolBot(Bot):
     async def on_ready(self):
         await self.initialize_user_commands()
         print('Logged on as {0}!'.format(self.user))
-        await self.change_presence(activity=discord.Activity(name="the tragedy of darth plagueis the wise", type=3))
+        await self.change_presence(activity=discord.Activity(name=f"shard id: {shard_id}", type=3))
 
     async def on_guild_join(self, guild):
         print(" -- JOINED NEW GUILD: {guild.name} -- ")
@@ -147,17 +161,42 @@ class CoolBot(Bot):
             em.set_image(url=message.attachments[0].url)
         await starboard_ch.send(embed=em)
 
+async def heartbeat():
+    global num_shards
+    global shard_id
+    print("connecting to manager...")
+    async with websockets.connect(MANAGER_URI) as websocket:
+        data = json.loads(await websocket.recv())
+        print(f"got data: {data}")
+        num_shards = data['num_shards']
+        shard_id = data['shard_id']
+        await websocket.send("ok thanks")
+        while False:
+            await websocket.recv()
+            await websocket.send("everything's fine here, thanks")
+#print("starting garbage")
+#asyncio.get_event_loop().run_until_complete(heartbeat())
+#print("after garbage")
 
-BOT_PREFIX = ("?", "!")
-coolbot = CoolBot(command_prefix=BOT_PREFIX)
+
+#while shard_id is None:
+    #time.sleep(.1)
+#print("shard_id is not none")
+shard_id = 0
+
+architus = Architus(
+    command_prefix=('!', '?'),
+    shard_id=shard_id,
+    shard_count=num_shards
+)
 
 for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
-    coolbot.load_extension(f"src.ext.{ext[:-3]}")
+    architus.load_extension(f"src.ext.{ext[:-3]}")
 
-coolbot.load_extension('src.emoji_manager')
-coolbot.load_extension('src.api.api')
-coolbot.load_extension('src.guild_settings')
+architus.load_extension('src.emoji_manager')
+architus.load_extension('src.api.api')
+architus.load_extension('src.guild_settings')
 
 if __name__ == '__main__':
     from src.config import secret_token
-    coolbot.run(secret_token)
+    architus.run(secret_token)
