@@ -11,7 +11,9 @@ COPY . /app
 RUN pip install --trusted-host pypi.python.org -r requirements.txt
 
 EXPOSE 7300
+EXPOSE 7200
 EXPOSE 6300
+EXPOSE 6200
 
 # Run app.py when the container launches
-CMD ["python", "queue_device.py"]
+CMD ["python", "-u", "forwarder_device.py"]

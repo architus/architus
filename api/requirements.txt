@@ -1,4 +1,5 @@
 Flask>=1.0.3
+uWSGI==2.0.17.1
 Flask-Cors>=3.0.8
 Flask-RESTful>=0.3.7
 requests>=2.21.0

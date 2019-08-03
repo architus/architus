@@ -3,13 +3,14 @@ from flask_restful import Api, Resource, reqparse
 from flask_cors import CORS
 import requests
 import json
-import zmq
 import os
 import re
 import secrets
+import random
 from datetime import datetime, timedelta
+from uuid import getnode
 
-from config import client_id, client_secret, get_session
+from config import client_id, client_secret, get_session, get_pubsub
 from models import AppSession, Command, Log
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
@@ -17,19 +18,24 @@ API_ENDPOINT = 'https://discordapp.com/api/v6'
 REDIRECT_URI = 'https://api.archit.us/redirect'
 # REDIRECT_URI = 'http://localhost:5000/home'
 
+NUM_SHARDS = 1
+
 app = Flask(__name__)
 cors = CORS(app)
+
 
 def get_db():
     if 'db' not in g:
         g.db = get_session()
     return g.db
 
+
 @app.teardown_appcontext
 def teardown_db(arg):
     db = g.pop('db', None)
     if db is not None:
         db.close()
+
 
 @app.route('/issue')
 def issue():
@@ -51,15 +57,24 @@ def authenticate(session, headers):
 class CustomResource(Resource):
     def __init__(self):
         self.session = get_db()
-        ctx = zmq.Context()
-        self.socket = ctx.socket(zmq.REQ)
-        self.socket.connect('tcp://ipc:7300')
+        self.topic = (getnode() << 15) | os.getpid()
+        self.pub, self.sub = get_pubsub(self.topic)
 
-    def enqueue(self, call):
-        self.socket.send(json.dumps(call).encode())
+    def bot_call(self, method, *args, guild_id=None):
+        self.send({'method': method, 'args': args}, guild_id=guild_id)
+        return self.recv()
+
+    def send(self, call, guild_id):
+        call['topic'] = self.topic
+        if guild_id is not None:
+            shard_id = (guild_id >> 22) % NUM_SHARDS
+        else:
+            shard_id = random.randint(0, NUM_SHARDS - 1)
+        print(f"sending {shard_id} {json.dumps(call)}")
+        self.pub.send_string(f"{shard_id} {json.dumps(call)}")
 
     def recv(self):
-        data = json.loads(self.socket.recv().decode())
+        data = json.loads(self.sub.recv_string()[len(str(self.topic)) + 1:])
         try:
             sc = data.pop("status_code", 200)
         except TypeError:
@@ -72,29 +87,20 @@ class CustomResource(Resource):
 
 class Login(CustomResource):
     def get(self):
-        nonce = str(secrets.randbits(24))
-        # redirects[nonce] = request.args.get('return') or 'https://aut-bot.com/app'
-        self.enqueue(
-            {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://archit.us/app']})
-        self.recv()
         response = redirect('https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
                             'https%3A%2F%2Fapi.archit.us%2Fredirect&response_type=code&scope=identify%20guilds')
-        response.set_cookie('redirect-nonce', nonce)
+        response.set_cookie('next', request.args.get('return'))
         return response
 
 
 class Invite(CustomResource):
     def get(self, guild_id):
-        nonce = str(secrets.randbits(24))
-        self.enqueue(
-            {'method': "store_callback", 'args': [nonce, request.args.get('return') or 'https://archit.us/app']})
-        self.recv()
         response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}'
                             f'&scope=bot&guild_id={guild_id}'
                             '&response_type=code'
                             '&redirect_uri=https://api.archit.us/redirect'
                             '&permissions=2134207679')
-        response.set_cookie('redirect-nonce', nonce)
+        response.set_cookie('next', request.args.get('return'))
         return response
 
 
@@ -104,8 +110,8 @@ class RedirectCallback(CustomResource):
     collects the return url from the cookie and sends the user back where they came from
     '''
     def get(self):
-        self.enqueue({'method': "get_callback", 'args': [request.cookies.get('redirect-nonce')]})
-        redirect_url = self.recv()[0]['content']
+        # TODO validate domain
+        redirect_url = request.cookies.get('next')
         code = request.args.get('code')
         perms = request.args.get('permissions')
         guild_id = request.args.get('guild_id')
@@ -123,8 +129,7 @@ class RedirectCallback(CustomResource):
 
 class User(CustomResource):
     def get(self, name):
-        self.enqueue({'method': "fetch_user_dict", 'args': [name]})
-        name, sc = self.recv()
+        name, sc = self.bot_call('fetch_user_dict', name)
         return name, 200
 
     def post(self, name):
@@ -133,8 +138,7 @@ class User(CustomResource):
 
 class GuildCounter(CustomResource):
     def get(self):
-        self.enqueue({'method': "guild_counter", 'args': []})
-        return self.recv()
+        return self.bot_call('guild_counter')
 
 
 class Logs(CustomResource):
@@ -173,11 +177,9 @@ class AutoResponses(CustomResource):
             })
             match = p.search(cmd.response)
             if match and str(match.group("emoji_id")) not in emojis:
-                self.enqueue({'method': "get_emoji", 'args': [match.group("emoji_id")]})
-                emojis[str(match.group("emoji_id"))], sc = self.recv()
+                emojis[str(match.group("emoji_id"))], sc = self.bot_call('get_emoji', match.group('emoji_id'))
             if str(cmd.author_id) not in authors:
-                self.enqueue({'method': "fetch_user_dict", 'args': [cmd.author_id]})
-                authors[str(cmd.author_id)], sc = self.recv()
+                authors[str(cmd.author_id)], sc = self.bot_call('fetch_user_dict', cmd.author_id)
 
         resp = {
             'authors': authors,
@@ -199,8 +201,7 @@ class AutoResponses(CustomResource):
         if args.get('trigger') is None or args.get('response') is None:
             return "Malformed request", 400
 
-        self.enqueue({'method': "set_response", 'args': [user_id, guild_id, args.get('trigger'), args.get('response')]})
-        return self.recv()
+        return self.bot_call('set_response', user_id, args.get('trigger'), args.get('response'), guild_id=guild_id)
 
     def delete(self, guild_id):
         row = authenticate(self.session, request.headers)
@@ -214,8 +215,7 @@ class AutoResponses(CustomResource):
         if args.get('trigger') is None:
             return "Malformed request", 400
 
-        self.enqueue({'method': "delete_response", 'args': [user_id, guild_id, args.get('trigger')]})
-        return self.recv()
+        return self.bot_call('delete_response', user_id, args.get('trigger'), guild_id=guild_id)
 
     def patch(self, guild_id):
         row = authenticate(self.session, request.headers)
@@ -238,8 +238,7 @@ class AutoResponses(CustomResource):
 class Settings(CustomResource):
     def get(self, guild_id, setting):
         # discord_id = authenticate(self.session, request.headers).discord_id
-        self.enqueue({'method': "settings_access", 'args': [guild_id, setting, None]})
-        return self.recv()
+        return self.bot_call('settings_access', setting, None, guild_id=guild_id)
 
     def post(self, guild_id, setting):
         # parser = reqparse.RequestParser()
@@ -253,16 +252,13 @@ class Coggers(CustomResource):
     def get(self, extension=None):
         row = authenticate(self.session, request.headers)
         if row and row.discord_id == 214037134477230080:
-            self.enqueue({'method': "get_extensions", 'args': []})
-            return self.recv()
+            return self.bot_call('get_extensions')
         return {"message": "401: not johnyburd"}, 401
 
     def post(self, extension):
         row = authenticate(self.session, request.headers)
         if row and row.discord_id == 214037134477230080:
-            self.enqueue({'method': "reload_extension", 'args': [extension]})
-            resp, sc = self.recv()
-            return resp, sc
+            return self.bot_call('reload_extension', extension)
         return {"message": "401: not johnyburd"}, 401
 
 
@@ -293,8 +289,7 @@ class ListGuilds(CustomResource):
             }
             r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
             if r.status_code == 200:
-                self.enqueue({'method': "tag_autbot_guilds", 'args': [r.json(), row.discord_id]})
-                resp, sc = self.recv()
+                resp, sc = self.bot_call('tag_autbot_guilds', r.json(), row.discord_id)
             else:
                 resp = r.json()
             return resp, r.status_code
