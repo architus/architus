@@ -166,12 +166,15 @@ class Api(Cog):
         return {'value': "unknown setting"}
 
     async def tag_autbot_guilds(self, guild_list, user_id):
-        guild_settings = self.bot.get_cog("GuildSettings")
+        all_guilds = await self.bot.manager_request('all_guilds')
         for guild_dict in guild_list:
-            guild = self.bot.get_guild(int(guild_dict['id']))
-            settings = guild_settings.get_guild(guild, self.bot.session)
-            guild_dict['has_architus'] = guild is not None
-            guild_dict['architus_admin'] = bool(settings) and user_id in settings.admins_ids
+            for guild in all_guilds:
+                if guild['id'] == guild_dict['id']:
+                    guild_dict['has_architus'] = True
+                    guild_dict['architus_admin'] = user_id in guild['admin_ids']
+                    break
+            else:
+                guild_dict.update({'has_architus': False, 'architus_admin': False})
         return guild_list
 
     async def interpret(

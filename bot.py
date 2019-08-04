@@ -158,12 +158,15 @@ class Architus(Bot):
                 if me.display_name == 'archit.us':
                     await me.edit(nick='architus')
                 print("{} - {} ({})".format(guild.name, guild.id, guild.member_count))
+                settings = self.guild_settings.get(guild, self.session)
                 guilds.append({
                     'id': guild.id,
                     'name': guild.name,
                     'icon': guild.icon,
-                    'member_count': guild.member_count
+                    'member_count': guild.member_count,
+                    'admin_ids': settings.admins_ids
                 })
+            # TODO this should happen on update not every 600 seconds
             await self.manager_request('guild_update', guilds)
             await asyncio.sleep(600)
 
