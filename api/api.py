@@ -42,6 +42,15 @@ def issue():
     return redirect('https://github.com/architus/architus/issues/new')
 
 
+def authenticated(func):
+    def authed_func(self, *args, **kwargs):
+        row = authenticate(self.session, request.headers)
+        if row is None:
+            return (401, "Not Authorized")
+        return func(self, row.discord_id, *args, **kwargs)
+    return authed_func
+
+
 def authenticate(session, headers):
     try:
         autbot_token = headers['Authorization']
@@ -129,11 +138,7 @@ class RedirectCallback(CustomResource):
 
 class User(CustomResource):
     def get(self, name):
-        name, sc = self.bot_call('fetch_user_dict', name)
-        return name, 200
-
-    def post(self, name):
-        return "not implemented", 418
+        return self.bot_call('fetch_user_dict', name)
 
 
 class GuildCounter(CustomResource):
@@ -188,12 +193,8 @@ class AutoResponses(CustomResource):
         }
         return resp, 200
 
-    def post(self, guild_id):
-        row = authenticate(self.session, request.headers)
-        if row is None:
-            return "not authorized", 401
-        user_id = row.discord_id
-
+    @authenticated
+    def post(self, user_id, guild_id):
         parser = reqparse.RequestParser()
         parser.add_argument('trigger')
         parser.add_argument('response')
@@ -203,7 +204,8 @@ class AutoResponses(CustomResource):
 
         return self.bot_call('set_response', user_id, args.get('trigger'), args.get('response'), guild_id=guild_id)
 
-    def delete(self, guild_id):
+    @authenticated
+    def delete(self, user_id, guild_id):
         row = authenticate(self.session, request.headers)
         if row is None:
             return "not authorized", 401
@@ -249,15 +251,15 @@ class Settings(CustomResource):
 
 class Coggers(CustomResource):
     '''provide an endpoint to reload cogs in the bot'''
-    def get(self, extension=None):
-        row = authenticate(self.session, request.headers)
-        if row and row.discord_id == 214037134477230080:
+    @authenticated
+    def get(self, user_id, extension=None):
+        if user_id == 214037134477230080:
             return self.bot_call('get_extensions')
         return {"message": "401: not johnyburd"}, 401
 
-    def post(self, extension):
-        row = authenticate(self.session, request.headers)
-        if row and row.discord_id == 214037134477230080:
+    @authenticated
+    def post(self, user_id, extension):
+        if user_id == 214037134477230080:
             return self.bot_call('reload_extension', extension)
         return {"message": "401: not johnyburd"}, 401
 
