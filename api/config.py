@@ -2,10 +2,13 @@ import yaml
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import zmq
+import os
+import time
 import json
 
 DB_HOST = 'postgres'
 DB_PORT = 5432
+NUM_SHARDS = int(os.environ['NUM_SHARDS'])
 
 try:
     with open('.secrets.yaml') as f:
@@ -46,6 +49,7 @@ def get_pubsub(id):
 
         # make sure our sockets are actually connected before we return them
         print("pinging shard 0...")
+        time.sleep(.1)  # garbage race condition, usually this prevents the 1 second timeout on recv
         while True:
             pub.send_string(f"0 {json.dumps({'method': 'ping', 'args': [], 'topic': id})}")
             try:
