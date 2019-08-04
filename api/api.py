@@ -10,15 +10,13 @@ import random
 from datetime import datetime, timedelta
 from uuid import getnode
 
-from config import client_id, client_secret, get_session, get_pubsub
+from config import client_id, client_secret, get_session, get_pubsub, NUM_SHARDS
 from models import AppSession, Command, Log
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://aut-bot.com/app'
 REDIRECT_URI = 'https://api.archit.us/redirect'
 # REDIRECT_URI = 'http://localhost:5000/home'
-
-NUM_SHARDS = 1
 
 app = Flask(__name__)
 cors = CORS(app)
@@ -206,11 +204,6 @@ class AutoResponses(CustomResource):
 
     @authenticated
     def delete(self, user_id, guild_id):
-        row = authenticate(self.session, request.headers)
-        if row is None:
-            return "not authorized", 401
-        user_id = row.discord_id
-
         parser = reqparse.RequestParser()
         parser.add_argument('trigger')
         args = parser.parse_args()

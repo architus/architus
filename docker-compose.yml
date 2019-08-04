@@ -10,10 +10,14 @@ services:
         limits:
           cpus: "1"
           memory: 500M
+    depends_on:
+      - manager
     networks:
       - webnet
   api:
     image: johnyburd/api:latest
+    environment:
+        - NUM_SHARDS
     deploy:
       replicas: 1
       restart_policy:
@@ -56,6 +60,8 @@ services:
       - webnet
   manager:
     image: johnyburd/manager:latest
+    environment:
+        - NUM_SHARDS
     deploy:
       restart_policy:
         condition: on-failure

@@ -86,7 +86,7 @@ class Api(Cog):
         return resp
 
     async def guild_counter(self):
-        return {'guild_count': self.bot.guild_counter[0], 'user_count': self.bot.guild_counter[1]}
+        return await self.bot.manager_request('guild_count')
 
     async def set_response(self, user_id, guild_id, trigger, response):
         guild = self.bot.get_guild(int(guild_id))

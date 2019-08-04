@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt /app
 
 # Copy the current directory contents into the container at /app
-RUN apk update && apk add linux-headers pcre-dev
+RUN apk update && apk add linux-headers pcre-dev uwsgi-python3
 RUN apk update && apk add build-base libzmq musl-dev python3 zeromq-dev
 RUN apk update && \
     apk add --virtual build-deps gcc python3-dev musl-dev && \
@@ -21,6 +21,8 @@ RUN apk del build-base musl-dev python3-dev zeromq-dev
 COPY . /app
 
 EXPOSE 5000
+
+ENV NUM_SHARDS=1
 
 
 # Run app.py when the container launches
