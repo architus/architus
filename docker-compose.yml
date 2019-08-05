@@ -37,8 +37,6 @@ services:
     deploy:
       placement:
         constraints: [node.role == manager]
-    ports:
-      - "5432:5432"
     networks:
       - webnet
   ipc:
