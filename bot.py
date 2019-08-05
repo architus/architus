@@ -27,7 +27,7 @@ class Architus(Bot):
         self.guild_counter = (0, 0)
         self.tracked_messages = {}
 
-        self.topic = (getnode() << 15) | os.getpid()
+        self.topic = 'm' + str((getnode() << 15) | os.getpid())
         ctx = zmq.asyncio.Context()
         self.sub = ctx.socket(zmq.SUB)
         self.sub.connect(f"tcp://ipc:6200")
@@ -158,7 +158,7 @@ class Architus(Bot):
                 if me.display_name == 'archit.us':
                     await me.edit(nick='architus')
                 print("{} - {} ({})".format(guild.name, guild.id, guild.member_count))
-                settings = self.guild_settings.get(guild, self.session)
+                settings = self.guild_settings.get_guild(guild, self.session)
                 guilds.append({
                     'id': guild.id,
                     'name': guild.name,
