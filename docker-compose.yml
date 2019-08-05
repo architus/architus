@@ -3,7 +3,7 @@ services:
   bot:
     image: johnyburd/bot
     deploy:
-      replicas: 5
+      replicas: "${NUM_SHARDS}"
       restart_policy:
         condition: on-failure
       resources:
@@ -26,8 +26,6 @@ services:
         limits:
           cpus: "1"
           memory: 500M
-    ports:
-      - "5000:5000"
     networks:
       - webnet
   postgres:
@@ -48,11 +46,6 @@ services:
     deploy:
       restart_policy:
         condition: on-failure
-    ports:
-      - "7300:7300"
-      - "6300:6300"
-      - "7200:7200"
-      - "6200:6200"
     deploy:
       placement:
         constraints: [node.role == manager]

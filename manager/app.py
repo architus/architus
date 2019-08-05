@@ -19,7 +19,6 @@ def listen_for_stuff(loop):
     while True:
         try:
             task = (yield from sub.recv_string())[len('manager '):]
-            print(f"manager got task {task}")
         except Exception as e:
             print(f"Malformed ipc request or something: {e}")
             continue
@@ -36,7 +35,6 @@ class Manager:
 
     @asyncio.coroutine
     def handle_task(self, pub, task):
-        print("future ensured")
         resp = yield from getattr(self, task['method'])(task['topic'], *task['args'])
         yield from pub.send_string(f"{task['topic']} {json.dumps(resp)}")
 
@@ -47,6 +45,12 @@ class Manager:
         print(f'Shard requested id, assigning {self.registered}/{self.total_shards}...')
         self.store[topic] = {'shard_id': self.registered - 1}
         return {'shard_id': self.registered - 1, 'shard_count': self.total_shards}
+
+    async def all_guilds(self, topic):
+        guilds = []
+        for shard, shard_store in self.store.items():
+            guilds += shard_store.get('guilds', ())
+        return guilds
 
     async def guild_count(self, topic):
         guild_count = 0
@@ -60,7 +64,7 @@ class Manager:
 
     async def guild_update(self, topic, guilds):
         '''shards only method'''
-        print(f"{topic} sent some guilds: {guilds}")
+        print(f"{topic} sent guild list containing {len(guilds)} guilds")
         self.store[topic]['guilds'] = guilds
         return {"message": "thanks"}
 
