@@ -26,6 +26,8 @@ services:
         limits:
           cpus: "1"
           memory: 500M
+    ports:
+      - "5000:5000"
     networks:
       - webnet
   postgres:
