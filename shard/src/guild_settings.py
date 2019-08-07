@@ -226,7 +226,7 @@ class GuildSettings(Cog):
 
     def __init__(self, bot):
         self.guilds = {}
-        self.session = self.bot.session
+        self.session = bot.session
 
     def __getitem__(self, key):
         return self.get_guild(key)

@@ -4,6 +4,10 @@ services:
     build:
       context: ./
       dockerfile: ./shard/Dockerfile
+    env_file:
+      - architus.env
+    environment:
+        - NUM_SHARDS
     deploy:
       replicas: "${NUM_SHARDS}"
       restart_policy:
@@ -20,6 +24,8 @@ services:
     build:
       context: ./
       dockerfile: ./api/Dockerfile
+    env_file:
+      - architus.env
     environment:
         - NUM_SHARDS
     deploy:
