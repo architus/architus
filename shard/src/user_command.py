@@ -2,7 +2,7 @@ import random
 import emoji as emojitool
 import re
 from sqlalchemy.exc import IntegrityError
-from src.models import Command
+from lib.models import Command
 GROUP_LIMIT = 1
 
 

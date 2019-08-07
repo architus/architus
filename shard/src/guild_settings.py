@@ -1,5 +1,5 @@
 import json
-from src.models import Settings
+from lib.models import Settings
 from src.config import get_session
 from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog

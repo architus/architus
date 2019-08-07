@@ -14,7 +14,7 @@ from uuid import getnode
 from src.user_command import UserCommand
 from src.smart_message import smart_message
 from src.config import get_session
-from src.models import Command
+from lib.models import Command
 
 starboarded_messages = []
 

@@ -12,7 +12,7 @@ from uuid import getnode
 
 from lib.status_codes import StatusCodes
 from config import client_id, client_secret, get_session, get_pubsub, NUM_SHARDS
-from models import AppSession, Command, Log
+from lib.models import AppSession, Command, Log
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://aut-bot.com/app'

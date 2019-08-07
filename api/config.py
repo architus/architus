@@ -49,7 +49,7 @@ def get_pubsub(id):
 
         # make sure our sockets are actually connected before we return them
         print("pinging shard 0...")
-        time.sleep(.1)  # garbage race condition, usually this prevents the 1 second timeout on recv
+        time.sleep(.1)  # garbage race condition, usually this prevents the recv from timing out once
         while True:
             pub.send_string(f"0 {json.dumps({'method': 'ping', 'args': [], 'topic': id})}")
             try:

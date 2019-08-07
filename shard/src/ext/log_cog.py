@@ -1,6 +1,6 @@
 from datetime import datetime
 from discord.ext import commands
-from src.models import Log
+from lib.models import Log
 import json
 
 
