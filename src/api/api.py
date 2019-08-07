@@ -9,6 +9,7 @@ import discord
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
+from src.api.status_codes import StatusCodes
 
 CALLBACK_URL = "https://archit.us/app"
 
@@ -94,18 +95,24 @@ class Api(Cog):
             command = UserCommand(self.bot.session, trigger, response, 0, guild, user_id, new=True)
         except VaguePatternError:
             msg = "Capture group too broad."
+            code = StatusCodes.NOT_ACCEPTABLE_406
         except LongResponseException:
             msg = "Response is too long."
+            code = StatusCodes.PAYLOAD_TOO_LARGE_413
         except ShortTriggerException:
             msg = "Trigger is too short."
+            code = StatusCodes.LENGTH_REQUIRED_411
         except ResponseKeywordException:
             msg = "That response is protected, please use another."
+            code = StatusCodes.NOT_ACCEPTABLE_406
         except DuplicatedTriggerException:
             msg = "Remove duplicated trigger first."
+            code = StatusCodes.CONFLICT_409
         else:
             self.bot.user_commands[guild_id].append(command)
-            msg = 'Sucessfully Set'
-        return {'message': msg}
+            msg = 'Successfully Set'
+            code = StatusCodes.OK_200
+        return {'message': msg, 'status_code': code}
 
     async def is_member(self, user_id, guild_id, admin=False):
         '''check if user is a member or admin of the given guild'''
@@ -123,8 +130,8 @@ class Api(Cog):
             if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
                 self.bot.user_commands[guild_id].remove(oldcommand)
                 update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
-                return {'message': "Successfully Deleted"}
-        return {'message': "No such command.", 'status_code': 400}
+                return {'message': "Successfully Deleted", 'status_code': StatusCodes.OK_200}
+        return {'message': "No such command.", 'status_code': StatusCodes.NOT_FOUND_404}
 
     async def fetch_user_dict(self, id):
         usr = self.bot.get_user(int(id))
@@ -154,7 +161,7 @@ class Api(Cog):
             self.bot.reload_extension(name)
         except discord.ext.commands.errors.ExtensionNotLoaded as e:
             print(e)
-            return {"message": f"Extension Not Loaded: {e}", "status_code": 503}
+            return {"message": f"Extension Not Loaded: {e}", "status_code": StatusCodes.SERVICE_UNAVAILABLE_503}
         return {"message": "Reload signal sent"}
 
     async def settings_access(self, guild_id=None, setting=None, value=None):

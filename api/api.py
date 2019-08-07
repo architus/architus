@@ -10,6 +10,7 @@ import random
 from datetime import datetime, timedelta
 from uuid import getnode
 
+from api.status_codes import StatusCodes
 from config import client_id, client_secret, get_session, get_pubsub, NUM_SHARDS
 from models import AppSession, Command, Log
 
@@ -45,7 +46,7 @@ def authenticated(func):
     def authed_func(self, *args, **kwargs):
         row = authenticate(self.session, request.headers)
         if row is None:
-            return (401, "Not Authorized")
+            return (StatusCodes.UNAUTHORIZED_401, "Not Authorized")
         return func(self, row.discord_id, *args, **kwargs)
     return authed_func
 
@@ -86,11 +87,11 @@ class CustomResource(Resource):
     def recv(self):
         data = json.loads(self.sub.recv_string()[len(str(self.topic)) + 1:])
         try:
-            sc = data.pop("status_code", 200)
+            sc = data.pop("status_code", StatusCodes.OK_200)
         except TypeError:
-            sc = 200
+            sc = StatusCodes.OK_200
         except AttributeError:
-            sc = 200
+            sc = StatusCodes.OK_200
         print(f"{self.topic} recv data from bot")
         return data, sc
 
@@ -151,7 +152,7 @@ class Logs(CustomResource):
     def get(self, guild_id):
         # TODO this should probably be authenticated
         if authenticate(self.session, request.headers) is None and False:
-            return "not authorized", 401
+            return "not authorized", StatusCodes.UNAUTHORIZED_401
         rows = self.session.query(Log).filter(Log.guild_id == guild_id).order_by(Log.timestamp.desc()).limit(400).all()
         logs = []
         for log in rows:
@@ -161,14 +162,14 @@ class Logs(CustomResource):
                 'user_id': str(log.user_id),
                 'timestamp': log.timestamp.isoformat()
             })
-        return json.dumps({"logs": logs}), 200
+        return json.dumps({"logs": logs}), StatusCodes.OK_200
 
 
 class AutoResponses(CustomResource):
     def get(self, guild_id):
         # TODO this should probably be authenticated
         if authenticate(self.session, request.headers) is None and False:
-            return "not authorized", 401
+            return "not authorized", StatusCodes.UNAUTHORIZED_401
         rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
         commands = []
         authors = {}
@@ -192,7 +193,7 @@ class AutoResponses(CustomResource):
             'emojis': emojis,
             'commands': commands
         }
-        return resp, 200
+        return resp, StatusCodes.OK_200
 
     @authenticated
     def post(self, user_id, guild_id):
@@ -201,7 +202,7 @@ class AutoResponses(CustomResource):
         parser.add_argument('response')
         args = parser.parse_args()
         if args.get('trigger') is None or args.get('response') is None:
-            return "Malformed request", 400
+            return "Malformed request", StatusCodes.BAD_REQUEST_400
 
         return self.bot_call('set_response', user_id, args.get('trigger'), args.get('response'), guild_id=guild_id)
 
@@ -211,7 +212,7 @@ class AutoResponses(CustomResource):
         parser.add_argument('trigger')
         args = parser.parse_args()
         if args.get('trigger') is None:
-            return "Malformed request", 400
+            return "Malformed request", StatusCodes.BAD_REQUEST_400
 
         return self.bot_call('delete_response', user_id, args.get('trigger'), guild_id=guild_id)
 
@@ -245,7 +246,7 @@ class Settings(CustomResource):
         # parser = reqparse.RequestParser()
         # parser.add_argument('value')
         # args = parser.parse_args()
-        return 400
+        return StatusCodes.BAD_REQUEST_400
 
 
 class Coggers(CustomResource):
@@ -254,13 +255,13 @@ class Coggers(CustomResource):
     def get(self, user_id, extension=None):
         if user_id == 214037134477230080:
             return self.bot_call('get_extensions')
-        return {"message": "401: not johnyburd"}, 401
+        return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
     @authenticated
     def post(self, user_id, extension):
         if user_id == 214037134477230080:
             return self.bot_call('reload_extension', extension)
-        return {"message": "401: not johnyburd"}, 401
+        return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
 
 class Identify(Resource):
@@ -273,7 +274,7 @@ class Identify(Resource):
         if discord_token:
             return discord_identify_request(discord_token)
 
-        return "token invalid or expired", 401
+        return "token invalid or expired", StatusCodes.UNAUTHORIZED_401
 
 
 class ListGuilds(CustomResource):
@@ -289,13 +290,13 @@ class ListGuilds(CustomResource):
                 'Authorization': f"Bearer {discord_token}"
             }
             r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
-            if r.status_code == 200:
+            if r.status_code == StatusCodes.OK_200:
                 resp, sc = self.bot_call('tag_autbot_guilds', r.json(), row.discord_id)
             else:
                 resp = r.json()
             return resp, r.status_code
 
-        return "token invalid or expired", 401
+        return "token invalid or expired", StatusCodes.UNAUTHORIZED_401
 
 
 def commit_tokens(autbot_token, discord_token, refresh_token, expires_in, discord_id):
@@ -334,7 +335,7 @@ def token_exchange():
     r = requests.post('%s/oauth2/token' % API_ENDPOINT, data=data, headers=headers)
     resp_data = r.json()
     print(r.status_code)
-    if r.status_code == 200:
+    if r.status_code == StatusCodes.OK_200:
         print(resp_data)
 
         discord_token = resp_data['access_token']
@@ -343,7 +344,7 @@ def token_exchange():
         refresh_token = resp_data['refresh_token']
 
         resp_data, status_code = discord_identify_request(discord_token)
-        if status_code == 200:
+        if status_code == StatusCodes.OK_200:
             print(resp_data)
             commit_tokens(autbot_token, discord_token, refresh_token, expires_in, resp_data['id'])
             return json.dumps({
@@ -353,13 +354,13 @@ def token_exchange():
                 'discriminator': resp_data['discriminator'],
                 'avatar': resp_data['avatar'],
                 'id': resp_data['id']
-            }), 200
+            }), StatusCodes.OK_200
     return json.dumps(resp_data), r.status_code
 
 
 @app.route('/status', methods=['GET'])
 def status():
-    return "all systems operational", 204
+    return "all systems operational", StatusCodes.NO_CONTENT_204
 
 
 def app_factory():
