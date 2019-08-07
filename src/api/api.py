@@ -113,7 +113,7 @@ class Api(Cog):
         if not guild:
             return False
         settings = guild_settings.get_guild(guild, self.bot.session)
-        return {'member': bool(guild.get_member(int(user_id)) and (not admin or int(user_id) in settings.admins_ids)}
+        return {'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)}
 
     async def delete_response(self, user_id, guild_id, trigger):
         guild = self.bot.get_guild(int(guild_id))

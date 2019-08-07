@@ -56,7 +56,7 @@ class smart_message:
     def get_datetime(self, timestamp):
         utc = timestamp.replace(tzinfo=timezone('UTC'))
         est = utc.astimezone(timezone('US/Eastern'))
-        return est
+        return timestamp
 
 
 class dumb_message:

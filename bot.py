@@ -130,6 +130,9 @@ class CoolBot(Bot):
             guild_counter = 0
             user_counter = 0
             for guild in self.guilds:
+                me = guild.get_member(self.user.id)
+                if me.display_name == 'archit.us':
+                    await me.edit(nick='architus')
                 print("{} - {} ({})".format(guild.name, guild.id, guild.member_count))
                 guild_counter += 1
                 user_counter += guild.member_count
