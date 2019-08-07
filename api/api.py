@@ -10,7 +10,7 @@ import random
 from datetime import datetime, timedelta
 from uuid import getnode
 
-from api.status_codes import StatusCodes
+from lib.status_codes import StatusCodes
 from config import client_id, client_secret, get_session, get_pubsub, NUM_SHARDS
 from models import AppSession, Command, Log
 

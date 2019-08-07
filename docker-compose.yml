@@ -1,7 +1,9 @@
 version: "3"
 services:
-  bot:
-    image: johnyburd/bot
+  shard:
+    build:
+      context: ./
+      dockerfile: ./shard/Dockerfile
     deploy:
       replicas: "${NUM_SHARDS}"
       restart_policy:
@@ -15,7 +17,9 @@ services:
     networks:
       - webnet
   api:
-    image: johnyburd/api:latest
+    build:
+      context: ./
+      dockerfile: ./api/Dockerfile
     environment:
         - NUM_SHARDS
     deploy:
