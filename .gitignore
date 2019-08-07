@@ -1,5 +1,5 @@
 .venv/*
-emojis/*
+shard/emojis/*
 *.secrets.yaml
 *.pkl
 __py*
