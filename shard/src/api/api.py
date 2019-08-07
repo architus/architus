@@ -9,7 +9,7 @@ import discord
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
-from src.api.status_codes import StatusCodes
+from lib.status_codes import StatusCodes
 
 CALLBACK_URL = "https://archit.us/app"
 
@@ -235,7 +235,7 @@ class Api(Cog):
                             help_text += f'```hi{args[1]} - {cmd.help}```'
                             break
                     except IndexError:
-                        help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
+                        help_text += f'```{cmd.name}: {cmd.help:>5}```\n'
 
                 sends.append(help_text)
             else:
