@@ -22,7 +22,7 @@ try:
     twitter_access_token_secret = os.environ['twitter_access_token_secret']
     scraper_token = os.environ['scraper_bot_token']
 except KeyError:
-    raise EnvironmentError("environment variables not set. Did you create architus.env?")
+    raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 
 print("creating engine...")
 engine = create_engine(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
