@@ -1,7 +1,6 @@
 from discord.ext import commands
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
-from src.config import get_session
 import re
 import discord
 
@@ -10,11 +9,7 @@ class SetCog(commands.Cog, name="Auto Responses"):
 
     def __init__(self, bot):
         self.bot = bot
-        self.session = get_session()
-
-    @property
-    def guild_settings(self):
-        return self.bot.get_cog('GuildSettings')
+        self.session = self.bot.session
 
     @commands.command()
     async def remove(self, ctx, trigger):
@@ -39,7 +34,7 @@ class SetCog(commands.Cog, name="Auto Responses"):
         [noun], [adj], [adv], [member], [owl], [:reaction:], [count], [comma,separated,choices]
         '''
         user_commands = self.bot.user_commands
-        settings = self.guild_settings.get_guild(ctx.guild, session=self.session)
+        settings = self.bot.settings[ctx.guild]
         from_admin = ctx.author.id in settings.admins_ids
         if settings.bot_commands_channels and ctx.channel.id not in settings.bot_commands_channels and not from_admin:
             for channelid in settings.bot_commands_channels:

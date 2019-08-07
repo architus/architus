@@ -1,6 +1,7 @@
 import zmq
 from multiprocessing import Process
 
+
 def bot_to_api():
 
     try:
@@ -24,6 +25,7 @@ def bot_to_api():
         backend.close()
         context.term()
 
+
 def api_to_bot():
 
     try:
@@ -46,6 +48,7 @@ def api_to_bot():
         frontend.close()
         backend.close()
         context.term()
+
 
 if __name__ == "__main__":
     p = Process(target=api_to_bot, daemon=True)

@@ -1,6 +1,6 @@
 .venv/*
 shard/emojis/*
-*.secrets.yaml
+*.env
 *.pkl
 __py*
 shard/res/foo.*

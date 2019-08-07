@@ -11,10 +11,6 @@ class Gulag(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @property
-    def guild_settings(self):
-        return self.bot.get_cog('GuildSettings')
-
     @commands.command()
     async def gulag(self, ctx, comrade: discord.Member):
         '''
@@ -22,7 +18,7 @@ class Gulag(commands.Cog):
         Each vote over the threshold will add additional time.
         '''
         server = ctx.message.guild
-        settings = self.guild_settings.get_guild(server)
+        settings = self.bot.settings[server]
         filtered = filter(lambda role: role.name == "kulak", server.roles)
         try:
             gulag_role = next(filtered)

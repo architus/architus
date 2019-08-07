@@ -1,5 +1,6 @@
 import zmq
 
+
 def main():
     try:
         context = zmq.Context(1)
@@ -18,6 +19,7 @@ def main():
         frontend.close()
         backend.close()
         context.term()
+
 
 if __name__ == "__main__":
     main()

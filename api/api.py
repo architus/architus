@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from uuid import getnode
 
 from lib.status_codes import StatusCodes
-from config import client_id, client_secret, get_session, get_pubsub, NUM_SHARDS
+from lib.config import client_id, client_secret, get_session, get_zmq_socks, NUM_SHARDS
 from lib.models import AppSession, Command, Log
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
@@ -67,7 +67,7 @@ class CustomResource(Resource):
     def __init__(self):
         self.session = get_db()
         self.topic = (getnode() << 15) | os.getpid()
-        self.pub, self.sub = get_pubsub(self.topic)
+        self.pub, self.sub = get_zmq_socks(self.topic)
 
     def bot_call(self, method, *args, guild_id=None):
         if guild_id is not None:

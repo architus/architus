@@ -1,6 +1,6 @@
 import requests
 import json
-from src.config import secret_token
+from lib.config import secret_token
 
 message_url = "https://discordapp.com/api/webhooks/%s/%s"
 

@@ -5,15 +5,13 @@ import asyncio
 import zmq
 import zmq.asyncio
 import json
-import websockets
 import os
-import time
 from pytz import timezone
 from uuid import getnode
 
 from src.user_command import UserCommand
 from src.smart_message import smart_message
-from src.config import get_session
+from lib.config import get_session, secret_token
 from lib.models import Command
 
 starboarded_messages = []
@@ -54,12 +52,10 @@ class Architus(Bot):
         self.loop.create_task(self.api_entry())
         super().run(token)
 
-
     @asyncio.coroutine
     def manager_request(self, method, *args):
         yield from self.pub.send_string(f"manager {json.dumps({'method': method, 'topic': self.topic, 'args': args})}")
         return json.loads((yield from self.msub.recv_string())[len(str(self.topic)) + 1:])
-
 
     @asyncio.coroutine
     def api_entry(self):
@@ -77,7 +73,7 @@ class Architus(Bot):
     async def on_reaction_add(self, react, user):
         if user == self.user:
             return
-        settings = self.guild_settings.get_guild(react.message.guild, session=self.session)
+        settings = self.settings[react.message.guild]
         if settings.starboard_emoji in str(react.emoji):
             if react.count == settings.starboard_threshold:
                 await self.starboard_post(react.message, react.message.guild)
@@ -88,7 +84,7 @@ class Architus(Bot):
                 await sm.add_popup(react.message.channel)
 
     async def on_reaction_remove(self, react, user):
-        settings = self.guild_settings.get_guild(react.message.guild, session=self.session)
+        settings = self.settings[react.message.guild]
         if settings.edit_emoji in str(react.emoji) and react.count == 0:
             sm = self.tracked_messages[react.message.id]
             await sm.delete_popup()
@@ -145,7 +141,7 @@ class Architus(Bot):
             self.user_commands[guild].sort()
 
     @property
-    def guild_settings(self):
+    def settings(self):
         return self.get_cog('GuildSettings')
 
     async def list_guilds(self):
@@ -158,7 +154,7 @@ class Architus(Bot):
                 if me.display_name == 'archit.us':
                     await me.edit(nick='architus')
                 print("{} - {} ({})".format(guild.name, guild.id, guild.member_count))
-                settings = self.guild_settings.get_guild(guild, self.session)
+                settings = self.settings[guild]
                 guilds.append({
                     'id': guild.id,
                     'name': guild.name,
@@ -197,5 +193,4 @@ architus.load_extension('src.api.api')
 architus.load_extension('src.guild_settings')
 
 if __name__ == '__main__':
-    from src.config import secret_token
     architus.run(secret_token)

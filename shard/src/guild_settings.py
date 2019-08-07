@@ -1,6 +1,5 @@
 import json
 from lib.models import Settings
-from src.config import get_session
 from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog
 import discord
@@ -227,14 +226,18 @@ class GuildSettings(Cog):
 
     def __init__(self, bot):
         self.guilds = {}
+        self.session = self.bot.session
 
-    def get_guild(self, guild, session=None):
+    def __getitem__(self, key):
+        return self.get_guild(key)
+
+    def get_guild(self, guild):
         if guild is None:
             return None
         try:
             return self.guilds[guild]
         except KeyError:
-            self.guilds[guild] = Setting(session or get_session(), guild)
+            self.guilds[guild] = Setting(self.session, guild)
             return self.guilds[guild]
 
 

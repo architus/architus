@@ -1,7 +1,7 @@
 from discord.ext.commands import Cog, Bot
 from discord.ext import commands
 from multiprocessing import Process, Queue
-from src.config import scraper_token
+from lib.config import scraper_token
 
 import asyncio
 import discord
@@ -54,10 +54,6 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
         p.daemon = True
         p.start()
 
-    @property
-    def guild_settings(self):
-        return self.bot.get_cog('GuildSettings')
-
     @commands.Cog.listener()
     async def on_ready(self):
         last_author = {}
@@ -69,7 +65,7 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
                 last_author = item['author']
                 for guild in self.bot.guilds:
                     if self.is_in_range(item):
-                        settings = self.guild_settings.get_guild(guild)
+                        settings = self.bot.settings[guild]
                         if settings:
                             channel = self.bot.get_channel(settings.scrim_channel_id)
                             if channel:

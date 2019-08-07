@@ -12,10 +12,6 @@ class Play(commands.Cog, name="Music Player"):
         self.bot = bot
         self.players = {}
 
-    @property
-    def guild_settings(self):
-        return self.bot.get_cog('GuildSettings')
-
     @commands.command()
     async def play(self, ctx, url):
         '''
@@ -26,7 +22,7 @@ class Play(commands.Cog, name="Music Player"):
         if ctx.guild not in self.players:
             self.players[ctx.guild] = GuildPlayer(self.bot)
         player = self.players[ctx.guild]
-        settings = self.guild_settings.get_guild(ctx.guild)
+        settings = self.bot.settings[ctx.guild]
 
         if not settings.music_enabled:
             return True
@@ -100,7 +96,7 @@ class Play(commands.Cog, name="Music Player"):
         if ctx.guild not in self.players:
             self.players[ctx.guild] = GuildPlayer(self.bot)
         player = self.players[ctx.guild]
-        settings = self.guild_settings.get_guild(ctx.guild)
+        settings = self.bot.settings[ctx.guild]
 
         if not settings.music_enabled:
             return

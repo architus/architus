@@ -8,7 +8,7 @@ async def purge(ctx, *args):
     Purge a channel of a user's messages
     optionally include member id, channel, or message limit
     '''
-    settings = ctx.bot.get_cog('GuildSettings').get_guild(ctx.guild)
+    settings = ctx.bot.settings[ctx.guild]
     user = ctx.bot.user
 
     for arg in args:

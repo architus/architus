@@ -167,7 +167,7 @@ class Api(Cog):
     async def settings_access(self, guild_id=None, setting=None, value=None):
         guild_settings = self.bot.get_cog("GuildSettings")
         guild = self.bot.get_guild(guild_id)
-        settings = guild_settings.get_guild(guild, self.bot.session)
+        settings = guild_settings[guild]
         if hasattr(settings, setting):
             return {'value': getattr(settings, setting)}
         return {'value': "unknown setting"}

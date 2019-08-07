@@ -150,17 +150,13 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
         self._managers = self._managers or {guild.id: emoji_manager(self.bot, guild, []) for guild in self.bot.guilds}
         return self._managers
 
-    @property
-    def guild_settings(self):
-        return self.bot.get_cog('GuildSettings')
-
     @commands.command(aliases=['emotes', 'emoji', 'emote'])
     async def emojis(self, ctx):
         '''
         List currently cached emojis.
         Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message
         '''
-        settings = self.guild_settings.get_guild(ctx.guild)
+        settings = self.bot.settings[ctx.guild]
         if not settings.manage_emojis:
             message = "The emoji manager is disabled, you can enable it in `!settings`"
         else:
@@ -171,13 +167,13 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        settings = self.guild_settings.get_guild(message.guild)
+        settings = self.bot.settings[message.guild]
         if settings.manage_emojis:
             await self.managers[message.guild.id].scan(message)
 
     @commands.Cog.listener()
     async def on_guild_emojis_update(self, guild, before, after):
-        settings = self.guild_settings.get_guild(guild)
+        settings = self.bot.settings[guild]
         if not settings.manage_emojis:
             return
 
