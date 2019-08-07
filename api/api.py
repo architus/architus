@@ -18,6 +18,7 @@ API_ENDPOINT = 'https://discordapp.com/api/v6'
 REDIRECT_URI = 'https://api.archit.us/redirect'
 # REDIRECT_URI = 'http://localhost:5000/home'
 
+
 app = Flask(__name__)
 cors = CORS(app)
 
@@ -68,6 +69,8 @@ class CustomResource(Resource):
         self.pub, self.sub = get_pubsub(self.topic)
 
     def bot_call(self, method, *args, guild_id=None):
+        if guild_id is not None:
+            args = (guild_id,) + args
         self.send({'method': method, 'args': args}, guild_id=guild_id)
         return self.recv()
 
@@ -94,7 +97,7 @@ class CustomResource(Resource):
 
 class Login(CustomResource):
     def get(self):
-        response = redirect('https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
+        response = redirect(f'https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
                             'https%3A%2F%2Fapi.archit.us%2Fredirect&response_type=code&scope=identify%20guilds')
         response.set_cookie('next', request.args.get('return'))
         return response
@@ -231,7 +234,10 @@ class AutoResponses(CustomResource):
 
 
 class Settings(CustomResource):
-    def get(self, guild_id, setting):
+    def get(self, guild_id, setting=None):
+        if setting is None:
+            with open('settings.json') as f:
+                return json.loads(f.read()), 200
         # discord_id = authenticate(self.session, request.headers).discord_id
         return self.bot_call('settings_access', setting, None, guild_id=guild_id)
 
@@ -359,7 +365,7 @@ def status():
 def app_factory():
     api = Api(app)
     api.add_resource(User, "/user/<string:name>")
-    api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>")
+    api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(Identify, "/identify")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Login, "/login")
