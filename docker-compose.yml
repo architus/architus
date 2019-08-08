@@ -18,6 +18,7 @@ services:
           memory: 500M
     depends_on:
       - manager
+      - postgres
     networks:
       - webnet
   api:
