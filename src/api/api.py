@@ -8,7 +8,7 @@ import re
 import discord
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
-from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
+from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command, UserLimitException
 
 CALLBACK_URL = "https://archit.us/app"
 
@@ -90,7 +90,7 @@ class Api(Cog):
     async def set_response(self, user_id, guild_id, trigger, response):
         guild = self.bot.get_guild(int(guild_id))
         try:
-            command = UserCommand(self.bot.session, trigger, response, 0, guild, user_id, new=True)
+            command = UserCommand(self.bot.session, self.bot, trigger, response, 0, guild, user_id, new=True)
         except VaguePatternError:
             msg = "Capture group too broad."
         except LongResponseException:
@@ -101,6 +101,8 @@ class Api(Cog):
             msg = "That response is protected, please use another."
         except DuplicatedTriggerException:
             msg = "Remove duplicated trigger first."
+        except UserLimitException as e:
+            msg = str(e)
         else:
             self.bot.user_commands[guild_id].append(command)
             msg = 'Sucessfully Set'
