@@ -13,6 +13,7 @@ LOCK_KEY = u"\U0001F510"
 SWORDS = u"\U00002694"
 HAMMER_PICK = u"\U00002692"
 HAMMER = u"\U0001F528"
+CHAIN = u"\U000026D3"
 
 
 class Settings(Cog):
@@ -41,7 +42,7 @@ class Settings(Cog):
         '''Open an interactive settings dialog'''
         settings = self.guild_settings.get_guild(ctx.guild)
         if ctx.author.id not in settings.admins_ids:
-            ctx.channel.send('nope, sorry')
+            await ctx.channel.send('nope, sorry')
             return True
 
         msg = await ctx.channel.send(embed=await self.get_embed(ctx))
@@ -55,6 +56,7 @@ class Settings(Cog):
         await msg.add_reaction(SWORDS)
         await msg.add_reaction(HAMMER_PICK)
         await msg.add_reaction(HAMMER)
+        await msg.add_reaction(CHAIN)
 
         while True:
             react, user = await self.bot.wait_for(
@@ -79,6 +81,8 @@ class Settings(Cog):
                 await self.gulag_threshold(ctx)
             elif e == HAMMER:
                 await self.gulag_severity(ctx)
+            elif e == CHAIN:
+                await self.user_command_threshold(ctx)
             await msg.edit(embed=await self.get_embed(ctx))
 
         return True
@@ -87,11 +91,23 @@ class Settings(Cog):
         await ctx.channel.send(
             '⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
         msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
-        self.guild_settings.get_guild(ctx.guild).starboard_threshold = abs(int(msg.content))
         try:
+            self.guild_settings.get_guild(ctx.guild).starboard_threshold = abs(int(msg.content))
             resp = "Threshold set"
         except Exception:
             resp = "Threshold unchanged"
+        await ctx.channel.send(resp)
+
+    async def user_command_threshold(self, ctx):
+        await ctx.channel.send(
+            f'{CHAIN} This is the number of custom responses each user can set. Enter a number to modify it:')
+        msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
+        try:
+            self.guild_settings.get_guild(ctx.guild).responses_limit = abs(int(msg.content))
+        except Exception:
+            resp = "Threshold unchanged"
+        else:
+            resp = "Threshold set"
         await ctx.channel.send(resp)
 
     async def repost_deletes(self, ctx):
@@ -239,6 +255,7 @@ class Settings(Cog):
         em.add_field(name=HAMMER_PICK + ' Gulag Threshold', value='Current value: %d' % settings.gulag_threshold, inline=True)
         em.add_field(name=HAMMER + ' Gulag Severity', value='Current value: %d' % settings.gulag_severity, inline=True)
         em.add_field(name='⚔ Joinable Roles', value='Current value: %s' % ', '.join(roles_names), inline=True)
+        em.add_field(name=CHAIN + ' Responses Limit', value='Current value: %s' % settings.responses_limit, inline=True)
         return em
 
 

@@ -112,6 +112,7 @@ class CoolBot(Bot):
             self.user_commands.setdefault(command.server_id, [])
             self.user_commands[command.server_id].append(UserCommand(
                 self.session,
+                self,
                 command.trigger.replace(str(command.server_id), '', 1),
                 command.response, command.count,
                 self.get_guild(command.server_id),
