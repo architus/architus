@@ -73,18 +73,18 @@ class GuildPlayer:
 
         }
         ydl = youtube_dl.YoutubeDL(opts)
-        func = functools.partial(ydl.extract_info, url, download=True)
+        func = functools.partial(ydl.extract_info, url, download=False)
         info = await self.bot.loop.run_in_executor(None, func)
         if "entries" in info:
             info = info['entries'][0]
 
-        # download_url = info['url']
-        download_url = ydl.prepare_filename(info)
+        download_url = info['url']
+        # download_url = ydl.prepare_filename(info)
         print("download_url")
         print(download_url)
         self.voice.play(discord.FFmpegPCMAudio(download_url, **ffmpeg_options), after=self.agane)
-        await asyncio.sleep(2)
-        os.remove(download_url)
+        #await asyncio.sleep(2)
+        #os.remove(download_url)
         return self.name
 
     async def add_spotify_playlist(self, url):

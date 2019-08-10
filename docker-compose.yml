@@ -1,6 +1,7 @@
 version: "3"
 services:
   shard:
+    image: johnyburd/shard
     build:
       context: ./
       dockerfile: ./shard/Dockerfile
@@ -22,6 +23,7 @@ services:
     networks:
       - webnet
   api:
+    image: johnyburd/api
     build:
       context: ./
       dockerfile: ./api/Dockerfile
