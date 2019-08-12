@@ -39,7 +39,7 @@ class CoolBot(Bot):
     def poll_requests(self, ctx):
         api = self.get_cog('Api')
         pub = ctx.socket(zmq.PUB)
-        pub.bind("tcp://127.0.0.1:7200")
+        pub.bind("tcp://127.0.0.1:7201")
         if self.q is not None:
             while True:
                 if not self.q.empty():

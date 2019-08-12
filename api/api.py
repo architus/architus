@@ -45,7 +45,7 @@ class CustomResource(Resource):
         ctx = zmq.Context()
         self.topic = str(os.getpid())
         self.sub = ctx.socket(zmq.SUB)
-        self.sub.connect("tcp://127.0.0.1:7200")
+        self.sub.connect("tcp://127.0.0.1:7201")
         self.sub.setsockopt(zmq.SUBSCRIBE, self.topic.encode())
 
     def enqueue(self, call):
