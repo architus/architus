@@ -23,7 +23,7 @@ class Api(Cog):
             except Exception as e:
                 print(f"Malformed ipc request or something: {e}")
                 continue
-            self.loop.create_task(self.handle_request(task))
+            self.bot.loop.create_task(self.handle_request(task))
 
     async def handle_request(self, pub, msg):
         try:
