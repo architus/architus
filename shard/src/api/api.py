@@ -1,10 +1,5 @@
-import json
 import traceback
-import ssl
-import asyncio
 import secrets
-import websockets
-import re
 import discord
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
@@ -20,71 +15,25 @@ class Api(Cog):
         self.bot = bot
         self.fake_messages = {}
         self.callback_urls = {}
-        self.bot.socket_task = None
 
-        self.start_socket_listener()
-
-    def start_socket_listener(self):
-        print("Starting websocket listener on port 8300")
-        try:
-            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
-
-            start_server = websockets.serve(self.handle_socket, '0.0.0.0', 8300, ssl=ssl_context)
-        except FileNotFoundError:
-            print("SSL certs not found, websockets running in insecure mode")
-            start_server = websockets.serve(self.handle_socket, '0.0.0.0', 8300)
-
-        self.bot.socket_task = asyncio.async(start_server)
-
-    async def handle_socket(self, websocket, path):
-        print(f"Started websocket connection with {websocket.remote_address}")
+    async def api_entry(self):
         while True:
             try:
-                self = self.bot.get_cog("Api")
-                data = json.loads(await websocket.recv())
-                # print("recvd: " + str(data))
-                if data['_module'] == 'interpret':
-                    resp = await self.interpret(**data)
-                else:
-                    resp = {'content': "Unknown module"}
-            except websockets.exceptions.ConnectionClosed:
-                print(f"Websocket connection to {websocket.remote_address} closed. goodbye.")
-                return
+                task = await self.bot.comm.wait_for_shard_message()
             except Exception as e:
-                traceback.print_exc()
-                print(f"caught {e} while handling websocket request")
-                resp = {'content': f"caught {e} while handling websocket request"}
-            await websocket.send(json.dumps(resp))
+                print(f"Malformed ipc request or something: {e}")
+                continue
+            self.loop.create_task(self.handle_request(task))
 
-    @asyncio.coroutine
-    def handle_request(self, pub, msg):
+    async def handle_request(self, pub, msg):
         try:
-            resp = json.dumps((yield from getattr(self.bot.get_cog("Api"), msg['method'])(*msg['args'])))
+            resp = await getattr(self.bot.get_cog("Api"), msg['method'])(*msg['args'])
         except Exception as e:
             traceback.print_exc()
             print(f"caught {e} while handling {msg['topic']}s request")
             resp = '{"message": "' + str(e) + '"}'
         print(f"sending msg from bot {resp}")
-        yield from pub.send(f"{msg['topic']} {resp}".encode())
-
-    async def store_callback(self, nonce=None, url=None):
-        assert nonce and url
-        if not any(re.match(pattern, url) for pattern in (
-                r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
-                r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
-                r'https:\/\/develop\.archit\.us\/app',
-                r'https:\/\/archit\.us\/app',
-                r'http:\/\/localhost:3000\/app')):
-            url = CALLBACK_URL
-
-        self.callback_urls[nonce] = url
-        return {"content": True}
-
-    async def get_callback(self, nonce=None):
-        url = self.callback_urls.pop(nonce, CALLBACK_URL)
-        resp = {"content": url}
-        return resp
+        await self.bot.comm.publish(msg['topic'], resp)
 
     async def guild_counter(self):
         return await self.bot.manager_request('guild_count')
@@ -128,15 +77,18 @@ class Api(Cog):
 
         for oldcommand in self.bot.user_commands[guild_id]:
             if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
-                self.bot.user_commands[guild_id].remove(oldcommand)
-                update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
-                return {'message': "Successfully Deleted", 'status_code': StatusCodes.OK_200}
+                if oldcommand.author_id == user_id or user_id in self.bot.settings[guild].admin_ids:
+                    self.bot.user_commands[guild_id].remove(oldcommand)
+                    update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
+                    return {'message': "Successfully Deleted", 'status_code': StatusCodes.OK_200}
+                else:
+                    return {'message': "Not authorized", 'status_code': StatusCodes.UNAUTHORIZED_401}
         return {'message': "No such command.", 'status_code': StatusCodes.NOT_FOUND_404}
 
     async def fetch_user_dict(self, id):
         usr = self.bot.get_user(int(id))
         if usr is None:
-            return None
+            return {'message': "No such user", 'status_code': StatusCodes.NOT_FOUND_404}
         return {
             'name': usr.name,
             'avatar': usr.avatar,
@@ -146,7 +98,7 @@ class Api(Cog):
     async def get_emoji(self, id):
         e = self.bot.get_emoji(int(id))
         if e is None:
-            return None
+            return {'message': "No such emoji", 'status_code': StatusCodes.NOT_FOUND_404}
         return {
             'name': e.name,
             'url': str(e.url)
@@ -174,9 +126,10 @@ class Api(Cog):
 
     async def tag_autbot_guilds(self, guild_list, user_id):
         all_guilds = await self.bot.manager_request('all_guilds')
+        print(all_guilds)
         for guild_dict in guild_list:
             for guild in all_guilds:
-                if guild['id'] == guild_dict['id']:
+                if str(guild['id']) == guild_dict['id']:
                     guild_dict['has_architus'] = True
                     guild_dict['architus_admin'] = user_id in guild['admin_ids']
                     break

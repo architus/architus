@@ -1,0 +1,6 @@
+websockets==6.0
+pyyaml
+pyzmq
+aiohttp==3.5.4
+zmq==0.0.0
+python-socketio

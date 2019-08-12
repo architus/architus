@@ -2,15 +2,12 @@ import discord
 from discord.ext.commands import Bot
 from datetime import datetime
 import asyncio
-import zmq
-import zmq.asyncio
-import json
 import os
 from pytz import timezone
-from uuid import getnode
 
 from src.user_command import UserCommand
 from src.smart_message import smart_message
+from src.communicators import Comms
 from lib.config import get_session, secret_token
 from lib.models import Command
 
@@ -22,61 +19,29 @@ class Architus(Bot):
     def __init__(self, **kwargs):
         self.user_commands = {}
         self.session = get_session()
-        self.guild_counter = (0, 0)
         self.tracked_messages = {}
 
-        self.topic = 'm' + str((getnode() << 15) | os.getpid())
-        ctx = zmq.asyncio.Context()
-        self.sub = ctx.socket(zmq.SUB)
-        self.sub.connect(f"tcp://ipc:6200")
-        self.msub = ctx.socket(zmq.SUB)
-        self.msub.connect(f"tcp://ipc:6200")
-        self.pub = ctx.socket(zmq.PUB)
-        self.pub.connect(f"tcp://ipc:7300")
-        self.msub.setsockopt_string(zmq.SUBSCRIBE, str(self.topic))
-        import time
-        time.sleep(1)
-
-        print("Requesting shard id...")
-        shard_info = asyncio.get_event_loop().run_until_complete(self.manager_request('register'))
+        self.comm = Comms()
+        self.broadcast = self.comm.event_broadcaster
+        shard_info = self.comm.register_shard()
         self.shard_id = shard_info['shard_id']
-        self.sub.setsockopt_string(zmq.SUBSCRIBE, str(self.shard_id))
-        print(f"Got shard_id {self.shard_id}")
 
         kwargs.update(shard_info)
         super().__init__(**kwargs)
 
     def run(self, token):
         self.loop.create_task(self.list_guilds())
-
-        self.loop.create_task(self.api_entry())
+        self.loop.create_task(self.get_cog('Api').api_entry())
         super().run(token)
-
-    @asyncio.coroutine
-    def manager_request(self, method, *args):
-        yield from self.pub.send_string(f"manager {json.dumps({'method': method, 'topic': self.topic, 'args': args})}")
-        return json.loads((yield from self.msub.recv_string())[len(str(self.topic)) + 1:])
-
-    @asyncio.coroutine
-    def api_entry(self):
-        api = self.get_cog('Api')
-
-        while True:
-            try:
-                task = (yield from self.sub.recv_string())[len(str(self.shard_id)) + 1:]
-                print(f"shard {self.shard_id} got task {task}")
-            except Exception as e:
-                print(f"Malformed ipc request or something: {e}")
-                continue
-            self.loop.create_task(api.handle_request(self.pub, json.loads(task)))
 
     async def on_reaction_add(self, react, user):
         if user == self.user:
             return
-        settings = self.settings[react.message.guild]
+        guild = react.message.guild
+        settings = self.settings[guild]
         if settings.starboard_emoji in str(react.emoji):
             if react.count == settings.starboard_threshold:
-                await self.starboard_post(react.message, react.message.guild)
+                await self.starboard_post(react.message, guild)
 
         if settings.edit_emoji in str(react.emoji):
             sm = self.tracked_messages.get(react.message.id)
@@ -137,8 +102,8 @@ class Architus(Bot):
                 command.response, command.count,
                 self.get_guild(command.server_id),
                 command.author_id))
-        for guild, cmds in self.user_commands.items():
-            self.user_commands[guild].sort()
+            for guild, cmds in self.user_commands.items():
+                self.user_commands[guild].sort()
 
     @property
     def settings(self):
@@ -162,8 +127,8 @@ class Architus(Bot):
                     'member_count': guild.member_count,
                     'admin_ids': settings.admins_ids
                 })
-            # TODO this should happen on update not every 600 seconds
-            await self.manager_request('guild_update', guilds)
+                # TODO this should happen on update not every 600 seconds
+            await self.comm.manager_request('guild_update', guilds)
             await asyncio.sleep(600)
 
     async def starboard_post(self, message, guild):

@@ -100,6 +100,14 @@ class Login(CustomResource):
     def get(self):
         response = redirect(f'https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
                             'https%3A%2F%2Fapi.archit.us%2Fredirect&response_type=code&scope=identify%20guilds')
+        # TODO nice validation
+       # if not any(re.match(pattern, url) for pattern in (
+       #         r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
+       #         r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
+       #         r'https:\/\/develop\.archit\.us\/app',
+       #         r'https:\/\/archit\.us\/app',
+       #         r'http:\/\/localhost:3000\/app')):
+       #     url = CALLBACK_URL
         response.set_cookie('next', request.args.get('return'))
         return response
 

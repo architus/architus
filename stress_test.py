@@ -1,4 +1,3 @@
-from multiprocessing.pool import ThreadPool
 from threading import Thread
 from collections import Counter
 import requests
@@ -20,21 +19,15 @@ if __name__ == '__main__':
     print(f'{url} at {rate_ps} r/s')
 
     now = datetime.now()
-    #results = [get(url) for _ in range(num)]
     threads = [Thread(target=get, args=(url,)) for _ in range(num)]
     for thread in threads:
         thread.start()
         time.sleep(1/rate_ps)
-    #with ThreadPool(num) as p:
-        #results = p.map(get, [url for _ in range(num)])
-
-    def thing(secs):
-        return '*' * round(secs * 10)
 
     total_time = 0
     codes = []
     for result in sorted(results, key=lambda x: x[2]):
-        print(f"{result[0].status_code} {result[1]:.2f} {thing(result[1])}")
+        print(f"{result[0].status_code} {result[1]:.2f} {'*' * round(result[1] * 10)}")
         total_time += result[1]
         codes.append(result[0].status_code)
     print('----------------')
