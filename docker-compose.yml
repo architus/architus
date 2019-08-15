@@ -98,5 +98,12 @@ services:
         constraints: [node.role == manager]
     networks:
       - webnet
+  rabbit:
+    image: rabbitmq:3.7.17-management-alpine
+    hostname: "rabbit"
+    ports:
+      - "8090:15672"
+    networks:
+      - webnet
 networks:
   webnet:

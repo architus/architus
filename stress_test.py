@@ -13,8 +13,9 @@ def get(url):
     results.append((r, (datetime.now() - now).total_seconds(), now))
 
 if __name__ == '__main__':
-    num = 40
+    num = 250
     rate_ps = 10
+    #url = 'https://api.archit.us:8000/stats/436189230390050826/messagecount'
     url = 'https://api.archit.us:8000/guild_count'
     print(f'{url} at {rate_ps} r/s')
 
@@ -23,6 +24,9 @@ if __name__ == '__main__':
     for thread in threads:
         thread.start()
         time.sleep(1/rate_ps)
+
+    for thread in threads:
+        thread.join()
 
     total_time = 0
     codes = []

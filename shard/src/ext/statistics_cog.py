@@ -70,33 +70,36 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         await ctx.channel.send("{0:.1f}% out of the {1:,} scanned words sent by {2} are spelled correctly".format(
             ((correct_words / words) * 100) - linh_modifier, words, victim.display_name))
 
-    @commands.command()
-    async def messagecount(self, ctx, *args):
+    async def count_messages(self, guild):
         '''Count the total messages a user has sent in the server'''
-        ctxchannel = ctx.channel
         cache = self.cache
-        cache[ctxchannel.guild].setdefault('messages', {})
+        cache[guild].setdefault('messages', {})
         blacklist = []
         word_counts = {}
         message_counts = {}
-        victim = ctx.message.mentions[0] if ctx.message.mentions else None
-        async with ctxchannel.typing():
-            for channel in ctx.guild.text_channels:
-                try:
-                    if channel not in blacklist:
-                        if channel not in cache[ctxchannel.guild]['messages'].keys()\
-                                or not cache[ctxchannel.guild]['messages'][channel]:
-                            print("reloading cache for " + channel.name)
-                            iterator = [log async for log in channel.history(limit=1000000)]
-                            logs = list(iterator)
-                            cache[ctxchannel.guild]['messages'][channel] = logs
-                        msgs = cache[ctxchannel.guild]['messages'][channel]
-                        for msg in msgs:
-                            message_counts[msg.author] = message_counts.get(msg.author, 0) + 1
-                            word_counts[msg.author] = word_counts.get(msg.author, 0) + len(msg.clean_content.split())
-                except Exception as e:
-                    print(e)
+        for channel in guild.text_channels:
+            try:
+                if channel not in blacklist:
+                    if channel not in cache[guild]['messages'].keys()\
+                            or not cache[guild]['messages'][channel]:
+                        print("reloading cache for " + channel.name)
+                        iterator = [log async for log in channel.history(limit=1000000)]
+                        logs = list(iterator)
+                        cache[guild]['messages'][channel] = logs
+                    msgs = cache[guild]['messages'][channel]
+                    for msg in msgs:
+                        message_counts[msg.author] = message_counts.get(msg.author, 0) + 1
+                        word_counts[msg.author] = word_counts.get(msg.author, 0) + len(msg.clean_content.split())
+            except Exception as e:
+                print(e)
 
+        return message_counts, word_counts
+
+    @commands.command()
+    async def messagecount(self, ctx, *args):
+        async with ctx.channel.typing():
+            message_counts, word_counts = await self.count_messages(ctx.guild)
+        victim = ctx.message.mentions[0] if ctx.message.mentions else None
         key = ''.join(random.choice(string.ascii_letters) for n in range(10))
         wordcount_gen.generate(key, message_counts, word_counts, victim)
         channel = discord.utils.get(self.bot.get_all_channels(), id=IMAGE_CHANNEL_ID)

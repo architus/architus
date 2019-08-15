@@ -21,22 +21,31 @@ class Api(Cog):
             try:
                 task = await self.bot.comm.wait_for_shard_message()
             except Exception as e:
+                traceback.print_exc()
                 print(f"Malformed ipc request or something: {e}")
                 continue
-            self.bot.loop.create_task(self.handle_request(task))
+            self.bot.loop.create_task(self._handle_request(task))
 
-    async def handle_request(self, pub, msg):
+    async def _handle_request(self, msg):
         try:
-            resp = await getattr(self.bot.get_cog("Api"), msg['method'])(*msg['args'])
+            method = getattr(self, msg['method'])
+            if not method.__name__.startswith('_'):
+                resp = await method(*msg['args'])
+            else:
+                resp = {"message": "private method", 'status_code': StatusCodes.FORBIDDEN_403}
         except Exception as e:
             traceback.print_exc()
             print(f"caught {e} while handling {msg['topic']}s request")
-            resp = '{"message": "' + str(e) + '"}'
+            resp = {"message": f"'{e}'", 'status_code': StatusCodes.INTERNAL_SERVER_ERROR_500}
         print(f"sending msg from bot {resp}")
+        resp['id'] = msg['id']
         await self.bot.comm.publish(msg['topic'], resp)
 
+    async def ping(self):
+        return {'message': 'pong', 'status_code': StatusCodes.OK_200}
+
     async def guild_counter(self):
-        return await self.bot.manager_request('guild_count')
+        return await self.bot.comm.manager_request('guild_count')
 
     async def set_response(self, user_id, guild_id, trigger, response):
         guild = self.bot.get_guild(int(guild_id))
@@ -116,6 +125,12 @@ class Api(Cog):
             return {"message": f"Extension Not Loaded: {e}", "status_code": StatusCodes.SERVICE_UNAVAILABLE_503}
         return {"message": "Reload signal sent"}
 
+    async def messagecount(self, guild_id):
+        guild = self.bot.get_guild(guild_id)
+        stats_cog = self.bot.get_cog("Server Statistics")
+        mc, wc = await stats_cog.count_messages(guild)
+        return {'message_counts': {k.id: v for k, v in mc.items()}, 'word_counts': {k.id: v for k, v in wc.items()}}
+
     async def settings_access(self, guild_id=None, setting=None, value=None):
         guild_settings = self.bot.get_cog("GuildSettings")
         guild = self.bot.get_guild(guild_id)
@@ -125,8 +140,7 @@ class Api(Cog):
         return {'value': "unknown setting"}
 
     async def tag_autbot_guilds(self, guild_list, user_id):
-        all_guilds = await self.bot.manager_request('all_guilds')
-        print(all_guilds)
+        all_guilds = await self.bot.comm.manager_request('all_guilds')
         for guild_dict in guild_list:
             for guild in all_guilds:
                 if str(guild['id']) == guild_dict['id']:

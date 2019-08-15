@@ -2,10 +2,8 @@ import youtube_dl
 import functools
 import discord
 from collections import deque
-try:
-    import src.spotify_tools as spotify_tools
-except Exception:
-    spotify_tools = None
+# import src.spotify_tools as spotify_tools
+spotify_tools = None
 import urllib
 import asyncio
 import os

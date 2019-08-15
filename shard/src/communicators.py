@@ -23,12 +23,14 @@ class Comms:
         self.msub.connect(f"tcp://ipc:6200")
         self.pub = ctx.socket(zmq.PUB)
         self.pub.connect(f"tcp://ipc:7300")
+        self.pub.setsockopt(zmq.IMMEDIATE, 1)
         self.msub.setsockopt_string(zmq.SUBSCRIBE, str(self.manager_topic))
 
         self.event_broadcaster = EventBroadcaster(self.pub)
 
     def register_shard(self):
-        time.sleep(0.5)
+        # TODO this is garb
+        time.sleep(2) # wait for sockets to connect and manager to come up
         print("Requesting shard id...")
         shard_info = asyncio.get_event_loop().run_until_complete(self.manager_request('register'))
         self.shard_id = str(shard_info['shard_id'])
@@ -39,7 +41,11 @@ class Comms:
     @asyncio.coroutine
     def publish(self, topic, data: dict, status_code=StatusCodes.OK_200):
         '''publish a message to the given topic'''
-        data.setdefault('status_code', status_code)
+        try:
+            data.setdefault('status_code', status_code)
+        except AttributeError:
+            #TODO
+            print("can't setdefault on whatever this is, this should be fixed")
         try:
             data = json.dumps(data)
         except TypeError:

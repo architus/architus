@@ -3,10 +3,12 @@ from flask_restful import Api, Resource, reqparse
 from flask_cors import CORS
 import requests
 import json
+import time
 import os
 import re
 import secrets
 import random
+import zmq
 from datetime import datetime, timedelta
 from uuid import getnode
 
@@ -16,7 +18,7 @@ from lib.models import AppSession, Command, Log
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://aut-bot.com/app'
-REDIRECT_URI = 'https://api.archit.us/redirect'
+REDIRECT_URI = 'https://api.archit.us:8000/redirect'
 # REDIRECT_URI = 'http://localhost:5000/home'
 
 
@@ -44,9 +46,10 @@ def issue():
 
 def authenticated(func):
     def authed_func(self, *args, **kwargs):
-        row = authenticate(self.session, request.headers)
+        row = authenticate(get_db(), request.headers)
         if row is None:
             return (StatusCodes.UNAUTHORIZED_401, "Not Authorized")
+        self.discord_token = row.discord_token
         return func(self, row.discord_id, *args, **kwargs)
     return authed_func
 
@@ -67,22 +70,46 @@ class CustomResource(Resource):
     def __init__(self):
         self.session = get_db()
         self.topic = (getnode() << 15) | os.getpid()
-        self.pub, self.sub = get_zmq_socks(self.topic)
+        self._sub = None
+        self._pub = None
+
+    @property
+    def sub(self):
+        if self._sub is None:
+            self._pub, self._sub = get_zmq_socks(self.topic)
+        return self._sub
+
+    @property
+    def pub(self):
+        if self._pub is None:
+            self._pub, self._sub = get_zmq_socks(self.topic)
+        return self._pub
 
     def bot_call(self, method, *args, guild_id=None):
         if guild_id is not None:
             args = (guild_id,) + args
-        self.send({'method': method, 'args': args}, guild_id=guild_id)
-        return self.recv()
+
+        while True:
+            try:
+                msg_id = self.send({'method': method, 'args': args}, guild_id=guild_id)
+                data, sc = self.recv()
+                if data['id'] == msg_id:
+                    return data, sc
+                print(f"WARNING - got a message with id:{data['id']}, was expecting {msg_id}")
+            except zmq.error.Again as e:
+                print(f"ERROR - caught {e} while reading from bot - probably a timeout?")
+                return {'message': "Internal Server Error"}, StatusCodes.INTERNAL_SERVER_ERROR_500
 
     def send(self, call, guild_id):
         call['topic'] = self.topic
+        call['id'] = secrets.randbits(12)
         if guild_id is not None:
             shard_id = (guild_id >> 22) % NUM_SHARDS
         else:
             shard_id = random.randint(0, NUM_SHARDS - 1)
         print(f"sending {shard_id} {json.dumps(call)}")
         self.pub.send_string(f"{shard_id} {json.dumps(call)}")
+        return call['id']
 
     def recv(self):
         data = json.loads(self.sub.recv_string()[len(str(self.topic)) + 1:])
@@ -99,15 +126,15 @@ class CustomResource(Resource):
 class Login(CustomResource):
     def get(self):
         response = redirect(f'https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
-                            'https%3A%2F%2Fapi.archit.us%2Fredirect&response_type=code&scope=identify%20guilds')
+                            'https%3A%2F%2Fapi.archit.us%3A8000%2Fredirect&response_type=code&scope=identify%20guilds')
         # TODO nice validation
-       # if not any(re.match(pattern, url) for pattern in (
-       #         r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
-       #         r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
-       #         r'https:\/\/develop\.archit\.us\/app',
-       #         r'https:\/\/archit\.us\/app',
-       #         r'http:\/\/localhost:3000\/app')):
-       #     url = CALLBACK_URL
+        # if not any(re.match(pattern, url) for pattern in (
+        #         r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
+        #         r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
+        #         r'https:\/\/develop\.archit\.us\/app',
+        #         r'https:\/\/archit\.us\/app',
+        #         r'http:\/\/localhost:3000\/app')):
+        #     url = CALLBACK_URL
         response.set_cookie('next', request.args.get('return'))
         return response
 
@@ -275,22 +302,23 @@ class Coggers(CustomResource):
 class Identify(Resource):
 
     def get(self):
-        session = get_db()
-        headers = request.headers
-        print(headers)
-        discord_token = authenticate(session, headers).discord_access_token
-        if discord_token:
-            return discord_identify_request(discord_token)
+        row = authenticate(get_db(), request.headers)
+        if row and row.discord_access_token:
+            return discord_identify_request(row.discord_access_token)
 
         return "token invalid or expired", StatusCodes.UNAUTHORIZED_401
+
+
+class Stats(CustomResource):
+    def get(self, guild_id, stat):
+        if stat == 'messagecount':
+            return self.bot_call('messagecount', guild_id=guild_id)
 
 
 class ListGuilds(CustomResource):
 
     def get(self):
-        headers = request.headers
-        print(headers)
-        row = authenticate(self.session, headers)
+        row = authenticate(self.session, request.headers)
         discord_token = row.discord_access_token
         if discord_token:
             headers = {
@@ -343,6 +371,7 @@ def token_exchange():
     r = requests.post('%s/oauth2/token' % API_ENDPOINT, data=data, headers=headers)
     resp_data = r.json()
     print(r.status_code)
+    print(r.text)
     if r.status_code == StatusCodes.OK_200:
         print(resp_data)
 
@@ -377,6 +406,7 @@ def app_factory():
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(Identify, "/identify")
     api.add_resource(ListGuilds, "/guilds")
+    api.add_resource(Stats, "/stats/<int:guild_id>/<string:stat>")
     api.add_resource(Login, "/login")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")

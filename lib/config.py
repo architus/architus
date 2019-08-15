@@ -47,15 +47,16 @@ def get_zmq_socks(id):
         sub = ctx.socket(zmq.SUB)
         sub.connect('tcp://ipc:6300')
         sub.setsockopt_string(zmq.SUBSCRIBE, str(id))
-        sub.setsockopt(zmq.RCVTIMEO, 2000)
+        sub.setsockopt(zmq.RCVTIMEO, 60000)
         pub = ctx.socket(zmq.PUB)
         pub.connect('tcp://ipc:7200')
+        pub.setsockopt(zmq.IMMEDIATE, 1)
 
         # make sure our sockets are actually connected before we return them
         print("pinging shard 0...")
         time.sleep(.1)  # garbage race condition, usually this prevents the recv from timing out once
         while True:
-            pub.send_string(f"0 {json.dumps({'method': 'ping', 'args': [], 'topic': id})}")
+            pub.send_string(f"0 {json.dumps({'method': 'ping', 'args': [], 'topic': id, 'id': 0})}")
             try:
                 print(sub.recv())
                 break
