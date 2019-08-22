@@ -68,6 +68,15 @@ class CoolBot(Bot):
             sm = self.tracked_messages[react.message.id]
             await sm.delete_popup()
 
+    async def on_message_delete(self, msg):
+        settings = self.guild_settings.get_guild(msg.guild, session=self.session)
+        if settings.repost_del_msg:
+            utc = msg.created_at.replace(tzinfo=timezone('UTC'))
+            est = utc.astimezone(timezone('US/Eastern'))
+            em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=msg.content, colour=0x42f468)
+            em.set_author(name=msg.author.display_name, icon_url=msg.author.avatar_url)
+            await msg.channel.send(embed=em)
+
     async def on_message_edit(self, before, after):
         if before.author == self.user:
             return
