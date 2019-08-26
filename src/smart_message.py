@@ -47,16 +47,16 @@ class smart_message:
 
     def get_popup_embed(self):
         title = "last %d edits" % (len(self.edits))
-        lem = ListEmbed(title, self.ogtime.strftime("%m-%d %I:%M %p"), self.most_recent.author)
+        lem = ListEmbed(title, self.ogtime.strftime("%m/%d %I:%M %p"), self.most_recent.author)
         for edit in self.edits:
             est = self.get_datetime(edit.timestamp)
-            lem.add(est.strftime("%I:%M:%S %p"), edit.content)
+            lem.add(edit.timestamp.strftime("%I:%M:%S %p"), edit.content)
         return lem.get_embed()
 
     def get_datetime(self, timestamp):
         utc = timestamp.replace(tzinfo=timezone('UTC'))
         est = utc.astimezone(timezone('US/Eastern'))
-        return timestamp
+        return est
 
 
 class dumb_message:
