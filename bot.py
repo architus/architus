@@ -75,7 +75,9 @@ class CoolBot(Bot):
             est = utc.astimezone(timezone('US/Eastern'))
             em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=msg.content, colour=0x42f468)
             em.set_author(name=msg.author.display_name, icon_url=msg.author.avatar_url)
-            await msg.channel.send(embed=em)
+            repost = await msg.channel.send(embed=em)
+            if msg.id in self.tracked_messages:
+                self.tracked_messages[repost.id] = self.tracked_messages[msg.id]
 
     async def on_message_edit(self, before, after):
         if before.author == self.user:
