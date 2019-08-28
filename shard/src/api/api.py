@@ -4,9 +4,7 @@ import discord
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
-from lib.status_codes import StatusCodes
-
-CALLBACK_URL = "https://archit.us/app"
+from lib.status_codes import StatusCodes as sc
 
 
 class Api(Cog):
@@ -14,38 +12,27 @@ class Api(Cog):
     def __init__(self, bot):
         self.bot = bot
         self.fake_messages = {}
-        self.callback_urls = {}
 
-    async def api_entry(self):
-        while True:
-            try:
-                task = await self.bot.comm.wait_for_shard_message()
-            except Exception as e:
-                traceback.print_exc()
-                print(f"Malformed ipc request or something: {e}")
-                continue
-            self.bot.loop.create_task(self._handle_request(task))
-
-    async def _handle_request(self, msg):
+    async def api_entry(self, method_name, *args, **kwargs):
         try:
-            method = getattr(self, msg['method'])
-            if not method.__name__.startswith('_'):
-                resp = await method(*msg['args'])
-            else:
-                resp = {"message": "private method", 'status_code': StatusCodes.FORBIDDEN_403}
+            assert not method_name.startswith('_')
+            method = getattr(self, method_name)
+        except (AttributeError, AssertionError):
+            print(f"Someone tried to call '{method}' but it doesn't exist (or is private)")
+            return {"message": "No such method"}, sc.NOT_FOUND_404
+
+        try:
+            return await method(*args, **kwargs)
         except Exception as e:
             traceback.print_exc()
-            print(f"caught {e} while handling {msg['topic']}s request")
-            resp = {"message": f"'{e}'", 'status_code': StatusCodes.INTERNAL_SERVER_ERROR_500}
-        print(f"sending msg from bot {resp}")
-        resp['id'] = msg['id']
-        await self.bot.comm.publish(msg['topic'], resp)
+            print(f"caught {e} while handling remote request")
+            return {"message": f"'{e}'"}, sc.INTERNAL_SERVER_ERROR_500
 
     async def ping(self):
-        return {'message': 'pong', 'status_code': StatusCodes.OK_200}
+        return {'message': 'pong'}, sc.OK_200
 
     async def guild_counter(self):
-        return await self.bot.comm.manager_request('guild_count')
+        return await self.bot.comm.manager_request('guild_count'), sc.OK_200
 
     async def set_response(self, user_id, guild_id, trigger, response):
         guild = self.bot.get_guild(int(guild_id))
@@ -53,33 +40,35 @@ class Api(Cog):
             command = UserCommand(self.bot.session, trigger, response, 0, guild, user_id, new=True)
         except VaguePatternError:
             msg = "Capture group too broad."
-            code = StatusCodes.NOT_ACCEPTABLE_406
+            code = sc.NOT_ACCEPTABLE_406
         except LongResponseException:
             msg = "Response is too long."
-            code = StatusCodes.PAYLOAD_TOO_LARGE_413
+            code = sc.PAYLOAD_TOO_LARGE_413
         except ShortTriggerException:
             msg = "Trigger is too short."
-            code = StatusCodes.LENGTH_REQUIRED_411
+            code = sc.LENGTH_REQUIRED_411
         except ResponseKeywordException:
             msg = "That response is protected, please use another."
-            code = StatusCodes.NOT_ACCEPTABLE_406
+            code = sc.NOT_ACCEPTABLE_406
         except DuplicatedTriggerException:
             msg = "Remove duplicated trigger first."
-            code = StatusCodes.CONFLICT_409
+            code = sc.CONFLICT_409
         else:
             self.bot.user_commands[guild_id].append(command)
             msg = 'Successfully Set'
-            code = StatusCodes.OK_200
-        return {'message': msg, 'status_code': code}
+            code = sc.OK_200
+        return {'message': msg}, code
 
     async def is_member(self, user_id, guild_id, admin=False):
         '''check if user is a member or admin of the given guild'''
         guild = self.bot.get_guild(int(guild_id))
         guild_settings = self.bot.get_cog("GuildSettings")
         if not guild:
-            return False
+            return {'member': False}, 200
         settings = guild_settings.get_guild(guild, self.bot.session)
-        return {'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)}
+        return {
+            'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)
+        }, sc.OK_200
 
     async def delete_response(self, user_id, guild_id, trigger):
         guild = self.bot.get_guild(int(guild_id))
@@ -89,32 +78,32 @@ class Api(Cog):
                 if oldcommand.author_id == user_id or user_id in self.bot.settings[guild].admin_ids:
                     self.bot.user_commands[guild_id].remove(oldcommand)
                     update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
-                    return {'message': "Successfully Deleted", 'status_code': StatusCodes.OK_200}
+                    return {'message': "Successfully Deleted"}, sc.OK_200
                 else:
-                    return {'message': "Not authorized", 'status_code': StatusCodes.UNAUTHORIZED_401}
-        return {'message': "No such command.", 'status_code': StatusCodes.NOT_FOUND_404}
+                    return {'message': "Not authorized"}, sc.UNAUTHORIZED_401
+        return {'message': "No such command."}, sc.NOT_FOUND_404
 
     async def fetch_user_dict(self, id):
         usr = self.bot.get_user(int(id))
         if usr is None:
-            return {'message': "No such user", 'status_code': StatusCodes.NOT_FOUND_404}
+            return {'message': "No such user"}, sc.NOT_FOUND_404
         return {
             'name': usr.name,
             'avatar': usr.avatar,
             'discriminator': usr.discriminator
-        }
+        }, sc.OK_200
 
     async def get_emoji(self, id):
         e = self.bot.get_emoji(int(id))
         if e is None:
-            return {'message': "No such emoji", 'status_code': StatusCodes.NOT_FOUND_404}
+            return {'message': "No such emoji"}, sc.NOT_FOUND_404
         return {
             'name': e.name,
             'url': str(e.url)
-        }
+        }, sc.OK_200
 
     async def get_extensions(self):
-        return {'extensions': [k for k in self.bot.extensions.keys()]}
+        return {'extensions': [k for k in self.bot.extensions.keys()]}, sc.OK_200
 
     async def reload_extension(self, extension_name):
         name = extension_name.replace('-', '.')
@@ -122,22 +111,25 @@ class Api(Cog):
             self.bot.reload_extension(name)
         except discord.ext.commands.errors.ExtensionNotLoaded as e:
             print(e)
-            return {"message": f"Extension Not Loaded: {e}", "status_code": StatusCodes.SERVICE_UNAVAILABLE_503}
-        return {"message": "Reload signal sent"}
+            return {"message": f"Extension Not Loaded: {e}"}, sc.SERVICE_UNAVAILABLE_503
+        return {"message": "Reload signal sent"}, sc.OK_200
 
     async def messagecount(self, guild_id):
         guild = self.bot.get_guild(guild_id)
         stats_cog = self.bot.get_cog("Server Statistics")
         mc, wc = await stats_cog.count_messages(guild)
-        return {'message_counts': {k.id: v for k, v in mc.items()}, 'word_counts': {k.id: v for k, v in wc.items()}}
+        return {
+            'message_counts': {k.id: v for k, v in mc.items()},
+            'word_counts': {k.id: v for k, v in wc.items()}
+        }, sc.OK_200
 
     async def settings_access(self, guild_id=None, setting=None, value=None):
         guild_settings = self.bot.get_cog("GuildSettings")
         guild = self.bot.get_guild(guild_id)
         settings = guild_settings[guild]
         if hasattr(settings, setting):
-            return {'value': getattr(settings, setting)}
-        return {'value': "unknown setting"}
+            return {'value': getattr(settings, setting)}, sc.OK_200
+        return {'value': "unknown setting"}, sc.NOT_FOUND_404
 
     async def tag_autbot_guilds(self, guild_list, user_id):
         all_guilds = await self.bot.comm.manager_request('all_guilds')
@@ -149,7 +141,7 @@ class Api(Cog):
                     break
             else:
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
-        return guild_list
+        return guild_list, sc.OK_200
 
     async def interpret(
             self,
@@ -246,7 +238,7 @@ class Api(Cog):
         }
         # if resp['content']:
         #   print(resp)
-        return resp
+        return resp, sc.OK_200
 
 
 class MockMember(object):

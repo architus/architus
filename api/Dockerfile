@@ -6,7 +6,7 @@ COPY ./api/requirements.txt /app
 
 # Copy the current directory contents into the container at /app
 RUN apk update && apk add linux-headers pcre-dev uwsgi-python3
-RUN apk add build-base libzmq musl-dev python3 zeromq-dev
+RUN apk add build-base musl-dev python3 #zeromq-dev libzmq
 RUN apk add --virtual build-deps gcc python3-dev musl-dev postgresql-dev
 
 

@@ -3,7 +3,6 @@ from flask_restful import Api, Resource, reqparse
 from flask_cors import CORS
 import requests
 import json
-import time
 import os
 import re
 import secrets
@@ -13,7 +12,7 @@ from datetime import datetime, timedelta
 from uuid import getnode
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, client_secret, get_session, get_zmq_socks, NUM_SHARDS
+from lib.config import client_id, client_secret, get_session, get_client, NUM_SHARDS
 from lib.models import AppSession, Command, Log
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
@@ -70,22 +69,26 @@ class CustomResource(Resource):
     def __init__(self):
         self.session = get_db()
         self.topic = (getnode() << 15) | os.getpid()
+        self.client = get_client(self.topic)
         self._sub = None
         self._pub = None
 
-    @property
-    def sub(self):
-        if self._sub is None:
-            self._pub, self._sub = get_zmq_socks(self.topic)
-        return self._sub
+    def bot_call(self, method, *args, guild_id=None, **kwargs):
 
-    @property
-    def pub(self):
-        if self._pub is None:
-            self._pub, self._sub = get_zmq_socks(self.topic)
-        return self._pub
+        if guild_id is not None:
+            # TODO please remove this terrible line
+            args = (guild_id,) + args
 
-    def bot_call(self, method, *args, guild_id=None):
+        if guild_id is not None:
+            shard_id = (guild_id >> 22) % NUM_SHARDS
+        else:
+            shard_id = random.randint(0, NUM_SHARDS - 1)
+
+        print("calling garb")
+
+        return self.client.call(method, *args, routing_key=shard_id, **kwargs)
+
+    def bot_call_a(self, method, *args, guild_id=None):
         if guild_id is not None:
             args = (guild_id,) + args
 

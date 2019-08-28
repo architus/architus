@@ -1,9 +1,10 @@
 import os
-import zmq
 import time
 import json
+import pika
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
+import uuid
 
 DB_HOST = 'postgres'
 DB_PORT = 5432
@@ -36,33 +37,60 @@ def get_session():
     return Session()
 
 
-def get_zmq_socks(id):
-    '''used by the api to keep track of connections between requests'''
-    if id in connkeeper:
-        print(f"reusing old zmq connection for {id}")
+def get_connection():
+    print("Connecting to rabbitmq...")
+    credentials = pika.PlainCredentials('hello', 'hello')
+    parameters = pika.ConnectionParameters('rabbit', 5672, '/', credentials)
+    while True:
+        try:
+            return pika.BlockingConnection(parameters)
+        except pika.exceptions.AMQPConnectionError as e:
+            print(f"rabbit doesn't seem to be up, trying again in 1 {e}")
+            time.sleep(1)
+
+
+print("connected to rabbit")
+
+
+def get_client(id):
+    try:
         return connkeeper[id]
-    else:
-        print(f"creating new zmq connection for {id}")
-        ctx = zmq.Context()
-        sub = ctx.socket(zmq.SUB)
-        sub.connect('tcp://ipc:6300')
-        sub.setsockopt_string(zmq.SUBSCRIBE, str(id))
-        sub.setsockopt(zmq.RCVTIMEO, 60000)
-        pub = ctx.socket(zmq.PUB)
-        pub.connect('tcp://ipc:7200')
-        pub.setsockopt(zmq.IMMEDIATE, 1)
+    except KeyError:
+        connkeeper[id] = shardRPC()
+        return connkeeper[id]
 
-        # make sure our sockets are actually connected before we return them
-        print("pinging shard 0...")
-        time.sleep(.1)  # garbage race condition, usually this prevents the recv from timing out once
-        while True:
-            pub.send_string(f"0 {json.dumps({'method': 'ping', 'args': [], 'topic': id, 'id': 0})}")
-            try:
-                print(sub.recv())
-                break
-            except zmq.ZMQError as e:
-                print(e)
-        print("connected")
 
-        connkeeper[id] = (pub, sub)
-        return (pub, sub)
+class shardRPC:
+    def __init__(self):
+        self.connection = get_connection()
+        self.channel = self.connection.channel()
+        result = self.channel.queue_declare(queue='', exclusive=True)
+        self.callback_queue = result.method.queue
+        self.channel.basic_consume(
+            queue=self.callback_queue,
+            on_message_callback=self.on_response,
+            auto_ack=True)
+
+    def on_response(self, ch, method, props, body):
+        if self.corr_id == props.correlation_id:
+            resp = json.loads(body)
+            self.resp = resp['resp']
+            self.status_code = resp['sc']
+
+    def call(self, method, *args, routing_key=None, **kwargs):
+        assert routing_key is not None
+        self.resp = None
+        self.corr_id = str(uuid.uuid4())
+        print("sending:")
+        print(json.dumps({'method': method, 'args': args, 'kwargs': kwargs}))
+        self.channel.basic_publish(
+            exchange='',
+            routing_key='rpc_queue',
+            properties=pika.BasicProperties(
+                reply_to=self.callback_queue,
+                correlation_id=self.corr_id,
+            ),
+            body=json.dumps({'method': method, 'args': args, 'kwargs': kwargs}))
+        while self.resp is None:
+            self.connection.process_data_events()
+        return self.resp, self.status_code

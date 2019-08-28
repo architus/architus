@@ -8,6 +8,7 @@ from pytz import timezone
 from src.user_command import UserCommand
 from src.smart_message import smart_message
 from src.communicators import Comms
+from src.pika_adapter import main
 from lib.config import get_session, secret_token
 from lib.models import Command
 
@@ -31,7 +32,8 @@ class Architus(Bot):
 
     def run(self, token):
         self.loop.create_task(self.list_guilds())
-        self.loop.create_task(self.get_cog('Api').api_entry())
+        #self.loop.create_task(self.get_cog('Api').api_entry())
+        self.loop.create_task(main(self))
         super().run(token)
 
     async def on_reaction_add(self, react, user):
