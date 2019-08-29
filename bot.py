@@ -24,6 +24,7 @@ class CoolBot(Bot):
         self.session = get_session()
         self.guild_counter = (0, 0)
         self.tracked_messages = {}
+        self.deletable_messages = []
         super().__init__(**kwargs)
 
     def run(self, token, q=None):
@@ -70,6 +71,9 @@ class CoolBot(Bot):
 
     async def on_message_delete(self, msg):
         settings = self.guild_settings.get_guild(msg.guild, session=self.session)
+        if msg.id in self.deletable_messages:
+            self.deletable_messages.remove(msg.id)
+            return
         if msg.author != self.user and settings.repost_del_msg:
             utc = msg.created_at.replace(tzinfo=timezone('UTC'))
             est = utc.astimezone(timezone('US/Eastern'))
