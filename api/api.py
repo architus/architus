@@ -43,6 +43,10 @@ def issue():
 
 
 def authenticated(func):
+    """decorator for rest endpoint functions
+    returns 401 if user is not logged in
+    and prepends their discord id to the arguments if identification is necessary
+    """
     def authed_func(self, *args, **kwargs):
         row = authenticate(get_db(), request.headers)
         if row is None:
@@ -53,6 +57,7 @@ def authenticated(func):
 
 
 def authenticate(session, headers):
+    """lookup a token in the database"""
     try:
         autbot_token = headers['Authorization']
     except KeyError:
@@ -65,6 +70,7 @@ def authenticate(session, headers):
 
 
 class CustomResource(Resource):
+    """Default flask Resource but contains tools to talk to the shard nodes and the db"""
     def __init__(self):
         self._session = None
         self.topic = (getnode() << 15) | os.getpid()

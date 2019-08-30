@@ -46,6 +46,7 @@ class Architus(Bot):
         super().run(token)
 
     async def on_reaction_add(self, react, user):
+        """Check if message should be added to starboard or an edit dialog should be posted"""
         if user == self.user:
             return
         guild = react.message.guild
@@ -66,6 +67,7 @@ class Architus(Bot):
             await sm.delete_popup()
 
     async def on_message_edit(self, before, after):
+        """Adds message to the store of edits"""
         if before.author == self.user:
             return
 
@@ -79,6 +81,7 @@ class Architus(Bot):
         self.tracked_messages[before.id] = sm
 
     async def on_message(self, msg):
+        """Execute commands, then trigger autoresponses"""
         print('Message from {0.author} in {0.guild.name}: {0.content}'.format(msg))
 
         if msg.author == self.user:
@@ -93,6 +96,7 @@ class Architus(Bot):
                 break
 
     async def on_ready(self):
+        """pull autoresponses from the db, then set activity"""
         await self.initialize_user_commands()
         print('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(name=f"shard id: {self.shard_id}", type=3))
@@ -121,6 +125,7 @@ class Architus(Bot):
         return self.get_cog('GuildSettings')
 
     async def list_guilds(self):
+        """Update the manager with the guilds that we know about"""
         await self.wait_until_ready()
         while not self.is_closed():
             print("Current guilds:")
@@ -143,6 +148,7 @@ class Architus(Bot):
             await asyncio.sleep(600)
 
     async def starboard_post(self, message, guild):
+        """Post a message in the starboard channel"""
         starboard_ch = discord.utils.get(guild.text_channels, name='starboard')
         if message.id in starboarded_messages or not starboard_ch or message.author == self.user:
             return

@@ -14,6 +14,12 @@ class Api(Cog):
         self.fake_messages = {}
 
     async def api_entry(self, method_name, *args, **kwargs):
+        """Callback method for the rpc server
+
+        :param method_name: name of the method to execute
+        :param *args: args to pass through
+        :param **kwargs: kwargs to pass through
+        """
         try:
             assert not method_name.startswith('_')
             method = getattr(self, method_name)

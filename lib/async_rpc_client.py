@@ -4,6 +4,7 @@ from aio_pika import connect, IncomingMessage, Message
 
 
 class shardRPC:
+    """Client to handle rabbit response ids and queues and stuff"""
     def __init__(self, loop, default_key=None):
         self.default_key = default_key
         self.connection = None
@@ -30,6 +31,13 @@ class shardRPC:
         future.set_result((resp['resp'], resp['sc']))
 
     async def call(self, method, *args, routing_key=None, **kwargs):
+        """Remotely call a method
+
+        :param method: name of method to call
+        :param *args: arguments to pass to method
+        :param routing_key: queue to route to in rabbitmq
+        :param **kwargs: keyword args to pass to method
+        """
         routing_key = self.default_key if routing_key is None else routing_key
         correlation_id = str(uuid.uuid4())
         future = self.loop.create_future()

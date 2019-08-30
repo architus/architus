@@ -1,6 +1,9 @@
 import os
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
+"""
+This file loads the environment secrets into memory and also manages database connections
+"""
 
 DB_HOST = 'postgres'
 DB_PORT = 5432

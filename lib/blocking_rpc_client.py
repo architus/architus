@@ -9,6 +9,11 @@ parameters = pika.ConnectionParameters('rabbit', 5672, '/', credentials)
 
 
 def get_rpc_client(id):
+    """manager function to keep track of connections between processes in wsgi
+
+    :param id: unique id to collect client
+    :returns: shardRPC -- rpc client object
+    """
     try:
         return connkeeper[id]
     except KeyError:
@@ -17,6 +22,7 @@ def get_rpc_client(id):
 
 
 class shardRPC:
+    """Client to handle rabbit response ids and queues and stuff"""
     def __init__(self):
         self._connect()
         self.channel = self.connection.channel()
@@ -43,6 +49,13 @@ class shardRPC:
             self.status_code = resp['sc']
 
     def call(self, method, *args, routing_key=None, **kwargs):
+        """Remotely call a method
+
+        :param method: name of method to call
+        :param *args: arguments to pass to method
+        :param routing_key: queue to route to in rabbitmq
+        :param **kwargs: keyword args to pass to method
+        """
         assert routing_key is not None
         print(f'calling {method} on queue: {routing_key}')
         self.resp = None
