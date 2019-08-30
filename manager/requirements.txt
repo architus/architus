@@ -1,2 +1,1 @@
-pyzmq
-zmq==0.0.0
+aio_pika

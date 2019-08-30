@@ -63,18 +63,11 @@ services:
         constraints: [node.role == manager]
     networks:
       - webnet
-  ipc:
-    image: johnyburd/ipc-balancer:latest
-    deploy:
-      restart_policy:
-        condition: on-failure
-    deploy:
-      placement:
-        constraints: [node.role == manager]
-    networks:
-      - webnet
   manager:
     image: johnyburd/manager:latest
+    build:
+      context: ./
+      dockerfile: ./manager/Dockerfile
     environment:
         - NUM_SHARDS
     deploy:

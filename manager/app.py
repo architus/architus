@@ -1,28 +1,8 @@
 import asyncio
-import json
-import zmq
-import zmq.asyncio
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 
-
-@asyncio.coroutine
-def listen_for_stuff(loop):
-    ctx = zmq.asyncio.Context()
-    sub = ctx.socket(zmq.SUB)
-    sub.connect('tcp://ipc:6300')
-    sub.setsockopt_string(zmq.SUBSCRIBE, 'manager')
-    # sub.setsockopt(zmq.RCVTIMEO, 2000)
-    pub = ctx.socket(zmq.PUB)
-    pub.connect('tcp://ipc:7200')
-    manager = Manager(int(os.environ['NUM_SHARDS']))
-    while True:
-        try:
-            task = (yield from sub.recv_string())[len('manager '):]
-        except Exception as e:
-            print(f"Malformed ipc request or something: {e}")
-            continue
-        loop.create_task(manager.handle_task(pub, json.loads(task)))
+from lib import async_rpc_server
 
 
 class Manager:
@@ -33,26 +13,24 @@ class Manager:
         self.last_checkin = {}
         self.store = {}
 
-    @asyncio.coroutine
-    def handle_task(self, pub, task):
-        resp = yield from getattr(self, task['method'])(task['topic'], *task['args'])
-        yield from pub.send_string(f"{task['topic']} {json.dumps(resp)}")
+    async def handle_task(self, method, *args, **kwargs):
+        return (await (getattr(self, method)(*args, **kwargs)), 200)
 
-    async def register(self, topic):
+    async def register(self):
         if self.registered >= self.total_shards:
             raise Exception("Shard trying to register even though we're full")
         self.registered += 1
         print(f'Shard requested id, assigning {self.registered}/{self.total_shards}...')
-        self.store[topic] = {'shard_id': self.registered - 1}
+        self.store[self.registered - 1] = {'shard_id': self.registered - 1}
         return {'shard_id': self.registered - 1, 'shard_count': self.total_shards}
 
-    async def all_guilds(self, topic):
+    async def all_guilds(self):
         guilds = []
         for shard, shard_store in self.store.items():
             guilds += shard_store.get('guilds', ())
         return guilds
 
-    async def guild_count(self, topic):
+    async def guild_count(self):
         guild_count = 0
         user_count = 0
         for shard, shard_store in self.store.items():
@@ -62,10 +40,10 @@ class Manager:
                 user_count += guild['member_count']
         return {'guild_count': guild_count, 'user_count': user_count}
 
-    async def guild_update(self, topic, guilds):
+    async def guild_update(self, shard_id, guilds):
         '''shards only method'''
-        print(f"{topic} sent guild list containing {len(guilds)} guilds")
-        self.store[topic]['guilds'] = guilds
+        print("someone sent guild list containing {len(guilds)} guilds")
+        self.store[int(shard_id)]['guilds'] = guilds
         return {"message": "thanks"}
 
     async def checkin(self, shard_id):
@@ -73,14 +51,15 @@ class Manager:
         self.last_checkin[shard_id] = datetime.now()
         return "nice"
 
-    def is_everyone_still_alive(self):
-        for shard, checkin in self.last_checkin.items():
-            if checkin > datetime.now() - timedelta(seconds=30):
-                print(f"Shard {shard} is DOWN!")
-                return False
-        return True
-
 
 loop = asyncio.get_event_loop()
-loop.run_until_complete(listen_for_stuff(loop))
-loop.close()
+manager = Manager(int(os.environ['NUM_SHARDS']))
+
+loop.create_task(
+    async_rpc_server.start_server(
+        loop,
+        'manager_rpc',
+        manager.handle_task
+    )
+)
+loop.run_forever()

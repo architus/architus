@@ -32,7 +32,7 @@ class Api(Cog):
         return {'message': 'pong'}, sc.OK_200
 
     async def guild_counter(self):
-        return await self.bot.comm.manager_request('guild_count'), sc.OK_200
+        return await self.bot.manager_client.call('guild_count')
 
     async def set_response(self, user_id, guild_id, trigger, response):
         guild = self.bot.get_guild(int(guild_id))

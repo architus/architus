@@ -12,7 +12,7 @@ class LogCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.broadcast = bot.broadcast
+        #self.broadcast = bot.broadcast
         self.session = self.bot.session
 
     def insert_row(self, guild_id, type, content, user_id, message_id=None, timestamp=None):
@@ -25,7 +25,7 @@ class LogCog(commands.Cog):
     async def on_message_edit(self, before, after):
         if before.content == after.content or before.author.id == self.bot.user.id:
             return
-        await self.broadcast.on_message_edit(before.guild.id, {'before': str(before), 'after': str(after)})
+        #await self.broadcast.on_message_edit(before.guild.id, {'before': str(before), 'after': str(after)})
         self.insert_row(
             before.channel.guild.id,
             LogCog.MSG_EDIT,

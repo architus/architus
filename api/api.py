@@ -7,18 +7,17 @@ import os
 import re
 import secrets
 import random
-import zmq
 from datetime import datetime, timedelta
 from uuid import getnode
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, client_secret, get_session, get_client, NUM_SHARDS
+from lib.config import client_id, client_secret, get_session, NUM_SHARDS
+from lib.blocking_rpc_client import get_rpc_client
 from lib.models import AppSession, Command, Log
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
-# REDIRECT_URI = 'https://aut-bot.com/app'
+# REDIRECT_URI = 'https://api.archit.us/redirect'
 REDIRECT_URI = 'https://api.archit.us:8000/redirect'
-# REDIRECT_URI = 'http://localhost:5000/home'
 
 
 app = Flask(__name__)
@@ -67,63 +66,29 @@ def authenticate(session, headers):
 
 class CustomResource(Resource):
     def __init__(self):
-        self.session = get_db()
+        self._session = None
         self.topic = (getnode() << 15) | os.getpid()
-        self.client = get_client(self.topic)
-        self._sub = None
-        self._pub = None
+        self.client = get_rpc_client(self.topic)
 
-    def bot_call(self, method, *args, guild_id=None, **kwargs):
+    @property
+    def session(self):
+        if self._session is None:
+            self._session = get_db()
+        return self._session
 
-        if guild_id is not None:
-            # TODO please remove this terrible line
-            args = (guild_id,) + args
+    def shard_call(self, method, *args, routing_guild=None, **kwargs):
 
-        if guild_id is not None:
-            shard_id = (guild_id >> 22) % NUM_SHARDS
+        if routing_guild is not None:
+            shard_id = (routing_guild >> 22) % NUM_SHARDS
         else:
             shard_id = random.randint(0, NUM_SHARDS - 1)
 
-        print("calling garb")
-
-        return self.client.call(method, *args, routing_key=shard_id, **kwargs)
-
-    def bot_call_a(self, method, *args, guild_id=None):
-        if guild_id is not None:
-            args = (guild_id,) + args
-
-        while True:
-            try:
-                msg_id = self.send({'method': method, 'args': args}, guild_id=guild_id)
-                data, sc = self.recv()
-                if data['id'] == msg_id:
-                    return data, sc
-                print(f"WARNING - got a message with id:{data['id']}, was expecting {msg_id}")
-            except zmq.error.Again as e:
-                print(f"ERROR - caught {e} while reading from bot - probably a timeout?")
-                return {'message': "Internal Server Error"}, StatusCodes.INTERNAL_SERVER_ERROR_500
-
-    def send(self, call, guild_id):
-        call['topic'] = self.topic
-        call['id'] = secrets.randbits(12)
-        if guild_id is not None:
-            shard_id = (guild_id >> 22) % NUM_SHARDS
-        else:
-            shard_id = random.randint(0, NUM_SHARDS - 1)
-        print(f"sending {shard_id} {json.dumps(call)}")
-        self.pub.send_string(f"{shard_id} {json.dumps(call)}")
-        return call['id']
-
-    def recv(self):
-        data = json.loads(self.sub.recv_string()[len(str(self.topic)) + 1:])
-        try:
-            sc = data.pop("status_code", StatusCodes.OK_200)
-        except TypeError:
-            sc = StatusCodes.OK_200
-        except AttributeError:
-            sc = StatusCodes.OK_200
-        print(f"{self.topic} recv data from bot")
-        return data, sc
+        return self.client.call(
+            method,
+            *args,
+            routing_key=f"shard_rpc_{shard_id}",
+            **kwargs
+        )
 
 
 class Login(CustomResource):
@@ -178,12 +143,12 @@ class RedirectCallback(CustomResource):
 
 class User(CustomResource):
     def get(self, name):
-        return self.bot_call('fetch_user_dict', name)
+        return self.shard_call('fetch_user_dict', name)
 
 
 class GuildCounter(CustomResource):
     def get(self):
-        return self.bot_call('guild_counter')
+        return self.shard_call('guild_counter')
 
 
 class Logs(CustomResource):
@@ -222,9 +187,9 @@ class AutoResponses(CustomResource):
             })
             match = p.search(cmd.response)
             if match and str(match.group("emoji_id")) not in emojis:
-                emojis[str(match.group("emoji_id"))], sc = self.bot_call('get_emoji', match.group('emoji_id'))
+                emojis[str(match.group("emoji_id"))], sc = self.shard_call('get_emoji', match.group('emoji_id'))
             if str(cmd.author_id) not in authors:
-                authors[str(cmd.author_id)], sc = self.bot_call('fetch_user_dict', cmd.author_id)
+                authors[str(cmd.author_id)], sc = self.shard_call('fetch_user_dict', cmd.author_id)
 
         resp = {
             'authors': authors,
@@ -242,7 +207,14 @@ class AutoResponses(CustomResource):
         if args.get('trigger') is None or args.get('response') is None:
             return "Malformed request", StatusCodes.BAD_REQUEST_400
 
-        return self.bot_call('set_response', user_id, args.get('trigger'), args.get('response'), guild_id=guild_id)
+        return self.shard_call(
+            'set_response',
+            user_id,
+            guild_id,
+            args.get('trigger'),
+            args.get('response'),
+            routing_guild=guild_id
+        )
 
     @authenticated
     def delete(self, user_id, guild_id):
@@ -252,13 +224,10 @@ class AutoResponses(CustomResource):
         if args.get('trigger') is None:
             return "Malformed request", StatusCodes.BAD_REQUEST_400
 
-        return self.bot_call('delete_response', user_id, args.get('trigger'), guild_id=guild_id)
+        return self.shard_call('delete_response', user_id, guild_id, args.get('trigger'), routing_guild=guild_id)
 
-    def patch(self, guild_id):
-        row = authenticate(self.session, request.headers)
-        if row is None:
-            return "not authorized", 401
-        user_id = row.discord_id
+    @authenticated
+    def patch(self, user_id, guild_id):
         parser = reqparse.RequestParser()
         parser.add_argument('trigger')
         parser.add_argument('response')
@@ -266,10 +235,22 @@ class AutoResponses(CustomResource):
         if args.get('trigger') is None or args.get('response') is None:
             return "Malformed request", 400
 
-        self.enqueue({'method': "delete_response", 'args': [user_id, guild_id, args.get('trigger')]})
-        self.recv()
-        self.enqueue({'method': "set_response", 'args': [user_id, guild_id, args.get('trigger'), args.get('response')]})
-        return self.recv()
+        _, sc = self.shard_call(
+            'delete_response',
+            user_id,
+            guild_id,
+            args.get('trigger'),
+            routing_guild=guild_id
+        )
+
+        return self.shard_call(
+            'set_response',
+            user_id,
+            guild_id,
+            args.get('trigger'),
+            args.get('response'),
+            routing_guild=guild_id
+        )
 
 
 class Settings(CustomResource):
@@ -278,7 +259,7 @@ class Settings(CustomResource):
             with open('settings.json') as f:
                 return json.loads(f.read()), 200
         # discord_id = authenticate(self.session, request.headers).discord_id
-        return self.bot_call('settings_access', setting, None, guild_id=guild_id)
+        return self.shard_call('settings_access', guild_id, setting, None, routing_guild=guild_id)
 
     def post(self, guild_id, setting):
         # parser = reqparse.RequestParser()
@@ -292,13 +273,13 @@ class Coggers(CustomResource):
     @authenticated
     def get(self, user_id, extension=None):
         if user_id == 214037134477230080:
-            return self.bot_call('get_extensions')
+            return self.shard_call('get_extensions')
         return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
     @authenticated
     def post(self, user_id, extension):
         if user_id == 214037134477230080:
-            return self.bot_call('reload_extension', extension)
+            return self.shard_call('reload_extension', extension)
         return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
 
@@ -315,7 +296,7 @@ class Identify(Resource):
 class Stats(CustomResource):
     def get(self, guild_id, stat):
         if stat == 'messagecount':
-            return self.bot_call('messagecount', guild_id=guild_id)
+            return self.shard_call('messagecount', guild_id, routing_guild=guild_id)
 
 
 class ListGuilds(CustomResource):
@@ -330,7 +311,7 @@ class ListGuilds(CustomResource):
             }
             r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
             if r.status_code == StatusCodes.OK_200:
-                resp, sc = self.bot_call('tag_autbot_guilds', r.json(), row.discord_id)
+                resp, sc = self.shard_call('tag_autbot_guilds', r.json(), row.discord_id)
             else:
                 resp = r.json()
             return resp, r.status_code

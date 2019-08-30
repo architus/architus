@@ -7,10 +7,9 @@ from pytz import timezone
 
 from src.user_command import UserCommand
 from src.smart_message import smart_message
-from src.communicators import Comms
-from src.pika_adapter import main
 from lib.config import get_session, secret_token
 from lib.models import Command
+from lib import async_rpc_server, async_rpc_client, blocking_rpc_client
 
 starboarded_messages = []
 
@@ -22,18 +21,28 @@ class Architus(Bot):
         self.session = get_session()
         self.tracked_messages = {}
 
-        self.comm = Comms()
-        self.broadcast = self.comm.event_broadcaster
-        shard_info = self.comm.register_shard()
+        manager_client = blocking_rpc_client.shardRPC()
+        print("asking for shard id")
+        shard_info, sc = manager_client.call('register', routing_key='manager_rpc')
         self.shard_id = shard_info['shard_id']
+        print(f"Got shard_id {self.shard_id}")
 
         kwargs.update(shard_info)
         super().__init__(**kwargs)
 
     def run(self, token):
         self.loop.create_task(self.list_guilds())
-        #self.loop.create_task(self.get_cog('Api').api_entry())
-        self.loop.create_task(main(self))
+        self.loop.create_task(
+            async_rpc_server.start_server(
+                self.loop,
+                f'shard_rpc_{self.shard_id}',
+                self.get_cog('Api').api_entry
+            )
+        )
+
+        self.manager_client = async_rpc_client.shardRPC(self.loop, default_key='manager_rpc')
+        self.loop.create_task(self.manager_client.connect())
+
         super().run(token)
 
     async def on_reaction_add(self, react, user):
@@ -130,7 +139,7 @@ class Architus(Bot):
                     'admin_ids': settings.admins_ids
                 })
                 # TODO this should happen on update not every 600 seconds
-            await self.comm.manager_request('guild_update', guilds)
+            await self.manager_client.call('guild_update', self.shard_id, guilds)
             await asyncio.sleep(600)
 
     async def starboard_post(self, message, guild):
