@@ -5,15 +5,15 @@ import requests
 import json
 import os
 import re
-import secrets
 import random
-from datetime import datetime, timedelta
+from datetime import datetime
 from uuid import getnode
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, client_secret, get_session, NUM_SHARDS
+from lib.config import client_id, get_session, NUM_SHARDS
 from lib.blocking_rpc_client import get_rpc_client
 from lib.models import AppSession, Command, Log
+from auth import JWT, discord_identify_request, token_exchange_request
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://api.archit.us/redirect'
@@ -40,20 +40,6 @@ def teardown_db(arg):
 @app.route('/issue')
 def issue():
     return redirect('https://github.com/architus/architus/issues/new')
-
-
-def authenticated(func):
-    """decorator for rest endpoint functions
-    returns 401 if user is not logged in
-    and prepends their discord id to the arguments if identification is necessary
-    """
-    def authed_func(self, *args, **kwargs):
-        row = authenticate(get_db(), request.headers)
-        if row is None:
-            return (StatusCodes.UNAUTHORIZED_401, "Not Authorized")
-        self.discord_token = row.discord_token
-        return func(self, row.discord_id, *args, **kwargs)
-    return authed_func
 
 
 def authenticate(session, headers):
@@ -205,7 +191,7 @@ class AutoResponses(CustomResource):
         return resp, StatusCodes.OK_200
 
     @authenticated
-    def post(self, user_id, guild_id):
+    def post(self, guild_id, jwt=None):
         parser = reqparse.RequestParser()
         parser.add_argument('trigger')
         parser.add_argument('response')
@@ -215,7 +201,7 @@ class AutoResponses(CustomResource):
 
         return self.shard_call(
             'set_response',
-            user_id,
+            jwt.id,
             guild_id,
             args.get('trigger'),
             args.get('response'),
@@ -223,14 +209,14 @@ class AutoResponses(CustomResource):
         )
 
     @authenticated
-    def delete(self, user_id, guild_id):
+    def delete(self, guild_id, jwt=None):
         parser = reqparse.RequestParser()
         parser.add_argument('trigger')
         args = parser.parse_args()
         if args.get('trigger') is None:
             return "Malformed request", StatusCodes.BAD_REQUEST_400
 
-        return self.shard_call('delete_response', user_id, guild_id, args.get('trigger'), routing_guild=guild_id)
+        return self.shard_call('delete_response', jwt.id, guild_id, args.get('trigger'), routing_guild=guild_id)
 
     @authenticated
     def patch(self, user_id, guild_id):
@@ -325,64 +311,31 @@ class ListGuilds(CustomResource):
         return "token invalid or expired", StatusCodes.UNAUTHORIZED_401
 
 
-def commit_tokens(autbot_token, discord_token, refresh_token, expires_in, discord_id):
-    session = get_db()
-    time = datetime.now() + timedelta(seconds=int(expires_in) - 60)
-    new_appsession = AppSession(autbot_token, discord_token, refresh_token, time, time, discord_id, datetime.now())
-    session.add(new_appsession)
-    session.commit()
-
-
-def discord_identify_request(token):
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': f"Bearer {token}"
-    }
-    r = requests.get('%s/users/@me' % API_ENDPOINT, headers=headers)
-    return r.json(), r.status_code
-
-
 @app.route('/token_exchange', methods=['POST'])
 def token_exchange():
     parser = reqparse.RequestParser()
     parser.add_argument('code')
     args = parser.parse_args()
-    data = {
-        'client_id': client_id,
-        'client_secret': client_secret,
-        'grant_type': 'authorization_code',
-        'code': args['code'],
-        'redirect_uri': REDIRECT_URI,
-        'scope': 'identify'
-    }
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded'
-    }
-    r = requests.post('%s/oauth2/token' % API_ENDPOINT, data=data, headers=headers)
-    resp_data = r.json()
-    print(r.status_code)
-    print(r.text)
-    if r.status_code == StatusCodes.OK_200:
-        print(resp_data)
+    ex_data, status_code = token_exchange_request(args['code'])
+    discord_token = ex_data['access_token']
 
-        discord_token = resp_data['access_token']
-        autbot_token = secrets.token_urlsafe()
-        expires_in = resp_data['expires_in']
-        refresh_token = resp_data['refresh_token']
-
-        resp_data, status_code = discord_identify_request(discord_token)
+    if status_code == StatusCodes.OK_200:
+        id_data, status_code = discord_identify_request(discord_token)
         if status_code == StatusCodes.OK_200:
-            print(resp_data)
-            commit_tokens(autbot_token, discord_token, refresh_token, expires_in, resp_data['id'])
-            return json.dumps({
-                'access_token': autbot_token,
-                'expires_in': expires_in,
-                'username': resp_data['username'],
-                'discriminator': resp_data['discriminator'],
-                'avatar': resp_data['avatar'],
-                'id': resp_data['id']
-            }), StatusCodes.OK_200
-    return json.dumps(resp_data), r.status_code
+            data = {
+                'access_token': discord_token,
+                'expires_in': ex_data['expires_in'],
+                'refresh_token': ex_data['refresh_token'],
+                'username': id_data['username'],
+                'discriminator': id_data['discriminator'],
+                'avatar': id_data['avatar'],
+                'id': id_data['id'],
+            }
+            jwt = JWT(data.copy())
+            data.update({'access_token': jwt.get_token()})
+            return json.dumps(data), StatusCodes.OK_200
+
+    return json.dumps(ex_data), status_code
 
 
 @app.route('/status', methods=['GET'])
