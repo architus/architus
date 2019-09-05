@@ -5,14 +5,15 @@ WORKDIR /app
 COPY ./websocket/requirements.txt /app
 
 # Copy the current directory contents into the container at /app
-RUN apk update && apk add linux-headers pcre-dev uwsgi-python3
-RUN apk add build-base libzmq musl-dev python3 zeromq-dev
+RUN apk update && apk add python3 linux-headers pcre-dev uwsgi-python3
+# RUN apk add build-base libzmq musl-dev python3 zeromq-dev
 RUN apk add --virtual build-deps gcc python3-dev musl-dev postgresql-dev
 
 
 # Install any needed packages specified in requirements.txt
 RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
-RUN apk del build-base musl-dev python3-dev zeromq-dev
+# RUN apk del build-base musl-dev python3-dev zeromq-dev
+RUN apk del python3-dev
 
 COPY ./websocket/ /app/
 COPY ./lib /app/lib

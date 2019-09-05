@@ -1,10 +1,15 @@
 import jwt as pyjwt
+import requests
+# from datetime import datetime
+from flask import request
 
 # from lib.config import jwt_secret
 from lib.status_codes import StatusCodes
+from lib.config import client_id, client_secret
+from lib.config import REDIRECT_URI, API_ENDPOINT
 
 
-def authenticated(func):
+def flask_authenticated(func):
     """decorator for rest endpoint functions
     returns 401 if user is not logged in
     and prepends a JWT object to the kwargs for id data
@@ -12,6 +17,7 @@ def authenticated(func):
     def authed_func(self, *args, **kwargs):
         try:
             jwt = JWT(jwt=request.headers['Authorization'])
+            # TODO check token expiration
         except jwt.exceptions.InvalidTokenError:
             return (StatusCodes.UNAUTHORIZED_401, "Not Authorized")
         return func(self, *args, jwt=jwt, **kwargs)
@@ -23,13 +29,14 @@ def token_exchange_request(code):
         'client_id': client_id,
         'client_secret': client_secret,
         'grant_type': 'authorization_code',
-        'code': args['code'],
+        'code': code,
         'redirect_uri': REDIRECT_URI,
         'scope': 'identify',
     }
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     r = requests.post('%s/oauth2/token' % API_ENDPOINT, data=data, headers=headers)
     return r.json(), r.status_code
+
 
 def discord_identify_request(token):
     headers = {
@@ -41,22 +48,23 @@ def discord_identify_request(token):
 
 
 class JWT:
-    def __init__(self, data=None, jwt=None):
-        assert data is not None or jwt is not None
+    def __init__(self, data=None, token=None):
+        assert data is not None or token is not None
 
         if data is None:
-            self._data = self._decode(jwt)
+            self._data = self._decode(token)
         else:
             self._data = data
+        print(f"new jwt: {self._data}")
 
-        self._jwt = jwt
-        self._dirty = jwt is None
+        self._token = token
+        self._dirty = token is None
 
     def get_token(self):
         if self._dirty:
-            self._jwt = self._encode(self.data)
+            self._token = self._encode(self.data)
             self._dirty = False
-        return self._jwt
+        return self._token
 
     def __getattr__(self, name):
         try:
@@ -68,8 +76,8 @@ class JWT:
         self._dirty = True
         self._data[name] = value
 
-    def _decode(self, jwt):
-        data = pyjwt.decode(encoded_jwt, 'secret', alorgithms='HS256')
+    def _decode(self, token):
+        return pyjwt.decode(token, 'secret', alorgithms='HS256')
 
     def _encode(self, payload):
         return pyjwt.encode(payload, 'secret', algorithm='HS256')

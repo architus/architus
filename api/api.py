@@ -6,14 +6,13 @@ import json
 import os
 import re
 import random
-from datetime import datetime
 from uuid import getnode
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, get_session, NUM_SHARDS
+from lib.config import client_id, get_session, NUM_SHARDS, which_shard
 from lib.blocking_rpc_client import get_rpc_client
-from lib.models import AppSession, Command, Log
-from auth import JWT, discord_identify_request, token_exchange_request
+from lib.models import Command, Log
+from lib.auth import JWT, discord_identify_request, token_exchange_request, flask_authenticated as authenticated
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://api.archit.us/redirect'
@@ -42,19 +41,6 @@ def issue():
     return redirect('https://github.com/architus/architus/issues/new')
 
 
-def authenticate(session, headers):
-    """lookup a token in the database"""
-    try:
-        autbot_token = headers['Authorization']
-    except KeyError:
-        return None
-    rows = session.query(AppSession).filter_by(autbot_access_token=autbot_token).all()
-    for row in rows:
-        if datetime.now() < row.autbot_expiration:
-            return row
-    return None
-
-
 class CustomResource(Resource):
     """Default flask Resource but contains tools to talk to the shard nodes and the db"""
     def __init__(self):
@@ -69,22 +55,17 @@ class CustomResource(Resource):
         return self._session
 
     def shard_call(self, method, *args, routing_guild=None, **kwargs):
-
-        if routing_guild is not None:
-            shard_id = (routing_guild >> 22) % NUM_SHARDS
-        else:
-            shard_id = random.randint(0, NUM_SHARDS - 1)
-
         return self.client.call(
             method,
             *args,
-            routing_key=f"shard_rpc_{shard_id}",
+            routing_key=f"shard_rpc_{which_shard(routing_guild)}",
             **kwargs
         )
 
 
 class Login(CustomResource):
     def get(self):
+        # TODO don't redirect to the staging api on production
         response = redirect(f'https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
                             'https%3A%2F%2Fapi.archit.us%3A8000%2Fredirect&response_type=code&scope=identify%20guilds')
         # TODO nice validation
@@ -146,8 +127,6 @@ class GuildCounter(CustomResource):
 class Logs(CustomResource):
     def get(self, guild_id):
         # TODO this should probably be authenticated
-        if authenticate(self.session, request.headers) is None and False:
-            return "not authorized", StatusCodes.UNAUTHORIZED_401
         rows = self.session.query(Log).filter(Log.guild_id == guild_id).order_by(Log.timestamp.desc()).limit(400).all()
         logs = []
         for log in rows:
@@ -163,8 +142,6 @@ class Logs(CustomResource):
 class AutoResponses(CustomResource):
     def get(self, guild_id):
         # TODO this should probably be authenticated
-        if authenticate(self.session, request.headers) is None and False:
-            return "not authorized", StatusCodes.UNAUTHORIZED_401
         rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
         commands = []
         authors = {}
@@ -191,7 +168,7 @@ class AutoResponses(CustomResource):
         return resp, StatusCodes.OK_200
 
     @authenticated
-    def post(self, guild_id, jwt=None):
+    def post(self, guild_id, jwt):
         parser = reqparse.RequestParser()
         parser.add_argument('trigger')
         parser.add_argument('response')
@@ -209,7 +186,7 @@ class AutoResponses(CustomResource):
         )
 
     @authenticated
-    def delete(self, guild_id, jwt=None):
+    def delete(self, guild_id, jwt):
         parser = reqparse.RequestParser()
         parser.add_argument('trigger')
         args = parser.parse_args()
@@ -219,7 +196,7 @@ class AutoResponses(CustomResource):
         return self.shard_call('delete_response', jwt.id, guild_id, args.get('trigger'), routing_guild=guild_id)
 
     @authenticated
-    def patch(self, user_id, guild_id):
+    def patch(self, guild_id, jwt):
         parser = reqparse.RequestParser()
         parser.add_argument('trigger')
         parser.add_argument('response')
@@ -229,7 +206,7 @@ class AutoResponses(CustomResource):
 
         _, sc = self.shard_call(
             'delete_response',
-            user_id,
+            jwt.id,
             guild_id,
             args.get('trigger'),
             routing_guild=guild_id
@@ -237,7 +214,7 @@ class AutoResponses(CustomResource):
 
         return self.shard_call(
             'set_response',
-            user_id,
+            jwt.id,
             guild_id,
             args.get('trigger'),
             args.get('response'),
@@ -263,26 +240,22 @@ class Settings(CustomResource):
 class Coggers(CustomResource):
     '''provide an endpoint to reload cogs in the bot'''
     @authenticated
-    def get(self, user_id, extension=None):
-        if user_id == 214037134477230080:
+    def get(self, jwt=None, extension=None):
+        if jwt.id == 214037134477230080:
             return self.shard_call('get_extensions')
         return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
     @authenticated
-    def post(self, user_id, extension):
-        if user_id == 214037134477230080:
+    def post(self, extension, jwt):
+        if jwt.id == 214037134477230080:
             return self.shard_call('reload_extension', extension)
         return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
 
 class Identify(Resource):
-
-    def get(self):
-        row = authenticate(get_db(), request.headers)
-        if row and row.discord_access_token:
-            return discord_identify_request(row.discord_access_token)
-
-        return "token invalid or expired", StatusCodes.UNAUTHORIZED_401
+    @authenticated
+    def get(self, jwt):
+        return discord_identify_request(jwt.access_token)
 
 
 class Stats(CustomResource):
@@ -293,22 +266,18 @@ class Stats(CustomResource):
 
 class ListGuilds(CustomResource):
 
-    def get(self):
-        row = authenticate(self.session, request.headers)
-        discord_token = row.discord_access_token
-        if discord_token:
-            headers = {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': f"Bearer {discord_token}"
-            }
-            r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
-            if r.status_code == StatusCodes.OK_200:
-                resp, sc = self.shard_call('tag_autbot_guilds', r.json(), row.discord_id)
-            else:
-                resp = r.json()
-            return resp, r.status_code
-
-        return "token invalid or expired", StatusCodes.UNAUTHORIZED_401
+    @authenticated
+    def get(self, jwt):
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': f"Bearer {jwt.access_token}"
+        }
+        r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
+        if r.status_code == StatusCodes.OK_200:
+            resp, _ = self.shard_call('tag_autbot_guilds', r.json(), jwt.id)
+        else:
+            resp = r.json()
+        return resp, r.status_code
 
 
 @app.route('/token_exchange', methods=['POST'])

@@ -1,4 +1,5 @@
 import os
+from random import randint
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 """
@@ -7,6 +8,10 @@ This file loads the environment secrets into memory and also manages database co
 
 DB_HOST = 'postgres'
 DB_PORT = 5432
+
+API_ENDPOINT = 'https://discordapp.com/api/v6'
+# REDIRECT_URI = 'https://api.archit.us/redirect'
+REDIRECT_URI = 'https://api.archit.us:8000/redirect'
 
 try:
     NUM_SHARDS = int(os.environ['NUM_SHARDS'])
@@ -32,3 +37,6 @@ def get_session():
     print("creating a new db session")
     Session = sessionmaker(bind=engine)
     return Session()
+
+def which_shard(guild_id=None):
+    return randint(0, NUM_SHARDS - 1) if guild_id is None else (guild_id >> 22) % NUM_SHARDS
