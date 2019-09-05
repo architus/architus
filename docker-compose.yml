@@ -92,7 +92,10 @@ services:
     networks:
       - webnet
   rabbit:
-    image: rabbitmq:3.7.17-management-alpine
+    image: johnyburd/rabbit
+    build:
+      context: ./
+      dockerfile: ./rabbitmq/Dockerfile
     hostname: "rabbit"
     ports:
       - "8090:15672"

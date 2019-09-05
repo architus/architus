@@ -46,7 +46,7 @@ class Manager:
 
     async def guild_update(self, shard_id, guilds):
         """Update the manager with the latest information about a shard's guilds"""
-        print("someone sent guild list containing {len(guilds)} guilds")
+        print(f"someone sent guild list containing {len(guilds)} guilds")
         self.store[int(shard_id)]['guilds'] = guilds
         return {"message": "thanks"}
 

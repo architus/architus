@@ -138,7 +138,7 @@ class Api(Cog):
         return {'value': "unknown setting"}, sc.NOT_FOUND_404
 
     async def tag_autbot_guilds(self, guild_list, user_id):
-        all_guilds = await self.bot.comm.manager_request('all_guilds')
+        all_guilds = await self.bot.manager_client.call('all_guilds')
         for guild_dict in guild_list:
             for guild in all_guilds:
                 if str(guild['id']) == guild_dict['id']:
