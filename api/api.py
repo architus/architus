@@ -286,9 +286,9 @@ def token_exchange():
     parser.add_argument('code')
     args = parser.parse_args()
     ex_data, status_code = token_exchange_request(args['code'])
-    discord_token = ex_data['access_token']
 
     if status_code == StatusCodes.OK_200:
+        discord_token = ex_data['access_token']
         id_data, status_code = discord_identify_request(discord_token)
         if status_code == StatusCodes.OK_200:
             data = {
@@ -301,7 +301,8 @@ def token_exchange():
                 'id': id_data['id'],
             }
             jwt = JWT(data.copy())
-            data.update({'access_token': jwt.get_token()})
+            data.update({'access_token': jwt.get_token().decode()})
+            print(data)
             return json.dumps(data), StatusCodes.OK_200
 
     return json.dumps(ex_data), status_code

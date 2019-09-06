@@ -39,4 +39,4 @@ def get_session():
     return Session()
 
 def which_shard(guild_id=None):
-    return randint(0, NUM_SHARDS - 1) if guild_id is None else (guild_id >> 22) % NUM_SHARDS
+    return randint(0, NUM_SHARDS - 1) if guild_id is None else (int(guild_id) >> 22) % NUM_SHARDS

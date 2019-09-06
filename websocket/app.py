@@ -1,4 +1,5 @@
 from aiohttp import web
+import asyncio
 import socketio
 
 from lib.config import which_shard
@@ -11,7 +12,7 @@ app = web.Application()
 sio.attach(app)
 
 
-shard_client = shardRPC(app.loop)
+shard_client = shardRPC(asyncio.get_event_loop())
 # @asyncio.coroutine
 # def background_task():
 #     """Example of how to send server generated events to clients."""
@@ -46,11 +47,22 @@ async def my_broadcast_event(sid, message):
 @sio.event
 async def join(sid, message):
     guild_id = message['room']
+    print("decoding jwt...")
     jwt = JWT(token=message['jwt'])
-    resp, _ = shard_client.call('is_member', jwt.id, guild_id, routing_key=f"shard_rpc_{which_shard(guild_id)}")
-    sio.enter_room(sid, message['room'])
-    await sio.emit('my_response', {'data': 'Entered room: ' + message['room']},
-                   room=sid)
+    print("checking membership...")
+    resp, _ = await shard_client.call('is_member', jwt.id, guild_id, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+    print(resp)
+    if resp['member']:
+        sio.enter_room(sid, message['room'])
+        await sio.emit('my_response', {'data': 'Entered room: ' + message['room']}, room=sid)
+    else:
+        await sio.emit('my_response', {'data': 'You don\'t have permission to enter: ' + message['room']}, room=sid)
+
+
+@sio.event
+async def interpret(sid, msg, **k):
+    resp, _ = await shard_client.call('interpret', **msg, routing_key=f"shard_rpc_{which_shard()}")
+    await sio.emit('my_response', resp)
 
 
 @sio.event
@@ -95,5 +107,5 @@ app.router.add_get('/', index)
 
 
 if __name__ == '__main__':
-    # sio.start_background_task(background_task)
+    sio.start_background_task(shard_client.connect)
     web.run_app(app, host='0.0.0.0', port='6000')

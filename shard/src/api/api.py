@@ -71,7 +71,7 @@ class Api(Cog):
         guild_settings = self.bot.get_cog("GuildSettings")
         if not guild:
             return {'member': False}, 200
-        settings = guild_settings.get_guild(guild, self.bot.session)
+        settings = self.bot.settings[guild]
         return {
             'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)
         }, sc.OK_200

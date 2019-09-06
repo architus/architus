@@ -16,7 +16,7 @@ def flask_authenticated(func):
     """
     def authed_func(self, *args, **kwargs):
         try:
-            jwt = JWT(jwt=request.headers['Authorization'])
+            jwt = JWT(token=request.headers['Authorization'])
             # TODO check token expiration
         except jwt.exceptions.InvalidTokenError:
             return (StatusCodes.UNAUTHORIZED_401, "Not Authorized")
@@ -55,14 +55,13 @@ class JWT:
             self._data = self._decode(token)
         else:
             self._data = data
-        print(f"new jwt: {self._data}")
 
         self._token = token
         self._dirty = token is None
 
     def get_token(self):
         if self._dirty:
-            self._token = self._encode(self.data)
+            self._token = self._encode(self._data)
             self._dirty = False
         return self._token
 
@@ -71,10 +70,6 @@ class JWT:
             return self._data[name]
         except KeyError:
             raise AttributeError(f"no such attribute {name}") from None
-
-    def __setattr__(self, name, value):
-        self._dirty = True
-        self._data[name] = value
 
     def _decode(self, token):
         return pyjwt.decode(token, 'secret', alorgithms='HS256')

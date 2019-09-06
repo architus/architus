@@ -43,6 +43,8 @@ class shardRPC:
         future = self.loop.create_future()
 
         self.futures[correlation_id] = future
+        if self.channel is None:
+            await self.connect()
 
         await self.channel.default_exchange.publish(
             Message(
