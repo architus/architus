@@ -10,15 +10,19 @@ start_timer = None
 @sio.event
 async def connect():
     print("connected to server...\njoining room '607606128985112596'...")
-    await sio.emit('join', {'room': '607606128985112596'})
-    #await send_ping()
-    #await asyncio.sleep(10)
-    #await sio.emit('leave', {'room': '123456789'})
+    await sio.emit('join', {'room': '607606128985112596', 'jwt': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhY2Nlc3NfdG9rZW4iOiJldmw4QmxMTWVtSjVrbHFHWFRZM01sRTNiQ2tiSFYiLCJleHBpcmVzX2luIjo2MDQ4MDAsInJlZnJlc2hfdG9rZW4iOiIyOU5vcjNmWWpsUFUyTEZ0R0pwZk04eHdJOVd3akciLCJ1c2VybmFtZSI6ImpvaG55YnVyZCIsImRpc2NyaW1pbmF0b3IiOiIxMDIyIiwiYXZhdGFyIjoiOWNlNWEwMDY1NDhmMWFlM2U1YzhmYjkxYTRkNjc3ZTQiLCJpZCI6IjIxNDAzNzEzNDQ3NzIzMDA4MCJ9.yuAbfPFavctPy5R3lauPN6BLM-D__557SksLLjC3bzc'})
+
+    print("'interpret', {'content': '!schedule event 12pm', 'guild_id': 1234, 'message_id': 1, 'allowed_commands': ['schedule']})")
+    await sio.emit('interpret', {'content': '!schedule event 12pm', 'guild_id': 1234, 'message_id': 1, 'allowed_commands': ['schedule']})
 
 @sio.event
 async def cool_event(data):
     print("I got an event")
     print(data)
+
+@sio.event
+async def my_response(data):
+    print(f'recv: {data}')
 
 @sio.event
 async def pong_from_server(data):
@@ -31,7 +35,7 @@ async def pong_from_server(data):
 
 async def start_server():
     print('hello I\'m a UI :)')
-    await sio.connect('http://127.0.0.1:6000')
+    await sio.connect('https://ws.archit.us:8000')
     await sio.wait()
 
 
