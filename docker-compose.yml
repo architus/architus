@@ -48,6 +48,8 @@ services:
     build:
       context: ./
       dockerfile: ./websocket/Dockerfile
+    env_file:
+      - architus.env
     ports:
       - "6000:6000"
     networks:
