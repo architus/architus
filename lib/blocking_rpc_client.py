@@ -5,7 +5,8 @@ import uuid
 
 connkeeper = {}
 credentials = pika.PlainCredentials('hello', 'hello')
-parameters = pika.ConnectionParameters('rabbit', 5672, '/', credentials)
+# TODO heartbeat should really, really not be disabled this is very bad
+parameters = pika.ConnectionParameters('rabbit', 5672, '/', credentials, heartbeat=0)
 
 
 def get_rpc_client(id):
