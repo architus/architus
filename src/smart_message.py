@@ -49,7 +49,7 @@ class smart_message:
         title = "last %d edits" % (len(self.edits))
         lem = ListEmbed(title, self.ogtime.strftime("%m/%d %I:%M %p"), self.most_recent.author)
         for edit in self.edits:
-            est = self.get_datetime(edit.timestamp)
+            # est = self.get_datetime(edit.timestamp)
             lem.add(edit.timestamp.strftime("%I:%M:%S %p"), edit.content)
         return lem.get_embed()
 

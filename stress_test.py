@@ -3,10 +3,12 @@ from collections import Counter
 import requests
 from datetime import datetime
 
+
 def get(url):
     now = datetime.now()
     r = requests.get(url)
     return r, (datetime.now() - now).total_seconds()
+
 
 if __name__ == '__main__':
     num = 400
