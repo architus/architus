@@ -1,6 +1,7 @@
 from aiohttp import web
 import asyncio
 import socketio
+from functools import partial
 
 from lib.config import which_shard
 from lib.auth import JWT
@@ -34,9 +35,15 @@ async def index(request):
         text='this endpoint is for websockets only, get your http out of here', content_type='text/html')
 
 
+async def handle_event(msg):
+    with msg.process(): 
+        await sio.emit('recv_event', msg.body, room=msg.routing_key)
+        print(msg.routing_key)
+        print(msg.body)
+
 @sio.event
-async def my_event(sid, message):
-    await sio.emit('my_response', {'data': message['data']}, room=sid)
+async def event(sid, message):
+    await sio.emit('recv_event', {'data': message['data']}, room=sid)
 
 
 @sio.event
@@ -60,7 +67,7 @@ async def join(sid, message):
 
 
 @sio.event
-async def interpret(sid, msg, **k):
+async def interpret(sid, msg):
     resp, _ = await shard_client.call('interpret', **msg, routing_key=f"shard_rpc_{which_shard()}")
     await sio.emit('my_response', resp)
 

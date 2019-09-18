@@ -23,6 +23,8 @@ class Architus(Bot):
 
         manager_client = blocking_rpc_client.shardRPC()
         print("asking for shard id")
+        import time
+        time.sleep(1)
         shard_info, sc = manager_client.call('register', routing_key='manager_rpc')
         self.shard_id = shard_info['shard_id']
         print(f"Got shard_id {self.shard_id}")

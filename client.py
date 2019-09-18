@@ -35,7 +35,7 @@ async def pong_from_server(data):
 
 async def start_server():
     print('hello I\'m a UI :)')
-    await sio.connect('https://ws.archit.us:8000')
+    await sio.connect('https://ws.archit.us')
     await sio.wait()
 
 

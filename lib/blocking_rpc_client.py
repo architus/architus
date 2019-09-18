@@ -39,7 +39,8 @@ class shardRPC:
             try:
                 self.connection = pika.BlockingConnection(parameters)
                 return
-            except pika.exceptions.AMQPConnectionError as e:
+            #except pika.exceptions.AMQPConnectionError as e:
+            except Exception as e:
                 print(f"rabbit doesn't seem to be up, trying again in 1 {e}")
                 time.sleep(1)
 

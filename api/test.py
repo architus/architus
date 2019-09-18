@@ -1,7 +1,9 @@
 class Test:
+
     @property
     def x(self):
         return "hi"
+
     @x.setter
     def hi(self, value):
         print(f"got {value} for x")

@@ -60,6 +60,8 @@ services:
       POSTGRES_USER: autbot
       POSTGRES_PASSWORD: autism
       POSTGRES_DB: autbot
+    ports:
+      - "5432:5432"
     deploy:
       placement:
         constraints: [node.role == manager]
