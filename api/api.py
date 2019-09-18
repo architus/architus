@@ -45,7 +45,7 @@ class CustomResource(Resource):
         ctx = zmq.Context()
         self.topic = str(os.getpid())
         self.sub = ctx.socket(zmq.SUB)
-        self.sub.connect("tcp://127.0.0.1:7200")
+        self.sub.connect("tcp://127.0.0.1:7201")
         self.sub.setsockopt(zmq.SUBSCRIBE, self.topic.encode())
 
     def enqueue(self, call):
@@ -54,7 +54,12 @@ class CustomResource(Resource):
 
     def recv(self):
         data = json.loads(self.sub.recv().decode().replace(self.topic + ' ', ''))
-        sc = data.pop("status_code", 200)
+        try:
+            sc = data.pop("status_code", 200)
+        except TypeError:
+            sc = 200
+        except AttributeError:
+            sc = 200
         return data, sc
 
 
@@ -130,16 +135,16 @@ class Logs(CustomResource):
         # TODO this should probably be authenticated
         if authenticate(self.session, request.headers) is None and False:
             return "not authorized", 401
-        rows = self.session.query(Log).filter(Log.guild_id == guild_id).all()
+        rows = self.session.query(Log).filter(Log.guild_id == guild_id).order_by(Log.timestamp.desc()).limit(400).all()
         logs = []
         for log in rows:
             logs.append({
                 'type': log.type,
                 'content': log.content,
-                'user_id': log.user_id,
+                'user_id': str(log.user_id),
                 'timestamp': log.timestamp.isoformat()
             })
-        return logs, 200
+        return json.dumps({"logs": logs}), 200
 
 
 class AutoResponses(CustomResource):
@@ -203,6 +208,23 @@ class AutoResponses(CustomResource):
             return "Malformed request", 400
 
         self.enqueue({'method': "delete_response", 'args': [user_id, guild_id, args.get('trigger')]})
+        return self.recv()
+
+    def patch(self, guild_id):
+        row = authenticate(self.session, request.headers)
+        if row is None:
+            return "not authorized", 401
+        user_id = row.discord_id
+        parser = reqparse.RequestParser()
+        parser.add_argument('trigger')
+        parser.add_argument('response')
+        args = parser.parse_args()
+        if args.get('trigger') is None or args.get('response') is None:
+            return "Malformed request", 400
+
+        self.enqueue({'method': "delete_response", 'args': [user_id, guild_id, args.get('trigger')]})
+        self.recv()
+        self.enqueue({'method': "set_response", 'args': [user_id, guild_id, args.get('trigger'), args.get('response')]})
         return self.recv()
 
 

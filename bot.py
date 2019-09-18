@@ -24,6 +24,7 @@ class CoolBot(Bot):
         self.session = get_session()
         self.guild_counter = (0, 0)
         self.tracked_messages = {}
+        self.deletable_messages = []
         super().__init__(**kwargs)
 
     def run(self, token, q=None):
@@ -39,7 +40,7 @@ class CoolBot(Bot):
     def poll_requests(self, ctx):
         api = self.get_cog('Api')
         pub = ctx.socket(zmq.PUB)
-        pub.bind("tcp://127.0.0.1:7200")
+        pub.bind("tcp://127.0.0.1:7201")
         if self.q is not None:
             while True:
                 if not self.q.empty():
@@ -67,6 +68,20 @@ class CoolBot(Bot):
         if settings.edit_emoji in str(react.emoji) and react.count == 0:
             sm = self.tracked_messages[react.message.id]
             await sm.delete_popup()
+
+    async def on_message_delete(self, msg):
+        settings = self.guild_settings.get_guild(msg.guild, session=self.session)
+        if msg.id in self.deletable_messages:
+            self.deletable_messages.remove(msg.id)
+            return
+        if msg.author != self.user and settings.repost_del_msg:
+            utc = msg.created_at.replace(tzinfo=timezone('UTC'))
+            est = utc.astimezone(timezone('US/Eastern'))
+            em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=msg.content, colour=0x42f468)
+            em.set_author(name=msg.author.display_name, icon_url=msg.author.avatar_url)
+            repost = await msg.channel.send(embed=em)
+            if msg.id in self.tracked_messages:
+                self.tracked_messages[repost.id] = self.tracked_messages[msg.id]
 
     async def on_message_edit(self, before, after):
         if before.author == self.user:
@@ -112,6 +127,7 @@ class CoolBot(Bot):
             self.user_commands.setdefault(command.server_id, [])
             self.user_commands[command.server_id].append(UserCommand(
                 self.session,
+                self,
                 command.trigger.replace(str(command.server_id), '', 1),
                 command.response, command.count,
                 self.get_guild(command.server_id),
@@ -130,6 +146,9 @@ class CoolBot(Bot):
             guild_counter = 0
             user_counter = 0
             for guild in self.guilds:
+                me = guild.get_member(self.user.id)
+                if me.display_name == 'archit.us':
+                    await me.edit(nick='architus')
                 print("{} - {} ({})".format(guild.name, guild.id, guild.member_count))
                 guild_counter += 1
                 user_counter += guild.member_count

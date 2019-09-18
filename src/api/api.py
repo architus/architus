@@ -8,7 +8,7 @@ import re
 import discord
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
-from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
+from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command, UserLimitException
 
 CALLBACK_URL = "https://archit.us/app"
 
@@ -24,7 +24,7 @@ class Api(Cog):
         self.start_socket_listener()
 
     def start_socket_listener(self):
-        print("Starting websocket listener")
+        print("Starting websocket listener on port 8300")
         try:
             ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
@@ -37,24 +37,24 @@ class Api(Cog):
         self.bot.socket_task = asyncio.async(start_server)
 
     async def handle_socket(self, websocket, path):
+        print(f"Started websocket connection with {websocket.remote_address}")
         while True:
             try:
-                try:
-                    self = self.bot.get_cog("Api")
-                    data = json.loads(await websocket.recv())
-                    print("recvd: " + str(data))
-                    if data['_module'] == 'interpret':
-                        resp = await self.interpret(**data)
-                    else:
-                        resp = {'content': "Unknown module"}
-                except Exception as e:
-                    traceback.print_exc()
-                    print(f"caught {e} while handling websocket request")
-                    resp = {'content': f"caught {e} while handling websocket request"}
-                await websocket.send(json.dumps(resp))
+                self = self.bot.get_cog("Api")
+                data = json.loads(await websocket.recv())
+                # print("recvd: " + str(data))
+                if data['_module'] == 'interpret':
+                    resp = await self.interpret(**data)
+                else:
+                    resp = {'content': "Unknown module"}
             except websockets.exceptions.ConnectionClosed:
-                print("Websocket connection closed")
+                print(f"Websocket connection to {websocket.remote_address} closed. goodbye.")
                 return
+            except Exception as e:
+                traceback.print_exc()
+                print(f"caught {e} while handling websocket request")
+                resp = {'content': f"caught {e} while handling websocket request"}
+            await websocket.send(json.dumps(resp))
 
     @asyncio.coroutine
     def handle_request(self, pub, msg):
@@ -69,7 +69,7 @@ class Api(Cog):
     async def store_callback(self, nonce=None, url=None):
         assert nonce and url
         if not any(re.match(pattern, url) for pattern in (
-                r'https:\/\/[A-Fa-f0-9]{24}--architus\.netlify\.com\/app',
+                r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
                 r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
                 r'https:\/\/develop\.archit\.us\/app',
                 r'https:\/\/archit\.us\/app',
@@ -90,7 +90,7 @@ class Api(Cog):
     async def set_response(self, user_id, guild_id, trigger, response):
         guild = self.bot.get_guild(int(guild_id))
         try:
-            command = UserCommand(self.bot.session, trigger, response, 0, guild, user_id, new=True)
+            command = UserCommand(self.bot.session, self.bot, trigger, response, 0, guild, user_id, new=True)
         except VaguePatternError:
             msg = "Capture group too broad."
         except LongResponseException:
@@ -101,10 +101,21 @@ class Api(Cog):
             msg = "That response is protected, please use another."
         except DuplicatedTriggerException:
             msg = "Remove duplicated trigger first."
+        except UserLimitException as e:
+            msg = str(e)
         else:
             self.bot.user_commands[guild_id].append(command)
             msg = 'Sucessfully Set'
         return {'message': msg}
+
+    async def is_member(self, user_id, guild_id, admin=False):
+        '''check if user is a member or admin of the given guild'''
+        guild = self.bot.get_guild(int(guild_id))
+        guild_settings = self.bot.get_cog("GuildSettings")
+        if not guild:
+            return False
+        settings = guild_settings.get_guild(guild, self.bot.session)
+        return {'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)}
 
     async def delete_response(self, user_id, guild_id, trigger):
         guild = self.bot.get_guild(int(guild_id))
@@ -114,7 +125,7 @@ class Api(Cog):
                 self.bot.user_commands[guild_id].remove(oldcommand)
                 update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
                 return {'message': "Successfully Deleted"}
-        return {'message': "No such command."}
+        return {'message': "No such command.", 'status_code': 400}
 
     async def fetch_user_dict(self, id):
         usr = self.bot.get_user(int(id))
@@ -215,7 +226,7 @@ class Api(Cog):
                             help_text += f'```hi{args[1]} - {cmd.help}```'
                             break
                     except IndexError:
-                        help_text += '```load_cert_chain{}: {:>5}```\n'.format(cmd.name, cmd.help)
+                        help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
 
                 sends.append(help_text)
             else:
@@ -257,8 +268,8 @@ class Api(Cog):
             'edit': edit,
             'guild_id': guild_id,
         }
-        if resp['content']:
-            print(resp)
+        # if resp['content']:
+        #   print(resp)
         return resp
 
 
@@ -353,7 +364,7 @@ class MockMessage(object):
                 return react
 
     async def edit(self, content=None):
-        print("EDIT " + content)
+        # print("EDIT " + content)
         self.sends.append(content)
 
 

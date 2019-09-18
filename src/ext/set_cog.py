@@ -1,6 +1,7 @@
 from discord.ext import commands
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
+from src.user_command import UserLimitException
 from src.config import get_session
 import re
 import discord
@@ -52,7 +53,7 @@ class SetCog(commands.Cog, name="Auto Responses"):
         msg = "try actually reading the syntax"
         if parser:
             try:
-                command = UserCommand(self.session, parser.group(1), parser.group(2),
+                command = UserCommand(self.session, self.bot, parser.group(1), parser.group(2),
                                       0, ctx.guild, ctx.author.id, new=True)
             except VaguePatternError:
                 msg = "let's try making that a little more specific please"
@@ -63,6 +64,8 @@ class SetCog(commands.Cog, name="Auto Responses"):
                     msg = "please use `!remove` instead"
                 elif parser.group(2).strip() in ("author", "list"):
                     msg = f"please check https://aut-bot.com/app/{ctx.guild.id}/responses"
+            except UserLimitException as e:
+                msg = str(e)
             except DuplicatedTriggerException:
                 msg = "That's a dupe idiot"
             else:

@@ -2,6 +2,7 @@ import random
 import emoji as emojitool
 import re
 from sqlalchemy.exc import IntegrityError
+from collections import Counter
 from src.models import Command
 GROUP_LIMIT = 1
 
@@ -24,7 +25,8 @@ def update_command(session, triggerkey, response, count, guild, author_id, delet
 
 
 class UserCommand:
-    def __init__(self, session, trigger, response, count, guild, author_id, new=False):
+    def __init__(self, session, bot, trigger, response, count, guild, author_id, new=False):
+        self.bot = bot
         self.session = session
         self.raw_trigger = self.filter_trigger(trigger)
         self.raw_response = emojitool.demojize(response)
@@ -44,12 +46,18 @@ class UserCommand:
                 raise DuplicatedTriggerException(self.raw_trigger)
 
     def validate_new_command(self):
+        settings = self.bot.get_cog("GuildSettings").get_guild(self.server)
         if len(self.raw_trigger) < 2:
             raise ShortTriggerException("Please use a longer trigger")
-        if len(self.raw_response) > 200:
+        if len(self.raw_response) > 200 and self.author_id not in settings.admin_ids:
             raise LongResponseException("That response is too long, ask an admin to set it")
         if self.raw_response in ("author", "list", "remove"):
             raise ResponseKeywordException()
+        if settings.responses_limit is not None and self.author_id not in settings.admin_ids:
+            c = Counter([r.author_id for r in self.bot.user_commands[self.server.id]])
+            count = c.get(self.author_id, 0)
+            if count >= settings.responses_limit:
+                raise UserLimitException(f"You have already set {count} commands, ask an admin to set it")
         # if user has too many commands?
         # language filter?
         return True
@@ -214,6 +222,10 @@ def get_owl():
 
 
 class VaguePatternError(Exception):
+    pass
+
+
+class UserLimitException(Exception):
     pass
 
 

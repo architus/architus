@@ -48,6 +48,15 @@ class Setting:
         self._update_db()
 
     @property
+    def responses_limit(self) -> int:
+        return self._settings_dict['responses_limit'] if 'responses_limit' in self._settings_dict else None
+
+    @responses_limit.setter
+    def responses_limit(self, new_threshold: int):
+        self._settings_dict['responses_limit'] = new_threshold
+        self._update_db()
+
+    @property
     def starboard_threshold(self) -> int:
         return self._settings_dict['starboard_threshold'] if 'starboard_threshold' in self._settings_dict else 5
 

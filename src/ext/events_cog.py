@@ -125,7 +125,7 @@ class EventCog(Cog, name="Events"):
         Timezone is based on your servers voice zone.
         '''
         args = list(argst)
-        print(args)
+        # print(args)
         # event bot's id
         if ctx.guild.get_member(476042677440479252):
             print("not scheduling cause event bot exists")
@@ -137,15 +137,15 @@ class EventCog(Cog, name="Events"):
         parsed_time = None
         for i in range(len(args)):
             with suppress(ValueError):
-                print(" ".join(args))
+                # print(" ".join(args))
                 parsed_time = dateutil.parser.parse(' '.join(args))
                 # parsed_time = tz.localize(parsed_time)
                 break
             with suppress(ValueError):
-                print(" ".join(args))
+                # print(" ".join(args))
                 parsed_time = dateutil.parser.parse(' '.join(args[:-1]))
                 # parsed_time = tz.localize(parsed_time)
-                print("deleted something from the end")
+                # print("deleted something from the end")
                 break
             title.append(args[0])
             del args[0]
