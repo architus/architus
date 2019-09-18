@@ -12,3 +12,4 @@ res/meme.png
 *pyc
 *sw*
 tags
+*.env
