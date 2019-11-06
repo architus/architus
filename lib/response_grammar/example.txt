@@ -1,1 +1,1 @@
-hello [capture] hello [owl] satoeu [aoseuth, asonteuh] natoheu
+hello [adj] [this is a list, with nested stuff [owl], [[member], [author]]]

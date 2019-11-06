@@ -1,11 +1,11 @@
 grammar Response;
 
 response
-    : (responseObj? STRING)+
+    : (respObj | STRING)+
     ;
 
-responseObj
-    : architusList
+respObj
+    : respList
     | REACT
     | NOUN
     | ADJ
@@ -17,7 +17,7 @@ responseObj
     | CAPTURE
     ;
 
-architusList
+respList
     : '[' listElement+ response ']'
     ;
 

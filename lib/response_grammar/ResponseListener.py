@@ -17,21 +17,21 @@ class ResponseListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by ResponseParser#responseObj.
-    def enterResponseObj(self, ctx:ResponseParser.ResponseObjContext):
+    # Enter a parse tree produced by ResponseParser#respObj.
+    def enterRespObj(self, ctx:ResponseParser.RespObjContext):
         pass
 
-    # Exit a parse tree produced by ResponseParser#responseObj.
-    def exitResponseObj(self, ctx:ResponseParser.ResponseObjContext):
+    # Exit a parse tree produced by ResponseParser#respObj.
+    def exitRespObj(self, ctx:ResponseParser.RespObjContext):
         pass
 
 
-    # Enter a parse tree produced by ResponseParser#architusList.
-    def enterArchitusList(self, ctx:ResponseParser.ArchitusListContext):
+    # Enter a parse tree produced by ResponseParser#respList.
+    def enterRespList(self, ctx:ResponseParser.RespListContext):
         pass
 
-    # Exit a parse tree produced by ResponseParser#architusList.
-    def exitArchitusList(self, ctx:ResponseParser.ArchitusListContext):
+    # Exit a parse tree produced by ResponseParser#respList.
+    def exitRespList(self, ctx:ResponseParser.RespListContext):
         pass
 
 
