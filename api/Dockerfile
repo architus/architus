@@ -1,4 +1,4 @@
-FROM alpine:edge
+FROM alpine:3.10
 
 # Set the working directory to /app
 WORKDIR /app

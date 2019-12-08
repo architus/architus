@@ -292,17 +292,18 @@ def token_exchange():
         discord_token = ex_data['access_token']
         id_data, status_code = discord_identify_request(discord_token)
         if status_code == StatusCodes.OK_200:
-            data = {
-                'access_token': discord_token,
-                'expires_in': ex_data['expires_in'],
-                'refresh_token': ex_data['refresh_token'],
-                'username': id_data['username'],
-                'discriminator': id_data['discriminator'],
-                'avatar': id_data['avatar'],
+            jwt = JWT({
+                'accessToken': discord_token,
+                'refreshToken': ex_data['refresh_token'],
+                'expiresIn': ex_data['expires_in'],
+                'issuedAt': datetime.now(),
                 'id': id_data['id'],
+                'permissions': 0,
+            })
+            data = {
+                'token': jwt.get_token().decode()
+                'user': id_data,
             }
-            jwt = JWT(data.copy())
-            data.update({'access_token': jwt.get_token().decode()})
             print(data)
             return json.dumps(data), StatusCodes.OK_200
 
