@@ -76,6 +76,7 @@ class Login(CustomResource):
         #         r'https:\/\/archit\.us\/app',
         #         r'http:\/\/localhost:3000\/app')):
         #     url = CALLBACK_URL
+        # TODO default destination
         response.set_cookie('next', request.args.get('return'))
         return response
 

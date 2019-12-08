@@ -32,11 +32,11 @@ shard_client = shardRPC(asyncio.get_event_loop())
 
 async def index(request):
     return web.Response(
-        text='this endpoint is for websockets only, get your http out of here', content_type='text/html')
+            text='this endpoint is for websockets only, get your http out of here >:(', content_type='text/html')
 
 
 async def handle_event(msg):
-    with msg.process(): 
+    with msg.process():
         await sio.emit('recv_event', msg.body, room=msg.routing_key)
         print(msg.routing_key)
         print(msg.body)

@@ -1,6 +1,12 @@
 import string
 from contextlib import suppress
 
+class ResponseMode:
+
+    REGEX = 'regex'
+    PUNCTUATED = 'punctuated'
+    NAIVE = 'naive'
+
 
 class AutoResponse:
 
@@ -29,7 +35,7 @@ class AutoResponse:
         self.response_ast = response_ast or self._parse_response()
         self.mode = mode or self._determine_mode()
 
-        if self.mode == 'punctuated' and trigger_punctuation == ():
+        if self.mode == ResponseMode.PUNCTUATED and trigger_punctuation == ():
             self.trigger_punctuation = self._extract_punctuation()
         else:
             self.trigger_punctuation = trigger_punctuation
@@ -38,12 +44,18 @@ class AutoResponse:
 
     def _generate_trigger_regex(self):
         # TODO
-        if self.mode == 'regex':
+        if self.mode == ResponseMode.REGEX:
             self.trigger_regex = self.trigger
-        elif self.mode == 'punctuated':
+        elif self.mode == ResponseMode.PUNCTUATED:
             pass
         else:
             pass
+
+        if self._collision_detector():
+            raise TriggerCollisionException()
+
+    def _collision_detector():
+        return False
 
     def _extract_punctuation(self):
         return tuple(c for c in self.trigger if c in string.punctuation)
@@ -61,3 +73,6 @@ class AutoResponse:
             return 'punctuated'
 
         return 'naive'
+
+class TriggerCollisionException(Exception):
+    pass

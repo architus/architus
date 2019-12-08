@@ -12,7 +12,7 @@ class Play(commands.Cog, name="Music Player"):
         self.bot = bot
         self.players = {}
 
-    @commands.command()
+    @commands.command(aliases=['p'])
     async def play(self, ctx, url):
         '''
         Add a song to the music queue.
