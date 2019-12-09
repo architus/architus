@@ -1,22 +1,23 @@
-from flask import Flask, redirect, request, g
+from flask import Flask, redirect, request, g, jsonify, make_response
 from flask_restful import Api, Resource, reqparse
 from flask_cors import CORS
 import requests
 import json
 import os
 import re
-import random
 from uuid import getnode
+from datetime import datetime
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, get_session, NUM_SHARDS, which_shard
+from lib.config import client_id, get_session, which_shard
 from lib.blocking_rpc_client import get_rpc_client
 from lib.models import Command, Log
 from lib.auth import JWT, discord_identify_request, token_exchange_request, flask_authenticated as authenticated
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 # REDIRECT_URI = 'https://api.archit.us/redirect'
-REDIRECT_URI = 'https://api.archit.us:8000/redirect'
+DOMAIN = 'archit.us:8000'
+REDIRECT_URI = f'https://api.{DOMAIN}/redirect'
 
 
 app = Flask(__name__)
@@ -68,15 +69,15 @@ class Login(CustomResource):
         # TODO don't redirect to the staging api on production
         response = redirect(f'https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
                             'https%3A%2F%2Fapi.archit.us%3A8000%2Fredirect&response_type=code&scope=identify%20guilds')
-        # TODO nice validation
-        # if not any(re.match(pattern, url) for pattern in (
-        #         r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
-        #         r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
-        #         r'https:\/\/develop\.archit\.us\/app',
-        #         r'https:\/\/archit\.us\/app',
-        #         r'http:\/\/localhost:3000\/app')):
-        #     url = CALLBACK_URL
-        # TODO default destination
+# TODO nice validation
+# if not any(re.match(pattern, url) for pattern in (
+#         r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
+#         r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
+#         r'https:\/\/develop\.archit\.us\/app',
+#         r'https:\/\/archit\.us\/app',
+#         r'http:\/\/localhost:3000\/app')):
+#     url = CALLBACK_URL
+# TODO default destination
         response.set_cookie('next', request.args.get('return'))
         return response
 
@@ -86,7 +87,7 @@ class Invite(CustomResource):
         response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}'
                             f'&scope=bot&guild_id={guild_id}'
                             '&response_type=code'
-                            '&redirect_uri=https://api.archit.us/redirect'
+                            f'&redirect_uri={REDIRECT_URI}'
                             '&permissions=2134207679')
         response.set_cookie('next', request.args.get('return'))
         return response
@@ -137,7 +138,7 @@ class Logs(CustomResource):
                 'user_id': str(log.user_id),
                 'timestamp': log.timestamp.isoformat()
             })
-        return json.dumps({"logs": logs}), StatusCodes.OK_200
+            return jsonify({"logs": logs}), StatusCodes.OK_200
 
 
 class AutoResponses(CustomResource):
@@ -292,22 +293,32 @@ def token_exchange():
         discord_token = ex_data['access_token']
         id_data, status_code = discord_identify_request(discord_token)
         if status_code == StatusCodes.OK_200:
+            now = datetime.now()
             jwt = JWT({
                 'accessToken': discord_token,
                 'refreshToken': ex_data['refresh_token'],
                 'expiresIn': ex_data['expires_in'],
-                'issuedAt': datetime.now(),
+                'issuedAt': now,
                 'id': id_data['id'],
                 'permissions': 0,
             })
             data = {
-                'token': jwt.get_token().decode()
+                # 'token': jwt.get_token().decode()
                 'user': id_data,
+                'access': {
+                    'issuedAt': now,
+                    'expiresIn': ex_data['expires_in'],
+                }
             }
             print(data)
-            return json.dumps(data), StatusCodes.OK_200
 
-    return json.dumps(ex_data), status_code
+            response = make_response()
+            response.set_cookie("token", jwt.get_token().decode(), domain=f'.{DOMAIN}', secure=True, httponly=True)
+            response.data = jsonify(data)
+            response.status_code = StatusCodes.OK_200
+            return response
+
+    return jsonify(ex_data), status_code
 
 
 @app.route('/status', methods=['GET'])

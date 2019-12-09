@@ -16,9 +16,9 @@ def flask_authenticated(func):
     """
     def authed_func(self, *args, **kwargs):
         try:
-            jwt = JWT(token=request.headers['Authorization'])
+            jwt = JWT(token=request.cookies.get('token'))
             # TODO check token expiration
-        except jwt.exceptions.InvalidTokenError:
+        except pyjwt.exceptions.InvalidTokenError:
             return (StatusCodes.UNAUTHORIZED_401, "Not Authorized")
         return func(self, *args, jwt=jwt, **kwargs)
     return authed_func
