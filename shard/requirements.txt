@@ -33,7 +33,7 @@ mutagen==1.41.1
 numpy==1.17.0
 pafy==0.5.4
 pathlib==1.0.1
-Pillow==5.3.0
+Pillow==6.2.0
 psycopg2-binary==2.7.6.1
 pycodestyle==2.5.0
 pycparser==2.19
