@@ -1,9 +1,8 @@
 # [![architus](https://i.imgur.com/qfPmMBW.png)](https://archit.us)
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Farchitus%2Farchitus.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Farchitus%2Farchitus?ref=badge_shield) [![API Uptime](https://img.shields.io/uptimerobot/ratio/7/m782992399-3443671051db8aeaecfe7434.svg?label=API%20uptime)](https://status.archit.us/)
-[![Style](https://github.com/architus/architus/workflows/Style%20Check/badge.svg)](https://github.com/architus/architus/actions)
-[![Build](https://github.com/architus/architus/workflows/Build%20Docker%20Images/badge.svg)](https://github.com/architus/architus/actions)
-
+[![Style](https://github.com/architus/architus/workflows/Style/badge.svg)](https://github.com/architus/architus/actions)
+[![Build](https://github.com/architus/architus/workflows/Build/badge.svg)](https://github.com/architus/architus/actions)
 [![Discord Server](https://img.shields.io/discord/607637793107345431?color=7289DA&logo=discord&logoColor=white)](https://discord.gg/FpyhED)
 
 > Architus is a multi-purpose Discord bot implemented using the discord.py library that empowers both admins and server members with the tools and features to have a more streamlined and enjoyable experience.
