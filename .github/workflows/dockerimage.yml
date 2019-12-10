@@ -12,5 +12,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+    - name: Environment garbage
+      run: mv example.env architus.env
+      
+    - uses: actions/checkout@v1
     - name: Build the Docker image
       run: docker-compose build
