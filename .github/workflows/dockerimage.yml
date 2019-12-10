@@ -27,7 +27,7 @@ jobs:
       run: TAG=":${GITHUB_REF##*/}" docker-compose build
 
     - name: Login to Docker
-      run: echo "${{ secrets.DOCKER_PASS }}" | docker login registry.hub.docker.com -u "${{ secrets.DOCKER_USER }}" --password-stdin
+      run: echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
 
     - name: Push the images
       run: TAG=":${GITHUB_REF##*/}" docker-compose push
