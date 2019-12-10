@@ -26,10 +26,8 @@ jobs:
     - name: Build the Docker images
       run: TAG=":${GITHUB_REF##*/}" docker-compose build
 
-    - uses: actions/docker/login@master
-      env: 
-        DOCKER_REGISTRY_URL: registry.hub.docker.com
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USER }}
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASS }}
+    - name: Login to Docker
+      run: echo "${{ secrets.DOCKER_PASS }}" | docker login registry.hub.docker.com -u "${{ secrets.DOCKER_USER }}" --password-stdin
+
     - name: Push the images
       run: TAG=":${GITHUB_REF##*/}" docker-compose push
