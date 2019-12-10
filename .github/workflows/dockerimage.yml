@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NUM_SHARDS: 2
-      TAG: :${GITHUB_REF##*/}
 
     steps:
     - uses: actions/checkout@v1
@@ -25,7 +24,7 @@ jobs:
       run: mv example.env architus.env
 
     - name: Build the Docker images
-      run: docker-compose build
+      run: TAG=":${GITHUB_REF##*/}" docker-compose build
 
     - uses: actions/docker/login@master
       env: 
@@ -33,4 +32,4 @@ jobs:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USER }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASS }}
     - name: Push the images
-      run: docker-compose push
+      run: TAG=":${GITHUB_REF##*/}" docker-compose push
