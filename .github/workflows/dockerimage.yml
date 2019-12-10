@@ -21,8 +21,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Environment garbage
-      run: mv example.env architus.env
-      run: export TAG=":${GITHUB_REF##*/}"
+      run: mv example.env architus.env && export TAG=":${GITHUB_REF##*/}"
 
     - name: Build the Docker images
       run: docker-compose build
