@@ -21,15 +21,10 @@ You can invite architus to your discord server with [this link](https://api.arch
 ## 🚀 Installing
 
 1. Create a discord app: https://discordapp.com/developers/applications/me 
-3. Install virtualenv and dependencies: `source install.sh`
-4. Activate your virtualenv: `source .venv/bin/activate`
-5. Set up DB:
-* Install postgresql
-* Create user `autbot`
-*  `sudo -u postgres psql -c 'CREATE DATABASE autbot WITH OWNER autbot;'`
-*  `sudo -u postgres psql autbot < data/autbot-seed.sql` (you may have to give postgres permission to see this file)
-7. Put the discord token, postgres username (`autbot`), and postgres password (from step 4) in a file called `.secret_token`, on separate lines
-8. Run bot: `python3.6 bot.py`
+2. Install `docker-compose`
+3. Create `architus.env` from `example.env`
+4. Build docker images `NUM_SHARDS=1 docker-compose build`
+5. Start containers `NUM_SHARDS=1 docker-compose run`
 
 ## ❓ Getting Help
 
