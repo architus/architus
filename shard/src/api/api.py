@@ -3,14 +3,8 @@ import secrets
 import discord
 from discord.ext.commands import Cog, Context
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
-<<<<<<< HEAD:src/api/api.py
-from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command, UserLimitException
-
-CALLBACK_URL = "https://archit.us/app"
-=======
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 from lib.status_codes import StatusCodes as sc
->>>>>>> docker:shard/src/api/api.py
 
 
 class Api(Cog):
@@ -22,43 +16,6 @@ class Api(Cog):
     async def api_entry(self, method_name, *args, **kwargs):
         """Callback method for the rpc server
 
-<<<<<<< HEAD:src/api/api.py
-    def start_socket_listener(self):
-        print("Starting websocket listener on port 8300")
-        try:
-            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-            ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
-
-            start_server = websockets.serve(self.handle_socket, '0.0.0.0', 8300, ssl=ssl_context)
-        except FileNotFoundError:
-            print("SSL certs not found, websockets running in insecure mode")
-            start_server = websockets.serve(self.handle_socket, '0.0.0.0', 8300)
-
-        self.bot.socket_task = asyncio.async(start_server)
-
-    async def handle_socket(self, websocket, path):
-        print(f"Started websocket connection with {websocket.remote_address}")
-        while True:
-            try:
-                self = self.bot.get_cog("Api")
-                data = json.loads(await websocket.recv())
-                # print("recvd: " + str(data))
-                if data['_module'] == 'interpret':
-                    resp = await self.interpret(**data)
-                else:
-                    resp = {'content': "Unknown module"}
-            except websockets.exceptions.ConnectionClosed:
-                print(f"Websocket connection to {websocket.remote_address} closed. goodbye.")
-                return
-            except Exception as e:
-                traceback.print_exc()
-                print(f"caught {e} while handling websocket request")
-                resp = {'content': f"caught {e} while handling websocket request"}
-            await websocket.send(json.dumps(resp))
-
-    @asyncio.coroutine
-    def handle_request(self, pub, msg):
-=======
         :param method_name: name of the method to execute
         :param *args: args to pass through
         :param **kwargs: kwargs to pass through
@@ -70,40 +27,15 @@ class Api(Cog):
             print(f"Someone tried to call '{method}' but it doesn't exist (or is private)")
             return {"message": "No such method"}, sc.NOT_FOUND_404
 
->>>>>>> docker:shard/src/api/api.py
         try:
             return await method(*args, **kwargs)
         except Exception as e:
             traceback.print_exc()
-<<<<<<< HEAD:src/api/api.py
-            print(f"caught {e} while handling {msg['topic']}s request")
-            resp = '{"message": "' + str(e) + '"}'
-        yield from pub.send((str(msg['topic']) + ' ' + str(resp)).encode())
-
-    async def store_callback(self, nonce=None, url=None):
-        assert nonce and url
-        if not any(re.match(pattern, url) for pattern in (
-                r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
-                r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
-                r'https:\/\/develop\.archit\.us\/app',
-                r'https:\/\/archit\.us\/app',
-                r'http:\/\/localhost:3000\/app')):
-            url = CALLBACK_URL
-
-        self.callback_urls[nonce] = url
-        return {"content": True}
-
-    async def get_callback(self, nonce=None):
-        url = self.callback_urls.pop(nonce, CALLBACK_URL)
-        resp = {"content": url}
-        return resp
-=======
             print(f"caught {e} while handling remote request")
             return {"message": f"'{e}'"}, sc.INTERNAL_SERVER_ERROR_500
 
     async def ping(self):
         return {'message': 'pong'}, sc.OK_200
->>>>>>> docker:shard/src/api/api.py
 
     async def guild_counter(self):
         return await self.bot.manager_client.call('guild_count')
@@ -126,12 +58,7 @@ class Api(Cog):
             code = sc.NOT_ACCEPTABLE_406
         except DuplicatedTriggerException:
             msg = "Remove duplicated trigger first."
-<<<<<<< HEAD:src/api/api.py
-        except UserLimitException as e:
-            msg = str(e)
-=======
             code = sc.CONFLICT_409
->>>>>>> docker:shard/src/api/api.py
         else:
             self.bot.user_commands[guild_id].append(command)
             msg = 'Successfully Set'
@@ -163,12 +90,6 @@ class Api(Cog):
 
         for oldcommand in self.bot.user_commands[guild_id]:
             if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
-<<<<<<< HEAD:src/api/api.py
-                self.bot.user_commands[guild_id].remove(oldcommand)
-                update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
-                return {'message': "Successfully Deleted"}
-        return {'message': "No such command.", 'status_code': 400}
-=======
                 if oldcommand.author_id == user_id or user_id in self.bot.settings[guild].admin_ids:
                     self.bot.user_commands[guild_id].remove(oldcommand)
                     update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
@@ -176,7 +97,6 @@ class Api(Cog):
                 else:
                     return {'message': "Not authorized"}, sc.UNAUTHORIZED_401
         return {'message': "No such command."}, sc.NOT_FOUND_404
->>>>>>> docker:shard/src/api/api.py
 
     async def fetch_user_dict(self, id):
         usr = self.bot.get_user(int(id))
@@ -289,11 +209,7 @@ class Api(Cog):
                             help_text += f'```hi{args[1]} - {cmd.help}```'
                             break
                     except IndexError:
-<<<<<<< HEAD:src/api/api.py
-                        help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
-=======
                         help_text += f'```{cmd.name}: {cmd.help:>5}```\n'
->>>>>>> docker:shard/src/api/api.py
 
                 sends.append(help_text)
             else:
@@ -337,11 +253,7 @@ class Api(Cog):
         }
         # if resp['content']:
         #   print(resp)
-<<<<<<< HEAD:src/api/api.py
-        return resp
-=======
         return resp, sc.OK_200
->>>>>>> docker:shard/src/api/api.py
 
 
 class MockMember(object):

@@ -87,10 +87,7 @@ class Settings(Cog):
         await ctx.channel.send(
             '⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
         msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
-<<<<<<< HEAD:src/ext/settings_cog.py
-=======
         self.bot.settings[ctx.guild].starboard_threshold = abs(int(msg.content))
->>>>>>> docker:shard/src/ext/settings_cog.py
         try:
             self.guild_settings.get_guild(ctx.guild).starboard_threshold = abs(int(msg.content))
             resp = "Threshold set"

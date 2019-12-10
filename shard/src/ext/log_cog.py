@@ -25,10 +25,7 @@ class LogCog(commands.Cog):
     async def on_message_edit(self, before, after):
         if before.content == after.content or before.author.id == self.bot.user.id:
             return
-<<<<<<< HEAD:src/ext/log_cog.py
-=======
         #await self.broadcast.on_message_edit(before.guild.id, {'before': str(before), 'after': str(after)})
->>>>>>> docker:shard/src/ext/log_cog.py
         self.insert_row(
             before.channel.guild.id,
             LogCog.MSG_EDIT,

@@ -20,11 +20,6 @@ class Architus(Bot):
         self.user_commands = {}
         self.session = get_session()
         self.tracked_messages = {}
-<<<<<<< HEAD:bot.py
-        self.deletable_messages = []
-        super().__init__(**kwargs)
-=======
->>>>>>> docker:shard/bot.py
 
         manager_client = blocking_rpc_client.shardRPC()
         print("asking for shard id")
@@ -50,23 +45,7 @@ class Architus(Bot):
         self.manager_client = async_rpc_client.shardRPC(self.loop, default_key='manager_rpc')
         self.loop.create_task(self.manager_client.connect())
 
-<<<<<<< HEAD:bot.py
-    @asyncio.coroutine
-    def poll_requests(self, ctx):
-        api = self.get_cog('Api')
-        pub = ctx.socket(zmq.PUB)
-        pub.bind("tcp://127.0.0.1:7201")
-        if self.q is not None:
-            while True:
-                if not self.q.empty():
-                    msg = json.loads(self.q.get())
-                    self.loop.create_task(api.handle_request(pub, msg))
-                yield from asyncio.sleep(.01)
-        else:
-            print("No ipc queue was found, I hope the api isn't supposed to be running")
-=======
         super().run(token)
->>>>>>> docker:shard/bot.py
 
     async def on_reaction_add(self, react, user):
         """Check if message should be added to starboard or an edit dialog should be posted"""

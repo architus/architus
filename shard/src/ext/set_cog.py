@@ -1,11 +1,8 @@
 from discord.ext import commands
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
-<<<<<<< HEAD:src/ext/set_cog.py
 from src.user_command import UserLimitException
-from src.config import get_session
-=======
->>>>>>> docker:shard/src/ext/set_cog.py
+
 import re
 import discord
 
