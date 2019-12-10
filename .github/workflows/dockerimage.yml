@@ -1,0 +1,16 @@
+name: Docker Image CI
+
+on: [push]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+    env:
+      NUM_SHARDS: 2
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build the Docker image
+      run: docker-compose build
