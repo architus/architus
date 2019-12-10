@@ -1,34 +1,22 @@
-from flask import Flask, redirect, request, g, jsonify, make_response
-from flask_restful import Api, Resource, reqparse
-from flask_cors import CORS
-import requests
 import json
-import os
 import re
-from uuid import getnode
-from datetime import datetime, timedelta
-from urllib.parse import quote_plus
+
+from flask import Flask, redirect, request, g, jsonify
+from flask_restful import Api, Resource
+from flask_cors import CORS
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, domain_name, get_session, which_shard
-from lib.blocking_rpc_client import get_rpc_client
+from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI
 from lib.models import Command, Log
-from lib.auth import JWT, discord_identify_request, token_exchange_request, flask_authenticated as authenticated
+from lib.auth import JWT, flask_authenticated as authenticated
 
-API_ENDPOINT = 'https://discordapp.com/api/v6'
-DOMAIN = domain_name
-REDIRECT_URI = f'https://api.{DOMAIN}/redirect'
-SAFE_REDIRECT_URI = quote_plus(REDIRECT_URI)
+from src.discord_requests import list_guilds_request
+from src.util import CustomResource, reqparams
+from src.session import Identify, Login, RefreshToken, TokenExchange
 
 
 app = Flask(__name__)
 cors = CORS(app)
-
-
-def get_db():
-    if 'db' not in g:
-        g.db = get_session()
-    return g.db
 
 
 @app.teardown_appcontext
@@ -38,69 +26,7 @@ def teardown_db(arg):
         db.close()
 
 
-def reqparams(**params):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            parser = reqparse.RequestParser()
-            for param, type in params:
-                parser.add_argument(param, type=type, required=True)
-            values = parser.parse_args()
-            kwargs.update(values)
-            func(*args, **kwargs)
-        return wrapper
-    return decorator
-
-
-@app.route('/issue')
-def issue():
-    return redirect('https://github.com/architus/architus/issues/new')
-
-
-class CustomResource(Resource):
-    '''Default flask Resource but contains tools to talk to the shard nodes and the db.'''
-    def __init__(self):
-        self._session = None
-        self.topic = (getnode() << 15) | os.getpid()
-        self.client = get_rpc_client(self.topic)
-
-    @property
-    def session(self):
-        if self._session is None:
-            self._session = get_db()
-        return self._session
-
-    def shard_call(self, method, *args, routing_guild=None, **kwargs):
-        '''Queues an RPC request to a shard.'''
-        return self.client.call(
-            method,
-            *args,
-            routing_key=f"shard_rpc_{which_shard(routing_guild)}",
-            **kwargs
-        )
-
-
-class Login(CustomResource):
-    def get(self):
-        response = redirect(f'https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
-                            f'{SAFE_REDIRECT_URI}&response_type=code&scope=identify%20guilds')
-# TODO nice validation
-# if not any(re.match(pattern, url) for pattern in (
-#         r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
-#         r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
-#         r'https:\/\/develop\.archit\.us\/app',
-#         r'https:\/\/archit\.us\/app',
-#         r'http:\/\/localhost:3000\/app')):
-#     url = CALLBACK_URL
-# TODO default destination
-        response.set_cookie('next', request.args.get('return'), domain=f'api.{DOMAIN}', secure=True, httponly=True)
-        return response
-
-
-class RefreshToken(CustomResource):
-    pass
-
-
-class Invite(CustomResource):
+class Invite(Resource):
     def get(self, guild_id: int):
         response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}'
                             f'&scope=bot&guild_id={guild_id}'
@@ -233,13 +159,6 @@ class Coggers(CustomResource):
         return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
 
-class Identify(Resource):
-    @authenticated
-    def get(self, jwt: JWT):
-        '''Forward identify request to discord and return response'''
-        return discord_identify_request(jwt.access_token)
-
-
 class Stats(CustomResource):
     def get(self, guild_id: int, stat: str):
         '''Request message count statistics from shard and return'''
@@ -248,82 +167,35 @@ class Stats(CustomResource):
 
 
 class ListGuilds(CustomResource):
-
     @authenticated
     def get(self, jwt: JWT):
         '''Forward guild list request to discord and return response'''
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': f"Bearer {jwt.access_token}"
-        }
-        r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
-        if r.status_code == StatusCodes.OK_200:
-            resp, _ = self.shard_call('tag_autbot_guilds', r.json(), jwt.id)
-        else:
-            resp = r.json()
-        return resp, r.status_code
-
-
-@app.route('/session/token_exchange', methods=['POST'])
-@reqparams(code=str)
-def token_exchange(code):
-    ex_data, status_code = token_exchange_request(code)
-
-    if status_code == StatusCodes.OK_200:
-        discord_token = ex_data['access_token']
-        id_data, status_code = discord_identify_request(discord_token)
+        resp, status_code = list_guilds_request()
         if status_code == StatusCodes.OK_200:
-            now = datetime.now()
-            expires_in = ex_data['expires_in']
-            refresh_in = timedelta(seconds=expires_in) / 2
-            jwt = JWT({
-                'access_token': discord_token,
-                'refresh_token': ex_data['refresh_token'],
-                'expires_in': expires_in,
-                'issued_at': now,
-                'refresh_in': refresh_in,
-                'id': id_data['id'],
-                'permissions': 0,
-            })
-            data = {
-                # 'token': jwt.get_token().decode()
-                'user': id_data,
-                'access': {
-                    'issuedAt': now,
-                    'expiresIn': expires_in,
-                    'refreshIn': refresh_in,
-                }
-            }
-            print(data)
-
-            response = make_response()
-            response.set_cookie("token", jwt.get_token().decode(), domain=f'.{DOMAIN}', secure=True, httponly=True)
-            response.data = jsonify(data)
-            response.status_code = StatusCodes.OK_200
-            return response
-
-    return jsonify(ex_data), status_code
+            resp, _ = self.shard_call('tag_autbot_guilds', resp, jwt.id)
+        return resp, status_code
 
 
-@app.route('/status', methods=['GET'])
+@app.route('/status')
 def status():
     return "all systems operational", StatusCodes.NO_CONTENT_204
 
 
 def app_factory():
     api = Api(app)
+    api.add_resource(Identify, "/session/identify")
+    api.add_resource(Login, "/session/login")
+    api.add_resource(RefreshToken, "/session/refresh")
+    api.add_resource(TokenExchange, "/session/token-exchange")
+
     api.add_resource(User, "/user/<string:name>")
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Stats, "/stats/<int:guild_id>/<string:stat>")
-    api.add_resource(Identify, "/session/identify")
-    api.add_resource(Login, "/session/login")
-    api.add_resource(RefreshToken, "/session/refresh")
-    # /session/token_exchange
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")
-    api.add_resource(GuildCounter, "/guild_count")
+    api.add_resource(GuildCounter, "/guild-count")
     api.add_resource(Invite, "/invite/<int:guild_id>")
     api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
     return app
