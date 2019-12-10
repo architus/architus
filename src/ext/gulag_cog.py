@@ -17,7 +17,10 @@ class Gulag(commands.Cog):
 
     @commands.command()
     async def gulag(self, ctx, comrade: discord.Member):
-        '''Starts a vote to move a member to the gulag. Each vote over the threshold will add additional time.'''
+        '''
+        Starts a vote to move a member to the gulag.
+        Each vote over the threshold will add additional time.
+        '''
         server = ctx.message.guild
         settings = self.guild_settings.get_guild(server)
         filtered = filter(lambda role: role.name == "kulak", server.roles)

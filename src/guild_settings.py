@@ -3,6 +3,7 @@ from src.models import Settings
 from src.config import get_session
 from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog
+import discord
 
 RYTHMS_ID = 235088799074484224
 
@@ -26,12 +27,33 @@ class Setting:
         self._update_db()
 
     @property
+    def scrim_channel_id(self) -> int:
+        if 'scrim_channel_id' in self._settings_dict:
+            return self._settings_dict.get('scrim_channel_id')
+        channel = discord.utils.find(lambda c: c.name == 'lfs-posts', self.guild.channels)
+        return channel.id if channel else 0
+
+    @scrim_channel_id.setter
+    def scrim_channel_id(self, scrim_channel_id: int):
+        self._settings_dict['scrim_channel_id'] = scrim_channel_id
+        self._update_db()
+
+    @property
     def starboard_emoji(self) -> str:
         return self._settings_dict['starboard_emoji'] if 'starboard_emoji' in self._settings_dict else "⭐"
 
     @starboard_emoji.setter
     def starboard_emoji(self, new_emoji: str):
         self._settings_dict['starboard_emoji'] = new_emoji
+        self._update_db()
+
+    @property
+    def responses_limit(self) -> int:
+        return self._settings_dict['responses_limit'] if 'responses_limit' in self._settings_dict else None
+
+    @responses_limit.setter
+    def responses_limit(self, new_threshold: int):
+        self._settings_dict['responses_limit'] = new_threshold
         self._update_db()
 
     @property
@@ -92,9 +114,19 @@ class Setting:
         self._update_db()
 
     @property
+    def admin_ids(self) -> list:
+        '''stupid alias'''
+        return self.admins_ids
+
+    @property
     def admins_ids(self) -> list:
         default_admins = [self.guild.owner.id, 214037134477230080]
-        return default_admins + self._settings_dict['admins'] if 'admins' in self._settings_dict else default_admins
+        return default_admins + [int(a) for a in self._settings_dict.get('admins', [])]
+
+    @admin_ids.setter
+    def admin_ids(self, new_admins: list):
+        '''stupid alias'''
+        self.admins_ids = new_admins
 
     @admins_ids.setter
     def admins_ids(self, new_admins: list):
@@ -206,6 +238,8 @@ class GuildSettings(Cog):
         self.guilds = {}
 
     def get_guild(self, guild, session=None):
+        if guild is None:
+            return None
         try:
             return self.guilds[guild]
         except KeyError:

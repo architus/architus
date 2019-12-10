@@ -10,12 +10,12 @@ EMOJI_DIR = 'emojis'
 
 
 class emoji_manager():
-    def __init__(self, client, guild, deletable_messages):
+    def __init__(self, client, guild):
         self.client = client
         self.guild = guild
-        self.deletable_messages = deletable_messages
         self._priorities = list(self.guild.emojis)
-        os.makedirs(EMOJI_DIR + '/' + str(self.guild.id))
+        if not os.path.exists(EMOJI_DIR + '/' + str(self.guild.id)):
+            os.makedirs(EMOJI_DIR + '/' + str(self.guild.id))
 
     @property
     def max_emojis(self):
@@ -58,7 +58,7 @@ class emoji_manager():
                     continue
                 if not emoji:
                     continue
-                self.deletable_messages.append(message.id)
+                self.client.deletable_messages.append(message.id)
                 await message.delete()
                 send_message(message.channel,
                              message.content.replace(':%s:' % emojistr.group('nameonly'), str(emoji)),
@@ -134,7 +134,11 @@ class emoji_manager():
                     print("API gave unexpected response (%d) emoji not saved" % resp.status)
 
 
-class EmojiManagerCog(commands.Cog):
+class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
+    '''
+    Can be used to hotswap extra emojis into the server when the limit is reached
+    must be enabled in settings
+    '''
 
     def __init__(self, bot):
         self.bot = bot
@@ -142,7 +146,7 @@ class EmojiManagerCog(commands.Cog):
 
     @property
     def managers(self):
-        self._managers = self._managers or {guild.id: emoji_manager(self.bot, guild, []) for guild in self.bot.guilds}
+        self._managers = self._managers or {guild.id: emoji_manager(self.bot, guild) for guild in self.bot.guilds}
         return self._managers
 
     @property

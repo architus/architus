@@ -1,12 +1,16 @@
 import json
 import traceback
+import ssl
 import asyncio
 import secrets
 import websockets
 import re
+import discord
 from discord.ext.commands import Cog, Context
+from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
+from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command, UserLimitException
 
-CALLBACK_URL = "https://aut-bot.com/app"
+CALLBACK_URL = "https://archit.us/app"
 
 
 class Api(Cog):
@@ -15,30 +19,47 @@ class Api(Cog):
         self.bot = bot
         self.fake_messages = {}
         self.callback_urls = {}
+        self.bot.socket_task = None
+
+        self.start_socket_listener()
+
+    def start_socket_listener(self):
+        print("Starting websocket listener on port 8300")
+        try:
+            ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ssl_context.load_cert_chain('certificate.pem', 'privkey.pem')
+
+            start_server = websockets.serve(self.handle_socket, '0.0.0.0', 8300, ssl=ssl_context)
+        except FileNotFoundError:
+            print("SSL certs not found, websockets running in insecure mode")
+            start_server = websockets.serve(self.handle_socket, '0.0.0.0', 8300)
+
+        self.bot.socket_task = asyncio.async(start_server)
 
     async def handle_socket(self, websocket, path):
+        print(f"Started websocket connection with {websocket.remote_address}")
         while True:
             try:
-                try:
-                    data = json.loads(await websocket.recv())
-                    print("recv: " + str(data))
-                    if data['_module'] == 'interpret':
-                        resp = await self.interpret(**data)
-                    else:
-                        resp = {'content': "Unknown module"}
-                except Exception as e:
-                    traceback.print_exc()
-                    print(f"caught {e} while handling websocket request")
-                    resp = {'content': f"caught {e} while handling websocket request"}
-                await websocket.send(json.dumps(resp))
+                self = self.bot.get_cog("Api")
+                data = json.loads(await websocket.recv())
+                # print("recvd: " + str(data))
+                if data['_module'] == 'interpret':
+                    resp = await self.interpret(**data)
+                else:
+                    resp = {'content': "Unknown module"}
             except websockets.exceptions.ConnectionClosed:
-                print("Websocket connection closed")
+                print(f"Websocket connection to {websocket.remote_address} closed. goodbye.")
                 return
+            except Exception as e:
+                traceback.print_exc()
+                print(f"caught {e} while handling websocket request")
+                resp = {'content': f"caught {e} while handling websocket request"}
+            await websocket.send(json.dumps(resp))
 
     @asyncio.coroutine
     def handle_request(self, pub, msg):
         try:
-            resp = json.dumps((yield from getattr(self, msg['method'])(*msg['args'])))
+            resp = json.dumps((yield from getattr(self.bot.get_cog("Api"), msg['method'])(*msg['args'])))
         except Exception as e:
             traceback.print_exc()
             print(f"caught {e} while handling {msg['topic']}s request")
@@ -48,9 +69,10 @@ class Api(Cog):
     async def store_callback(self, nonce=None, url=None):
         assert nonce and url
         if not any(re.match(pattern, url) for pattern in (
-                r'https:\/\/[A-Za-z0-9-]{3,24}--aut-bot\.netlify\.com\/app',
-                r'https:\/\/deploy-preview-[0-9]+--aut-bot\.netlify\.com\/app',
-                r'https:\/\/aut-bot.com\/app',
+                r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
+                r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
+                r'https:\/\/develop\.archit\.us\/app',
+                r'https:\/\/archit\.us\/app',
                 r'http:\/\/localhost:3000\/app')):
             url = CALLBACK_URL
 
@@ -58,32 +80,99 @@ class Api(Cog):
         return {"content": True}
 
     async def get_callback(self, nonce=None):
-        try:
-            url = self.callback_urls[nonce]
-        except KeyError:
-            print("couldn't find callback url, returning default")
-            url = CALLBACK_URL
+        url = self.callback_urls.pop(nonce, CALLBACK_URL)
         resp = {"content": url}
-        self.callback_urls[nonce] = None
         return resp
 
     async def guild_counter(self):
         return {'guild_count': self.bot.guild_counter[0], 'user_count': self.bot.guild_counter[1]}
 
+    async def set_response(self, user_id, guild_id, trigger, response):
+        guild = self.bot.get_guild(int(guild_id))
+        try:
+            command = UserCommand(self.bot.session, self.bot, trigger, response, 0, guild, user_id, new=True)
+        except VaguePatternError:
+            msg = "Capture group too broad."
+        except LongResponseException:
+            msg = "Response is too long."
+        except ShortTriggerException:
+            msg = "Trigger is too short."
+        except ResponseKeywordException:
+            msg = "That response is protected, please use another."
+        except DuplicatedTriggerException:
+            msg = "Remove duplicated trigger first."
+        except UserLimitException as e:
+            msg = str(e)
+        else:
+            self.bot.user_commands[guild_id].append(command)
+            msg = 'Sucessfully Set'
+        return {'message': msg}
+
+    async def is_member(self, user_id, guild_id, admin=False):
+        '''check if user is a member or admin of the given guild'''
+        guild = self.bot.get_guild(int(guild_id))
+        guild_settings = self.bot.get_cog("GuildSettings")
+        if not guild:
+            return False
+        settings = guild_settings.get_guild(guild, self.bot.session)
+        return {'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)}
+
+    async def delete_response(self, user_id, guild_id, trigger):
+        guild = self.bot.get_guild(int(guild_id))
+
+        for oldcommand in self.bot.user_commands[guild_id]:
+            if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
+                self.bot.user_commands[guild_id].remove(oldcommand)
+                update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
+                return {'message': "Successfully Deleted"}
+        return {'message': "No such command.", 'status_code': 400}
+
     async def fetch_user_dict(self, id):
-        usr = await self.bot.fetch_user(int(id))
-        return {'name': usr.name, 'avatar': usr.avatar}
+        usr = self.bot.get_user(int(id))
+        if usr is None:
+            return None
+        return {
+            'name': usr.name,
+            'avatar': usr.avatar,
+            'discriminator': usr.discriminator
+        }
+
+    async def get_emoji(self, id):
+        e = self.bot.get_emoji(int(id))
+        if e is None:
+            return None
+        return {
+            'name': e.name,
+            'url': str(e.url)
+        }
+
+    async def get_extensions(self):
+        return {'extensions': [k for k in self.bot.extensions.keys()]}
 
     async def reload_extension(self, extension_name):
         name = extension_name.replace('-', '.')
-        print(f"reloading extention: {name}")
-        self.bot.reload_extension(name)
-        return {}
+        try:
+            self.bot.reload_extension(name)
+        except discord.ext.commands.errors.ExtensionNotLoaded as e:
+            print(e)
+            return {"message": f"Extension Not Loaded: {e}", "status_code": 503}
+        return {"message": "Reload signal sent"}
 
-    async def tag_autbot_guilds(self, guild_list):
-        autbot_guilds = [g.id for g in self.bot.guilds]
-        for guild in guild_list:
-            guild['has_autbot'] = int(guild['id']) in autbot_guilds
+    async def settings_access(self, guild_id=None, setting=None, value=None):
+        guild_settings = self.bot.get_cog("GuildSettings")
+        guild = self.bot.get_guild(guild_id)
+        settings = guild_settings.get_guild(guild, self.bot.session)
+        if hasattr(settings, setting):
+            return {'value': getattr(settings, setting)}
+        return {'value': "unknown setting"}
+
+    async def tag_autbot_guilds(self, guild_list, user_id):
+        guild_settings = self.bot.get_cog("GuildSettings")
+        for guild_dict in guild_list:
+            guild = self.bot.get_guild(int(guild_dict['id']))
+            settings = guild_settings.get_guild(guild, self.bot.session)
+            guild_dict['has_autbot'] = guild is not None
+            guild_dict['autbot_admin'] = bool(settings) and user_id in settings.admins_ids
         return guild_list
 
     async def interpret(
@@ -134,7 +223,7 @@ class Api(Cog):
                 for cmd in possible_commands:
                     try:
                         if args[1] in cmd.aliases or args[1] == cmd.name:
-                            help_text += f'```{args[1]} - {cmd.help}```'
+                            help_text += f'```hi{args[1]} - {cmd.help}```'
                             break
                     except IndexError:
                         help_text += '```{}: {:>5}```\n'.format(cmd.name, cmd.help)
@@ -144,7 +233,7 @@ class Api(Cog):
                 # check for user set commands in this "guild"
                 for command in self.bot.user_commands[mock_message.guild.id]:
                     if (command.triggered(mock_message.content)):
-                        await command.execute(mock_message, self.bot.session)
+                        await command.execute(mock_message)
                         break
 
             # Prevent response sending for silent requests
@@ -162,7 +251,7 @@ class Api(Cog):
                 fkmsg = self.fake_messages[guild_id][react[0]]
                 fkmsg.sends = sends
                 react = await fkmsg.add_reaction(react[1], bot=False)
-                await self.bot.get_cog("EventCog").on_reaction_add(react, MockMember())
+                await self.bot.get_cog("Events").on_reaction_add(react, MockMember())
         elif removed_reactions:
             edit = True
             resp_id = removed_reactions[0][0]
@@ -170,7 +259,7 @@ class Api(Cog):
                 fkmsg = self.fake_messages[guild_id][react[0]]
                 fkmsg.sends = sends
                 react = await fkmsg.remove_reaction(react[1])
-                await self.bot.get_cog("EventCog").on_reaction_remove(react, MockMember())
+                await self.bot.get_cog("Events").on_reaction_remove(react, MockMember())
         resp = {
             '_module': 'interpret',
             'content': '\n'.join(sends),
@@ -179,8 +268,8 @@ class Api(Cog):
             'edit': edit,
             'guild_id': guild_id,
         }
-        if resp['content']:
-            print(resp)
+        # if resp['content']:
+        #   print(resp)
         return resp
 
 
@@ -275,7 +364,7 @@ class MockMessage(object):
                 return react
 
     async def edit(self, content=None):
-        print("EDIT " + content)
+        # print("EDIT " + content)
         self.sends.append(content)
 
 

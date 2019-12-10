@@ -13,9 +13,13 @@ LOCK_KEY = u"\U0001F510"
 SWORDS = u"\U00002694"
 HAMMER_PICK = u"\U00002692"
 HAMMER = u"\U0001F528"
+CHAIN = u"\U000026D3"
 
 
 class Settings(Cog):
+    '''
+    Manage server specific aut-bot settings
+    '''
 
     def __init__(self, bot):
         self.bot = bot
@@ -24,8 +28,9 @@ class Settings(Cog):
     def guild_settings(self):
         return self.bot.get_cog('GuildSettings')
 
-    @commands.command()
+    @commands.command(hidden=True)
     async def roleids(self, ctx):
+        '''Shows the discord id for every role in your server'''
         lem = ListEmbed(ctx.channel.guild.name, '')
         lem.name = "Role IDs"
         for role in ctx.guild.roles:
@@ -34,9 +39,10 @@ class Settings(Cog):
 
     @commands.command()
     async def settings(self, ctx):
+        '''Open an interactive settings dialog'''
         settings = self.guild_settings.get_guild(ctx.guild)
         if ctx.author.id not in settings.admins_ids:
-            ctx.channel.send('nope, sorry')
+            await ctx.channel.send('nope, sorry')
             return True
 
         msg = await ctx.channel.send(embed=await self.get_embed(ctx))
@@ -50,6 +56,7 @@ class Settings(Cog):
         await msg.add_reaction(SWORDS)
         await msg.add_reaction(HAMMER_PICK)
         await msg.add_reaction(HAMMER)
+        await msg.add_reaction(CHAIN)
 
         while True:
             react, user = await self.bot.wait_for(
@@ -74,6 +81,8 @@ class Settings(Cog):
                 await self.gulag_threshold(ctx)
             elif e == HAMMER:
                 await self.gulag_severity(ctx)
+            elif e == CHAIN:
+                await self.user_command_threshold(ctx)
             await msg.edit(embed=await self.get_embed(ctx))
 
         return True
@@ -82,11 +91,23 @@ class Settings(Cog):
         await ctx.channel.send(
             '⭐ This is the number of reacts a message must get to be starboarded. Enter a number to modify it:')
         msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
-        self.guild_settings.get_guild(ctx.guild).starboard_threshold = abs(int(msg.content))
         try:
+            self.guild_settings.get_guild(ctx.guild).starboard_threshold = abs(int(msg.content))
             resp = "Threshold set"
         except Exception:
             resp = "Threshold unchanged"
+        await ctx.channel.send(resp)
+
+    async def user_command_threshold(self, ctx):
+        await ctx.channel.send(
+            f'{CHAIN} This is the number of custom responses each user can set. Enter a number to modify it:')
+        msg = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author)
+        try:
+            self.guild_settings.get_guild(ctx.guild).responses_limit = abs(int(msg.content))
+        except Exception:
+            resp = "Threshold unchanged"
+        else:
+            resp = "Threshold set"
         await ctx.channel.send(resp)
 
     async def repost_deletes(self, ctx):
@@ -156,10 +177,12 @@ class Settings(Cog):
         settings = self.guild_settings.get_guild(ctx.guild)
         if msg.mentions:
             resp = "Admins updated"
+            admin_ids = settings.admin_ids
             if msg.mentions[0].id in settings.admins_ids:
-                settings.admins_ids.remove(msg.mentions[0].id)
+                admin_ids.remove(msg.mentions[0].id)
             else:
-                settings.admins_ids += [msg.mentions[0].id]
+                admin_ids.append(msg.mentions[0].id)
+            settings.admin_ids = admin_ids
         await ctx.channel.send(resp)
 
     async def roles(self, ctx):
@@ -222,16 +245,17 @@ class Settings(Cog):
         default_role = discord.utils.get(ctx.guild.roles, id=settings.default_role_id)
 
         em = discord.Embed(title="⚙ Settings", description="Select an item for more info, or to change it", colour=0xc1c1ff)
-        em.set_author(name='Aut-Bot Server Settings', icon_url='')
+        em.set_author(name='Architus Server Settings', icon_url='')
         em.add_field(name='⭐ Starboard Threshold ', value='Current value: %d' % settings.starboard_threshold, inline=True)
         em.add_field(name='🗑️ Repost Deleted Messages', value='Current value: %s' % settings.repost_del_msg, inline=True)
         em.add_field(name='📂 Emoji Manager', value='Current value: %s' % settings.manage_emojis, inline=True)
         em.add_field(name='🤖 Bot Commands Channels', value='Current value: %s' % ', '.join(bot_commandses), inline=True)
         em.add_field(name='🛡 Default Role', value='Current value: %s' % (default_role.mention if default_role else 'None'), inline=True)
-        em.add_field(name='🔐 Aut-Bot Admins', value='Current value: %s' % ', '.join(admin_names), inline=True)
+        em.add_field(name='🔐 Architus Admins', value='Current value: %s' % ', '.join(admin_names), inline=True)
         em.add_field(name=HAMMER_PICK + ' Gulag Threshold', value='Current value: %d' % settings.gulag_threshold, inline=True)
         em.add_field(name=HAMMER + ' Gulag Severity', value='Current value: %d' % settings.gulag_severity, inline=True)
         em.add_field(name='⚔ Joinable Roles', value='Current value: %s' % ', '.join(roles_names), inline=True)
+        em.add_field(name=CHAIN + ' Responses Limit', value='Current value: %s' % settings.responses_limit, inline=True)
         return em
 
 
