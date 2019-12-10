@@ -1,7 +1,7 @@
 version: "3"
 services:
   shard:
-    image: johnyburd/shard
+    image: johnyburd/shard${TAG}
     build:
       context: ./
       dockerfile: ./shard/Dockerfile
@@ -23,7 +23,7 @@ services:
     networks:
       - webnet
   api:
-    image: johnyburd/api
+    image: johnyburd/api${TAG}
     build:
       context: ./
       dockerfile: ./api/Dockerfile
@@ -55,7 +55,7 @@ services:
     networks:
       - webnet
   postgres:
-    image: johnyburd/db:latest
+    image: johnyburd/db${TAG}
     environment:
       POSTGRES_USER: autbot
       POSTGRES_PASSWORD: autism
@@ -68,7 +68,7 @@ services:
     networks:
       - webnet
   manager:
-    image: johnyburd/manager:latest
+    image: johnyburd/manager${TAG}
     build:
       context: ./
       dockerfile: ./manager/Dockerfile
@@ -96,7 +96,7 @@ services:
     networks:
       - webnet
   rabbit:
-    image: johnyburd/rabbit
+    image: johnyburd/rabbit${TAG}
     build:
       context: ./
       dockerfile: ./rabbitmq/Dockerfile
