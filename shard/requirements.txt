@@ -11,7 +11,7 @@ chardet==3.0.4
 Click==7.0
 cycler==0.10.0
 discord==1.0.1
-discord.py==1.2.2
+discord.py>=1.2.3
 emoji==0.5.1
 entrypoints==0.3
 flake8==3.7.7
