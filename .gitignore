@@ -12,3 +12,5 @@ shard/res/meme.png
 *pyc
 *sw*
 tags
+.vs/*
+.vscode/*
