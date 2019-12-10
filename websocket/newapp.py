@@ -1,7 +1,6 @@
 from aiohttp import web
 import asyncio
 import socketio
-from functools import partial
 
 from lib.config import which_shard
 from lib.auth import JWT
@@ -14,6 +13,7 @@ sio.attach(app)
 
 shard_client = shardRPC(asyncio.get_event_loop())
 
+
 async def index(request):
     return web.Response(
         text='this endpoint is for websockets only, get your http out of here >:(',
@@ -22,13 +22,16 @@ async def index(request):
 
 app.router.add_get('/', index)
 
+
 @sio.event
 async def connect(sid, environ):
     print(f"{environ['REMOTE_ADDR']} has connected with sid: {sid}")
 
+
 @sio.event
 def disconnect(sid):
     print('client ({sid}) disconnected')
+
 
 @sio.event
 async def request_elevation(sid, msg):
@@ -37,10 +40,11 @@ async def request_elevation(sid, msg):
         jwt = JWT(token=token)
     except (jwt.exceptions.InvalidTokenError, KeyError):
         print(f"{sid} requested room elevation but didn't provide a valid jwt")
-        sio.emit('elevation_return' {'payload': {'message': "Missing or invalid jwt"}}, room=sid)
+        sio.emit('elevation_return', {'payload': {'message': "Missing or invalid jwt"}}, room=sid)
     else:
         sio.enter_room(sid, f"{sid}_auth")
-        sio.emit('elevation_return' {'payload': {'message': "success"}}, room=sid)
+        sio.emit('elevation_return', {'payload': {'message': "success"}}, room=sid)
+
 
 @sio.event
 async def mock_user_event(sid, msg):
@@ -52,6 +56,7 @@ async def mock_user_event(sid, msg):
         routing_key=f"shard_rpc_{target_shard}"
     )
     await sio.emit('mock_bot_event', {'payload': resp}, room=sid)
+
 
 @sio.event
 async def spectate(sid, msg):

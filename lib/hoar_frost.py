@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 from uuid import getnode
 from os import getpid
 
+
 class HoarFrostGenerator:
 
     def __init__(self):

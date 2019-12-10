@@ -1,6 +1,6 @@
 from collections import deque
 from src.list_embed import ListEmbed
-from pytz import timezone
+# from pytz import timezone
 
 
 class smart_message:
@@ -54,8 +54,8 @@ class smart_message:
         return lem.get_embed()
 
     def get_datetime(self, timestamp):
-        utc = timestamp.replace(tzinfo=timezone('UTC'))
-        est = utc.astimezone(timezone('US/Eastern'))
+        # utc = timestamp.replace(tzinfo=timezone('UTC'))
+        # est = utc.astimezone(timezone('US/Eastern'))
         return timestamp
 
 

@@ -3,5 +3,6 @@ max_line_length = 120
 ignore = W606,W503
 exclude =
     ./shard/src/generate/*
+    ./websocket/client.py
     ./lib/response_grammar/*
     .venv/*

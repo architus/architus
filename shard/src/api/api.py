@@ -68,22 +68,13 @@ class Api(Cog):
     async def is_member(self, user_id, guild_id, admin=False):
         '''check if user is a member or admin of the given guild'''
         guild = self.bot.get_guild(int(guild_id))
-        guild_settings = self.bot.get_cog("GuildSettings")
+        # guild_settings = self.bot.get_cog("GuildSettings")
         if not guild:
             return {'member': False}, 200
         settings = self.bot.settings[guild]
         return {
             'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)
         }, sc.OK_200
-
-    async def is_member(self, user_id, guild_id, admin=False):
-        '''check if user is a member or admin of the given guild'''
-        guild = self.bot.get_guild(int(guild_id))
-        guild_settings = self.bot.get_cog("GuildSettings")
-        if not guild:
-            return False
-        settings = guild_settings.get_guild(guild, self.bot.session)
-        return {'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)}
 
     async def delete_response(self, user_id, guild_id, trigger):
         guild = self.bot.get_guild(int(guild_id))

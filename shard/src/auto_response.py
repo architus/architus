@@ -1,6 +1,7 @@
 import string
 from contextlib import suppress
 
+
 class ResponseMode:
 
     REGEX = 'regex'
@@ -73,6 +74,7 @@ class AutoResponse:
             return 'punctuated'
 
         return 'naive'
+
 
 class TriggerCollisionException(Exception):
     pass

@@ -3,15 +3,14 @@ import functools
 import discord
 from collections import deque
 # import src.spotify_tools as spotify_tools
-spotify_tools = None
 import urllib
 import asyncio
-import os
 import aiohttp
 from bs4 import BeautifulSoup
 from src.list_embed import ListEmbed as list_embed
 
 import subprocess
+spotify_tools = None
 
 
 class GuildPlayer:
@@ -84,8 +83,8 @@ class GuildPlayer:
         print("download_url")
         print(download_url)
         self.voice.play(discord.FFmpegPCMAudio(download_url, **ffmpeg_options), after=self.agane)
-        #await asyncio.sleep(2)
-        #os.remove(download_url)
+        # await asyncio.sleep(2)
+        # os.remove(download_url)
         return self.name
 
     async def add_spotify_playlist(self, url):
