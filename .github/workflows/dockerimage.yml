@@ -17,14 +17,20 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NUM_SHARDS: 2
+      TAG: :${GITHUB_REF##*/}
 
     steps:
     - uses: actions/checkout@v1
     - name: Environment garbage
-      run: mv example.env architus.env && export TAG=":${GITHUB_REF##*/}"
+      run: mv example.env architus.env
 
     - name: Build the Docker images
       run: docker-compose build
 
+    - uses: actions/docker/login@master
+      env: 
+        DOCKER_REGISTRY_URL: registry.hub.docker.com
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USER }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASS }}
     - name: Push the images
       run: docker-compose push
