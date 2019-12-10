@@ -1,16 +1,16 @@
 version: "3"
 services:
   shard:
-    image: johnyburd/shard${TAG}
+    image: johnyburd/shard:${TAG:-latest}
     build:
       context: ./
       dockerfile: ./shard/Dockerfile
     env_file:
       - architus.env
     environment:
-        - NUM_SHARDS
+      NUM_SHARDS: "${NUM_SHARDS:-1}"
     deploy:
-      replicas: "${NUM_SHARDS}"
+      replicas: "${NUM_SHARDS:-1}"
       restart_policy:
         condition: on-failure
       resources:
@@ -23,14 +23,14 @@ services:
     networks:
       - webnet
   api:
-    image: johnyburd/api${TAG}
+    image: johnyburd/api:${TAG:-latest}
     build:
       context: ./
       dockerfile: ./api/Dockerfile
     env_file:
       - architus.env
     environment:
-        - NUM_SHARDS
+      NUM_SHARDS: "${NUM_SHARDS:-1}"
     deploy:
       replicas: 4
       restart_policy:
@@ -55,7 +55,10 @@ services:
     networks:
       - webnet
   postgres:
-    image: johnyburd/db${TAG}
+    image: johnyburd/db:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./db/Dockerfile
     environment:
       POSTGRES_USER: autbot
       POSTGRES_PASSWORD: autism
@@ -68,12 +71,12 @@ services:
     networks:
       - webnet
   manager:
-    image: johnyburd/manager${TAG}
+    image: johnyburd/manager:${TAG:-latest}
     build:
       context: ./
       dockerfile: ./manager/Dockerfile
     environment:
-        - NUM_SHARDS
+      NUM_SHARDS: "${NUM_SHARDS:-1}"
     deploy:
       restart_policy:
         condition: on-failure
@@ -96,7 +99,7 @@ services:
     networks:
       - webnet
   rabbit:
-    image: johnyburd/rabbit${TAG}
+    image: johnyburd/rabbit:${TAG:-latest}
     build:
       context: ./
       dockerfile: ./rabbitmq/Dockerfile
