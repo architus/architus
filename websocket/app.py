@@ -4,7 +4,7 @@ import socketio
 
 from lib.config import which_shard
 from lib.auth import JWT
-from lib.async_rpc_client import shardRPC
+from lib.ipc.async_rpc_client import shardRPC
 
 
 sio = socketio.AsyncServer(async_mode='aiohttp')

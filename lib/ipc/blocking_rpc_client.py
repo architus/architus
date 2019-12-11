@@ -4,10 +4,9 @@ import pika
 import uuid
 from functools import partial
 
+from lib.ipc.util import poll_for_connection
+
 connkeeper = {}
-credentials = pika.PlainCredentials('hello', 'hello')
-# TODO heartbeat should really, really not be disabled this is very bad
-parameters = pika.ConnectionParameters('rabbit', 5672, '/', credentials, heartbeat=0)
 
 
 def get_rpc_client(id):
@@ -26,7 +25,7 @@ def get_rpc_client(id):
 class shardRPC:
     """Client to handle rabbit response ids and queues and stuff"""
     def __init__(self):
-        self._connect()
+        self.connection = poll_for_connection()
         self.channel = self.connection.channel()
         result = self.channel.queue_declare(queue='', exclusive=True)
         self.callback_queue = result.method.queue
@@ -34,16 +33,6 @@ class shardRPC:
             queue=self.callback_queue,
             on_message_callback=self.on_response,
             auto_ack=True)
-
-    def _connect(self):
-        while True:
-            try:
-                self.connection = pika.BlockingConnection(parameters)
-                return
-            # except pika.exceptions.AMQPConnectionError as e:
-            except Exception as e:
-                print(f"rabbit doesn't seem to be up, trying again in 1 {e}")
-                time.sleep(1)
 
     def on_response(self, ch, method, props, body):
         if self.corr_id == props.correlation_id:

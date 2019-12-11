@@ -9,7 +9,7 @@ from src.user_command import UserCommand
 from src.smart_message import smart_message
 from lib.config import get_session, secret_token
 from lib.models import Command
-from lib import async_rpc_server, async_rpc_client, blocking_rpc_client
+from lib.ipc import async_rpc_server, async_rpc_client, blocking_rpc_client
 
 starboarded_messages = []
 

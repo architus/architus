@@ -5,7 +5,7 @@ from flask_restful import Resource, reqparse
 from flask import g
 
 from lib.config import get_session, which_shard
-from lib.blocking_rpc_client import get_rpc_client
+from lib.ipc.blocking_rpc_client import get_rpc_client
 
 
 class ShardClientWrapper:

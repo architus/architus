@@ -2,7 +2,7 @@ import asyncio
 import os
 from datetime import datetime
 
-from lib import async_rpc_server
+from lib.ipc import async_rpc_server
 
 
 class Manager:

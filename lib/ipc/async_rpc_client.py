@@ -1,7 +1,9 @@
 import uuid
 import json
 from functools import partial
-from aio_pika import connect, IncomingMessage, Message
+from aio_pika import IncomingMessage, Message
+
+from lib.ipc.util import poll_for_async_connection
 
 
 class shardRPC:
@@ -15,9 +17,7 @@ class shardRPC:
         self.loop = loop
 
     async def connect(self):
-        self.connection = await connect(
-            "amqp://hello:hello@rabbit/", loop=self.loop
-        )
+        self.connection = await poll_for_async_connection(self.loop)
         self.channel = await self.connection.channel()
         self.callback_queue = await self.channel.declare_queue(
             exclusive=True

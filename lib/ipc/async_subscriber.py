@@ -1,6 +1,8 @@
 from uuid import getnode
 from os import getpid
-from aio_pika import connect, ExchangeType
+from aio_pika import ExchangeType
+
+from lib.ipc.util import poll_for_async_connection
 
 
 # def on_message(message: IncomingMessage):
@@ -15,9 +17,7 @@ class Subscriber:
         self.id = (getnode() << 15) | getpid()
 
     async def connect(self, loop):
-        self.connection = await connect(
-            "amqp://hello:hello@rabbit/", loop=loop
-        )
+        self.connection = await poll_for_async_connection(loop)
         channel = await self.connection.channel()
         await channel.set_qos(prefetch_count=1)
         self.event_exchange = await channel.declare_exchange(
