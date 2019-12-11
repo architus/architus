@@ -1,5 +1,6 @@
 import uuid
 import json
+from functools import partial
 from aio_pika import connect, IncomingMessage, Message
 
 
@@ -29,6 +30,9 @@ class shardRPC:
         future = self.futures.pop(message.correlation_id)
         resp = json.loads(message.body)
         future.set_result((resp['resp'], resp['sc']))
+
+    def __getattr__(self, name):
+        return partial(self.call, name)
 
     async def call(self, method, *args, routing_key=None, **kwargs):
         """Remotely call a method

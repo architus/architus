@@ -2,6 +2,7 @@ import time
 import json
 import pika
 import uuid
+from functools import partial
 
 connkeeper = {}
 credentials = pika.PlainCredentials('hello', 'hello')
@@ -49,6 +50,9 @@ class shardRPC:
             resp = json.loads(body)
             self.resp = resp['resp']
             self.status_code = resp['sc']
+
+    def __getattr__(self, name):
+        return partial(self.call, name)
 
     def call(self, method, *args, routing_key=None, **kwargs):
         """Remotely call a method
