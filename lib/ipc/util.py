@@ -25,8 +25,7 @@ async def poll_for_async_connection(loop):
 def poll_for_connection():
     name = socket.gethostname()
     credentials = pika.PlainCredentials('hello', 'hello')
-    # TODO heartbeat should really, really not be disabled this is very bad
-    parameters = pika.ConnectionParameters('rabbit', 5672, '/', credentials, heartbeat=0)
+    parameters = pika.ConnectionParameters('rabbit', 5672, '/', credentials, heartbeat=60)
     while True:
         try:
             return pika.BlockingConnection(parameters)
