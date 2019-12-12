@@ -68,7 +68,7 @@ class User(CustomResource):
 
 class GuildCounter(CustomResource):
     def get(self):
-        return self.shard.guild_counter()
+        return self.shard.guild_count()
 
 
 class Logs(CustomResource):

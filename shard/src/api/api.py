@@ -37,8 +37,8 @@ class Api(Cog):
     async def ping(self):
         return {'message': 'pong'}, sc.OK_200
 
-    async def guild_counter(self):
-        return await self.bot.manager_client.call('guild_count')
+    async def guild_count(self):
+        return await self.bot.manager_client.guild_count()
 
     async def set_response(self, user_id, guild_id, trigger, response):
         guild = self.bot.get_guild(int(guild_id))
@@ -70,7 +70,7 @@ class Api(Cog):
         guild = self.bot.get_guild(int(guild_id))
         # guild_settings = self.bot.get_cog("GuildSettings")
         if not guild:
-            return {'member': False}, 200
+            return {'member': False}, sc.OK_200
         settings = self.bot.settings[guild]
         return {
             'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)
@@ -138,7 +138,7 @@ class Api(Cog):
         return {'value': "unknown setting"}, sc.NOT_FOUND_404
 
     async def tag_autbot_guilds(self, guild_list, user_id):
-        all_guilds, _ = await self.bot.manager_client.call('all_guilds')
+        all_guilds, _ = await self.bot.manager_client.all_guilds()
         for guild_dict in guild_list:
             for guild in all_guilds:
                 if str(guild['id']) == guild_dict['id']:
