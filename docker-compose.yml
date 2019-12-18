@@ -43,7 +43,7 @@ services:
       - "5000:5000"
     networks:
       - webnet
-  gatewayt:
+  gateway:
     image: johnyburd/gateway:${TAG:-latest}
     build:
       context: ./

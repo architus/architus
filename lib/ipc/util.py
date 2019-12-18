@@ -15,7 +15,7 @@ async def poll_for_async_connection(loop):
     while True:
         try:
             return await connect("amqp://hello:hello@rabbit/", loop=loop)
-        except ConnectionError as e:
+        except (ConnectionError, Exception) as e:
             print(f"{name} is waiting to connect to rabbit: {e}")
             await asyncio.sleep(3)
         finally:

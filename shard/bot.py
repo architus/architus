@@ -22,6 +22,9 @@ class Architus(Bot):
         self.tracked_messages = {}
 
         manager_client = blocking_rpc_client.shardRPC()
+        # wait for manager to come up; this is scuffed
+        import time
+        time.sleep(2)
         print("asking for shard id")
 
         shard_info, sc = manager_client.register(routing_key='manager_rpc')
