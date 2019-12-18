@@ -25,8 +25,7 @@ You can invite architus to your discord server with [this link](https://api.arch
 1. Create a discord app: https://discordapp.com/developers/applications/me 
 2. Install `docker-compose`
 3. Create `architus.env` from `example.env`
-4. Build docker images `NUM_SHARDS=1 docker-compose build`
-5. Start containers `NUM_SHARDS=1 docker-compose run`
+4. Build and start containers `docker-compose up --build`
 
 ## ❓ Getting Help
 
