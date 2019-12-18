@@ -1,6 +1,9 @@
 import uuid
 import json
-from aio_pika import connect, IncomingMessage, Message
+from functools import partial
+from aio_pika import IncomingMessage, Message
+
+from lib.ipc.util import poll_for_async_connection
 
 
 class shardRPC:
@@ -14,9 +17,7 @@ class shardRPC:
         self.loop = loop
 
     async def connect(self):
-        self.connection = await connect(
-            "amqp://hello:hello@rabbit/", loop=self.loop
-        )
+        self.connection = await poll_for_async_connection(self.loop)
         self.channel = await self.connection.channel()
         self.callback_queue = await self.channel.declare_queue(
             exclusive=True
@@ -29,6 +30,9 @@ class shardRPC:
         future = self.futures.pop(message.correlation_id)
         resp = json.loads(message.body)
         future.set_result((resp['resp'], resp['sc']))
+
+    def __getattr__(self, name):
+        return partial(self.call, name)
 
     async def call(self, method, *args, routing_key=None, **kwargs):
         """Remotely call a method

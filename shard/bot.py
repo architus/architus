@@ -9,7 +9,7 @@ from src.user_command import UserCommand
 from src.smart_message import smart_message
 from lib.config import get_session, secret_token
 from lib.models import Command
-from lib import async_rpc_server, async_rpc_client, blocking_rpc_client
+from lib.ipc import async_rpc_server, async_rpc_client, blocking_rpc_client
 
 starboarded_messages = []
 
@@ -23,9 +23,8 @@ class Architus(Bot):
 
         manager_client = blocking_rpc_client.shardRPC()
         print("asking for shard id")
-        import time
-        time.sleep(1)
-        shard_info, sc = manager_client.call('register', routing_key='manager_rpc')
+
+        shard_info, sc = manager_client.register(routing_key='manager_rpc')
         self.shard_id = shard_info['shard_id']
         print(f"Got shard_id {self.shard_id}")
 

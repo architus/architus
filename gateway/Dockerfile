@@ -2,7 +2,7 @@ FROM alpine:3.10
 
 # Set the working directory to /app
 WORKDIR /app
-COPY ./websocket/requirements.txt /app
+COPY ./gateway/requirements.txt /app
 
 # Copy the current directory contents into the container at /app
 RUN apk update && apk add python3 linux-headers pcre-dev uwsgi-python3
@@ -15,13 +15,10 @@ RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
 # RUN apk del build-base musl-dev python3-dev zeromq-dev
 RUN apk del python3-dev
 
-COPY ./websocket/ /app/
+COPY ./gateway/ /app/
 COPY ./lib /app/lib
 
 EXPOSE 6000
-
-ENV NUM_SHARDS=1
-
 
 # Run app.py when the container launches
 CMD ["python3", "-u", "app.py"]

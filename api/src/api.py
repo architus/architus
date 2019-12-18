@@ -63,12 +63,12 @@ class RedirectCallback(CustomResource):
 class User(CustomResource):
     def get(self, name: int):
         '''Request information about a user from a shard nope and return it.'''
-        return self.shard_call('fetch_user_dict', name)
+        return self.shard.fetch_user_dict(name)
 
 
 class GuildCounter(CustomResource):
     def get(self):
-        return self.shard_call('guild_counter')
+        return self.shard.guild_count()
 
 
 class Logs(CustomResource):
@@ -103,9 +103,9 @@ class AutoResponses(CustomResource):
             })
             match = p.search(cmd.response)
             if match and str(match.group("emoji_id")) not in emojis:
-                emojis[str(match.group("emoji_id"))], sc = self.shard_call('get_emoji', match.group('emoji_id'))
+                emojis[str(match.group("emoji_id"))], sc = self.shard.get_emoji(match.group('emoji_id'))
             if str(cmd.author_id) not in authors:
-                authors[str(cmd.author_id)], sc = self.shard_call('fetch_user_dict', cmd.author_id)
+                authors[str(cmd.author_id)], sc = self.shard.fetch_user_dict(cmd.author_id)
 
         resp = {
             'authors': authors,
@@ -117,19 +117,19 @@ class AutoResponses(CustomResource):
     @reqparams(trigger=str, response=str)
     @authenticated
     def post(self, guild_id: int, trigger: str, response: str, jwt: JWT):
-        return self.shard_call('set_response', jwt.id, guild_id, trigger, response, routing_guild=guild_id)
+        return self.shard.set_response(jwt.id, guild_id, trigger, response, routing_guild=guild_id)
 
     @reqparams(trigger=str)
     @authenticated
     def delete(self, guild_id: int, trigger: str, jwt: JWT):
-        return self.shard_call('delete_response', jwt.id, guild_id, trigger, routing_guild=guild_id)
+        return self.shard.delete_response(jwt.id, guild_id, trigger, routing_guild=guild_id)
 
     @reqparams(trigger=str, response=str)
     @authenticated
     def patch(self, guild_id: int, trigger: str, response: str, jwt: JWT):
-        _, sc = self.shard_call('delete_response', jwt.id, guild_id, trigger, routing_guild=guild_id)
+        _, sc = self.shard.delete_response(jwt.id, guild_id, trigger, routing_guild=guild_id)
 
-        return self.shard_call('set_response', jwt.id, guild_id, trigger, response, routing_guild=guild_id)
+        return self.shard.set_response(jwt.id, guild_id, trigger, response, routing_guild=guild_id)
 
 
 class Settings(CustomResource):
@@ -138,7 +138,7 @@ class Settings(CustomResource):
             with open('settings.json') as f:
                 return json.loads(f.read()), 200
         # discord_id = authenticate(self.session, request.headers).discord_id
-        return self.shard_call('settings_access', guild_id, setting, None, routing_guild=guild_id)
+        return self.shard.settings_access(guild_id, setting, None, routing_guild=guild_id)
 
     def post(self, guild_id: int, setting: str):
         return StatusCodes.BAD_REQUEST_400
@@ -149,13 +149,13 @@ class Coggers(CustomResource):
     @authenticated
     def get(self, jwt: JWT = None, extension: str = None):
         if jwt.id == 214037134477230080:  # johnyburd
-            return self.shard_call('get_extensions')
+            return self.shard.get_extensions()
         return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
     @authenticated
     def post(self, extension: str, jwt: JWT):
         if jwt.id == 214037134477230080:  # johnyburd
-            return self.shard_call('reload_extension', extension)
+            return self.shard.reload_extension(extension)
         return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
 
@@ -163,7 +163,7 @@ class Stats(CustomResource):
     def get(self, guild_id: int, stat: str):
         '''Request message count statistics from shard and return'''
         if stat == 'messagecount':
-            return self.shard_call('messagecount', guild_id, routing_guild=guild_id)
+            return self.shard.messagecount(guild_id, routing_guild=guild_id)
 
 
 class ListGuilds(CustomResource):
@@ -172,7 +172,7 @@ class ListGuilds(CustomResource):
         '''Forward guild list request to discord and return response'''
         resp, status_code = list_guilds_request()
         if status_code == StatusCodes.OK_200:
-            resp, _ = self.shard_call('tag_autbot_guilds', resp, jwt.id)
+            resp, _ = self.shard.tag_autbot_guilds(resp, jwt.id)
         return resp, status_code
 
 

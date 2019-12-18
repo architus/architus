@@ -43,13 +43,15 @@ services:
       - "5000:5000"
     networks:
       - webnet
-  websocket:
-    image: johnyburd/websocket
+  gatewayt:
+    image: johnyburd/gateway:${TAG:-latest}
     build:
       context: ./
-      dockerfile: ./websocket/Dockerfile
+      dockerfile: ./gateway/Dockerfile
     env_file:
       - architus.env
+    environment:
+      NUM_SHARDS: "${NUM_SHARDS:-1}"
     ports:
       - "6000:6000"
     networks:

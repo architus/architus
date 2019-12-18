@@ -1,7 +1,8 @@
 from functools import partial
-from aio_pika import connect, Message
+from aio_pika import Message
 import json
-import asyncio
+
+from lib.ipc.util import poll_for_async_connection
 
 
 async def on_message(entry_point, exchange, message):
@@ -26,14 +27,7 @@ async def on_message(entry_point, exchange, message):
 
 
 async def start_server(loop, listener_queue, entry_point):
-    while True:
-        try:
-            rabbit_connection = await connect("amqp://hello:hello@rabbit/", loop=loop)
-            break
-        except Exception as e:
-            print(f"Waiting to connect to rabbit: {e}")
-            await asyncio.sleep(1)
-    print("connected")
+    rabbit_connection = await poll_for_async_connection(loop)
 
     channel = await rabbit_connection.channel()
     queue = await channel.declare_queue(listener_queue)

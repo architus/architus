@@ -1,5 +1,7 @@
 import json
-from aio_pika import connect, Message, DeliveryMode, ExchangeType
+from aio_pika import Message, DeliveryMode, ExchangeType
+
+from lib.ipc.util import poll_for_async_connection
 
 
 class Emitter:
@@ -9,9 +11,7 @@ class Emitter:
 
     async def connect(self, loop):
         # Perform connection
-        self.connection = await connect(
-            "amqp://hello:hello@rabbit/", loop=loop
-        )
+        self.connection = await poll_for_async_connection(loop)
 
         channel = await self.connection.channel()
 
