@@ -1,5 +1,6 @@
 import os
 from uuid import getnode
+from functools import wraps
 
 from flask_restful import Resource, reqparse
 from flask import g
@@ -33,12 +34,13 @@ class CustomResource(Resource):
 
 def reqparams(**params):
     def decorator(func):
+        @wraps(func)
         def wrapper(*args, **kwargs):
             parser = reqparse.RequestParser()
             for param, type in params:
                 parser.add_argument(param, type=type, required=True)
             values = parser.parse_args()
             kwargs.update(values)
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
         return wrapper
     return decorator

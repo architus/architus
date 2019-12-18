@@ -47,7 +47,7 @@ class shardRPC:
         All rabbit connections require heartbeat, but flask doesn't have time to do this itself.
         `process_data_events` is not thread safe, however
         '''
-        while self.connection.is_open():
+        while self.connection.is_open:
             with self.hb_lock:
                 self.connection.process_data_events(time_limit=0)
             time.sleep(30)

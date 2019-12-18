@@ -11,13 +11,14 @@ from lib.ipc.util import poll_for_async_connection
 
 
 class Subscriber:
-    def __init__(self):
+    def __init__(self, loop):
+        self.loop = loop
         self.connection = None
         self.queue = None
         self.id = (getnode() << 15) | getpid()
 
-    async def connect(self, loop):
-        self.connection = await poll_for_async_connection(loop)
+    async def connect(self):
+        self.connection = await poll_for_async_connection(self.loop)
         channel = await self.connection.channel()
         await channel.set_qos(prefetch_count=1)
         self.event_exchange = await channel.declare_exchange(
@@ -26,9 +27,12 @@ class Subscriber:
         self.queue = await channel.declare_queue(
             f'event_queue_{self.id}', exclusive=True
         )
+        return self
 
     async def bind_key(self, key):
         await self.queue.bind(self.event_exchange, routing_key=key)
+        return self
 
     async def bind_callback(self, callback):
         await self.queue.consume(callback)
+        return self
