@@ -5,11 +5,14 @@ from functools import wraps
 from aiohttp import web
 import socketio
 from aio_pika import IncomingMessage
+from jwt.exceptions import InvalidTokenError
 
 from lib.config import which_shard
 from lib.auth import JWT
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
+from lib.ipc.async_rpc_server import start_server
+from lib.status_codes import StatusCodes as sc
 
 
 sio = socketio.AsyncServer(async_mode='aiohttp')
@@ -37,6 +40,17 @@ def payload_params(*params):
     return decorator
 
 
+async def register_nonce(method, *args, **kwargs):
+    if method == 'register_nonce':
+        try:
+            auth_nonces[args[0]] = args[1]
+        except IndexError:
+            pass
+        else:
+            return {'message': 'registered'}, sc.OK_200
+    return {'message': 'invaild arguments'}, sc.BAD_REQUEST_400
+
+
 async def event_callback(msg: IncomingMessage):
     '''handles incoming events from the other services'''
     with msg.process():
@@ -59,7 +73,7 @@ async def connect(sid: str, environ: dict):
     request = environ['aiohttp.request']
     try:
         jwt = JWT(token=request.cookies['token'])
-    except KeyError:
+    except (InvalidTokenError, KeyError):
         print("No valid token found, logging into unprivileged gateway...")
     else:
         print("Found valid token, logging into elevated gateway...")
@@ -78,7 +92,8 @@ def disconnect(sid: str):
 async def request_elevation(sid: str, msg: dict, nonce: int):
     try:
         jwt = JWT(token=auth_nonces[nonce])
-    except KeyError:
+        del auth_nonces[nonce]
+    except (InvalidTokenError, KeyError):
         print(f"{sid} requested room elevation but didn't provide a valid jwt")
         await sio.emit('elevation_return', {'payload': {'message': "Missing or invalid jwt"}}, room=sid)
     else:
@@ -118,4 +133,5 @@ if __name__ == '__main__':
         await (await (await event_sub.connect()).bind_key("gateway_events")).bind_callback(event_callback)
 
     sio.start_background_task(register_clients, shard_client, event_subscriber)
+    sio.start_background_task(start_server, loop, 'gateway_rpc', register_nonce)
     web.run_app(app, host='0.0.0.0', port='6000')

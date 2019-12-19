@@ -44,8 +44,8 @@ async def pong_from_server(data):
 
 async def start_server():
     print('hello I\'m a UI :)')
-    # await sio.connect('https://ws.archit.us')
-    await sio.connect('http://127.0.0.1:6000')
+    await sio.connect('https://gateway.develop.archit.us')
+    # await sio.connect('http://127.0.0.1:6000')
     await sio.wait()
 
 
