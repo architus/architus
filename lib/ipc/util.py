@@ -25,7 +25,7 @@ async def poll_for_async_connection(loop):
 def poll_for_connection():
     name = socket.gethostname()
     credentials = pika.PlainCredentials('hello', 'hello')
-    parameters = pika.ConnectionParameters('rabbit', 5672, '/', credentials, heartbeat=60)
+    parameters = pika.ConnectionParameters('rabbit', 5672, '/', credentials, heartbeat=200)
     while True:
         try:
             return pika.BlockingConnection(parameters)
