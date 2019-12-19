@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from urllib.parse import quote_plus
+from secrets import randbits
 
 from flask_restful import Resource
 from flask import redirect, request, jsonify, make_response
@@ -57,6 +58,7 @@ class TokenExchange(Resource):
                     'id': id_data['id'],
                     'permissions': 0,
                 })
+                nonce = randbits(32)
                 data = {
                     # 'token': jwt.get_token().decode()
                     'user': id_data,
@@ -64,6 +66,7 @@ class TokenExchange(Resource):
                         'issuedAt': now,
                         'expiresIn': expires_in,
                         'refreshIn': refresh_in,
+                        'gateway_nonce': nonce,
                     }
                 }
                 print(data)
@@ -72,6 +75,13 @@ class TokenExchange(Resource):
                 response.set_cookie("token", jwt.get_token().decode(), domain=f'.{DOMAIN}', secure=True, httponly=True)
                 response.data = jsonify(data)
                 response.status_code = StatusCodes.OK_200
+
+                self.shard.client.call(
+                    'register_nonce',
+                    nonce,
+                    jwt.get_token().decode(),
+                    routing_key='gateway_rpc'
+                )
                 return response
 
         return jsonify(ex_data), status_code
