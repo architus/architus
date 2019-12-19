@@ -2,7 +2,7 @@ import json
 import uuid
 import time
 from functools import partial
-from threading import Thread, Lock
+from threading import Thread, RLock
 
 import pika
 
@@ -29,7 +29,7 @@ class shardRPC:
     def __init__(self):
         self.connection = poll_for_connection()
         self.channel = self.connection.channel()
-        self.hb_lock = Lock()
+        self.hb_lock = RLock()
         result = self.channel.queue_declare(queue='', exclusive=True)
         self.callback_queue = result.method.queue
         self.channel.basic_consume(
@@ -39,6 +39,10 @@ class shardRPC:
 
         hb_thread = Thread(target=self.heartbeat, daemon=True)
         hb_thread.start()
+
+    def __del__(self):
+        with self.hb_lock:
+            self.connection.close()
 
     def heartbeat(self):
         '''
@@ -50,13 +54,15 @@ class shardRPC:
         while True:
             with self.hb_lock:
                 self.connection.process_data_events(time_limit=0)
-            time.sleep(30)
+                print("thump")
+            time.sleep(10)
 
     def on_response(self, ch, method, props, body):
         if self.corr_id == props.correlation_id:
-            resp = json.loads(body)
-            self.resp = resp['resp']
-            self.status_code = resp['sc']
+            with self.hb_lock:
+                resp = json.loads(body)
+                self.resp = resp['resp']
+                self.status_code = resp['sc']
 
     def __getattr__(self, name):
         return partial(self.call, name)
