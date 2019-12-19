@@ -54,8 +54,7 @@ class shardRPC:
         while True:
             with self.hb_lock:
                 self.connection.process_data_events(time_limit=0)
-                print("thump")
-            time.sleep(10)
+            time.sleep(60)
 
     def on_response(self, ch, method, props, body):
         if self.corr_id == props.correlation_id:
