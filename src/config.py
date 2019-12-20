@@ -15,11 +15,12 @@ try:
     db_pass = lines[2]
     client_id = lines[3]
     client_secret = lines[4]
-    twitter_consumer_key = lines[5]
-    twitter_consumer_secret = lines[6]
-    twitter_access_token_key = lines[7]
-    twitter_access_token_secret = lines[8]
-    scraper_token = lines[9]
+    alphavantage_api_key = lines[5]
+    twitter_consumer_key = lines[6]
+    twitter_consumer_secret = lines[7]
+    twitter_access_token_key = lines[8]
+    twitter_access_token_secret = lines[9]
+    scraper_token = lines[10]
 
 except Exception as e:
     print(e)
