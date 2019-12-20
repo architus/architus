@@ -18,6 +18,7 @@ try:
     client_id = os.environ['client_id']
     client_secret = os.environ['client_secret']
     domain_name = os.environ['domain_name']
+    alphavantage_api_key = os.environ['alphavantage_api_key']
     twitter_consumer_key = os.environ['twitter_consumer_key']
     twitter_consumer_secret = os.environ['twitter_consumer_secret']
     twitter_access_token_key = os.environ['twitter_access_token_key']
