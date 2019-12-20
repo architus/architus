@@ -3,7 +3,7 @@ import discord
 import aiohttp
 import json
 
-from lib.config import alphavantage_api_key
+from src.config import alphavantage_api_key
 
 
 class Stocks(commands.Cog, name="Stock Prices"):
