@@ -5,13 +5,14 @@ from lib.ipc.util import poll_for_async_connection
 
 
 class Emitter:
-    def __init__(self):
+    def __init__(self, loop):
+        self.loop = loop
         self.connection = None
         self.event_exchange = None
 
-    async def connect(self, loop):
+    async def connect(self):
         # Perform connection
-        self.connection = await poll_for_async_connection(loop)
+        self.connection = await poll_for_async_connection(self.loop)
 
         channel = await self.connection.channel()
 

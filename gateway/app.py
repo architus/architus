@@ -55,15 +55,8 @@ async def event_callback(msg: IncomingMessage):
     '''handles incoming events from the other services'''
     with msg.process():
         body = json.loads(msg.body.decode())
+        print(body)
 
-        def register_nonce(nonce: int, jwt: JWT):
-            auth_nonces[nonce] = jwt
-
-        if body['method'] == 'register_nonce':
-            auth_nonces[body['args']]
-
-        elif body['method'] == 'emit':
-            pass
             # sio.emit(body['event'], {'payload': {'message': 'broadcast'}}
 
 
@@ -130,7 +123,7 @@ app.router.add_get('/', index)
 if __name__ == '__main__':
     async def register_clients(shard_client, event_sub):
         await shard_client.connect()
-        await (await (await event_sub.connect()).bind_key("gateway_events")).bind_callback(event_callback)
+        await (await (await event_sub.connect()).bind_key("gateway.*")).bind_callback(event_callback)
 
     sio.start_background_task(register_clients, shard_client, event_subscriber)
     sio.start_background_task(start_server, loop, 'gateway_rpc', register_nonce)

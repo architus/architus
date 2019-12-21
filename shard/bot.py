@@ -10,6 +10,8 @@ from src.smart_message import smart_message
 from lib.config import get_session, secret_token
 from lib.models import Command
 from lib.ipc import async_rpc_server, async_rpc_client, blocking_rpc_client
+from lib.ipc.async_emitter import Emitter
+from lib.hoar_frost import HoarFrostGenerator
 
 starboarded_messages = []
 
@@ -20,6 +22,8 @@ class Architus(Bot):
         self.user_commands = {}
         self.session = get_session()
         self.tracked_messages = {}
+
+        self.hoarfrost_gen = HoarFrostGenerator()
 
         manager_client = blocking_rpc_client.shardRPC()
         # wait for manager to come up; this is scuffed
@@ -35,6 +39,7 @@ class Architus(Bot):
         super().__init__(**kwargs)
 
     def run(self, token):
+        self.emitter = Emitter(self.loop)
         self.loop.create_task(self.list_guilds())
         self.loop.create_task(
             async_rpc_server.start_server(
@@ -46,6 +51,8 @@ class Architus(Bot):
 
         self.manager_client = async_rpc_client.shardRPC(self.loop, default_key='manager_rpc')
         self.loop.create_task(self.manager_client.connect())
+
+        self.loop.create_task(self.emitter.connect())
 
         super().run(token)
 
