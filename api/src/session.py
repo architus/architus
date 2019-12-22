@@ -73,10 +73,8 @@ class TokenExchange(Resource):
                 }
                 print(data)
 
-                response = make_response()
+                response = make_response(jsonify(data), StatusCodes.OK_200)
                 response.set_cookie("token", jwt.get_token().decode(), domain=f'.{DOMAIN}', secure=True, httponly=True)
-                response.data = jsonify(data)
-                response.status_code = StatusCodes.OK_200
                 return response
 
         return jsonify(ex_data), status_code
