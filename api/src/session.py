@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from urllib.parse import quote_plus
 
 from flask_restful import Resource
-from flask import redirect, request, jsonify, make_response, after_this_request
+from flask import redirect, request, jsonify
 
 from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN
 from lib.status_codes import StatusCodes
@@ -73,12 +73,7 @@ class TokenExchange(Resource):
                 }
                 print(data)
 
-                @after_this_request
-                def set_is_bar_cookie(response):
-                    response.set_cookie("token", jwt.get_token().decode(), domain=f'.{DOMAIN}', secure=True, httponly=True)
-                    return response
-
-                return jsonify(data), StatusCodes.OK_200
+                return jsonify(data), StatusCodes.OK_200, {'Set-Cookie': f'token={jwt.get_token().decode()}; Domain=.{DOMAIN}; Secure; HttpOnly;'}
 
         return jsonify(ex_data), status_code
 
