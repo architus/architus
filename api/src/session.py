@@ -43,7 +43,7 @@ class RefreshToken(CustomResource):
 
 class TokenExchange(Resource):
     @reqparams(code=str)
-    def post(self, code):
+    def post(self, code: str):
         ex_data, status_code = token_exchange_request(code)
 
         if status_code == StatusCodes.OK_200:
@@ -58,22 +58,23 @@ class TokenExchange(Resource):
                     'refresh_token': ex_data['refresh_token'],
                     'expires_in': expires_in,
                     'issued_at': now.isoformat(),
-                    'refresh_in': refresh_in,
                     'id': id_data['id'],
-                    'permissions': 0,
+                    'permissions': 274,
                 })
                 data = {
-                    # 'token': jwt.get_token().decode()
+                    # 'token': jwt.get_token()
                     'user': id_data,
                     'access': {
                         'issuedAt': now.isoformat(),
-                        'expiresIn': expires_in.isoformat(),
-                        'refreshIn': refresh_in.isoformat(),
+                        'expiresIn': expires_in,
+                        'refreshIn': int(refresh_in.total_seconds()),
                     }
                 }
-                print(data)
 
-                cookie = {'Set-Cookie': f'token={jwt.get_token().decode()}; Domain=.{DOMAIN}; Secure; HttpOnly;'}
+                cookie = {
+                    'Set-Cookie':
+                        f'token={jwt.get_token()}; Max-Age={expires_in * 2}; Domain=.{DOMAIN}; Secure; HttpOnly;'
+                }
                 return data, StatusCodes.OK_200, cookie
 
         return ex_data, status_code
