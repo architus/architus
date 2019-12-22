@@ -1,7 +1,7 @@
 import json
 import re
 
-from flask import Flask, redirect, request, g, jsonify
+from flask import Flask, redirect, request, g
 from flask_restful import Api, Resource
 from flask_cors import CORS
 
@@ -83,7 +83,7 @@ class Logs(CustomResource):
                 'user_id': str(log.user_id),
                 'timestamp': log.timestamp.isoformat()
             })
-            return jsonify({"logs": logs}), StatusCodes.OK_200
+            return {"logs": logs}, StatusCodes.OK_200
 
 
 class AutoResponses(CustomResource):
