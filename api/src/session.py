@@ -67,15 +67,15 @@ class TokenExchange(Resource):
                     'user': id_data,
                     'access': {
                         'issuedAt': now.isoformat(),
-                        'expiresIn': expires_in,
-                        'refreshIn': refresh_in,
+                        'expiresIn': expires_in.isoformat(),
+                        'refreshIn': refresh_in.isoformat(),
                     }
                 }
                 print(data)
 
-                return jsonify(data), StatusCodes.OK_200, {'Set-Cookie': f'token={jwt.get_token().decode()}; Domain=.{DOMAIN}; Secure; HttpOnly;'}
+                return data, StatusCodes.OK_200, {'Set-Cookie': f'token={jwt.get_token().decode()}; Domain=.{DOMAIN}; Secure; HttpOnly;'}
 
-        return jsonify(ex_data), status_code
+        return ex_data, status_code
 
 
 class Identify(Resource):
