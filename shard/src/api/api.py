@@ -2,6 +2,7 @@ import traceback
 import secrets
 import discord
 from discord.ext.commands import Cog, Context
+
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 from lib.status_codes import StatusCodes as sc
@@ -75,6 +76,12 @@ class Api(Cog):
         return {
             'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)
         }, sc.OK_200
+
+    async def get_permissions(self, user_id: int, guild_id: int):
+        guild = self.bot.get_guild(int(guild_id))
+        settings = self.bot.settings[guild]
+        default = not guild or not settings and user_id not in settings.admin_ids
+        return {'permissions': 274 if default else 65535}
 
     async def delete_response(self, user_id, guild_id, trigger):
         guild = self.bot.get_guild(int(guild_id))
