@@ -57,7 +57,7 @@ class TokenExchange(Resource):
                     'access_token': discord_token,
                     'refresh_token': ex_data['refresh_token'],
                     'expires_in': expires_in,
-                    'issued_at': now,
+                    'issued_at': now.isoformat(),
                     'refresh_in': refresh_in,
                     'id': id_data['id'],
                     'permissions': 0,
@@ -66,7 +66,7 @@ class TokenExchange(Resource):
                     # 'token': jwt.get_token().decode()
                     'user': id_data,
                     'access': {
-                        'issuedAt': now,
+                        'issuedAt': now.isoformat(),
                         'expiresIn': expires_in,
                         'refreshIn': refresh_in,
                     }
