@@ -44,7 +44,7 @@ class RedirectCallback(CustomResource):
     '''
     def get(self):
         # TODO validate domain
-        redirect_url = request.cookies.get('next')
+        redirect_url = request.cookies.get('next') or f'https://{DOMAIN}/app'
         code = request.args.get('code')
         perms = request.args.get('permissions')
         guild_id = request.args.get('guild_id')

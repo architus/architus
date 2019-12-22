@@ -28,7 +28,12 @@ class Login(CustomResource):
         #     url = CALLBACK_URL
 
         # TODO default destination if return is not included
-        response.set_cookie('next', request.args.get('return'), domain=f'api.{DOMAIN}', secure=True, httponly=True)
+        response.set_cookie(
+            'next',
+            request.args.get('return') or f'https://{DOMAIN}/app',
+            domain=f'api.{DOMAIN}',
+            secure=True, httponly=True
+        )
         return response
 
 
