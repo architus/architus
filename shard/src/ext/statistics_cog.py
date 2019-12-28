@@ -1,105 +1,116 @@
-from discord.ext import commands
 import random
 import string
 import os
-import src.generate.wordcount as wordcount_gen
+from collections import defaultdict
+from datetime import datetime, timezone, timedelta
+
+from discord.ext import commands
+from discord import Forbidden, HTTPException
 import discord
 import json
 
+import src.generate.wordcount as wordcount_gen
+
 IMAGE_CHANNEL_ID = 577523623355613235
-LINHS_ID = 81231616772411392
+
+class MessageData:
+
+    epoch = datetime(2015, 1, 1, tzinfo=timezone.utc)
+
+    def __init__(self, message_id, author_id, channel_id, total_words, correct_words):
+        self.message_id = message_id
+        self.author_id = author_id
+        self.channel_id = channel_id
+        self.total_words = total_words
+        self.correct_words = correct_words
+
+    def __hash__(self):
+        return hash(self.message_id)
+
+    @property
+    def created_at(self):
+        return self.__class__.epoch + timedelta(milliseconds=self.message_id >> 22)
 
 
 class MessageStats(commands.Cog, name="Server Statistics"):
 
     def __init__(self, bot):
         self.bot = bot
-        self._cache = None
+        self.cache = defaultdict(list)
         with open('res/words/words.json') as f:
             self.dictionary = json.loads(f.read())
 
-    @property
-    def cache(self):
-        self._cache = self._cache or {guild: {} for guild in self.bot.guilds}
-        return self._cache
+    def count_correct(self, string):
+        '''returns the number of correctly spelled words in a string'''
+        return len([w for w in string.split() if w in self.dictionary or w.upper() in ('A', 'I')])
+
+    async def cache_guild(self, guild):
+        '''cache interesting information about all the messages in a guild'''
+        print(f"Downloading messages in {len(guild.channels)} channels for '{guild.name}'...")
+        for channel in guild.text_channels:
+            try:
+                async for message in channel.history(oldest_first=True):
+                    self.cache[guild.id].append(MessageData(
+                        message.id,
+                        message.author.id,
+                        channel.id,
+                        len(message.clean_content.split()),
+                        self.count_correct(message.clean_content)
+                    ))
+            except Forbidden:
+                print(f"Insuffcient permissions to download messages from '{guild.name}.{channel.name}'")
+            except HTTPException as e:
+                print(f"Caught {e} when downloading '{guild.name}.{channel.name}'")
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print(f"Caching messages for {len(self.bot.guilds)} guilds...")
+        for guild in self.bot.guilds:
+            await self.cache_guild(guild)
+        print(f"Message cache up-to-date")
 
     @commands.Cog.listener()
     async def on_message(self, msg):
-        try:
-            self.cache[msg.guild]['messages'][msg.channel].append(msg)
-        except (KeyError, AttributeError):
-            pass
+        self.cache[msg.channel.guild.id].append(MessageData(
+            msg.id,
+            msg.author.id,
+            msg.channel.id,
+            len(msg.clean_content.split()),
+            self.count_correct(msg.clean_content)
+        ))
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        self.cache.setdefault(guild, {})
+        await self.cache_guild(guild)
 
     @commands.command()
     async def spellcheck(self, ctx, victim: discord.Member):
         '''Checks the spelling of a user'''
-        ctxchannel = ctx.channel
-        cache = self.cache
-        cache[ctxchannel.guild].setdefault('messages', {})
-        blacklist = []
-        blacklist.append(discord.utils.get(ctx.guild.text_channels, name='bot-commands'))
-        blacklist.append(discord.utils.get(ctx.guild.text_channels, name='private-bot-commands'))
-        correct_words = 0
         words = 1
-        async with ctxchannel.typing():
-            for channel in ctx.guild.text_channels:
-                try:
-                    if channel not in blacklist:
-                        if channel not in cache[ctxchannel.guild]['messages'].keys()\
-                                or not cache[ctxchannel.guild]['messages'][channel]:
-                            print("reloading cache for " + channel.name)
-                            iterator = [log async for log in channel.history(limit=7500)]
-                            logs = list(iterator)
-                            cache[ctxchannel.guild]['messages'][channel] = logs
-                        msgs = cache[ctxchannel.guild]['messages'][channel]
-                        for msg in msgs:
-                            if msg.author == victim:
-                                for word in msg.clean_content.split():
-                                    if word[0] == '!':
-                                        continue
-                                    words += 1
-                                    if word in self.dictionary and len(word) > 1 or word in ['a', 'i', 'A', 'I']:
-                                        correct_words += 1
-                except Exception as e:
-                    print(e)
-        linh_modifier = 10 if victim.id == LINHS_ID else 0
-        await ctx.channel.send("{0:.1f}% out of the {1:,} scanned words sent by {2} are spelled correctly".format(
-            ((correct_words / words) * 100) - linh_modifier, words, victim.display_name))
+        correct_words = 0
+        async with ctx.channel.typing():
+            for msgdata in self.cache[ctx.guild.id]:
+                if msgdata.author_id == victim.id:
+                    words += msgdata.total_words
+                    correct_words += msgdata.correct_words
+        ratio = correct_words / words * 100
+        await ctx.send(f"{ratio:.1f}% of the {words:,} words sent by {victim.display_name} are spelled correctly.")
 
     async def count_messages(self, guild):
         '''Count the total messages a user has sent in the server'''
-        cache = self.cache
-        cache[guild].setdefault('messages', {})
-        blacklist = []
         word_counts = {}
         message_counts = {}
-        for channel in guild.text_channels:
-            try:
-                if channel not in blacklist:
-                    if channel not in cache[guild]['messages'].keys()\
-                            or not cache[guild]['messages'][channel]:
-                        print("reloading cache for " + channel.name)
-                        iterator = [log async for log in channel.history(limit=1000000)]
-                        logs = list(iterator)
-                        cache[guild]['messages'][channel] = logs
-                    msgs = cache[guild]['messages'][channel]
-                    for msg in msgs:
-                        message_counts[msg.author] = message_counts.get(msg.author, 0) + 1
-                        word_counts[msg.author] = word_counts.get(msg.author, 0) + len(msg.clean_content.split())
-            except Exception as e:
-                print(e)
+        for msgdata in self.cache[guild.id]:
+            message_counts[msgdata.author_id] = message_counts.get(msgdata.author_id, 0) + 1
+            word_counts[msgdata.author_id] = word_counts.get(msgdata.author_id, 0) + msgdata.total_words
 
         return message_counts, word_counts
 
     @commands.command()
-    async def messagecount(self, ctx, *args):
+    async def messagecount(self, ctx, victim: discord.Member = None):
         async with ctx.channel.typing():
             message_counts, word_counts = await self.count_messages(ctx.guild)
-        victim = ctx.message.mentions[0] if ctx.message.mentions else None
+
         key = ''.join(random.choice(string.ascii_letters) for n in range(10))
         wordcount_gen.generate(key, message_counts, word_counts, victim)
         channel = discord.utils.get(self.bot.get_all_channels(), id=IMAGE_CHANNEL_ID)

@@ -16,8 +16,8 @@ def generate(key, message_counts, word_counts, victim):
     colors = random.sample(COLORS, 2)
     top_5_mesages = sorted(message_counts.items(), key=operator.itemgetter(1))[-5:]
 
-    if victim and victim not in [m[0] for m in top_5_mesages]:
-        top_5_mesages[0] = (victim, message_counts[victim] if victim in message_counts else 0)
+    if victim and victim.id not in [m[0] for m in top_5_mesages]:
+        top_5_mesages[0] = (victim.id, message_counts[victim.id] if victim.id in message_counts else 0)
 
     n_groups = len(top_5_mesages)
 
@@ -42,7 +42,7 @@ def generate(key, message_counts, word_counts, victim):
     ax.set_ylabel('Count')
     #ax.set_title('Scores by group and gender')
     ax.set_xticks(index + bar_width / 2)
-    ax.set_xticklabels([m[0].display_name for m in reversed(top_5_mesages)])
+    ax.set_xticklabels([m[0] for m in reversed(top_5_mesages)])
     ax.legend()
 
     fig.tight_layout()
