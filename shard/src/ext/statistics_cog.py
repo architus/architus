@@ -2,7 +2,7 @@ import random
 import string
 import os
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 
 from discord.ext import commands
 from discord import Forbidden, HTTPException
@@ -13,6 +13,7 @@ import src.generate.wordcount as wordcount_gen
 from lib.config import DISCORD_EPOCH
 
 IMAGE_CHANNEL_ID = 577523623355613235
+
 
 class MessageData:
 

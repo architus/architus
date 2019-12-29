@@ -2,6 +2,7 @@ from functools import wraps
 
 from lib.status_codes import StatusCodes as sc
 
+
 def fetch_guild(func):
     @wraps(func)
     def decorator(self, *args, **kwargs):
@@ -12,4 +13,3 @@ def fetch_guild(func):
 
         return func(self, guild, *args[1:], **kwargs)
     return decorator
-
