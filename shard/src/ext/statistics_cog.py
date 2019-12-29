@@ -51,7 +51,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
                 async for message in channel.history(limit=None, oldest_first=True):
                     self.cache[guild.id].append(MessageData(
                         message.id,
-                        message.author.id,
+                        message.author,
                         channel.id,
                         len(message.clean_content.split()),
                         self.count_correct(message.clean_content)
@@ -72,7 +72,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
     async def on_message(self, msg):
         self.cache[msg.channel.guild.id].append(MessageData(
             msg.id,
-            msg.author.id,
+            msg.author,
             msg.channel.id,
             len(msg.clean_content.split()),
             self.count_correct(msg.clean_content)
@@ -111,7 +111,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         channel_bins = defaultdict(int)
         for msgdata in self.cache[guild.id]:
             date = msgdata.created_at - ((msgdata.created_at - DISCORD_EPOCH) % time_granularity)
-            time_bins[date] += 1
+            time_bins[date.isoformat()] += 1
             member_bins[msgdata.author.id] += 1
             channel_bins[msgdata.channel_id] += 1
         return member_bins, channel_bins, time_bins

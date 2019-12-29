@@ -10,5 +10,6 @@ def fetch_guild(func):
         if not guild:
             return {'message': "Unknown Guild"}, sc.NOT_FOUND_404
 
-        return func(self, guild, *[1:]args, **kwargs)
+        return func(self, guild, *args[1:], **kwargs)
+    return decorator
 

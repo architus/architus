@@ -1,5 +1,6 @@
 import traceback
 import secrets
+from datetime import timedelta
 
 from discord.ext.commands import Cog, Context
 import discord
@@ -124,15 +125,14 @@ class Api(Cog):
         return {"message": "Reload signal sent"}, sc.OK_200
 
     @fetch_guild
-    async def message_bins(self, guild):
+    async def bin_messages(self, guild):
         stats_cog = self.bot.get_cog("Server Statistics")
-        mc, wc = await stats_cog.count_messages(guild)
+        members, channels, times = stats_cog.bin_messages(guild, timedelta(minutes=5))
         return {
-            'total': len(stats_cog.cache[guild_id]),
-            'members': {
-                'messages': {k.id: v for k, v in mc.items()},
-                'words': {k.id: v for k, v in wc.items()}
-            }
+            'total': len(stats_cog.cache[guild.id]),
+            'members': members,
+            'channels': channels,
+            'times': times,
         }, sc.OK_200
 
     @fetch_guild
