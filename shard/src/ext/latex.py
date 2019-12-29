@@ -6,8 +6,6 @@ import shutil
 import io
 import PIL
 import PIL.Image
-from open_relative import *
-
 
 class Latex(commands.Cog, name="LaTeX Renderer"):
 
@@ -15,8 +13,8 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
     DARK_MODE_TEXT_COLOR = "F0F0F0"
 
     def load_template(self):
-        with open_relative('../../latex_template.txt', encoding='utf-8') as f:
-            raw = f.read()
+        with open('res/latex_template.txt', encoding='utf-8') as f:
+           raw = f.read()
         return raw
 
     TEMPLATE = self.load_template()
@@ -34,7 +32,7 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
         '''
         Render some LaTeX code and post the result as an image.
         '''
-        latex_file = TEMPLATE.replace("#TEXTCOLOR",Latex.DARK_MODE_TEXT_COLOR).replace("#CONTENT",latex)
+        latex_file = Latex.TEMPLATE.replace("#TEXTCOLOR", Latex.DARK_MODE_TEXT_COLOR).replace("#CONTENT", latex)
         payload = {
             'code': latex_file,
             'format': 'png'
