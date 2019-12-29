@@ -1,23 +1,25 @@
 from discord.ext import commands
-import discord
 import requests
+import discord
 import aiohttp
 import shutil
 import io
 import PIL
 import PIL.Image
 
+
 class Latex(commands.Cog, name="LaTeX Renderer"):
 
     HOST = 'http://rtex.probablyaweb.site/api/v2'
+    DARK_MODE_TEXT_COLOR = "F0F0F0"
 
     def __init__(self, bot):
         self.bot = bot
 
     def download_file(self, url, dest_filename):
-        response = requests.get(url, stream = True)
+        response = requests.get(url, stream=True)
         response.raise_for_status()
-        with open(dest_filename, 'wb') as out_File:
+        with open(dest_filename, 'wb') as out_file:
             shutil.copyfilobj(response.raw, out_file)
 
     async def render(self, ctx, latex: str):
@@ -25,39 +27,52 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
         Render some LaTeX code and post the result as an image.
         '''
         latex_file = (
+            f"\\usepackage{{xcolor}}\n"
             f"\\documentclass{{article}}\n"
+            f"\\definecolor{{textcolor}}{{HTML}}{{{DARK_MODE_TEXT_COLOR}}}\n"
             f"\\begin{{document}}\n"
             f"\\pagenumbering{{gobble}}\n"
+            f"\\color{{textcolor}}\n"
             f"\\[{latex}\\]\n"
             f"\\end{{document}}\n"
         )
         payload = {
-            'code': latex,
+            'code': latex_file,
             'format': 'png'
         }
         async with aiohttp.ClientSession() as session:
             try:
-                async with session.post(HOST, json=payload, timeout=8) as loc_req:
+                async with session.post(Latex.HOST, json=payload, timeout=8) as loc_req:
                     loc_req.raise_for_status()
                     jdata = await loc_req.json()
                     if jdata['status'] == 'error':
+                        print("jdata has error status")
                         await ctx.send('Failed to render LaTeX.')
                     filename = jdata['filename']
-                async with session.get(f"{HOST}/{filename}", json=payload, timeout=8) as img_req:
-                    img_re.raise_for_status()
+                async with session.get(f"{Latex.HOST}/{filename}", json=payload, timeout=8) as img_req:
+                    img_req.raise_for_status()
                     fo = io.BytesIO(await img_req.read())
                     image = PIL.Image.open(fo).convert('RGBA')
             except aiohttp.client_exceptions.ClientResponseError:
+                print("ClientResponseError from Latex render method")
                 await ctx.send('Failed to render LaTeX.')
         if image.width <= 2 or image.height <= 2:
-            raise RenderingError(None)
+            raise Exception("Rendering Error")
+            print("Rendering Error from Latex render method")
+        OVERSAMPLING = 2
         border_size = 5 * OVERSAMPLING
-        colour_back = imageutil.hex_to_tuple(colour_back)
+        colour_back = '36393E'
+        colour_back = (
+            int(colour_back[0:2], base=16),
+            int(colour_back[2:4], base=16),
+            int(colour_back[4:6], base=16)
+        )
         width, height = image.size
-        backing = imageutil.new_monocolour((width + border_size * 2, height + border_size * 2), colour_back)
+        backing = PIL.Image.new('RGBA', (width + border_size * 2, height + border_size * 2), colour_back)
         backing.paste(image, (border_size, border_size), image)
         if OVERSAMPLING != 1:
-            backing = backing.resize((backing.width // OVERSAMPLING, backing.height // OVERSAMPLING), resample = PIL.Image.BICUBIC)
+            backing = backing.resize((backing.width // OVERSAMPLING, backing.height // OVERSAMPLING),
+                                     resample=PIL.Image.BICUBIC)
         fobj = io.BytesIO()
         backing.save(fobj, format='PNG')
         fobj = io.BytesIO(fobj.getvalue())
@@ -65,8 +80,9 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
 
     @commands.command()
     async def latex(self, ctx, content: str):
-        image = await render(ctx, content)
-        ctx.send(file=Discord.file(image, 'latex.png'))
+        image = await self.render(ctx, content)
+        await ctx.send(file=discord.File(image, 'latex.png'))
+
 
 def setup(bot):
     bot.add_cog(Latex(bot))
