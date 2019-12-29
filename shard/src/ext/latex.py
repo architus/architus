@@ -78,7 +78,8 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
         return fobj
 
     @commands.command()
-    async def latex(self, ctx, content: str):
+    async def latex(self, ctx, *args):
+        content = ' '.join(args)
         image = await self.render(ctx, content)
         await ctx.send(file=discord.File(image, 'latex.png'))
 
