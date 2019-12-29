@@ -20,6 +20,7 @@ class Architus(Bot):
         self.user_commands = {}
         self.session = get_session()
         self.tracked_messages = {}
+        self.deletable_messages = []
 
         manager_client = blocking_rpc_client.shardRPC()
         # wait for manager to come up; this is scuffed
@@ -71,7 +72,7 @@ class Architus(Bot):
             await sm.delete_popup()
 
     async def on_message_delete(self, msg):
-        settings = self.guild_settings.get_guild(msg.guild, session=self.session)
+        settings = self.settings[msg.guild]
         if msg.id in self.deletable_messages:
             self.deletable_messages.remove(msg.id)
             return

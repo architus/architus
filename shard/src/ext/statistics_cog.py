@@ -134,7 +134,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         em.color = 0x7b8fb7
         if victim:
             em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
-                victim.display_name, word_counts[victim.id], message_counts[victim.id]), icon_url=victim.avatar_url)
+                victim.display_name, word_counts[victim], message_counts[victim]), icon_url=victim.avatar_url)
 
         await ctx.channel.send(embed=em)
 
