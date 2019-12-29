@@ -19,7 +19,7 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
             raw = f.read()
         return raw
 
-    TEMPLATE = load_template()
+    TEMPLATE = self.load_template()
 
     def __init__(self, bot):
         self.bot = bot
