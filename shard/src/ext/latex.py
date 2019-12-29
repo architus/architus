@@ -33,6 +33,7 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
         Render some LaTeX code and post the result as an image.
         '''
         latex_file = Latex.TEMPLATE.replace("#TEXTCOLOR", Latex.DARK_MODE_TEXT_COLOR).replace("#CONTENT", latex)
+        print(f"here is the entire latex file isn't that awesome: \n{latex_file}")
         payload = {
             'code': latex_file,
             'format': 'png'
