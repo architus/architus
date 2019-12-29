@@ -37,7 +37,7 @@ def reqparams(**params):
         @wraps(func)
         def wrapper(*args, **kwargs):
             parser = reqparse.RequestParser()
-            for param, type in params:
+            for param, type in params.items():
                 parser.add_argument(param, type=type, required=True)
             values = parser.parse_args()
             kwargs.update(values)

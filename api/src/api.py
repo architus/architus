@@ -1,7 +1,7 @@
 import json
 import re
 
-from flask import Flask, redirect, request, g, jsonify
+from flask import Flask, redirect, request, g
 from flask_restful import Api, Resource
 from flask_cors import CORS
 
@@ -44,7 +44,7 @@ class RedirectCallback(CustomResource):
     '''
     def get(self):
         # TODO validate domain
-        redirect_url = request.cookies.get('next')
+        redirect_url = request.cookies.get('next') or f'https://{DOMAIN}/app'
         code = request.args.get('code')
         perms = request.args.get('permissions')
         guild_id = request.args.get('guild_id')
@@ -83,7 +83,7 @@ class Logs(CustomResource):
                 'user_id': str(log.user_id),
                 'timestamp': log.timestamp.isoformat()
             })
-            return jsonify({"logs": logs}), StatusCodes.OK_200
+            return {"logs": logs}, StatusCodes.OK_200
 
 
 class AutoResponses(CustomResource):
@@ -160,10 +160,21 @@ class Coggers(CustomResource):
 
 
 class Stats(CustomResource):
-    def get(self, guild_id: int, stat: str):
+    def get(self, guild_id: int):
         '''Request message count statistics from shard and return'''
-        if stat == 'messagecount':
-            return self.shard.messagecount(guild_id, routing_guild=guild_id)
+        msg_data, _ = self.shard.bin_messages(guild_id, routing_guild=guild_id)
+        guild_data, _ = self.shard.get_guild_data(guild_id, routing_guild=guild_id)
+        return {
+            'members': {
+                'count': guild_data['member_count'],
+            },
+            'messages': {
+                'count': msg_data['total'],
+                'channels': msg_data['channels'],
+                'members': msg_data['members'],
+                'times': msg_data['times'],
+            }
+        }, StatusCodes.OK_200
 
 
 class ListGuilds(CustomResource):
@@ -191,7 +202,7 @@ def app_factory():
     api.add_resource(User, "/user/<string:name>")
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
-    api.add_resource(Stats, "/stats/<int:guild_id>/<string:stat>")
+    api.add_resource(Stats, "/stats/<int:guild_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")

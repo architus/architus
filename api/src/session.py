@@ -3,7 +3,7 @@ from urllib.parse import quote_plus
 from secrets import randbits
 
 from flask_restful import Resource
-from flask import redirect, request, jsonify, make_response
+from flask import redirect, request
 
 from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN
 from lib.status_codes import StatusCodes
@@ -29,7 +29,12 @@ class Login(CustomResource):
         #     url = CALLBACK_URL
 
         # TODO default destination if return is not included
-        response.set_cookie('next', request.args.get('return'), domain=f'api.{DOMAIN}', secure=True, httponly=True)
+        response.set_cookie(
+            'next',
+            request.args.get('return') or f'https://{DOMAIN}/app',
+            domain=f'api.{DOMAIN}',
+            secure=True, httponly=True
+        )
         return response
 
 
@@ -39,7 +44,7 @@ class RefreshToken(CustomResource):
 
 class TokenExchange(Resource):
     @reqparams(code=str)
-    def post(self, code):
+    def post(self, code: str):
         ex_data, status_code = token_exchange_request(code)
 
         if status_code == StatusCodes.OK_200:
@@ -53,28 +58,21 @@ class TokenExchange(Resource):
                     'access_token': discord_token,
                     'refresh_token': ex_data['refresh_token'],
                     'expires_in': expires_in,
-                    'issued_at': now,
-                    'refresh_in': refresh_in,
+                    'issued_at': now.isoformat(),
                     'id': id_data['id'],
-                    'permissions': 0,
+                    'permissions': 274,
                 })
                 nonce = randbits(32)
                 data = {
-                    # 'token': jwt.get_token().decode()
+                    # 'token': jwt.get_token()
                     'user': id_data,
                     'access': {
-                        'issuedAt': now,
+                        'issuedAt': now.isoformat(),
                         'expiresIn': expires_in,
-                        'refreshIn': refresh_in,
+                        'refreshIn': int(refresh_in.total_seconds()),
                         'gateway_nonce': nonce,
                     }
                 }
-                print(data)
-
-                response = make_response()
-                response.set_cookie("token", jwt.get_token().decode(), domain=f'.{DOMAIN}', secure=True, httponly=True)
-                response.data = jsonify(data)
-                response.status_code = StatusCodes.OK_200
 
                 self.shard.client.call(
                     'register_nonce',
@@ -82,9 +80,13 @@ class TokenExchange(Resource):
                     jwt.get_token().decode(),
                     routing_key='gateway_rpc'
                 )
-                return response
+                cookie = {
+                    'Set-Cookie':
+                        f'token={jwt.get_token()}; Max-Age={expires_in * 2}; Domain=.{DOMAIN}; Secure; HttpOnly;'
+                }
+                return data, StatusCodes.OK_200, cookie
 
-        return jsonify(ex_data), status_code
+        return ex_data, status_code
 
 
 class Identify(Resource):

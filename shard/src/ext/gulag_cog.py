@@ -17,12 +17,11 @@ class Gulag(commands.Cog):
         Starts a vote to move a member to the gulag.
         Each vote over the threshold will add additional time.
         '''
-        server = ctx.message.guild
-        settings = self.bot.settings[server]
-        filtered = filter(lambda role: role.name == "kulak", server.roles)
+        settings = self.bot.settings[ctx.guild]
+        filtered = filter(lambda role: role.name == "kulak", ctx.guild.roles)
         try:
             gulag_role = next(filtered)
-            gulag_emoji = discord.utils.get(server.emojis, name="gulag")
+            gulag_emoji = discord.utils.get(ctx.guild.emojis, name="gulag")
             assert gulag_emoji is not None
         except Exception:
             print("gulag role/emoji not found")
@@ -66,7 +65,7 @@ class Gulag(commands.Cog):
                     await ctx.channel.send("gulag'd " + comrade.display_name)
 
                 timer_msg = await ctx.channel.send("⏰ %d seconds" % (settings.gulag_severity * 60))
-                timer_msg_gulag = await (discord.utils.get(server.text_channels, name='gulag')).send(
+                timer_msg_gulag = await (discord.utils.get(ctx.guild.text_channels, name='gulag')).send(
                     "⏰ %d seconds, %s" % (settings.gulag_severity * 60, comrade.display_name))
                 await comrade.add_roles(gulag_role)
 
