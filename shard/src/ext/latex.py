@@ -33,7 +33,9 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
             f"\\begin{{document}}\n"
             f"\\pagenumbering{{gobble}}\n"
             f"\\color{{textcolor}}\n"
+            f"\\begin{{large}}\n"
             f"\\[{latex}\\]\n"
+            f"\\end{{large}}\n"
             f"\\end{{document}}\n"
         )
         payload = {
