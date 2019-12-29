@@ -27,9 +27,9 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
         Render some LaTeX code and post the result as an image.
         '''
         latex_file = (
-            f"\\usepackage{{xcolor}}\n"
             f"\\documentclass{{article}}\n"
-            f"\\definecolor{{textcolor}}{{HTML}}{{{DARK_MODE_TEXT_COLOR}}}\n"
+            f"\\usepackage{{xcolor}}\n"
+            f"\\definecolor{{textcolor}}{{HTML}}{{{Latex.DARK_MODE_TEXT_COLOR}}}\n"
             f"\\begin{{document}}\n"
             f"\\pagenumbering{{gobble}}\n"
             f"\\color{{textcolor}}\n"
