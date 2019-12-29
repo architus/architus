@@ -1,0 +1,21 @@
+\documentclass{article}
+\begin{document}
+\usepackage[utf8]{inputenc}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{tikz-cd}
+\usepackage{xcolor}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\N}{\mathbb{N}}
+\definecolor{textcolor}{HTML}{#TEXTCOLOR}
+\begin{document}
+\pagenumbering{gobble}
+\color{textcolor}
+\begin{large}
+\[ #CONTENT \]
+\end{large}
+\end{document}
