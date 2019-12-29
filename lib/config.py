@@ -2,12 +2,15 @@ import os
 from random import randint
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
+from datetime import datetime, timezone
 """
 This file loads the environment secrets into memory and also manages database connections
 """
 
 DB_HOST = 'postgres'
 DB_PORT = 5432
+
+DISCORD_EPOCH = datetime(2015, 1, 1, tzinfo=timezone.utc)
 
 try:
     NUM_SHARDS = int(os.environ['NUM_SHARDS'])
