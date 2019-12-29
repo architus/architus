@@ -29,9 +29,6 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
             shutil.copyfilobj(response.raw, out_file)
 
     async def render(self, ctx, latex: str):
-        '''
-        Render some LaTeX code and post the result as an image.
-        '''
         latex_file = Latex.TEMPLATE.replace("#TEXTCOLOR", Latex.DARK_MODE_TEXT_COLOR).replace("#CONTENT", latex)
         print(f"here is the entire latex file isn't that awesome: \n{latex_file}")
         payload = {
@@ -78,6 +75,9 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
 
     @commands.command()
     async def latex(self, ctx, *args):
+        '''
+        Render some LaTeX code and post the result as an image.
+        '''
         content = ' '.join(args)
         image = await self.render(ctx, content)
         await ctx.send(file=discord.File(image, 'latex.png'))
