@@ -1,11 +1,11 @@
 \documentclass{article}
-\begin{document}
 \usepackage[utf8]{inputenc}
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{mathtools}
 \usepackage{tikz-cd}
 \usepackage{xcolor}
+\begin{document}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\Q}{\mathbb{Q}}
 \newcommand{\C}{\mathbb{C}}
