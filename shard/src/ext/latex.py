@@ -29,11 +29,15 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
             shutil.copyfilobj(response.raw, out_file)
 
     async def render(self, ctx, latex: str):
+
+        OVERSAMPLING = 2
+
         latex_file = Latex.TEMPLATE.replace("#TEXTCOLOR", Latex.DARK_MODE_TEXT_COLOR).replace("#CONTENT", latex)
-        print(f"here is the entire latex file isn't that awesome: \n{latex_file}")
         payload = {
             'code': latex_file,
-            'format': 'png'
+            'format': 'png',
+            'quality': 100,
+            'density': 220 * OVERSAMPLING
         }
         async with aiohttp.ClientSession() as session:
             try:
@@ -41,7 +45,6 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
                     loc_req.raise_for_status()
                     jdata = await loc_req.json()
                     if jdata['status'] == 'error':
-                        print("jdata has error status")
                         await ctx.send('Failed to render LaTeX.')
                     filename = jdata['filename']
                 async with session.get(f"{Latex.HOST}/{filename}", json=payload, timeout=8) as img_req:
@@ -49,12 +52,9 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
                     fo = io.BytesIO(await img_req.read())
                     image = PIL.Image.open(fo).convert('RGBA')
             except aiohttp.client_exceptions.ClientResponseError:
-                print("ClientResponseError from Latex render method")
                 await ctx.send('Failed to render LaTeX.')
         if image.width <= 2 or image.height <= 2:
             raise Exception("Rendering Error")
-            print("Rendering Error from Latex render method")
-        OVERSAMPLING = 2
         border_size = 5 * OVERSAMPLING
         colour_back = '36393E'
         colour_back = (
