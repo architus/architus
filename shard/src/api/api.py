@@ -1,10 +1,13 @@
 import traceback
 import secrets
-import discord
+
 from discord.ext.commands import Cog, Context
+import discord
+
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 from lib.status_codes import StatusCodes as sc
+from src.api.util import fetch_guild
 
 
 class Api(Cog):
@@ -120,13 +123,23 @@ class Api(Cog):
             return {"message": f"Extension Not Loaded: {e}"}, sc.SERVICE_UNAVAILABLE_503
         return {"message": "Reload signal sent"}, sc.OK_200
 
-    async def messagecount(self, guild_id):
-        guild = self.bot.get_guild(guild_id)
+    @fetch_guild
+    async def message_bins(self, guild):
         stats_cog = self.bot.get_cog("Server Statistics")
         mc, wc = await stats_cog.count_messages(guild)
         return {
-            'message_counts': {k.id: v for k, v in mc.items()},
-            'word_counts': {k.id: v for k, v in wc.items()}
+            'total': len(stats_cog.cache[guild_id]),
+            'members': {
+                'messages': {k.id: v for k, v in mc.items()},
+                'words': {k.id: v for k, v in wc.items()}
+            }
+        }, sc.OK_200
+
+    @fetch_guild
+    async def get_guild_data(self, guild):
+        return {
+            'name': guild.name,
+            'member_count': guild.member_count,
         }, sc.OK_200
 
     async def settings_access(self, guild_id=None, setting=None, value=None):

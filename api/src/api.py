@@ -160,10 +160,21 @@ class Coggers(CustomResource):
 
 
 class Stats(CustomResource):
-    def get(self, guild_id: int, stat: str):
+    def get(self, guild_id: int):
         '''Request message count statistics from shard and return'''
-        if stat == 'messagecount':
-            return self.shard.messagecount(guild_id, routing_guild=guild_id)
+        msg_data, _ = self.shard.messagecount(guild_id, routing_guild=guild_id)
+        guild_data, _ = self.shard.get_guild_data(guild_id)
+        return {
+            'members': {
+                'count': guild_data['member_count'],
+            },
+            'messages': {
+                'count': msg_data['total'],
+                'channels': {},
+                'members': {},
+                'times': {},
+            }
+        }, StatusCodes.OK_200
 
 
 class ListGuilds(CustomResource):

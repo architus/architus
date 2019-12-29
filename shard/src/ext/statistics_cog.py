@@ -10,16 +10,15 @@ import discord
 import json
 
 import src.generate.wordcount as wordcount_gen
+from lib.config import DISCORD_EPOCH
 
 IMAGE_CHANNEL_ID = 577523623355613235
 
 class MessageData:
 
-    epoch = datetime(2015, 1, 1, tzinfo=timezone.utc)
-
-    def __init__(self, message_id, author_id, channel_id, total_words, correct_words):
+    def __init__(self, message_id, author, channel_id, total_words, correct_words):
         self.message_id = message_id
-        self.author_id = author_id
+        self.author = author
         self.channel_id = channel_id
         self.total_words = total_words
         self.correct_words = correct_words
@@ -29,7 +28,7 @@ class MessageData:
 
     @property
     def created_at(self):
-        return self.__class__.epoch + timedelta(milliseconds=self.message_id >> 22)
+        return DISCORD_EPOCH + timedelta(milliseconds=self.message_id >> 22)
 
 
 class MessageStats(commands.Cog, name="Server Statistics"):
@@ -49,7 +48,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         print(f"Downloading messages in {len(guild.channels)} channels for '{guild.name}'...")
         for channel in guild.text_channels:
             try:
-                async for message in channel.history(oldest_first=True):
+                async for message in channel.history(limit=None, oldest_first=True):
                     self.cache[guild.id].append(MessageData(
                         message.id,
                         message.author.id,
@@ -90,7 +89,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         correct_words = 0
         async with ctx.channel.typing():
             for msgdata in self.cache[ctx.guild.id]:
-                if msgdata.author_id == victim.id:
+                if msgdata.author.id == victim.id:
                     words += msgdata.total_words
                     correct_words += msgdata.correct_words
         ratio = correct_words / words * 100
@@ -101,10 +100,21 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         word_counts = {}
         message_counts = {}
         for msgdata in self.cache[guild.id]:
-            message_counts[msgdata.author_id] = message_counts.get(msgdata.author_id, 0) + 1
-            word_counts[msgdata.author_id] = word_counts.get(msgdata.author_id, 0) + msgdata.total_words
+            message_counts[msgdata.author] = message_counts.get(msgdata.author, 0) + 1
+            word_counts[msgdata.author] = word_counts.get(msgdata.author, 0) + msgdata.total_words
 
         return message_counts, word_counts
+
+    def bin_messages(self, guild, time_granularity: timedelta):
+        time_bins = defaultdict(int)
+        member_bins = defaultdict(int)
+        channel_bins = defaultdict(int)
+        for msgdata in self.cache[guild.id]:
+            date = msgdata.created_at - ((msgdata.created_at - DISCORD_EPOCH) % time_granularity)
+            time_bins[date] += 1
+            member_bins[msgdata.author.id] += 1
+            channel_bins[msgdata.channel_id] += 1
+        return member_bins, channel_bins, time_bins
 
     @commands.command()
     async def messagecount(self, ctx, victim: discord.Member = None):
@@ -123,7 +133,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         em.color = 0x7b8fb7
         if victim:
             em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
-                victim.display_name, word_counts[victim], message_counts[victim]), icon_url=victim.avatar_url)
+                victim.display_name, word_counts[victim.id], message_counts[victim.id]), icon_url=victim.avatar_url)
 
         await ctx.channel.send(embed=em)
 
