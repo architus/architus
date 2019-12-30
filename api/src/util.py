@@ -44,3 +44,10 @@ def reqparams(**params):
             return func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+def camelcase_keys(dictionary: dict):
+    for key in dictionary.keys():
+        first, *rest = key.split('_')
+        new_key = first + ''.join(word.capitalize() for word in rest)
+        dictionary[new_key] = dictionary.pop(key)

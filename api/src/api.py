@@ -11,7 +11,7 @@ from lib.models import Command, Log
 from lib.auth import JWT, flask_authenticated as authenticated
 
 from src.discord_requests import list_guilds_request
-from src.util import CustomResource, reqparams
+from src.util import CustomResource, reqparams, camelcase_keys
 from src.session import Identify, Login, RefreshToken, TokenExchange
 
 
@@ -68,7 +68,9 @@ class User(CustomResource):
 
 class GuildCounter(CustomResource):
     def get(self):
-        return self.shard.guild_count()
+        guild_count, sc = self.shard.guild_count()
+        camelcase_keys(guild_count)
+        return guild_count, sc
 
 
 class Logs(CustomResource):
