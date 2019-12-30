@@ -17,7 +17,7 @@ from lib.status_codes import StatusCodes as sc
 
 sio = socketio.AsyncServer(
     async_mode='aiohttp',
-    cors_allowed_origins=('https://*.archit.us:443', 'https://archit.us:443', 'http://localhost:3000')
+    cors_allowed_origins='*'  # ('https://*.archit.us:443', 'https://archit.us:443', 'http://localhost:3000')
 )
 app = web.Application()
 sio.attach(app)
