@@ -15,6 +15,10 @@ from src.discord_requests import identify_request, token_exchange_request
 SAFE_REDIRECT_URI = quote_plus(REDIRECT_URI)
 
 
+def make_token_cookie_header(token: str, max_age: int):
+    return {'Set-Cookie': f'token={token}; Max-Age={max_age}; Domain=.{DOMAIN}; Secure; HttpOnly;'}
+
+
 class Login(CustomResource):
     def get(self):
         response = redirect(f'https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
@@ -38,8 +42,20 @@ class Login(CustomResource):
         return response
 
 
+class End(CustomResource):
+    @authenticated
+    def post(self, jwt: JWT):
+        self.shard.client.call(
+            'demote_connection',
+            jwt.get_token(),
+            routing_key='gateway_rpc'
+        )
+        return {'message': 'Okay I definitetly did something :)'}, 200, make_token_cookie_header(None, 1)
+
+
 class RefreshToken(CustomResource):
-    pass
+    def post(self):
+        return {'message': 'Okay I definitetly did something :)'}, 200
 
 
 class TokenExchange(Resource):
@@ -77,14 +93,10 @@ class TokenExchange(Resource):
                 self.shard.client.call(
                     'register_nonce',
                     nonce,
-                    jwt.get_token().decode(),
+                    jwt.get_token(),
                     routing_key='gateway_rpc'
                 )
-                cookie = {
-                    'Set-Cookie':
-                        f'token={jwt.get_token()}; Max-Age={expires_in * 2}; Domain=.{DOMAIN}; Secure; HttpOnly;'
-                }
-                return data, StatusCodes.OK_200, cookie
+                return data, StatusCodes.OK_200, make_token_cookie_header(jwt.get_token(), expires_in * 2)
 
         return ex_data, status_code
 

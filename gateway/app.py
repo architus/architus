@@ -15,7 +15,10 @@ from lib.ipc.async_rpc_server import start_server
 from lib.status_codes import StatusCodes as sc
 
 
-sio = socketio.AsyncServer(async_mode='aiohttp')
+sio = socketio.AsyncServer(
+    async_mode='aiohttp',
+    cors_allowed_origins=('https://*.archit.us:443', 'https://archit.us:443', 'http://localhost:3000')
+)
 app = web.Application()
 sio.attach(app)
 
@@ -48,6 +51,9 @@ async def register_nonce(method, *args, **kwargs):
             pass
         else:
             return {'message': 'registered'}, sc.OK_200
+    elif method == 'demote_connection':
+        # TODO
+        return {'message': 'demoted :)'}, sc.OK_200
     return {'message': 'invaild arguments'}, sc.BAD_REQUEST_400
 
 
@@ -60,7 +66,7 @@ async def event_callback(msg: IncomingMessage):
         sio.emit('log_pool', body, room=f'guild_{guild_id}')
         print(f"emitting action ({body['action_number']})")
 
-            # sio.emit(body['event'], {'payload': {'message': 'broadcast'}}
+        # sio.emit(body['event'], {'payload': {'message': 'broadcast'}}
 
 
 @sio.event
@@ -100,22 +106,19 @@ async def request_elevation(sid: str, msg: dict, nonce: int):
 
 
 @sio.event
-async def mock_user_event(sid: str, msg: dict):
-    args = msg['payload']
-    target_shard = which_shard()
-    resp, _ = await shard_client.call(
-        'interpret',
-        **args,
-        routing_key=f"shard_rpc_{target_shard}"
-    )
-    await sio.emit('mock_bot_event', {'payload': resp}, room=sid)
+async def mock_user_event(sid: str, kwargs: dict):
+    resp, _ = await shard_client.interpret(**kwargs, routing_key=f"shard_rpc_{which_shard()}")
+    await sio.emit('mock_bot_event', resp, room=sid)
 
 
 @sio.event
-async def spectate(sid: str, msg: dict):
+async def spectate(sid: str, guild_id: int):
     if f"{sid}_auth" not in sio.rooms(sid):
         return
-    # spectate stuff
+    async with sio.session(sid) as session:
+        member, _ = shard_client.is_member(session['token'].id, guild_id)
+        if member:
+            sio.enter_room(sid, f"guild_{guild_id}")
 
 
 async def index(request: web.Request):

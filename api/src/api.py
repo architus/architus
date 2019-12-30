@@ -12,7 +12,7 @@ from lib.auth import JWT, flask_authenticated as authenticated
 
 from src.discord_requests import list_guilds_request
 from src.util import CustomResource, reqparams, camelcase_keys
-from src.session import Identify, Login, RefreshToken, TokenExchange
+from src.session import Identify, Login, RefreshToken, TokenExchange, End
 
 
 app = Flask(__name__)
@@ -199,6 +199,7 @@ def app_factory():
     api.add_resource(Identify, "/session/identify")
     api.add_resource(Login, "/session/login")
     api.add_resource(RefreshToken, "/session/refresh")
+    api.add_resource(End, "/session/end")
     api.add_resource(TokenExchange, "/session/token-exchange")
 
     api.add_resource(User, "/user/<string:name>")
