@@ -7,6 +7,7 @@ import io
 import PIL
 import PIL.Image
 
+
 class Latex(commands.Cog, name="LaTeX Renderer"):
 
     HOST = 'http://rtex.probablyaweb.site/api/v2'
@@ -14,10 +15,10 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
 
     def load_template():
         with open('res/latex_template.txt', encoding='utf-8') as f:
-           raw = f.read()
+            raw = f.read()
         return raw
 
-    TEMPLATE = Latex.load_template()
+    TEMPLATE = load_template()
 
     def __init__(self, bot):
         self.bot = bot
