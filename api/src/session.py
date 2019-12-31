@@ -58,7 +58,7 @@ class RefreshToken(CustomResource):
         return {'message': 'Okay I definitetly did something :)'}, 200
 
 
-class TokenExchange(Resource):
+class TokenExchange(CustomResource):
     @reqparams(code=str)
     def post(self, code: str):
         ex_data, status_code = token_exchange_request(code)
