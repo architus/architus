@@ -38,7 +38,7 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
             'code': latex_file,
             'format': 'png',
             'quality': 100,
-            'density': 220 * OVERSAMPLING
+            'density': 544
         }
         async with aiohttp.ClientSession() as session:
             try:
@@ -46,16 +46,17 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
                     loc_req.raise_for_status()
                     jdata = await loc_req.json()
                     if jdata['status'] == 'error':
-                        await ctx.send('Failed to render LaTeX.')
+                        return None
                     filename = jdata['filename']
                 async with session.get(f"{Latex.HOST}/{filename}", json=payload, timeout=8) as img_req:
                     img_req.raise_for_status()
                     fo = io.BytesIO(await img_req.read())
                     image = PIL.Image.open(fo).convert('RGBA')
             except aiohttp.client_exceptions.ClientResponseError:
-                await ctx.send('Failed to render LaTeX.')
+                return None
         if image.width <= 2 or image.height <= 2:
             raise Exception("Rendering Error")
+
         border_size = 5 * OVERSAMPLING
         colour_back = '36393E'
         colour_back = (
@@ -80,6 +81,9 @@ class Latex(commands.Cog, name="LaTeX Renderer"):
         Render some LaTeX code and post the result as an image.
         '''
         image = await self.render(ctx, content)
+        if image is None:
+            await ctx.send("Failed to render LaTeX.")
+            return
         await ctx.send(file=discord.File(image, 'latex.png'))
 
 
