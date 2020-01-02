@@ -63,7 +63,7 @@ async def event_callback(msg: IncomingMessage):
         body = json.loads(msg.body.decode())
         guild_id = body['guild_id']
         # private = body['private']
-        sio.emit('log_pool', body, room=f'guild_{guild_id}')
+        await sio.emit('log_pool', body, room=f'guild_{guild_id}')
         print(f"emitting action ({body['action_number']})")
 
         # sio.emit(body['event'], {'payload': {'message': 'broadcast'}}

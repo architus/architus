@@ -6,7 +6,7 @@ from flask_restful import Resource
 from flask import redirect, request
 
 from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN
-from lib.status_codes import StatusCodes
+from lib.status_codes import StatusCodes as sc
 from lib.auth import JWT, flask_authenticated as authenticated
 
 from src.util import CustomResource, reqparams, time_to_refresh
@@ -17,6 +17,25 @@ SAFE_REDIRECT_URI = quote_plus(REDIRECT_URI)
 
 def make_token_cookie_header(token: str, max_age: int):
     return {'Set-Cookie': f'token={token}; Max-Age={max_age}; Domain=.{DOMAIN}; Secure; HttpOnly;'}
+
+
+def generate_refresh_response(jwt: JWT):
+    data, sc = refresh_token_request(jwt.refresh_token)
+    if sc == sc.OK_200:
+        now = datetime.now()
+        jwt.access_token = data['access_token']
+        jwt.refresh_token = data['refresh_token']
+        jwt.expires_in = data['expires_in']
+        jwt.issued_at = now.isoformat()
+
+        return {
+            'access': {
+                'issuedAt': now.isoformat(),
+                'expiresIn': jwt.expires_in,
+                'refresh_in': jwt.expires_in / 2
+            }
+        }, sc, make_token_cookie_header(jwt.get_token(), jwt.expires_in * 2)
+    return data, sc
 
 
 class Login(CustomResource):
@@ -50,15 +69,15 @@ class End(CustomResource):
             jwt.get_token(),
             routing_key='gateway_rpc'
         )
-        return {'message': 'Okay I definitetly did something :)'}, 200, make_token_cookie_header(None, 1)
+        return {'message': 'Okay I definitetly did something :)'}, sc.OK_200, make_token_cookie_header(None, 1)
 
 
 class RefreshToken(CustomResource):
     @authenticated
     def post(self, jwt: JWT):
         if time_to_refresh(jwt):
-            data, sc = refresh_token_request(jwt.refresh_token)
-        return {'message': 'Okay I definitetly did something :)'}, 200
+            return generate_refresh_response(jwt)
+        return {'message': 'It\'s not time to refresh your token'}, sc.TOO_MANY_REQUESTS_429
 
 
 class TokenExchange(CustomResource):
@@ -66,10 +85,10 @@ class TokenExchange(CustomResource):
     def post(self, code: str):
         ex_data, status_code = token_exchange_request(code)
 
-        if status_code == StatusCodes.OK_200:
+        if status_code == sc.OK_200:
             discord_token = ex_data['access_token']
             id_data, status_code = identify_request(discord_token)
-            if status_code == StatusCodes.OK_200:
+            if status_code == sc.OK_200:
                 now = datetime.now()
                 expires_in = ex_data['expires_in']
                 refresh_in = timedelta(seconds=expires_in) / 2
@@ -99,7 +118,7 @@ class TokenExchange(CustomResource):
                     jwt.get_token(),
                     routing_key='gateway_rpc'
                 )
-                return data, StatusCodes.OK_200, make_token_cookie_header(jwt.get_token(), expires_in * 2)
+                return data, sc.OK_200, make_token_cookie_header(jwt.get_token(), expires_in * 2)
 
         return ex_data, status_code
 
@@ -109,13 +128,18 @@ class Identify(Resource):
     def get(self, jwt: JWT):
         '''Forward identify request to discord and return response'''
         id_data, sc = identify_request(jwt.access_token)
-        if sc == 200:
-            return {
-                'user': id_data,
-                'access': {
-                    'issuedAt': jwt.issued_at,
-                    'expiresIn': jwt.expires_in,
-                    'refreshIn': int(jwt.expires_in) / 2,
-                }
-            }, sc
+        if sc == sc.OK_200:
+            if time_to_refresh(jwt):
+                data, *rest = generate_refresh_response(jwt)
+                data['user'] = id_data
+                return data, *rest
+            else:
+                return {
+                    'user': id_data,
+                    'access': {
+                        'issuedAt': jwt.issued_at,
+                        'expiresIn': jwt.expires_in,
+                        'refreshIn': int(jwt.expires_in) / 2,
+                    }
+                }, sc.OK_200
         return id_data, sc
