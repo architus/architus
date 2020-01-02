@@ -86,7 +86,7 @@ class TokenExchange(CustomResource):
                         'issuedAt': now.isoformat(),
                         'expiresIn': expires_in,
                         'refreshIn': int(refresh_in.total_seconds()),
-                        'gateway_nonce': nonce,
+                        'gatewayNonce': nonce,
                     }
                 }
 
