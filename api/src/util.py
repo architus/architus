@@ -1,7 +1,6 @@
 import os
 from uuid import getnode
 from functools import wraps
-import dateutil.parser
 from datetime import datetime, timedelta
 
 from flask_restful import Resource, reqparse
@@ -57,6 +56,6 @@ def camelcase_keys(dictionary: dict):
 
 
 def time_to_refresh(jwt: JWT):
-    issued_at = dateutil.parser.parse(jwt.issued_at)
+    issued_at = datetime.strptime(jwt.issued_at, "%Y-%m-%dT%H:%M:%S%z")
     refresh_in = timedelta(seconds=jwt.expires_in) / 2
     return datetime.now() > issued_at + refresh_in
