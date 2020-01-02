@@ -16,7 +16,7 @@ from src.session import Identify, Login, RefreshToken, TokenExchange, End
 
 
 app = Flask(__name__)
-cors = CORS(app)
+cors = CORS(app, supports_credentials=True)
 
 
 @app.teardown_appcontext
@@ -57,6 +57,7 @@ class RedirectCallback(CustomResource):
             redirect_url += f"?guild_id={guild_id}"
 
         resp = redirect(redirect_url)
+        resp.set_cookie('next', '', expires=0)
         return resp
 
 
