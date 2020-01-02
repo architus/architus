@@ -132,7 +132,7 @@ class Identify(Resource):
             if time_to_refresh(jwt):
                 data, *rest = generate_refresh_response(jwt)
                 data['user'] = id_data
-                return data, *rest
+                return (data, *rest)
             else:
                 return {
                     'user': id_data,
