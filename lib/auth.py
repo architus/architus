@@ -20,7 +20,8 @@ def flask_authenticated(func):
 
 class JWT:
     def __init__(self, data=None, token=None):
-        assert data is not None or token is not None
+        if data is None and token is None:
+            raise pyjwt.exceptions.InvalidTokenError("Token (or data) is empty")
 
         if data is None:
             self._data = self._decode(token)

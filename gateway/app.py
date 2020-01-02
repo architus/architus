@@ -64,7 +64,7 @@ async def event_callback(msg: IncomingMessage):
         guild_id = body['guild_id']
         # private = body['private']
         await sio.emit('log_pool', body, room=f'guild_{guild_id}')
-        print(f"emitting action ({body['action_number']})")
+        # print(f"emitting action ({body['action_number']})")
 
         # sio.emit(body['event'], {'payload': {'message': 'broadcast'}}
 
@@ -79,7 +79,7 @@ async def connect(sid: str, environ: dict):
         print("No valid token found, logging into unprivileged gateway...")
     else:
         print("Found valid token, logging into elevated gateway...")
-        await sio.enter_room(sid, f"{sid}_auth")
+        sio.enter_room(sid, f"{sid}_auth")
         async with sio.session(sid) as session:
             session['token'] = jwt
 
@@ -90,17 +90,19 @@ def disconnect(sid: str):
 
 
 @sio.event
-@payload_params('nonce')
-async def request_elevation(sid: str, msg: dict, nonce: int):
+# @payload_params('nonce')
+async def request_elevation(sid: str, nonce: int):
+    print(f"{sid} requesting elevation...")
     try:
         jwt = JWT(token=auth_nonces[nonce])
         del auth_nonces[nonce]
     except (InvalidTokenError, KeyError):
         print(f"{sid} requested room elevation but didn't provide a valid jwt")
-        await sio.emit('elevation_return', {'payload': {'message': "Missing or invalid jwt"}}, room=sid)
+        await sio.emit('elevation_return', {'message': "Missing or invalid jwt"}, room=sid)
     else:
-        await sio.enter_room(sid, f"{sid}_auth")
-        await sio.emit('elevation_return', {'payload': {'message': "success"}}, room=sid)
+        print(f"valid nonce provided, granting access...")
+        sio.enter_room(sid, f"{sid}_auth")
+        await sio.emit('elevation_return', {'message': "success"}, room=sid)
         async with sio.session(sid) as session:
             session['token'] = jwt
 
@@ -116,7 +118,11 @@ async def spectate(sid: str, guild_id: int):
     if f"{sid}_auth" not in sio.rooms(sid):
         return
     async with sio.session(sid) as session:
-        member, _ = shard_client.is_member(session['token'].id, guild_id)
+        member, _ = await shard_client.is_member(
+            session['token'].id,
+            guild_id,
+            routing_key=f"shard_rpc_{which_shard(guild_id)}"
+        )
         if member:
             sio.enter_room(sid, f"guild_{guild_id}")
 

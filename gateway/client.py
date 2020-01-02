@@ -1,4 +1,5 @@
 import asyncio
+import sys
 import time
 import socketio
 
@@ -6,46 +7,34 @@ loop = asyncio.get_event_loop()
 sio = socketio.AsyncClient()
 start_timer = None
 
+guild_id = 607637793107345431
 
 @sio.event
 async def connect():
-    print("connected to server...\njoining room '607606128985112596'...")
-    # print("'interpret', {'content': '!schedule event 12pm', 'guild_id': 1234, 'message_id': 1,
-    # 'allowed_commands': ['schedule']})")
-    # await sio.emit('interpret', {'content': '!schedule event 12pm', 'guild_id': 1234, 'message_id': 1,
-    # 'allowed_commands': ['schedule']})
-    await sio.emit('request_elevation', {'payload': {'nonce': 123}})
+    print("connected to server...")
+    nonce = 1923512129
+    if len(sys.argv) > 1:
+        print("requesting elevated gateway...")
+        await sio.emit('request_elevation', int(sys.argv[1]))
+
+    print(f"requesting spectate guild {guild_id}")
+    await sio.emit('spectate', guild_id)
 
 
 @sio.event
-async def cool_event(data):
-    print("I got an event")
-    print(data)
+async def elevation_return(*data):
+    print(f'elevation_return: {data}')
 
 
 @sio.event
-async def my_response(data):
-    print(f'recv: {data}')
-
-
-@sio.event
-async def elevation_return(data):
-    print(f'recv: {data}')
-
-
-@sio.event
-async def pong_from_server(data):
-    global start_timer
-    latency = time.time() - start_timer
-    print('latency is {0:.2f} ms'.format(latency * 1000))
-    await sio.sleep(1)
-    # await send_ping()
+async def log_pool(*data):
+    print(f'log_pool: {data}')
 
 
 async def start_server():
     print('hello I\'m a UI :)')
-    await sio.connect('https://gateway.develop.archit.us')
-    # await sio.connect('http://127.0.0.1:6000')
+    # await sio.connect('https://gateway.develop.archit.us')
+    await sio.connect('http://127.0.0.1:6000')
     await sio.wait()
 
 

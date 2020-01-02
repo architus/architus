@@ -56,6 +56,6 @@ def camelcase_keys(dictionary: dict):
 
 
 def time_to_refresh(jwt: JWT):
-    issued_at = datetime.strptime(jwt.issued_at, "%Y-%m-%dT%H:%M:%S%z")
+    issued_at = datetime.strptime(jwt.issued_at, "%Y-%m-%dT%H:%M:%S.%f")
     refresh_in = timedelta(seconds=jwt.expires_in) / 2
     return datetime.now() > issued_at + refresh_in
