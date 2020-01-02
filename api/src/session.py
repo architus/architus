@@ -9,8 +9,8 @@ from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN
 from lib.status_codes import StatusCodes
 from lib.auth import JWT, flask_authenticated as authenticated
 
-from src.util import CustomResource, reqparams
-from src.discord_requests import identify_request, token_exchange_request
+from src.util import CustomResource, reqparams, time_to_refresh
+from src.discord_requests import identify_request, token_exchange_request, refresh_token_request
 
 SAFE_REDIRECT_URI = quote_plus(REDIRECT_URI)
 
@@ -54,7 +54,10 @@ class End(CustomResource):
 
 
 class RefreshToken(CustomResource):
-    def post(self):
+    @authenticated
+    def post(self, jwt: JWT):
+        if time_to_refresh(jwt):
+            data, sc = refresh_token_request(jwt.refresh_token)
         return {'message': 'Okay I definitetly did something :)'}, 200
 
 
@@ -86,8 +89,8 @@ class TokenExchange(CustomResource):
                         'issuedAt': now.isoformat(),
                         'expiresIn': expires_in,
                         'refreshIn': int(refresh_in.total_seconds()),
-                        'gatewayNonce': nonce,
-                    }
+                    },
+                    'gatewayNonce': nonce,
                 }
 
                 self.shard.client.call(
@@ -105,4 +108,14 @@ class Identify(Resource):
     @authenticated
     def get(self, jwt: JWT):
         '''Forward identify request to discord and return response'''
-        return identify_request(jwt.access_token)
+        id_data, sc = identify_request(jwt.access_token)
+        if sc == 200:
+            return {
+                'user': id_data,
+                'access': {
+                    'issuedAt': jwt.issued_at,
+                    'expiresIn': jwt.expires_in,
+                    'refreshIn': int(jwt.expires_in) / 2,
+                }
+            }, sc
+        return id_data, sc
