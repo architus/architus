@@ -3,6 +3,7 @@ from random import randint
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime, timezone
+import re
 """
 This file loads the environment secrets into memory and also manages database connections
 """
@@ -45,3 +46,14 @@ def get_session():
 
 def which_shard(guild_id=None):
     return randint(0, NUM_SHARDS - 1) if guild_id is None else (int(guild_id) >> 22) % NUM_SHARDS
+
+
+allowed_origins_regexes = [
+    re.compile(o) for o in (
+        r'https:\/\/archit\.us\/app',
+        r'https:\/\/.*\.archit\.us\/app',
+        r'http:\/\/localhost:3000\/app',
+        r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
+        r'https:\/\/deploy-preview-[0-9]+--architus\.netlify\.com\/app',
+    )
+]

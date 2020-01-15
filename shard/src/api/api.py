@@ -166,7 +166,7 @@ class Api(Cog):
                     break
             else:
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
-        return guild_list, sc.OK_200
+        return {'guilds': guild_list}, sc.OK_200
 
     async def interpret(
             self,

@@ -17,7 +17,7 @@ SAFE_REDIRECT_URI = quote_plus(REDIRECT_URI)
 
 def make_token_cookie_header(token: str, max_age: int) -> dict:
     '''creates a set-cookie header for storing the auth token'''
-    return {'Set-Cookie': f'token={token}; Max-Age={max_age}; Secure; HttpOnly'}
+    return {'Set-Cookie': f'token={token}; Max-Age={max_age}; Path=/; Domain=api.{DOMAIN}; Secure; HttpOnly'}
 
 
 def generate_refresh_response(jwt: JWT) -> tuple:
