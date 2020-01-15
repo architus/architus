@@ -99,7 +99,7 @@ class TokenExchange(CustomResource):
                     'refresh_token': ex_data['refresh_token'],
                     'expires_in': expires_in,
                     'issued_at': now.isoformat(),
-                    'id': id_data['id'],
+                    'id': int(id_data['id']),
                     'permissions': 274,
                 })
                 nonce = randbits(32)

@@ -358,7 +358,7 @@ class LogCog(commands.Cog):
         pass
 
     @commands.Cog.listener()
-    async def on_voice_state_update(self, before, after):
+    async def on_voice_state_update(self, member, before, after):
         pass
 
 

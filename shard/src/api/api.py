@@ -156,7 +156,7 @@ class Api(Cog):
             return {'value': getattr(settings, setting)}, sc.OK_200
         return {'value': "unknown setting"}, sc.NOT_FOUND_404
 
-    async def tag_autbot_guilds(self, guild_list, user_id):
+    async def tag_autbot_guilds(self, guild_list, user_id: int):
         all_guilds, _ = await self.bot.manager_client.all_guilds()
         for guild_dict in guild_list:
             for guild in all_guilds:
