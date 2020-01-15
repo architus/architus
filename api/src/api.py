@@ -184,7 +184,7 @@ class ListGuilds(CustomResource):
     @authenticated
     def get(self, jwt: JWT):
         '''Forward guild list request to discord and return response'''
-        resp, status_code = list_guilds_request()
+        resp, status_code = list_guilds_request(jwt)
         if status_code == StatusCodes.OK_200:
             resp, _ = self.shard.tag_autbot_guilds(resp, jwt.id)
         return resp, status_code
