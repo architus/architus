@@ -172,12 +172,17 @@ class Api(Cog):
     async def handle_mock_user_action(
             self,
             action: int = None,
-            message_id: int = None,
-            guild_id: int = None,
+            messageId: int = None,
+            guildId: int = None,
             content: str = None,
-            allowed_commands: List[str] = (),
+            allowedCommands: List[str] = (),
             emoji: str = None,
             silent: bool = False):
+
+        message_id = messageId
+        guild_id = guildId
+        allowed_commands = allowedCommands
+
         if action is None or message_id is None or guild_id is None:
             return {'message': "missing arguments"}, sc.BAD_REQUEST_400
 
@@ -269,10 +274,12 @@ class Api(Cog):
             react = await fkmsg.add_reaction(emoji, bot=False)
             await self.bot.get_cog("Events").on_reaction_add(react, MockMember())
             resp = {
-                'action': LogActions.MESSAGE_EDIT,
-                'content': '\n'.join(sends),
-                'messageId': resp_id,
                 'guildId': guild_id,
+                'actions': ({
+                    'action': LogActions.MESSAGE_EDIT,
+                    'content': '\n'.join(sends),
+                    'messageId': resp_id,
+                },)
             }
         elif action == LogActions.REACTION_REMOVE:
             resp_id = message_id
@@ -281,10 +288,12 @@ class Api(Cog):
             react = await fkmsg.remove_reaction(emoji)
             await self.bot.get_cog("Events").on_reaction_remove(react, MockMember())
             resp = {
-                'action': LogActions.MESSAGE_EDIT,
-                'content': '\n'.join(sends),
-                'messageId': resp_id,
                 'guildId': guild_id,
+                'actions': ({
+                    'action': LogActions.MESSAGE_EDIT,
+                    'content': '\n'.join(sends),
+                    'messageId': resp_id,
+                },)
             }
 
         return resp, sc.OK_200
