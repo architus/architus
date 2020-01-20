@@ -37,7 +37,7 @@ class UserCommand:
         self.count = count
         self.server = guild
         self.author_id = author_id
-        if new and self.validate_new_command() and guild.id > 1000000:
+        if new and self.validate_new_command() and guild.id > 10000000:
             try:
                 new_command = Command(str(guild.id) + self.raw_trigger, self.raw_response, count, guild.id, author_id)
                 self.session.add(new_command)

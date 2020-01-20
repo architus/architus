@@ -183,6 +183,9 @@ class Api(Cog):
         guild_id = guildId
         allowed_commands = allowedCommands
 
+        # this is very scuffed. guilds under this number won't have their responses added to the db
+        assert guild_id < 10000000
+
         if action is None or message_id is None or guild_id is None:
             return {'message': "missing arguments"}, sc.BAD_REQUEST_400
 
@@ -260,7 +263,7 @@ class Api(Cog):
             }
             resp['actions'] += [{
                 'action': LogActions.REACTION_ADD,
-                'emoji': r[0],
+                'emoji': r[1],
                 'messageId': resp_id,
             } for r in reactions]
 

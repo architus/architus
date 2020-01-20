@@ -59,14 +59,14 @@ class SetCog(commands.Cog, name="Auto Responses"):
                 if parser.group(2).strip() == "remove":
                     msg = "please use `!remove` instead"
                 elif parser.group(2).strip() in ("author", "list"):
-                    msg = f"please check https://aut-bot.com/app/{ctx.guild.id}/responses"
+                    msg = f"please check https://archit.us/app/{ctx.guild.id}/responses"
             except UserLimitException as e:
                 msg = str(e)
             except DuplicatedTriggerException:
-                msg = "That's a dupe idiot"
+                msg = "A response with that triggered already exists."
             else:
                 user_commands[ctx.guild.id].append(command)
-                msg = 'command set'
+                msg = 'Command set.'
 
         await ctx.channel.send(msg)
 
