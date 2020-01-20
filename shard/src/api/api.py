@@ -287,7 +287,7 @@ class Api(Cog):
         elif action == LogActions.REACTION_REMOVE:
             resp_id = message_id
             fkmsg = self.fake_messages[guild_id][resp_id]
-            fkmsg.sends = sends
+            fkmsg.sends = [fkmsg.content]
             react = await fkmsg.remove_reaction(emoji)
             await self.bot.get_cog("Events").on_reaction_remove(react, MockMember())
             resp = {
