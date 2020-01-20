@@ -109,7 +109,7 @@ async def request_elevation(sid: str, nonce: int):
 
 @sio.event
 async def mock_user_event(sid: str, kwargs: dict):
-    resp, _ = await shard_client.interpret(**kwargs, routing_key=f"shard_rpc_{which_shard()}")
+    resp, _ = await shard_client.handle_mock_user_action(**kwargs, routing_key=f"shard_rpc_{which_shard()}")
     await sio.emit('mock_bot_event', resp, room=sid)
 
 
