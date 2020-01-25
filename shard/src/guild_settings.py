@@ -16,6 +16,15 @@ class Setting:
         self._settings_dict = self._load_from_db(self.guild_id)
 
     @property
+    def command_prefix(self) -> str:
+        return self._settings_dict['command_prefix'] if 'command_prefix' in self._settings_dict else '!'
+
+    @command_prefix.setter
+    def command_prefix(self, new_command_prefex: str):
+        self._settings_dict['command_prefix'] = new_command_prefex
+        self._update_db()
+
+    @property
     def music_enabled(self) -> bool:
         return self._settings_dict['music_enabled'] if 'music_enabled' in self._settings_dict else not bool(
             self.guild.get_member(RYTHMS_ID))
