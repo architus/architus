@@ -192,7 +192,10 @@ class Architus(Bot):
         await starboard_ch.send(embed=em)
 
 
-architus = Architus(command_prefix=('!', '?'))
+def command_prefix(bot: Architus, msg: discord.Message):
+    return bot.settings[msg.guild].command_prefix
+
+architus = Architus(command_prefix=command_prefix)
 
 for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
     architus.load_extension(f"src.ext.{ext[:-3]}")
