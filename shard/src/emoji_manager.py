@@ -4,14 +4,14 @@ import os
 import re
 import aiofiles
 import aiohttp
-from src.webhook import send_message
+from src.utils import send_message_webhook
 
 EMOJI_DIR = 'emojis'
 
 
 class emoji_manager():
-    def __init__(self, client, guild):
-        self.client = client
+    def __init__(self, bot, guild):
+        self.bot = bot
         self.guild = guild
         self._priorities = list(self.guild.emojis)
         if not os.path.exists(EMOJI_DIR + '/' + str(self.guild.id)):
@@ -50,31 +50,34 @@ class emoji_manager():
         pattern = re.compile(r'(?:<:(?P<name>\w+):(?P<id>\d+)>)|(?::(?P<nameonly>\w+):)')
         emojis = pattern.finditer(message.content)
         for emojistr in emojis:
-            if emojistr.group('nameonly'):
+            if emojistr['nameonly']:
                 try:
-                    emoji = await self.bump_emoji(emojistr.group('nameonly'))
+                    emoji = await self.bump_emoji(emojistr['nameonly'])
                 except Exception as e:
                     print(e)
                     continue
                 if not emoji:
                     continue
-                self.client.deletable_messages.append(message.id)
-                await message.delete()
-                send_message(message.channel,
-                             message.content.replace(':%s:' % emojistr.group('nameonly'), str(emoji)),
-                             username=message.author.display_name,
-                             avatar_url=str(message.author.avatar_url).replace('webp', 'png')
-                             )
-                print(str(message.author.avatar_url))
+                try:
+                    await send_message_webhook(
+                        message.channel,
+                        message.content.replace(':%s:' % emojistr['nameonly'], str(emoji)),
+                        username=message.author.display_name,
+                        avatar_url=str(message.author.avatar_url_as(format='png')))
+                except Exception as e:
+                    print(f"Couldn't send message with webhook: {e}")
+                else:
+                    self.bot.deletable_messages.append(message.id)
+                    await message.delete()
                 break
 
-            elif emojistr.group('name'):
-                emoji = discord.utils.get(self.guild.emojis, id=emojistr.group('id'), name=emojistr.group('name'))
+            elif emojistr['name']:
+                emoji = discord.utils.get(self.guild.emojis, id=emojistr['id'], name=emojistr['name'])
                 if emoji:
                     await self.bump_emoji(emoji)
 
     async def rename_emoji(self, before, after):
-        print('renamed')
+        print(f'renamed emoji {before.name}->{after.name}')
         await self.clean()
 
     async def add_emoji(self, emoji):
@@ -157,7 +160,7 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
         '''
         settings = self.bot.settings[ctx.guild]
         if not settings.manage_emojis:
-            message = "The emoji manager is disabled, you can enable it in `!settings`"
+            message = f"The emoji manager is disabled, you can enable it in `{settings.command_prefix}settings`"
         else:
             message = '```\n • ' + '\n • '.join(self.managers[ctx.guild.id].list_unloaded()) + '```\n'
             message += "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"

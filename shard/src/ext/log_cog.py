@@ -139,7 +139,7 @@ class LogCog(commands.Cog):
         )
 
     @commands.Cog.listener()
-    async def on_guild_emojis_update(self, before, after):
+    async def on_guild_emojis_update(self, guild, before, after):
         pass
 
     @commands.Cog.listener()
@@ -270,7 +270,7 @@ class LogCog(commands.Cog):
                 'reversible': True,
                 'action_number': 3003,
                 'agent_id': msg.author.id,
-                'subject_id': msg.msg.id,
+                'subject_id': msg.id,
                 'data': None,
             }
         )
