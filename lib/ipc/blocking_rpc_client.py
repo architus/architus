@@ -7,6 +7,7 @@ from threading import Thread, RLock
 import pika
 
 from lib.ipc.util import poll_for_connection
+from lib.config import logger
 
 connkeeper = {}
 
@@ -76,7 +77,7 @@ class shardRPC:
         """
         assert routing_key is not None
         with self.hb_lock:
-            print(f'calling {method} on queue: {routing_key}')
+            logger.debug(f'calling {method} on queue: {routing_key}')
             self.resp = None
             self.corr_id = str(uuid.uuid4())
             self.channel.basic_publish(

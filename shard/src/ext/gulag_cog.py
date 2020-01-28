@@ -5,6 +5,8 @@ import time
 import asyncio
 import discord
 
+from lib.config import logger
+
 
 class Gulag(commands.Cog):
 
@@ -24,7 +26,7 @@ class Gulag(commands.Cog):
             gulag_emoji = discord.utils.get(ctx.guild.emojis, name="gulag")
             assert gulag_emoji is not None
         except Exception:
-            print("gulag role/emoji not found")
+            logger.warning("gulag role/emoji not found")
             await ctx.send("Please create a role called `kulak` and an emoji called `gulag` to use this feature.")
             return
         if comrade == self.bot.user:
@@ -53,11 +55,11 @@ class Gulag(commands.Cog):
                 t_end += int((settings.gulag_severity / 2) * 60)
             if len(user_list) >= settings.gulag_threshold and gulag_role not in comrade.roles:
                 try:
-                    print(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
+                    logger.debug(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
                     gulaggen.generate(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
                     generated = True
-                except Exception as e:
-                    print(e)
+                except Exception:
+                    logger.exception("gulag generator error")
                     pass
                 if generated:
                     await ctx.channel.send(file=discord.File('res/gulag.png'))
@@ -79,7 +81,7 @@ class Gulag(commands.Cog):
             await msg.edit(content=f"Vote for {comrade.display_name} failed to pass")
 
         await comrade.remove_roles(gulag_role)
-        print('ungulag\'d ' + comrade.display_name)
+        logger.info('ungulag\'d ' + comrade.display_name)
 
 
 def setup(bot):

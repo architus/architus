@@ -10,7 +10,7 @@ import discord
 import json
 
 import src.generate.wordcount as wordcount_gen
-from lib.config import DISCORD_EPOCH
+from lib.config import DISCORD_EPOCH, logger
 
 IMAGE_CHANNEL_ID = 577523623355613235
 
@@ -46,7 +46,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     async def cache_guild(self, guild):
         '''cache interesting information about all the messages in a guild'''
-        print(f"Downloading messages in {len(guild.channels)} channels for '{guild.name}'...")
+        logger.debug(f"Downloading messages in {len(guild.channels)} channels for '{guild.name}'...")
         for channel in guild.text_channels:
             try:
                 async for message in channel.history(limit=None, oldest_first=True):
@@ -58,16 +58,16 @@ class MessageStats(commands.Cog, name="Server Statistics"):
                         self.count_correct(message.clean_content)
                     ))
             except Forbidden:
-                print(f"Insuffcient permissions to download messages from '{guild.name}.{channel.name}'")
+                logger.warning(f"Insuffcient permissions to download messages from '{guild.name}.{channel.name}'")
             except HTTPException as e:
-                print(f"Caught {e} when downloading '{guild.name}.{channel.name}'")
+                logger.error(f"Caught {e} when downloading '{guild.name}.{channel.name}'")
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print(f"Caching messages for {len(self.bot.guilds)} guilds...")
+        logger.debug(f"Caching messages for {len(self.bot.guilds)} guilds...")
         for guild in self.bot.guilds:
             await self.cache_guild(guild)
-        print(f"Message cache up-to-date")
+        logger.debug(f"Message cache up-to-date")
 
     @commands.Cog.listener()
     async def on_message(self, msg):
