@@ -129,7 +129,8 @@ class Setting:
     @property
     def admins_ids(self) -> list:
         default_admins = [self.guild.owner.id, 214037134477230080]
-        return default_admins + [int(a) for a in self._settings_dict.get('admins', [])]
+
+        return list(set(default_admins + [int(a) for a in self._settings_dict.get('admins', [])]))
 
     @admin_ids.setter
     def admin_ids(self, new_admins: list):
