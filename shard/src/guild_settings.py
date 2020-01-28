@@ -117,7 +117,6 @@ class Setting:
 
     @bot_commands_channels.setter
     def bot_commands_channels(self, new_bot_commands: list):
-        print(new_bot_commands)
         self._settings_dict['bot_commands'] = new_bot_commands
         self._update_db()
 

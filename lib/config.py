@@ -4,9 +4,16 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime, timezone
 import re
+import logging
 """
 This file loads the environment secrets into memory and also manages database connections
 """
+
+logger = logging.getLogger("architus")
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(module)s: %(message)s'))
+logger.addHandler(handler)
 
 DB_HOST = 'postgres'
 DB_PORT = 5432
@@ -34,12 +41,12 @@ except KeyError:
 API_ENDPOINT = 'https://discordapp.com/api/v6'
 REDIRECT_URI = f'https://api.{domain_name}/redirect'
 
-print("creating engine...")
+logger.debug("creating db engine...")
 engine = create_engine(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
 
 
 def get_session():
-    print("creating a new db session")
+    logger.debug("creating a new db session")
     Session = sessionmaker(bind=engine)
     return Session()
 

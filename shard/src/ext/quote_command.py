@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 from pytz import timezone
 
+from lib.config import logger
+
 
 @commands.command()
 async def quote(ctx, message: discord.Message):
@@ -18,7 +20,7 @@ async def quote(ctx, message: discord.Message):
         elif message.attachments:
             em.set_image(url=message.attachments[0].url)
     except (IndexError, KeyError):
-        print("tried to attach image, couldn't")
+        logger.exception("tried to attach image, couldn't")
     await ctx.channel.send(embed=em)
 
 

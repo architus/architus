@@ -4,6 +4,8 @@ import time
 
 from contextlib import suppress
 
+from lib.config import logger
+
 with suppress(ModuleNotFoundError):
     from aio_pika import connect
 with suppress(ModuleNotFoundError):
@@ -16,10 +18,10 @@ async def poll_for_async_connection(loop):
         try:
             return await connect("amqp://hello:hello@rabbit/", loop=loop)
         except (ConnectionError, Exception) as e:
-            print(f"{name} is waiting to connect to rabbit: {e}")
+            logger.debug(f"{name} is waiting to connect to rabbit: {e}")
             await asyncio.sleep(3)
         finally:
-            print(f"{name} successfully connected to rabbit")
+            logger.debug(f"{name} successfully connected to rabbit")
 
 
 def poll_for_connection():
@@ -31,7 +33,7 @@ def poll_for_connection():
             return pika.BlockingConnection(parameters)
         except pika.exceptions.AMQPConnectionError as e:
             # except Exception as e:
-            print(f"{name} is waiting to connect to rabbit: {e}")
+            logger.debug(f"{name} is waiting to connect to rabbit: {e}")
             time.sleep(3)
         finally:
-            print(f"{name} successfully connected to rabbit")
+            logger.debug(f"{name} successfully connected to rabbit")

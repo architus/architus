@@ -2,6 +2,8 @@ from src.list_embed import ListEmbed
 from discord.ext import commands
 import discord
 
+from lib.config import logger
+
 
 class Roles(commands.Cog):
 
@@ -10,13 +12,13 @@ class Roles(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        print("%s joined guild: %s" % (member.name, member.guild.name))
+        logger.info("%s joined guild: %s" % (member.name, member.guild.name))
         settings = self.bot.settings[member.guild]
         try:
             default_role = discord.utils.get(member.guild.roles, id=settings.default_role_id)
             await member.add_roles(default_role)
         except Exception:
-            print("could not add %s to %s" % (member.display_name, 'default role'))
+            logger.exception("could not add %s to %s" % (member.display_name, 'default role'))
 
     @commands.command(aliases=['rank', 'join', 'roles'])
     async def role(self, ctx, *arg):

@@ -1,7 +1,7 @@
 from discord.ext.commands import Cog, Bot
 from discord.ext import commands
 from multiprocessing import Process, Queue
-from lib.config import scraper_token
+from lib.config import scraper_token, logger
 
 import asyncio
 import discord
@@ -10,7 +10,7 @@ import re
 
 class ScrimScraper(Bot):
     async def on_ready(self):
-        print(f"Scraper logged in as {self.user.name}")
+        logger.info(f"Scraper logged in as {self.user.name}")
 
     async def on_message(self, msg):
         if msg.author == self.user:
@@ -86,7 +86,7 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
 
 def teardown(bot):
     pass
-    # print("Terminating scraper bot")
+    # logger.debug("Terminating scraper bot")
     # p.terminate()
 
 

@@ -7,7 +7,7 @@ from discord.ext.commands import Cog, MemberConverter, RoleConverter, CommandErr
 from discord.ext import commands
 
 from src.list_embed import ListEmbed
-from lib.config import domain_name
+from lib.config import domain_name, logger
 
 STAR = "⭐"
 TRASH = u"\U0001F5D1"
@@ -212,7 +212,7 @@ class JoinableRoles(SettingsElement):
             try:
                 role = await role_converter.convert(ctx, match['role'])
             except CommandError:
-                print(f"'{match['role']}' doesn't seem to be a role")
+                logger.warning(f"'{match['role']}' doesn't seem to be a role")
                 continue
             if match['nick']:
                 new_roles.append((match.group('nick').lower(), role.id))
@@ -337,9 +337,9 @@ class Settings(Cog):
                         value = await setting.parse(ctx, user_msg, settings)
                     except ValueError:
                         await ctx.send(setting.failure_msg)
-                    except Exception as e:
+                    except Exception:
                         await ctx.send("Something bad happened... try again?")
-                        print(f"Caught '{e}', continuing...")
+                        logger.exception(f"Caught exception, continuing...")
                         continue
                     else:
                         setattr(settings, setting.setting, value)
