@@ -58,7 +58,7 @@ class SettingsElement:
 
     async def formatted_value(self, bot, ctx, settings):
         '''the value displayed in the embed'''
-        return getattr(settings, self.setting)
+        return str(getattr(settings, self.setting))
 
     async def parse(self, ctx, msg, settings):
         '''parses a message for new values and returns them or raises ValueError'''
@@ -108,7 +108,7 @@ class ManageEmojis(SettingsElement):
             "Emoji Manager",
             OPEN_FOLDER,
             "If true, less popular emojis will be cycled in and out as needed, effectively "
-            "allowing greater than 50 emojis. Enter `true` or `false` to modify it:",
+            "allowing greater than the max emojis. Enter `true` or `false` to modify it:",
             'manage_emojis')
 
 
