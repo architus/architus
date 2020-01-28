@@ -1,9 +1,13 @@
-import discord
 import re
-from discord.ext.commands import Cog, MemberConverter, CommandError
+from datetime import datetime, timedelta
+from asyncio import TimeoutError
+
+import discord
+from discord.ext.commands import Cog, MemberConverter, RoleConverter, CommandError
 from discord.ext import commands
 
 from src.list_embed import ListEmbed
+from lib.config import domain_name
 
 STAR = "⭐"
 TRASH = u"\U0001F5D1"
@@ -56,7 +60,7 @@ class SettingsElement:
         '''the value displayed in the embed'''
         return getattr(settings, self.setting)
 
-    async def parse(self, msg, settings):
+    async def parse(self, ctx, msg, settings):
         '''parses a message for new values and returns them or raises ValueError'''
         if msg.clean_content.lower() in SettingsElement.TRUE_STRINGS:
             return True
@@ -73,7 +77,7 @@ class StarboardThreshold(SettingsElement):
             "This is the number of reacts a message must get to be starboarded. Enter a number to modify it:",
             'starboard_threshold')
 
-    async def parse(self, msg, settings):
+    async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
 
 
@@ -85,7 +89,7 @@ class UserCommandThreshold(SettingsElement):
             "This is the number of custom responses each user can set. Enter a number to modify it:",
             'responses_limit')
 
-    async def parse(self, msg, settings):
+    async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
 
 
@@ -120,7 +124,9 @@ class BotCommands(SettingsElement):
         return ', '.join([c.mention for c in [discord.utils.get(ctx.guild.channels, id=i)
                           for i in settings.bot_commands_channels] if c] or ['None'])
 
-    async def parse(self, msg, settings):
+    async def parse(self, ctx, msg, settings):
+        if not msg.channel_mentions:
+            raise ValueError
         bc_channels = settings.bot_commands_channels
 
         for channel in msg.channel_mentions:
@@ -128,8 +134,6 @@ class BotCommands(SettingsElement):
                 bc_channels.remove(channel.id)
             else:
                 bc_channels.append(channel.id)
-        else:
-            raise ValueError
         return bc_channels
 
 
@@ -145,18 +149,18 @@ class Admins(SettingsElement):
     async def formatted_value(self, bot, ctx, settings):
         return ', '.join({(await bot.fetch_user(u)).name for u in settings.admins_ids})
 
-    async def parse(self, msg, settings):
+    async def parse(self, ctx, msg, settings):
         member_converter = MemberConverter()
+        admin_ids = settings.admin_ids
         try:
-            member = await member_converter.convert(msg, msg.clean_content)
-        except CommandError as e:
-            # TODO does this work
-            print(e)
+            member = await member_converter.convert(ctx, msg.content)
+        except CommandError:
             raise ValueError
         if member.id in settings.admin_ids:
-            return settings.admin_ids.remove(member.id)
+            admin_ids.remove(member.id)
         else:
-            return settings.admins_ids.append(member.id)
+            admin_ids.append(member.id)
+        return admin_ids
 
 
 class DefaultRole(SettingsElement):
@@ -164,7 +168,7 @@ class DefaultRole(SettingsElement):
         super().__init__(
             "Default Role",
             SHIELD,
-            "New members will be automatically moved into this role. Enter a role id (`!roleids`) to change:",
+            "New members will be automatically moved into this role. Enter a role (`!roleids`) to change:",
             'default_role_id')
 
     async def formatted_value(self, bot, ctx, settings):
@@ -174,10 +178,12 @@ class DefaultRole(SettingsElement):
     def check(self, msg):
         return not msg.content.endswith('roleids')
 
-    async def parse(self, msg, settings):
-        if discord.utils.get(msg.guild.roles, id=int(msg.content)):
-            return msg.content
-        raise ValueError
+    async def parse(self, ctx, msg, settings):
+        role_converter = RoleConverter()
+        try:
+            return (await role_converter.convert(ctx, msg.content)).id
+        except CommandError:
+            raise ValueError
 
 
 class JoinableRoles(SettingsElement):
@@ -189,6 +195,7 @@ class JoinableRoles(SettingsElement):
             "(`!roleids`) to toggle. Optionally enter a nickname for the role in the format "
             "`nickname::roleid` if the role's name is untypable:",
             'roles_dict')
+        self.pattern = re.compile(r"((?P<nick>\w+)::)?(?P<role>\w+)")
 
     async def formatted_value(self, bot, ctx, settings):
         return ', '.join([r.mention for r in [discord.utils.get(ctx.guild.roles, id=i)
@@ -197,16 +204,22 @@ class JoinableRoles(SettingsElement):
     def check(self, msg):
         return not msg.content.endswith('roleids')
 
-    async def parse(self, msg, settings):
-        pattern = re.compile(r"((?P<nick>\w+)::)?(?P<id>\d{17,20})")
+    async def parse(self, ctx, msg, settings):
+        role_converter = RoleConverter()
         new_roles = []
         roles = settings.roles_dict
-        for match in re.finditer(pattern, msg.content):
-            role = discord.utils.get(msg.guild.roles, id=int(match.group('id')))
-            if match.group('nick') and role:
+        for match in re.finditer(self.pattern, msg.content):
+            try:
+                role = await role_converter.convert(ctx, match['role'])
+            except CommandError:
+                print(f"'{match['role']}' doesn't seem to be a role")
+                continue
+            if match['nick']:
                 new_roles.append((match.group('nick').lower(), role.id))
-            elif role:
+            else:
                 new_roles.append((role.name.lower(), role.id))
+        if new_roles == []:
+            raise ValueError
         for role in new_roles:
             if role[1] in roles.values():  # if role already in dict
                 if role[0] not in roles:  # in dict with a different nick
@@ -216,8 +229,6 @@ class JoinableRoles(SettingsElement):
                     roles = {k: v for k, v in roles.items() if v != role[1]}
             else:                         # new role
                 roles[role[0]] = role[1]
-        else:
-            raise ValueError
 
         return roles
 
@@ -230,7 +241,7 @@ class GulagThreshold(SettingsElement):
             'This is the number of reacts a gulag vote must get to be pass. Enter a number to modify it:',
             'gulag_threshold')
 
-    async def parse(self, msg, settings):
+    async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
 
 
@@ -243,7 +254,7 @@ class GulagSeverity(SettingsElement):
             'Half again per extra vote. Enter a number to modify it:',
             'gulag_severity')
 
-    async def parse(self, msg, settings):
+    async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
 
 
@@ -268,7 +279,7 @@ class CommandPrefix(SettingsElement):
     async def formatted_value(self, bot, ctx, settings):
         return f"'{getattr(settings, self.setting)}'"
 
-    async def parse(self, msg, settings):
+    async def parse(self, ctx, msg, settings):
         if msg.clean_content == 'cancel':
             raise ValueError
         return msg.clean_content
@@ -278,6 +289,8 @@ class Settings(Cog):
     '''
     Manage server specific architus settings
     '''
+
+    SETTINGS_MENU_TIMEOUT_SEC = 60 * 60
 
     def __init__(self, bot):
         self.bot = bot
@@ -305,30 +318,42 @@ class Settings(Cog):
         for setting in self.settings_elements:
             await msg.add_reaction(setting.emoji)
 
-        # TODO not forever
-        while True:
-            react, user = await self.bot.wait_for(
-                'reaction_add', check=lambda r, u: r.message.id == msg.id and u == ctx.author)
+        then = datetime.now() + timedelta(seconds=Settings.SETTINGS_MENU_TIMEOUT_SEC)
+        while datetime.now() < then:
+            try:
+                react, user = await self.bot.wait_for(
+                    'reaction_add',
+                    check=lambda r, u: r.message.id == msg.id and u == ctx.author,
+                    timeout=Settings.SETTINGS_MENU_TIMEOUT_SEC)
+            except TimeoutError:
+                break
+            await react.remove(user)
             for setting in self.settings_elements:
                 if react.emoji == setting.emoji:
                     await ctx.send(setting.description)
                     user_msg = await self.bot.wait_for(
-                        'message', check=lambda m: m.author == ctx.author and setting.check(msg))
+                        'message', check=lambda m: m.author == ctx.author and setting.check(m))
                     try:
-                        value = await setting.parse(user_msg, settings)
+                        value = await setting.parse(ctx, user_msg, settings)
                     except ValueError:
                         await ctx.send(setting.failure_msg)
+                    except Exception as e:
+                        await ctx.send("Something bad happened... try again?")
+                        print(f"Caught '{e}', continuing...")
+                        continue
                     else:
                         setattr(settings, setting.setting, value)
                         await ctx.send(setting.success_msg)
-            await msg.edit(embed=await self.get_embed(ctx, settings))
+                        await msg.edit(embed=await self.get_embed(ctx, settings))
+        await msg.edit(content="*Settings menu expired.*", embed=None)
 
     async def get_embed(self, ctx, settings):
+        '''makes the pretty embed menu'''
         em = discord.Embed(
             title="⚙ Settings",
-            description="Select an item for more info or to change it",
+            description="Select an item to modify or view more information about it",
             colour=0x83bdff,
-            url=f'https://archit.us/app/{ctx.guild.id}/settings')
+            url=f'https://{domain_name}/app/{ctx.guild.id}/settings')
         em.set_author(name='Architus Server Settings', icon_url=str(ctx.guild.icon_url))
 
         for setting in self.settings_elements:
