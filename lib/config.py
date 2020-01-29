@@ -42,7 +42,10 @@ API_ENDPOINT = 'https://discordapp.com/api/v6'
 REDIRECT_URI = f'https://api.{domain_name}/redirect'
 
 logger.debug("creating db engine...")
-engine = create_engine(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
+try:
+    engine = create_engine(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
+except Exception as e:
+    logger.warn(f"Couldn't create engine, maybe you don't care {e}")
 
 
 def get_session():

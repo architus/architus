@@ -1,1 +1,2 @@
 aio_pika
+SQLAlchemy>=1.3.0

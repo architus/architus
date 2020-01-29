@@ -1,8 +1,7 @@
-import random
-import string
-import os
 from collections import defaultdict
 from datetime import timedelta
+from concurrent.futures import ThreadPoolExecutor
+import base64
 
 from discord.ext import commands
 from discord import Forbidden, HTTPException
@@ -11,8 +10,6 @@ import json
 
 import src.generate.wordcount as wordcount_gen
 from lib.config import DISCORD_EPOCH, logger
-
-IMAGE_CHANNEL_ID = 577523623355613235
 
 
 class MessageData:
@@ -122,23 +119,18 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         async with ctx.channel.typing():
             message_counts, word_counts = await self.count_messages(ctx.guild)
 
-        key = ''.join(random.choice(string.ascii_letters) for n in range(10))
-        wordcount_gen.generate(key, message_counts, word_counts, victim)
-        channel = discord.utils.get(self.bot.get_all_channels(), id=IMAGE_CHANNEL_ID)
-
-        with open(f'res/word{key}.png', 'rb') as f:
-            msg = await channel.send(file=discord.File(f))
+        with ThreadPoolExecutor() as pool:
+            img = await self.bot.loop.run_in_executor(pool, wordcount_gen.generate, message_counts, word_counts, victim)
+        data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
 
         em = discord.Embed(title="Top 5 Message Senders", description=ctx.guild.name)
-        em.set_image(url=msg.attachments[0].url)
+        em.set_image(url=data['url'])
         em.color = 0x7b8fb7
         if victim:
             em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
                 victim.display_name, word_counts[victim], message_counts[victim]), icon_url=victim.avatar_url)
 
         await ctx.channel.send(embed=em)
-
-        os.remove(f"res/word{key}.png")
 
 
 def setup(bot):
