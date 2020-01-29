@@ -11,7 +11,7 @@ from lib.ipc.util import poll_for_connection
 connkeeper = {}
 
 
-def get_rpc_client(id):
+def get_rpc_client(id: int):
     """manager function to keep track of connections between processes in wsgi
 
     :param id: unique id to collect client
@@ -56,17 +56,17 @@ class shardRPC:
                 self.connection.process_data_events(time_limit=0)
             time.sleep(60)
 
-    def on_response(self, ch, method, props, body):
+    def on_response(self, ch, method, props: pika.spec.BasicProperties, body: bytes):
         if self.corr_id == props.correlation_id:
             with self.hb_lock:
                 resp = json.loads(body)
                 self.resp = resp['resp']
                 self.status_code = resp['sc']
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str):
         return partial(self.call, name)
 
-    def call(self, method, *args, routing_key=None, **kwargs):
+    def call(self, method: str, *args, routing_key: str = None, **kwargs):
         """Remotely call a method
 
         :param method: name of method to call

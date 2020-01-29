@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from urllib.parse import quote_plus
+from secrets import randbits
 
 from flask_restful import Resource
 from flask import redirect, request
@@ -8,10 +9,35 @@ from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN
 from lib.status_codes import StatusCodes
 from lib.auth import JWT, flask_authenticated as authenticated
 
-from src.util import CustomResource, reqparams
-from src.discord_requests import identify_request, token_exchange_request
+from src.util import CustomResource, reqparams, time_to_refresh
+from src.discord_requests import identify_request, token_exchange_request, refresh_token_request
 
 SAFE_REDIRECT_URI = quote_plus(REDIRECT_URI)
+
+
+def make_token_cookie_header(token: str, max_age: int) -> dict:
+    '''creates a set-cookie header for storing the auth token'''
+    return {'Set-Cookie': f'token={token}; Max-Age={max_age}; Path=/; Domain=api.{DOMAIN}; Secure; HttpOnly'}
+
+
+def generate_refresh_response(jwt: JWT) -> tuple:
+    '''makes a refresh request and compiles the json, status code, and set-cookie header'''
+    data, sc = refresh_token_request(jwt.refresh_token)
+    if sc == StatusCodes.OK_200:
+        now = datetime.now()
+        jwt.access_token = data['access_token']
+        jwt.refresh_token = data['refresh_token']
+        jwt.expires_in = data['expires_in']
+        jwt.issued_at = now.isoformat()
+
+        return {
+            'access': {
+                'issuedAt': now.isoformat(),
+                'expiresIn': jwt.expires_in,
+                'refresh_in': jwt.expires_in // 2
+            }
+        }, sc, make_token_cookie_header(jwt.get_token(), jwt.expires_in * 2)
+    return data, sc
 
 
 class Login(CustomResource):
@@ -37,11 +63,26 @@ class Login(CustomResource):
         return response
 
 
+class End(CustomResource):
+    @authenticated
+    def post(self, jwt: JWT):
+        self.shard.client.call(
+            'demote_connection',
+            jwt.get_token(),
+            routing_key='gateway_rpc'
+        )
+        return {'message': 'ok I definitetly did something :)'}, StatusCodes.OK_200, make_token_cookie_header(None, -1)
+
+
 class RefreshToken(CustomResource):
-    pass
+    @authenticated
+    def post(self, jwt: JWT):
+        if time_to_refresh(jwt):
+            return generate_refresh_response(jwt)
+        return {'message': 'It\'s not time to refresh your token'}, StatusCodes.TOO_MANY_REQUESTS_429
 
 
-class TokenExchange(Resource):
+class TokenExchange(CustomResource):
     @reqparams(code=str)
     def post(self, code: str):
         ex_data, status_code = token_exchange_request(code)
@@ -58,9 +99,10 @@ class TokenExchange(Resource):
                     'refresh_token': ex_data['refresh_token'],
                     'expires_in': expires_in,
                     'issued_at': now.isoformat(),
-                    'id': id_data['id'],
+                    'id': int(id_data['id']),
                     'permissions': 274,
                 })
+                nonce = randbits(32)
                 data = {
                     # 'token': jwt.get_token()
                     'user': id_data,
@@ -68,14 +110,17 @@ class TokenExchange(Resource):
                         'issuedAt': now.isoformat(),
                         'expiresIn': expires_in,
                         'refreshIn': int(refresh_in.total_seconds()),
-                    }
+                    },
+                    'gatewayNonce': nonce,
                 }
 
-                cookie = {
-                    'Set-Cookie':
-                        f'token={jwt.get_token()}; Max-Age={expires_in * 2}; Domain=.{DOMAIN}; Secure; HttpOnly;'
-                }
-                return data, StatusCodes.OK_200, cookie
+                self.shard.client.call(
+                    'register_nonce',
+                    nonce,
+                    jwt.get_token(),
+                    routing_key='gateway_rpc'
+                )
+                return data, StatusCodes.OK_200, make_token_cookie_header(jwt.get_token(), expires_in * 2)
 
         return ex_data, status_code
 
@@ -84,4 +129,19 @@ class Identify(Resource):
     @authenticated
     def get(self, jwt: JWT):
         '''Forward identify request to discord and return response'''
-        return identify_request(jwt.access_token)
+        id_data, sc = identify_request(jwt.access_token)
+        if sc == StatusCodes.OK_200:
+            if time_to_refresh(jwt):
+                data, *rest = generate_refresh_response(jwt)
+                data['user'] = id_data
+                return (data, *rest)
+            else:
+                return {
+                    'user': id_data,
+                    'access': {
+                        'issuedAt': jwt.issued_at,
+                        'expiresIn': jwt.expires_in,
+                        'refreshIn': jwt.expires_in // 2,
+                    }
+                }, StatusCodes.OK_200
+        return id_data, sc

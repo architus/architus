@@ -1,11 +1,13 @@
 import os
 from uuid import getnode
 from functools import wraps
+from datetime import datetime, timedelta
 
 from flask_restful import Resource, reqparse
 from flask import g
 
 from lib.config import get_session, which_shard
+from lib.auth import JWT
 from lib.ipc.blocking_rpc_client import get_rpc_client
 
 
@@ -51,3 +53,9 @@ def camelcase_keys(dictionary: dict):
         first, *rest = key.split('_')
         new_key = first + ''.join(word.capitalize() for word in rest)
         dictionary[new_key] = dictionary.pop(key)
+
+
+def time_to_refresh(jwt: JWT):
+    issued_at = datetime.strptime(jwt.issued_at, "%Y-%m-%dT%H:%M:%S.%f")
+    refresh_in = timedelta(seconds=jwt.expires_in) / 2
+    return datetime.now() > issued_at + refresh_in

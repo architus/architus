@@ -12,11 +12,11 @@ from lib.auth import JWT, flask_authenticated as authenticated
 
 from src.discord_requests import list_guilds_request
 from src.util import CustomResource, reqparams, camelcase_keys
-from src.session import Identify, Login, RefreshToken, TokenExchange
+from src.session import Identify, Login, RefreshToken, TokenExchange, End
 
 
 app = Flask(__name__)
-cors = CORS(app)
+cors = CORS(app, supports_credentials=True)
 
 
 @app.teardown_appcontext
@@ -57,6 +57,7 @@ class RedirectCallback(CustomResource):
             redirect_url += f"?guild_id={guild_id}"
 
         resp = redirect(redirect_url)
+        resp.set_cookie('next', '', expires=0)
         return resp
 
 
@@ -183,7 +184,7 @@ class ListGuilds(CustomResource):
     @authenticated
     def get(self, jwt: JWT):
         '''Forward guild list request to discord and return response'''
-        resp, status_code = list_guilds_request()
+        resp, status_code = list_guilds_request(jwt)
         if status_code == StatusCodes.OK_200:
             resp, _ = self.shard.tag_autbot_guilds(resp, jwt.id)
         return resp, status_code
@@ -199,6 +200,7 @@ def app_factory():
     api.add_resource(Identify, "/session/identify")
     api.add_resource(Login, "/session/login")
     api.add_resource(RefreshToken, "/session/refresh")
+    api.add_resource(End, "/session/end")
     api.add_resource(TokenExchange, "/session/token-exchange")
 
     api.add_resource(User, "/user/<string:name>")
