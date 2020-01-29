@@ -3,17 +3,17 @@ DEFAULT_PERMISSIONS = 0x112
 
 class Permissions:
     flags = {
-        'ADMINISTRATOR':                0x0001,
-        'VIEW_PUBLIC_LOGS':             0x0002,
-        'VIEW_PRIVATE_LOGS':            0x0004,
-        'REVERT_LOG_ACTIONS':           0x0008,
-        'ADD_AUTO_RESPONSE':            0x0010,
-        'IGNORE_AUTO_RESPONSE_QUOTA':   0x0020,
-        'EDIT_ANY_AUTO_RESPONSE':       0x0040,
-        'DELETE_ANY_AUTO_RESPONSE':     0x0080,
-        'VIEW_SETTINGS':                0x0100,
-        'MANAGE_SETTINGS':              0x0200,
-        'EXEC_PURGE_CMD':               0x0400,
+        'ADMINISTRATOR': 0x0001,
+        'VIEW_PUBLIC_LOGS': 0x0002,
+        'VIEW_PRIVATE_LOGS': 0x0004,
+        'REVERT_LOG_ACTIONS': 0x0008,
+        'ADD_AUTO_RESPONSE': 0x0010,
+        'IGNORE_AUTO_RESPONSE_QUOTA': 0x0020,
+        'EDIT_ANY_AUTO_RESPONSE': 0x0040,
+        'DELETE_ANY_AUTO_RESPONSE': 0x0080,
+        'VIEW_SETTINGS': 0x0100,
+        'MANAGE_SETTINGS': 0x0200,
+        'EXEC_PURGE_CMD': 0x0400,
     }
 
     def __init__(self, code: int = DEFAULT_PERMISSIONS):
