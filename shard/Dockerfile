@@ -9,7 +9,7 @@ WORKDIR /app
 #RUN apt-get install imagemagi
 
 RUN apt-get -y update
-RUN apt-get -y install python3-pip libmagickwand-dev ffmpeg
+RUN apt-get -y install python3-pip ffmpeg
 
 COPY ./shard/requirements.txt /app
 

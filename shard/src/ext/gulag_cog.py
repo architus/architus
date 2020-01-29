@@ -67,8 +67,9 @@ class Gulag(commands.Cog):
                     await ctx.channel.send("gulag'd " + comrade.display_name)
 
                 timer_msg = await ctx.channel.send("⏰ %d seconds" % (settings.gulag_severity * 60))
-                timer_msg_gulag = await (discord.utils.get(ctx.guild.text_channels, name='gulag')).send(
-                    "⏰ %d seconds, %s" % (settings.gulag_severity * 60, comrade.display_name))
+                with suppress(AttributeError):
+                    timer_msg_gulag = await (discord.utils.get(ctx.guild.text_channels, name='gulag')).send(
+                        "⏰ %d seconds, %s" % (settings.gulag_severity * 60, comrade.display_name))
                 await comrade.add_roles(gulag_role)
 
                 t_end = time.time() + int(60 * settings.gulag_severity)
