@@ -1,5 +1,6 @@
 from discord.ext import commands
 import discord
+import base64
 
 from src.utils import timezone_aware_format
 from lib.config import logger
@@ -29,7 +30,12 @@ class StarboardCog(commands.Cog):
         # TODO save author's image so this doesn't break when the change it
         em = discord.Embed(
             title=timezone_aware_format(message.created_at), description=message.content, colour=0x42f468)
-        em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
+        img = await message.author.avatar_url.read()
+        data, _ = await self.bot.manager_client.publish_file(location='avatars',
+                                                             name=message.author.id,
+                                                             data=base64.b64encode(img).decode('ascii'))
+
+        em.set_author(name=message.author.display_name, icon_url=data['url'])
         if message.embeds:
             em.set_image(url=message.embeds[0].url)
         elif message.attachments:
