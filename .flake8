@@ -2,7 +2,6 @@
 max_line_length = 120
 ignore = W606,W503
 exclude =
-    ./shard/src/generate/*
     ./gateway/client.py
     ./lib/response_grammar/*
     .venv/*

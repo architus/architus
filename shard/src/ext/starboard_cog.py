@@ -23,7 +23,7 @@ class StarboardCog(commands.Cog):
     async def starboard_post(self, message, guild):
         """Post a message in the starboard channel"""
         starboard_ch = discord.utils.get(guild.text_channels, name='starboard')
-        if message.id in self.starboarded_messages or not starboard_ch or message.author == self.user:
+        if message.id in self.starboarded_messages or not starboard_ch or message.author == self.bot.user:
             return
         logger.info("Starboarding message: " + message.content)
         self.starboarded_messages.append(message.id)

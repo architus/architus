@@ -55,14 +55,14 @@ class Gulag(commands.Cog):
                 t_end += int((settings.gulag_severity / 2) * 60)
             if len(user_list) >= settings.gulag_threshold and gulag_role not in comrade.roles:
                 try:
-                    logger.debug(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
-                    gulaggen.generate(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
+                    logger.debug(comrade.avatar_url)
+                    img = gulaggen.generate(await comrade.avatar_url_as(format='png', size=1024).read())
                     generated = True
                 except Exception:
                     logger.exception("gulag generator error")
                     pass
                 if generated:
-                    await ctx.channel.send(file=discord.File('res/gulag.png'))
+                    await ctx.channel.send(file=discord.File(img, filename=f'{self.bot.hoarfrost_gen.generate()}.png'))
                 else:
                     await ctx.channel.send("gulag'd " + comrade.display_name)
 

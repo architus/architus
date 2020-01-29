@@ -37,6 +37,7 @@ class SetCog(commands.Cog, name="Auto Responses"):
         '''
         user_commands = self.bot.user_commands
         settings = self.bot.settings[ctx.guild]
+        prefix = settings.command_prefix
         from_admin = ctx.author.id in settings.admins_ids
         if settings.bot_commands_channels and ctx.channel.id not in settings.bot_commands_channels and not from_admin:
             for channelid in settings.bot_commands_channels:
@@ -45,7 +46,7 @@ class SetCog(commands.Cog, name="Auto Responses"):
                     await ctx.channel.send(botcommands.mention + '?')
                     return
 
-        parser = re.search('!set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+        parser = re.search(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
         msg = "try actually reading the syntax"
         if parser:
             try:
@@ -57,7 +58,7 @@ class SetCog(commands.Cog, name="Auto Responses"):
                 msg = str(e)
             except ResponseKeywordException:
                 if parser.group(2).strip() == "remove":
-                    msg = "please use `!remove` instead"
+                    msg = f"please use `{prefix}remove` instead"
                 elif parser.group(2).strip() in ("author", "list"):
                     msg = f"please check https://archit.us/app/{ctx.guild.id}/responses"
             except UserLimitException as e:
