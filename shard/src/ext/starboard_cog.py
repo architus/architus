@@ -15,7 +15,7 @@ class StarboardCog(commands.Cog):
     @commands.Cog.listener()
     async def on_reaction_add(self, react, user):
         guild = react.message.guild
-        settings = self.settings[guild]
+        settings = self.bot.settings[guild]
         if settings.starboard_emoji in str(react.emoji):
             if react.count == settings.starboard_threshold:
                 await self.starboard_post(react.message, guild)

@@ -17,7 +17,7 @@ class EditTrackerCog(commands.Cog):
         """Check if an edit dialog should be posted"""
         if user == self.bot.user:
             return
-        settings = self.settings[react.message.guild]
+        settings = self.bot.settings[react.message.guild]
         if settings.edit_emoji in str(react.emoji):
             sm = self.tracked_messages.get(react.message.id)
             if sm:
@@ -25,7 +25,7 @@ class EditTrackerCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_reaction_remove(self, react, user):
-        settings = self.settings[react.message.guild]
+        settings = self.bot.settings[react.message.guild]
         if settings.edit_emoji in str(react.emoji) and react.count == 0:
             sm = self.tracked_messages[react.message.id]
             await sm.delete_popup()
@@ -46,7 +46,7 @@ class EditTrackerCog(commands.Cog):
         self.tracked_messages[before.id] = sm
 
     async def on_message_delete(self, msg):
-        settings = self.settings[msg.guild]
+        settings = self.bot.settings[msg.guild]
         if msg.id in self.bot.deletable_messages:
             self.bot.deletable_messages.remove(msg.id)
             return
