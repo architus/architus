@@ -1,7 +1,5 @@
 import asyncio
 import os
-import logging
-import sys
 
 from discord.ext.commands import Bot
 import discord
@@ -13,7 +11,6 @@ from lib.models import Command
 from lib.ipc import async_rpc_server, async_rpc_client, blocking_rpc_client
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
-
 
 
 class Architus(Bot):
@@ -106,7 +103,12 @@ class Architus(Bot):
 
     @property
     def guilds_as_dicts(self):
-        return [guild_to_dict(g).update({'admin_ids': self.settings[g].admins_ids}) for g in self.guilds]
+        guilds = []
+        for guild in self.guilds:
+            guild_dict = guild_to_dict(guild)
+            guild_dict.update({'admin_ids': self.settings[guild].admins_ids})
+            guilds.append(guild_dict)
+        return guilds
 
     async def list_guilds(self):
         """Update the manager with the guilds that we know about"""
