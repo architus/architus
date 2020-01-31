@@ -2,7 +2,7 @@ import youtube_dl
 import functools
 import discord
 from collections import deque
-# import src.spotify_tools as spotify_tools
+import src.spotify_tools as spotify_tools
 import urllib
 import asyncio
 import aiohttp
@@ -11,7 +11,7 @@ from src.list_embed import ListEmbed as list_embed
 from lib.config import logger
 
 import subprocess
-spotify_tools = None
+# spotify_tools = None
 
 
 class GuildPlayer:
@@ -74,13 +74,13 @@ class GuildPlayer:
 
         }
         ydl = youtube_dl.YoutubeDL(opts)
-        func = functools.partial(ydl.extract_info, url, download=False)
+        func = functools.partial(ydl.extract_info, url, download=True)
         info = await self.bot.loop.run_in_executor(None, func)
         if "entries" in info:
             info = info['entries'][0]
 
-        download_url = info['url']
-        # download_url = ydl.prepare_filename(info)
+        #download_url = info['url']
+        download_url = ydl.prepare_filename(info)
         logger.debug(f"downloading url {download_url}")
         self.voice.play(discord.FFmpegPCMAudio(download_url, **ffmpeg_options), after=self.agane)
         # await asyncio.sleep(2)
