@@ -32,7 +32,7 @@ class AutoResponse:
         self.guild_id = guild_id
         self.count = count
 
-        self.id = id or bot.hoar_frost_generator.generate()
+        self.id = id or bot.hoar_frost_gen.generate()
         self.response_ast = response_ast or self._parse_response()
         self.mode = mode or self._determine_mode()
 
@@ -55,9 +55,6 @@ class AutoResponse:
         if self._collision_detector():
             raise TriggerCollisionException()
 
-    def _collision_detector():
-        return False
-
     def _extract_punctuation(self):
         return tuple(c for c in self.trigger if c in string.punctuation)
 
@@ -75,6 +72,43 @@ class AutoResponse:
 
         return 'naive'
 
+    def validate(self, bot, ctx):
+        settings = bot.settings[ctx.guild]
+        guild_responses = bot.autoresponses[ctx.guild]
 
-class TriggerCollisionException(Exception):
+        author_count = len([_ for r in guild_responses if r.author_id == self.author_id])
+        if settings.responses_limit is not None and author_count >= settings.responses_limit:
+            raise UserLimitException
+
+       if len(self.response) > settings.responses_response_length:
+           raise LongResponseException
+
+       if len(self.trigger) < settings.responses_trigger_length:
+           raise ShortTriggerException
+
+       fsm = FSM(self.trigger_regex)
+       if any(fsm.intersects(FSM(other.trigger_regex)) for other in guild_responses):
+           raise TriggerCollisionException
+
+    async def triggered(self, msg):
+        pass
+
+
+class AutoResponseException(Exception):
+    pass
+
+
+class ShortTriggerException(AutoResponseException):
+    pass
+
+
+class LongResponseException(AutoResponseException):
+    pass
+
+
+class UserLimitException(AutoResponseException):
+    pass
+
+
+class TriggerCollisionException(AutoResponseException):
     pass
