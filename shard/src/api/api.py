@@ -274,6 +274,7 @@ class Api(Cog):
             fkmsg.sends = sends
             react = await fkmsg.add_reaction(emoji, bot=False)
             await self.bot.cogs["Events"].on_reaction_add(react, MockMember())
+
             resp = {
                 'guildId': guild_id,
                 'actions': ({
@@ -288,6 +289,7 @@ class Api(Cog):
             fkmsg.sends = [fkmsg.content]
             react = await fkmsg.remove_reaction(emoji)
             await self.bot.cogs["Events"].on_reaction_remove(react, MockMember())
+
             resp = {
                 'guildId': guild_id,
                 'actions': ({

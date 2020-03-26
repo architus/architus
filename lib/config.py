@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from datetime import datetime, timezone
 import re
 import logging
+
 """
 This file loads the environment secrets into memory and also manages database connections
 """
