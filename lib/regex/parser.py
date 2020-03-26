@@ -27,7 +27,8 @@ class CharClass:
 
     @property
     def alphabet(self):
-        return {default_char} | self.chars
+        pass
+        # return {default_char} | self.chars
 
 
 class Quantifier:
@@ -119,4 +120,3 @@ class Quantifier:
                     return cls(0, 1), match.end
 
         return cls(1, 1), i
-

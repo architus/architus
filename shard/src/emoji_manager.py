@@ -5,6 +5,7 @@ import re
 import aiofiles
 import aiohttp
 from src.utils import send_message_webhook
+from lib.config import logger
 
 EMOJI_DIR = 'emojis'
 

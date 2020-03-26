@@ -76,19 +76,19 @@ class AutoResponse:
         settings = bot.settings[ctx.guild]
         guild_responses = bot.autoresponses[ctx.guild]
 
-        author_count = len([_ for r in guild_responses if r.author_id == self.author_id])
+        author_count = len([r for r in guild_responses if r.author_id == self.author_id])
         if settings.responses_limit is not None and author_count >= settings.responses_limit:
             raise UserLimitException
 
-       if len(self.response) > settings.responses_response_length:
-           raise LongResponseException
+        if len(self.response) > settings.responses_response_length:
+            raise LongResponseException
 
-       if len(self.trigger) < settings.responses_trigger_length:
-           raise ShortTriggerException
+        if len(self.trigger) < settings.responses_trigger_length:
+            raise ShortTriggerException
 
-       fsm = FSM(self.trigger_regex)
-       if any(fsm.intersects(FSM(other.trigger_regex)) for other in guild_responses):
-           raise TriggerCollisionException
+        # fsm = FSM(self.trigger_regex)
+        # if any(fsm.intersects(FSM(other.trigger_regex)) for other in guild_responses):
+            # raise TriggerCollisionException
 
     async def triggered(self, msg):
         pass
