@@ -16,6 +16,15 @@ class Setting:
         self._settings_dict = self._load_from_db(self.guild_id)
 
     @property
+    def command_prefix(self) -> str:
+        return self._settings_dict['command_prefix'] if 'command_prefix' in self._settings_dict else '!'
+
+    @command_prefix.setter
+    def command_prefix(self, new_command_prefex: str):
+        self._settings_dict['command_prefix'] = new_command_prefex
+        self._update_db()
+
+    @property
     def music_enabled(self) -> bool:
         return self._settings_dict['music_enabled'] if 'music_enabled' in self._settings_dict else not bool(
             self.guild.get_member(RYTHMS_ID))
@@ -108,7 +117,6 @@ class Setting:
 
     @bot_commands_channels.setter
     def bot_commands_channels(self, new_bot_commands: list):
-        print(new_bot_commands)
         self._settings_dict['bot_commands'] = new_bot_commands
         self._update_db()
 
@@ -120,7 +128,8 @@ class Setting:
     @property
     def admins_ids(self) -> list:
         default_admins = [self.guild.owner.id, 214037134477230080]
-        return default_admins + [int(a) for a in self._settings_dict.get('admins', [])]
+
+        return list(set(default_admins + [int(a) for a in self._settings_dict.get('admins', [])]))
 
     @admin_ids.setter
     def admin_ids(self, new_admins: list):

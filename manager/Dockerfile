@@ -1,4 +1,5 @@
 FROM alpine:edge
+RUN mkdir -p /var/www
 # Set the working directory to /app
 WORKDIR /app
 COPY ./manager/requirements.txt /app

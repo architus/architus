@@ -6,6 +6,8 @@ from contextlib import suppress
 from discord.ext.commands import Cog
 from discord.ext import commands
 
+from lib.config import logger
+
 
 class ScheduleEvent(object):
     def __init__(self, msg, title, time_str):
@@ -18,11 +20,12 @@ class ScheduleEvent(object):
 
 
 class PollEvent(object):
-    def __init__(self, msg, title, options, votes):
+    def __init__(self, msg, title, options, votes, exclusive):
         self.msg = msg
         self.title = title
         self.options = options
         self.votes = votes
+        self.exclusive = exclusive
 
 
 class EventCog(Cog, name="Events"):
@@ -78,31 +81,30 @@ class EventCog(Cog, name="Events"):
         elif not user.bot and react.message.id in self.poll_messages:
             event = self.poll_messages[react.message.id]
             for r in react.message.reactions:
-                try:
+                with suppress(ValueError):
                     i = self.ANSWERS.index(str(r.emoji))
                     event.votes[i] = [u for u in await r.users().flatten() if u != self.bot.user]
-                except ValueError:
-                    continue
+                    if event.exclusive:
+                        if i != self.ANSWERS.index(str(react.emoji)):
+                            event.votes[i].remove(user)
+                            await r.remove(user)
+
             await react.message.edit(
                 content=self.render_poll_text(event.title, event.options, event.votes))
 
     @commands.Cog.listener()
     async def on_reaction_remove(self, react, user):
 
-        if not user.bot and react.message.id in self.schedule_messages and False:
-            event = self.schedule_messages[react.message.id]
-            with suppress(KeyError):
-                if self.YES_EMOJI in str(react.emoji):
-                    event.yes.remove(user)
-                elif self.NO_EMOJI in str(react.emoji):
-                    event.no.remove(user)
-                elif self.MAYBE_EMOJI in str(react.emoji):
-                    event.maybe.remove(user)
-            await react.message.edit(
-                content=self.render_schedule_text(event.title_str, event.parsed_time, event.yes, event.no, event.maybe))
-
-        elif not user.bot and react.message.id in self.poll_messages:
-            await self.on_reaction_add(react, user)
+        if not user.bot and react.message.id in self.poll_messages:
+            event = self.poll_messages[react.message.id]
+            if event.exclusive:
+                for i in range(10):
+                    with suppress(ValueError):
+                        event.votes[i].remove(user)
+                await react.message.edit(
+                    content=self.render_poll_text(event.title, event.options, event.votes))
+            else:
+                await self.on_reaction_add(react, user)
 
     async def prompt_date(self, ctx, author):
         await ctx.channel.send("what time?")
@@ -125,10 +127,10 @@ class EventCog(Cog, name="Events"):
         Timezone is based on your servers voice zone.
         '''
         args = list(argst)
-        # print(args)
+        logger.debug(args)
         # event bot's id
         if ctx.guild.get_member(476042677440479252):
-            print("not scheduling cause event bot exists")
+            logger.warning("not scheduling cause event bot exists")
             return
         region = ctx.guild.region
         tz = pytz.timezone(self.get_timezone(region))
@@ -137,15 +139,12 @@ class EventCog(Cog, name="Events"):
         parsed_time = None
         for i in range(len(args)):
             with suppress(ValueError):
-                # print(" ".join(args))
                 parsed_time = dateutil.parser.parse(' '.join(args))
                 # parsed_time = tz.localize(parsed_time)
                 break
             with suppress(ValueError):
-                # print(" ".join(args))
                 parsed_time = dateutil.parser.parse(' '.join(args[:-1]))
                 # parsed_time = tz.localize(parsed_time)
-                # print("deleted something from the end")
                 break
             title.append(args[0])
             del args[0]
@@ -171,12 +170,30 @@ class EventCog(Cog, name="Events"):
     @commands.command()
     async def poll(self, ctx, *args):
         '''
-        Starts a poll with some pretty formatting.
+        Starts a poll with some pretty formatting
+        Allows more than one response per user
+        Surround title in quotes to include spaces
         Supports up to 10 options
         '''
-        pattern = re.compile(r'.poll (?P<title>(?:\S*[^\s,] )+)(?P<options>.*$)')
+        pattern = re.compile(r'.poll (?P<title>(?:(?:".*")|(?:.*?)+)) (?P<options>.*$)')
         match = pattern.search(unidecode(ctx.message.content))
+        await self.register_poll(ctx, match, False)
+
+    @commands.command()
+    async def xpoll(self, ctx, *args):
+        '''
+        Starts a exclusive poll with some pretty formatting
+        Limited to one response per user
+        Surround title in quotes to include spaces
+        Supports up to 10 options
+        '''
+        pattern = re.compile(r'.poll (?P<title>(?:(?:".*")|(?:.*?)+)) (?P<options>.*$)')
+        match = pattern.search(unidecode(ctx.message.content))
+        await self.register_poll(ctx, match, True)
+
+    async def register_poll(self, ctx, match, exclusive: bool):
         if not match:
+            await ctx.send("Sorry, I couldn't parse that nonsense.")
             return
 
         votes = [[] for x in range(10)]
@@ -188,7 +205,7 @@ class EventCog(Cog, name="Events"):
         for i in range(len(options)):
             await msg.add_reaction(self.ANSWERS[i])
 
-        self.poll_messages[msg.id] = PollEvent(msg, title, options, votes)
+        self.poll_messages[msg.id] = PollEvent(msg, title, options, votes, exclusive)
 
     def get_timezone(self, region):
         region = str(region)

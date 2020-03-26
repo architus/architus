@@ -47,7 +47,7 @@ class UserCommand:
                 raise DuplicatedTriggerException(self.raw_trigger)
 
     def validate_new_command(self):
-        settings = self.bot.get_cog("GuildSettings").get_guild(self.server)
+        settings = self.bot.settings[self.server]
         if len(self.raw_trigger) < 2:
             raise ShortTriggerException("Please use a longer trigger")
         if len(self.raw_response) > 200 and self.author_id not in settings.admin_ids:

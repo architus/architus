@@ -1,8 +1,7 @@
-import random
-import string
-import os
 from collections import defaultdict
 from datetime import timedelta
+from concurrent.futures import ThreadPoolExecutor
+import base64
 
 from discord.ext import commands
 from discord import Forbidden, HTTPException
@@ -10,9 +9,7 @@ import discord
 import json
 
 import src.generate.wordcount as wordcount_gen
-from lib.config import DISCORD_EPOCH
-
-IMAGE_CHANNEL_ID = 577523623355613235
+from lib.config import DISCORD_EPOCH, logger
 
 
 class MessageData:
@@ -46,7 +43,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     async def cache_guild(self, guild):
         '''cache interesting information about all the messages in a guild'''
-        print(f"Downloading messages in {len(guild.channels)} channels for '{guild.name}'...")
+        logger.debug(f"Downloading messages in {len(guild.channels)} channels for '{guild.name}'...")
         for channel in guild.text_channels:
             try:
                 async for message in channel.history(limit=None, oldest_first=True):
@@ -58,16 +55,16 @@ class MessageStats(commands.Cog, name="Server Statistics"):
                         self.count_correct(message.clean_content)
                     ))
             except Forbidden:
-                print(f"Insuffcient permissions to download messages from '{guild.name}.{channel.name}'")
+                logger.warning(f"Insuffcient permissions to download messages from '{guild.name}.{channel.name}'")
             except HTTPException as e:
-                print(f"Caught {e} when downloading '{guild.name}.{channel.name}'")
+                logger.error(f"Caught {e} when downloading '{guild.name}.{channel.name}'")
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print(f"Caching messages for {len(self.bot.guilds)} guilds...")
+        logger.debug(f"Caching messages for {len(self.bot.guilds)} guilds...")
         for guild in self.bot.guilds:
             await self.cache_guild(guild)
-        print(f"Message cache up-to-date")
+        logger.debug(f"Message cache up-to-date")
 
     @commands.Cog.listener()
     async def on_message(self, msg):
@@ -122,23 +119,18 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         async with ctx.channel.typing():
             message_counts, word_counts = await self.count_messages(ctx.guild)
 
-        key = ''.join(random.choice(string.ascii_letters) for n in range(10))
-        wordcount_gen.generate(key, message_counts, word_counts, victim)
-        channel = discord.utils.get(self.bot.get_all_channels(), id=IMAGE_CHANNEL_ID)
-
-        with open(f'res/word{key}.png', 'rb') as f:
-            msg = await channel.send(file=discord.File(f))
+        with ThreadPoolExecutor() as pool:
+            img = await self.bot.loop.run_in_executor(pool, wordcount_gen.generate, message_counts, word_counts, victim)
+        data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
 
         em = discord.Embed(title="Top 5 Message Senders", description=ctx.guild.name)
-        em.set_image(url=msg.attachments[0].url)
+        em.set_image(url=data['url'])
         em.color = 0x7b8fb7
         if victim:
             em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
                 victim.display_name, word_counts[victim], message_counts[victim]), icon_url=victim.avatar_url)
 
         await ctx.channel.send(embed=em)
-
-        os.remove(f"res/word{key}.png")
 
 
 def setup(bot):

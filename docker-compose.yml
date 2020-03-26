@@ -77,6 +77,8 @@ services:
     build:
       context: ./
       dockerfile: ./manager/Dockerfile
+    env_file:
+      - architus.env
     environment:
       NUM_SHARDS: "${NUM_SHARDS:-1}"
     deploy:
@@ -84,6 +86,8 @@ services:
         condition: on-failure
     ports:
       - "5300:5300"
+    volumes:
+      - "./www:/var/www"
     deploy:
       placement:
         constraints: [node.role == manager]

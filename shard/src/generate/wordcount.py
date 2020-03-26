@@ -2,6 +2,7 @@ import numpy as np
 import operator
 import random
 import matplotlib
+import io
 matplotlib.use('agg')
 
 import matplotlib.pyplot as plt
@@ -11,7 +12,7 @@ from collections import namedtuple
 
 COLORS = ['b','g','r','c','m','k']
 
-def generate(key, message_counts, word_counts, victim):
+def generate(message_counts, word_counts, victim) -> bytes:
     colors = random.sample(COLORS, 2)
     top_5_mesages = sorted(message_counts.items(), key=operator.itemgetter(1))[-5:]
 
@@ -45,5 +46,9 @@ def generate(key, message_counts, word_counts, victim):
 
     fig.tight_layout()
 
-    plt.savefig('res/word%s.png' % key, bbox_inches='tight', edgecolor=None)
+    buf = io.BytesIO()
+    plt.savefig(buf, bbox_inches='tight', edgecolor=None)
+
     plt.close()
+    buf.seek(0)
+    return buf.read()

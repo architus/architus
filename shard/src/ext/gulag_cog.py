@@ -5,6 +5,8 @@ import time
 import asyncio
 import discord
 
+from lib.config import logger
+
 
 class Gulag(commands.Cog):
 
@@ -24,7 +26,7 @@ class Gulag(commands.Cog):
             gulag_emoji = discord.utils.get(ctx.guild.emojis, name="gulag")
             assert gulag_emoji is not None
         except Exception:
-            print("gulag role/emoji not found")
+            logger.warning("gulag role/emoji not found")
             await ctx.send("Please create a role called `kulak` and an emoji called `gulag` to use this feature.")
             return
         if comrade == self.bot.user:
@@ -53,20 +55,21 @@ class Gulag(commands.Cog):
                 t_end += int((settings.gulag_severity / 2) * 60)
             if len(user_list) >= settings.gulag_threshold and gulag_role not in comrade.roles:
                 try:
-                    print(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
-                    gulaggen.generate(comrade.avatar_url if comrade.avatar_url else comrade.default_avatar_url)
+                    logger.debug(comrade.avatar_url)
+                    img = gulaggen.generate(await comrade.avatar_url_as(format='png', size=1024).read())
                     generated = True
-                except Exception as e:
-                    print(e)
+                except Exception:
+                    logger.exception("gulag generator error")
                     pass
                 if generated:
-                    await ctx.channel.send(file=discord.File('res/gulag.png'))
+                    await ctx.channel.send(file=discord.File(img, filename=f'{self.bot.hoarfrost_gen.generate()}.png'))
                 else:
                     await ctx.channel.send("gulag'd " + comrade.display_name)
 
                 timer_msg = await ctx.channel.send("⏰ %d seconds" % (settings.gulag_severity * 60))
-                timer_msg_gulag = await (discord.utils.get(ctx.guild.text_channels, name='gulag')).send(
-                    "⏰ %d seconds, %s" % (settings.gulag_severity * 60, comrade.display_name))
+                with suppress(AttributeError):
+                    timer_msg_gulag = await (discord.utils.get(ctx.guild.text_channels, name='gulag')).send(
+                        "⏰ %d seconds, %s" % (settings.gulag_severity * 60, comrade.display_name))
                 await comrade.add_roles(gulag_role)
 
                 t_end = time.time() + int(60 * settings.gulag_severity)
@@ -79,7 +82,7 @@ class Gulag(commands.Cog):
             await msg.edit(content=f"Vote for {comrade.display_name} failed to pass")
 
         await comrade.remove_roles(gulag_role)
-        print('ungulag\'d ' + comrade.display_name)
+        logger.info('ungulag\'d ' + comrade.display_name)
 
 
 def setup(bot):

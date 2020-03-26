@@ -1,4 +1,3 @@
-import traceback
 import secrets
 from datetime import timedelta
 from typing import List
@@ -9,6 +8,7 @@ import discord
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 from lib.status_codes import StatusCodes as sc
+from lib.config import logger
 from src.api.util import fetch_guild
 from src.api.mock_discord import MockMember, MockMessage, LogActions
 
@@ -30,14 +30,13 @@ class Api(Cog):
             assert not method_name.startswith('_')
             method = getattr(self, method_name)
         except (AttributeError, AssertionError):
-            print(f"Someone tried to call '{method}' but it doesn't exist (or is private)")
+            logger.warning(f"Someone tried to call '{method}' but it doesn't exist (or is private)")
             return {"message": "No such method"}, sc.NOT_FOUND_404
 
         try:
             return await method(*args, **kwargs)
         except Exception as e:
-            traceback.print_exc()
-            print(f"caught {e} while handling remote request")
+            logger.exception(f"caught exception while handling remote request")
             return {"message": f"'{e}'"}, sc.INTERNAL_SERVER_ERROR_500
 
     async def ping(self):
@@ -74,7 +73,6 @@ class Api(Cog):
     async def is_member(self, user_id, guild_id, admin=False):
         '''check if user is a member or admin of the given guild'''
         guild = self.bot.get_guild(int(guild_id))
-        # guild_settings = self.bot.get_cog("GuildSettings")
         if not guild:
             return {'member': False}, sc.OK_200
         settings = self.bot.settings[guild]
@@ -128,13 +126,13 @@ class Api(Cog):
         try:
             self.bot.reload_extension(name)
         except discord.ext.commands.errors.ExtensionNotLoaded as e:
-            print(e)
+            logger.exception("Couldn't load extension")
             return {"message": f"Extension Not Loaded: {e}"}, sc.SERVICE_UNAVAILABLE_503
         return {"message": "Reload signal sent"}, sc.OK_200
 
     @fetch_guild
     async def bin_messages(self, guild):
-        stats_cog = self.bot.get_cog("Server Statistics")
+        stats_cog = self.bot.cogs["Server Statistics"]
         members, channels, times = stats_cog.bin_messages(guild, timedelta(minutes=5))
         return {
             'total': len(stats_cog.cache[guild.id]),
@@ -275,7 +273,8 @@ class Api(Cog):
             fkmsg = self.fake_messages[guild_id][resp_id]
             fkmsg.sends = sends
             react = await fkmsg.add_reaction(emoji, bot=False)
-            await self.bot.get_cog("Events").on_reaction_add(react, MockMember())
+            await self.bot.cogs["Events"].on_reaction_add(react, MockMember())
+
             resp = {
                 'guildId': guild_id,
                 'actions': ({
@@ -289,7 +288,8 @@ class Api(Cog):
             fkmsg = self.fake_messages[guild_id][resp_id]
             fkmsg.sends = [fkmsg.content]
             react = await fkmsg.remove_reaction(emoji)
-            await self.bot.get_cog("Events").on_reaction_remove(react, MockMember())
+            await self.bot.cogs["Events"].on_reaction_remove(react, MockMember())
+
             resp = {
                 'guildId': guild_id,
                 'actions': ({

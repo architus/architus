@@ -4,14 +4,15 @@ import os
 import re
 import aiofiles
 import aiohttp
-from src.webhook import send_message
+from src.utils import send_message_webhook
+from lib.config import logger
 
 EMOJI_DIR = 'emojis'
 
 
 class emoji_manager():
-    def __init__(self, client, guild):
-        self.client = client
+    def __init__(self, bot, guild):
+        self.bot = bot
         self.guild = guild
         self._priorities = list(self.guild.emojis)
         if not os.path.exists(EMOJI_DIR + '/' + str(self.guild.id)):
@@ -29,7 +30,7 @@ class emoji_manager():
     async def clean(self):
         '''renames any emoji on the server that shares a name with an emoji on the disk or on the server'''
         return
-        print("renaming dupes")
+        logger.debug("renaming dupes")
         names = os.listdir(f"{EMOJI_DIR}/{self.guild.id}")
         for emoji in self.guild.emojis:
             if emoji.animated:
@@ -39,60 +40,63 @@ class emoji_manager():
             if name in names:
                 while name + str(count) in names:
                     count += 1
-                print("renaming %s to %s" % (emoji.name, emoji.name + str(count)))
+                logger.debug("renaming %s to %s" % (emoji.name, emoji.name + str(count)))
                 await emoji.edit(name=emoji.name + str(count))
             names.append(emoji.name)
         if len(self.guild.emojis) > self.max_emojis and False:
-            print("caching one emoji...")
+            logger.debug("caching one emoji...")
             await self.guild.emojis[-1].delete(reason="cached")
 
     async def scan(self, message):
         pattern = re.compile(r'(?:<:(?P<name>\w+):(?P<id>\d+)>)|(?::(?P<nameonly>\w+):)')
         emojis = pattern.finditer(message.content)
         for emojistr in emojis:
-            if emojistr.group('nameonly'):
+            if emojistr['nameonly']:
                 try:
-                    emoji = await self.bump_emoji(emojistr.group('nameonly'))
-                except Exception as e:
-                    print(e)
+                    emoji = await self.bump_emoji(emojistr['nameonly'])
+                except Exception:
+                    logger.exception('')
                     continue
                 if not emoji:
                     continue
-                self.client.deletable_messages.append(message.id)
-                await message.delete()
-                send_message(message.channel,
-                             message.content.replace(':%s:' % emojistr.group('nameonly'), str(emoji)),
-                             username=message.author.display_name,
-                             avatar_url=str(message.author.avatar_url).replace('webp', 'png')
-                             )
-                print(str(message.author.avatar_url))
+                try:
+                    await send_message_webhook(
+                        message.channel,
+                        message.content.replace(':%s:' % emojistr['nameonly'], str(emoji)),
+                        username=message.author.display_name,
+                        avatar_url=str(message.author.avatar_url_as(format='png')))
+                except Exception:
+                    logger.exception(f"Couldn't send message with webhook")
+                else:
+                    self.bot.deletable_messages.append(message.id)
+                    await message.delete()
                 break
 
-            elif emojistr.group('name'):
-                emoji = discord.utils.get(self.guild.emojis, id=emojistr.group('id'), name=emojistr.group('name'))
+            elif emojistr['name']:
+                emoji = discord.utils.get(self.guild.emojis, id=emojistr['id'], name=emojistr['name'])
                 if emoji:
                     await self.bump_emoji(emoji)
 
     async def rename_emoji(self, before, after):
-        print('renamed')
+        logger.debug(f'renamed emoji {before.name}->{after.name}')
         await self.clean()
 
     async def add_emoji(self, emoji):
         '''call this when an emoji is added to the server'''
         await self.clean()
-        print('added ' + str(emoji))
+        logger.debug('added ' + str(emoji))
         if emoji in self._priorities:
             # this can happen if the emoji manager is instantiated after the emoji is added
             self._priorities.remove(emoji)
         if len(self.guild.emojis) > self.max_emojis:
             await self._save(self._priorities[-1])
             await self._priorities[-1].delete(reason="cached")
-        print("inserting")
+        logger.debug("inserting")
         self._priorities.insert(0, emoji)
 
     async def bump_emoji(self, emoji):
         '''call this when an emoji is used or requested'''
-        print('bumped ' + str(emoji))
+        logger.debug('bumped ' + str(emoji))
         if emoji in self.guild.emojis:
             i = self._priorities.index(emoji)
             if i != 0:
@@ -103,7 +107,7 @@ class emoji_manager():
             return await self.guild.create_custom_emoji(name=emoji, image=image)
 
     def del_emoji(self, emoji):
-        print('deleted ' + str(emoji))
+        logger.debug('deleted ' + str(emoji))
         '''call this when an emoji is deleted (even if by the manager)'''
         self._priorities.remove(emoji)
 
@@ -114,7 +118,7 @@ class emoji_manager():
             return "%s/%s/%s" % (EMOJI_DIR, self.guild.id, emoji)
 
     async def _load(self, emoji):
-        print('loaded ' + str(emoji))
+        logger.debug('loaded ' + str(emoji))
         f = await aiofiles.open(self._path(emoji), 'rb')
         binary = await f.read()
         await f.close()
@@ -122,7 +126,7 @@ class emoji_manager():
         return binary
 
     async def _save(self, emoji):
-        print('saving ' + str(emoji) + ' from ' + str(emoji.url))
+        logger.debug('saving ' + str(emoji) + ' from ' + str(emoji.url))
         '''load all emojis in the server into memory'''
         async with aiohttp.ClientSession() as session:
             async with session.get(str(emoji.url)) as resp:
@@ -131,7 +135,7 @@ class emoji_manager():
                     await f.write(await resp.read())
                     await f.close()
                 else:
-                    print("API gave unexpected response (%d) emoji not saved" % resp.status)
+                    logger.debug("API gave unexpected response (%d) emoji not saved" % resp.status)
 
 
 class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
@@ -157,7 +161,7 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
         '''
         settings = self.bot.settings[ctx.guild]
         if not settings.manage_emojis:
-            message = "The emoji manager is disabled, you can enable it in `!settings`"
+            message = f"The emoji manager is disabled, you can enable it in `{settings.command_prefix}settings`"
         else:
             message = '```\n • ' + '\n • '.join(self.managers[ctx.guild.id].list_unloaded()) + '```\n'
             message += "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"

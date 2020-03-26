@@ -2,20 +2,21 @@ import youtube_dl
 import functools
 import discord
 from collections import deque
-# import src.spotify_tools as spotify_tools
+import src.spotify_tools as spotify_tools
 import urllib
 import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
 from src.list_embed import ListEmbed as list_embed
+from lib.config import logger
 
 import subprocess
-spotify_tools = None
+# spotify_tools = None
 
 
 class GuildPlayer:
     def __init__(self, bot):
-        print("creating new smart player")
+        logger.debug("creating new smart player")
         self.bot = bot
         self.q = deque()
         self.voice = None
@@ -34,8 +35,8 @@ class GuildPlayer:
         try:
             self.player = self.voice.create_ffmpeg_player(filepath, after=self.agane, stderr=subprocess.STDOUT)
             self.player.start()
-        except Exception as e:
-            print(e)
+        except Exception:
+            logger.exception("can't create new player")
         self.playing_file = False
         return True
 
@@ -48,7 +49,7 @@ class GuildPlayer:
         song = self.q.pop()
         url = song.url
         self.name = song.title
-        print("starting " + url)
+        logger.debug("starting " + url)
         if ('spotify' in url):
             url = await self.spotify_to_youtube(url)
             self.name = url['name']
@@ -73,15 +74,14 @@ class GuildPlayer:
 
         }
         ydl = youtube_dl.YoutubeDL(opts)
-        func = functools.partial(ydl.extract_info, url, download=False)
+        func = functools.partial(ydl.extract_info, url, download=True)
         info = await self.bot.loop.run_in_executor(None, func)
         if "entries" in info:
             info = info['entries'][0]
 
-        download_url = info['url']
-        # download_url = ydl.prepare_filename(info)
-        print("download_url")
-        print(download_url)
+        # download_url = info['url']
+        download_url = ydl.prepare_filename(info)
+        logger.debug(f"downloading url {download_url}")
         self.voice.play(discord.FFmpegPCMAudio(download_url, **ffmpeg_options), after=self.agane)
         # await asyncio.sleep(2)
         # os.remove(download_url)
@@ -137,7 +137,6 @@ class GuildPlayer:
                 html = await resp.read()
 
                 soup = BeautifulSoup(html.decode('utf-8'), 'lxml')
-                # print(soup.findAll(attrs={'class': 'yt-uix-tile-link'}, limit=2))
                 for video in soup.findAll(attrs={'class': 'yt-uix-tile-link'}):
                     if ('googleadservices' not in video['href']):
                         return 'https://www.youtube.com' + video['href']
@@ -161,10 +160,10 @@ class GuildPlayer:
 
     async def skip(self):
         if self.voice is None:
-            print("no voice")
+            logger.debug("no voice")
             return
         if (len(self.q) < 1):
-            print("len was less than 1")
+            logger.debug("len(q) < 1")
             await self.voice.disconnect()
             return ''
         self.stop()
@@ -198,9 +197,8 @@ class GuildPlayer:
         fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
         try:
             fut.result()
-        except Exception as e:
-            print(e)
-            print('error playing next thing')
+        except Exception:
+            logger.exception('error playing next thing')
 
 
 class Song:
