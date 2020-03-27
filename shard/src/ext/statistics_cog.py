@@ -7,8 +7,10 @@ from discord.ext import commands
 from discord import Forbidden, HTTPException
 import discord
 import json
+import aiohttp
 
 import src.generate.wordcount as wordcount_gen
+from src.generate import corona
 from lib.config import DISCORD_EPOCH, logger
 
 
@@ -133,5 +135,30 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         await ctx.channel.send(embed=em)
 
 
+class CoronaStats(commands.Cog, name="Coronavirus Data"):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.command(aliases=['covid', 'covid-19', 'covid19', 'coronavirus'])
+    async def corona(self, ctx, deaths_only: bool = False):
+        async with aiohttp.ClientSession() as session:
+            url = 'http://coronavirusapi.com/time_series.csv'
+            async with session.get(url) as resp:
+                text = await resp.text()
+                parsed = (e.split(',') for e in text.split('\n')[1:-1])
+
+                img = corona.generate(parsed, deaths_only)
+
+                data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
+
+                em = discord.Embed(title="Coronavirus in the US", description="More Information". url="https://www.cdc.gov/coronavirus/2019-ncov/index.html")
+                em.set_image(url=data['url'])
+                em.color = 0x7b8fb7
+                em.set_footer(text="data collected from state websites by http://coronavirusapi.com")
+
+                await ctx.channel.send(embed=em)
+
+
 def setup(bot):
     bot.add_cog(MessageStats(bot))
+    bot.add_cog(CoronaStats(bot))

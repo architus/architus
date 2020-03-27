@@ -98,11 +98,11 @@ class EventCog(Cog, name="Events"):
         if not user.bot and react.message.id in self.poll_messages:
             event = self.poll_messages[react.message.id]
             if event.exclusive:
-                for i in range(10):
-                    with suppress(ValueError):
-                        event.votes[i].remove(user)
-                await react.message.edit(
-                    content=self.render_poll_text(event.title, event.options, event.votes))
+                with suppress(ValueError):
+                    i = self.ANSWERS.index(str(react.emoji))
+                    event.votes[i].remove(user)
+                    await react.message.edit(
+                        content=self.render_poll_text(event.title, event.options, event.votes))
             else:
                 await self.on_reaction_add(react, user)
 
