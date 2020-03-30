@@ -9,7 +9,7 @@ GROUP_LIMIT = 1
 
 
 def update_command(session, triggerkey, response, count, guild, author_id, delete=False):
-    if guild.id < 1000000:
+    if guild.id < 10000000:
         return
     if (delete):
         session.query(Command).filter_by(trigger=str(guild.id) + triggerkey).delete()

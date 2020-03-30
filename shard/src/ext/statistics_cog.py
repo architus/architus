@@ -151,7 +151,8 @@ class CoronaStats(commands.Cog, name="Coronavirus Data"):
 
                 data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
 
-                em = discord.Embed(title="Coronavirus in the US", description="More Information". url="https://www.cdc.gov/coronavirus/2019-ncov/index.html")
+                em = discord.Embed(title="Coronavirus in the US", description="More Information",
+                                   url="https://www.cdc.gov/coronavirus/2019-ncov/index.html")
                 em.set_image(url=data['url'])
                 em.color = 0x7b8fb7
                 em.set_footer(text="data collected from state websites by http://coronavirusapi.com")
