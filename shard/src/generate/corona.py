@@ -24,6 +24,7 @@ def generate(data, deaths_only=False):
 
     ax.set(xlabel='Date', ylabel='People', title='Coronavirus')
     ax.grid()
+    plt.xticks(rotation=45)
     ax.legend()
 
     buf = io.BytesIO()
