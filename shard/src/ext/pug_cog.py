@@ -49,5 +49,6 @@ class Pug(commands.Cog):
 
         logger.info('no longer listening for pugs for ' + role.name)
 
+
 def setup(bot):
     bot.add_cog(Pug(bot))
