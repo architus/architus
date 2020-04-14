@@ -3,7 +3,6 @@ from contextlib import suppress
 import time
 import asyncio
 import discord
-
 from lib.config import logger
 
 
@@ -17,7 +16,6 @@ class Pug(commands.Cog):
         '''
         Starts a tally for pugs
         '''
-        settings = self.bot.settings[ctx.guild]
         try:
             pug_emoji = discord.utils.get(ctx.guild.emojis, name="pugger")
             assert pug_emoji is not None
@@ -45,14 +43,11 @@ class Pug(commands.Cog):
                 t_end += 600
             if len(user_list) >= requiredPlayers:
                 await ctx.channel.send(f"GET ON FOR PUGS {' '.join(map(lambda x: f'<@{x.id}>', user_list))}")
-                break;
-
+                break
 
         await msg.edit(content=f"Pugs are {'dead. :cry:' if user_list < requiredPlayers else 'poppin! :fire:'}")
 
         logger.info('no longer listening for pugs for ' + role.name)
 
-
 def setup(bot):
     bot.add_cog(Pug(bot))
-
