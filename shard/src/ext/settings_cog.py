@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from asyncio import TimeoutError
 
 import discord
-from discord.ext.commands import Cog, MemberConverter, RoleConverter, PartialEmojiConverter, CommandError
+from discord.ext.commands import Cog, MemberConverter, RoleConverter, CommandError
 from discord.ext import commands
 
 from src.list_embed import ListEmbed
@@ -37,10 +37,10 @@ class SettingsElement:
             emoji: str,
             description: str,
             setting: str,
-            success_msg: str = "Setting Updated",
-            failure_msg: str = "Setting Unchanged",
+            success_msg: str="Setting Updated",
+            failure_msg: str="Setting Unchanged",
             *,
-            category = "general"):
+            category="general"):
         self._title = title
         self.emoji = emoji
         self._description = description
@@ -262,6 +262,7 @@ class GulagSeverity(SettingsElement):
     async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
 
+
 class PugTimeoutSpeed(SettingsElement):
     def __init__(self):
         super().__init__(
@@ -275,6 +276,7 @@ class PugTimeoutSpeed(SettingsElement):
     async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
 
+
 class PugEmoji(SettingsElement):
     def __init__(self):
         super().__init__(
@@ -284,13 +286,14 @@ class PugEmoji(SettingsElement):
             'Enter an emoji to modify it',
             'pug_emoji',
             category="pug")
-    
+
     async def parse(self, ctx, msg, settings):
         try:
             await msg.add_reaction(msg.content)
         except Exception:
             raise ValueError
         return str(msg.content)
+
 
 class MusicEnabled(SettingsElement):
     def __init__(self):
@@ -340,7 +343,7 @@ class Settings(Cog):
         await ctx.channel.send(embed=lem.get_embed())
 
     @commands.command()
-    async def settings(self, ctx, category = "general"):
+    async def settings(self, ctx, category="general"):
         '''Open an interactive settings dialog'''
         settings = self.bot.settings[ctx.guild]
         if ctx.author.id not in settings.admins_ids:

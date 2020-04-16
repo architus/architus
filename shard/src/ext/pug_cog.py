@@ -18,7 +18,7 @@ class Pug(commands.Cog):
         settings = self.bot.settings[ctx.guild]
         pug_emoji = settings.pug_emoji
         pug_timeout_speed = settings.pug_timeout_speed
-        
+
         t_end = time.time() + 60 * pug_timeout_speed
         user_list = []
         msg = await ctx.send(f"{requiredPlayers} more {pug_emoji}'s for pugs")
