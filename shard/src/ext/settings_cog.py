@@ -282,10 +282,10 @@ class PugEmoji(SettingsElement):
         super().__init__(
             "Pug Emoji",
             WHITE_HEAVY_CHECK_MARK,
-            'This is the emoji that is used to tally up pug votes '
-            'Enter an emoji to modify it',
+            'This is the emoji that is used to tally up pug votes. '
+            'Enter an emoji to modify it:',
             'pug_emoji',
-            tags==["pug"])
+            tags=["pug"])
 
     async def parse(self, ctx, msg, settings):
         try:
@@ -355,7 +355,7 @@ class Settings(Cog):
             await ctx.channel.send(f'no settings were found with tag: {tag}')
             return
 
-        msg = await ctx.channel.send(embed=await self.get_embed(ctx, settings, settings_with_tag))
+        msg = await ctx.channel.send(embed=await self.get_embed(ctx, settings, tag))
 
         for setting in settings_with_tag:
             await msg.add_reaction(setting.emoji)
@@ -386,10 +386,10 @@ class Settings(Cog):
                     else:
                         setattr(settings, setting.setting, value)
                         await ctx.send(setting.success_msg)
-                        await msg.edit(embed=await self.get_embed(ctx, settings, settings_with_tag))
+                        await msg.edit(embed=await self.get_embed(ctx, settings, tag))
         await msg.edit(content="*Settings menu expired.*", embed=None)
 
-    async def get_embed(self, ctx, settings, settings_with_tag):
+    async def get_embed(self, ctx, settings, tag):
         '''makes the pretty embed menu'''
         em = discord.Embed(
             title="⚙ Settings",
@@ -398,7 +398,7 @@ class Settings(Cog):
             url=f'https://{domain_name}/app/{ctx.guild.id}/settings')
         em.set_author(name='Architus Server Settings', icon_url=str(ctx.guild.icon_url))
 
-        for setting in settings_with_tag:
+        for setting in filter(lambda s: tag in s.tags, self.settings_elements):
             value = await setting.formatted_value(self.bot, ctx, settings)
             em.add_field(name=setting.title, value=f"Value: {value}", inline=True)
         return em
