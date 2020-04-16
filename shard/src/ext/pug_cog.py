@@ -41,7 +41,7 @@ class Pug(commands.Cog):
                     react, user = task_remove.result()
                 else:
                     continue
-            
+
             user_list = [u for u in await react.users().flatten() if u != self.bot.user]
             num_left = max(0, (requiredPlayers - len(user_list)))
             await msg.edit(content=f"{num_left} more {pug_emoji}'s for pugs")
