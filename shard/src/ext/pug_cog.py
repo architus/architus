@@ -12,42 +12,52 @@ class Pug(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    async def startpug(self, ctx, role: discord.Role, requiredPlayers: int):
+    async def startpug(self, ctx, requiredPlayers: int = 10):
         '''
         Starts a tally for pugs
         '''
-        try:
-            pug_emoji = discord.utils.get(ctx.guild.emojis, name="pugger")
-            assert pug_emoji is not None
-        except Exception:
-            logger.warning("pugger emoji not found")
-            await ctx.send("Could not find the pugger emoji")
-            return
+        settings = self.bot.settings[ctx.guild]
+        pug_emoji = settings.pug_emoji
 
         t_end = time.time() + 60 * 30
         user_list = []
         msg = await ctx.send(f"{requiredPlayers} more {pug_emoji}'s for pugs")
         await msg.add_reaction(pug_emoji)
         while time.time() < t_end:
-            user = None
 
             def check(r, u):
-                return r.message.id == msg.id and r.emoji.id == pug_emoji.id
-            with suppress(asyncio.TimeoutError):
-                react, user = await self.bot.wait_for('reaction_add', timeout=5, check=check)
+                return r.message.id == msg.id and str(r.emoji) == pug_emoji
 
-            if user and user not in user_list and user != self.bot.user:
-                user_list.append(user)
+            async def update():
                 num_left = max(0, (requiredPlayers - len(user_list)))
                 await msg.edit(content=f"{num_left} more {pug_emoji}'s for pugs")
-                t_end += 600
+            
+            with suppress(TimeoutError):
+                task_add = asyncio.ensure_future(self.bot.wait_for('reaction_add', check=check))
+                task_remove = asyncio.ensure_future(self.bot.wait_for('reaction_remove', check=check))
+                done, _ = await asyncio.wait([task_add, task_remove], timeout=5, return_when=asyncio.FIRST_COMPLETED)
+                
+                if task_add in done:
+                    task_remove.cancel()
+                    react, user = task_add.result()
+                    if user and user not in user_list and user != self.bot.user:
+                        user_list.append(user)
+                        t_end += int((settings.pug_timeout_speed / 2) * 60)
+                        await update()
+                elif task_remove in done:
+                    task_add.cancel()
+                    react, user = task_remove.result()
+                    if user and user in user_list and user != self.bot.user:
+                        user_list = [u for u in user_list if u.id != user.id]
+                        await update()
+            
             if len(user_list) >= requiredPlayers:
-                await ctx.channel.send(f"GET ON FOR PUGS {' '.join(map(lambda x: f'<@{x.id}>', user_list))}")
+                await ctx.channel.send(f"GET ON FOR PUGS {' '.join(map(lambda x: x.mention, user_list))}")
                 break
 
-        await msg.edit(content=f"Pugs are {'dead. :cry:' if user_list < requiredPlayers else 'poppin! :fire:'}")
+        await msg.edit(content=f"Pugs are {'dead. :cry:' if len(user_list) < requiredPlayers else 'poppin! :fire:'}")
 
-        logger.info('no longer listening for pugs for ' + role.name)
+        logger.info(f"no longer listening for pugs for {role.name}")
 
 
 def setup(bot):
