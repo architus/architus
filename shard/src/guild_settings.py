@@ -60,7 +60,7 @@ class Setting:
         return self._settings_dict['pug_emoji'] if 'pug_emoji' in self._settings_dict else "✅"
 
     @pug_emoji.setter
-    def pugemoji(self, new_emoji: str):
+    def pug_emoji(self, new_emoji: str):
         self._settings_dict['pug_emoji'] = new_emoji
         self._update_db()
 

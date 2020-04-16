@@ -3,13 +3,15 @@ from datetime import datetime, timedelta
 from asyncio import TimeoutError
 
 import discord
-from discord.ext.commands import Cog, MemberConverter, RoleConverter, CommandError
+from discord.ext.commands import Cog, MemberConverter, RoleConverter, PartialEmojiConverter, CommandError
 from discord.ext import commands
 
 from src.list_embed import ListEmbed
 from lib.config import domain_name, logger
 
 STAR = "⭐"
+CLOCK = u"\U000023f0"
+WHITE_HEAVY_CHECK_MARK = "✅"
 TRASH = u"\U0001F5D1"
 OPEN_FOLDER = u"\U0001F4C2"
 BOT_FACE = u"\U0001F916"
@@ -36,13 +38,16 @@ class SettingsElement:
             description: str,
             setting: str,
             success_msg: str = "Setting Updated",
-            failure_msg: str = "Setting Unchanged"):
+            failure_msg: str = "Setting Unchanged",
+            *,
+            category = "general"):
         self._title = title
         self.emoji = emoji
         self._description = description
         self.setting = setting
         self.success_msg = success_msg
         self.failure_msg = failure_msg
+        self.category = category
 
     @property
     def title(self):
@@ -257,6 +262,35 @@ class GulagSeverity(SettingsElement):
     async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
 
+class PugTimeoutSpeed(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Pug Timeout Speed",
+            CLOCK,
+            'This is number of minutes before a pug vote expires. '
+            'Half again per extra vote. Enter a number to modify it:',
+            'pug_timeout_speed',
+            category="pug")
+
+    async def parse(self, ctx, msg, settings):
+        return abs(int(msg.clean_content))
+
+class PugEmoji(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Pug Emoji",
+            WHITE_HEAVY_CHECK_MARK,
+            'This is the emoji that is used to tally up pug votes '
+            'Enter an emoji to modify it',
+            'pug_emoji',
+            category="pug")
+    
+    async def parse(self, ctx, msg, settings):
+        try:
+            await msg.add_reaction(msg.content)
+        except Exception:
+            raise ValueError
+        return str(msg.content)
 
 class MusicEnabled(SettingsElement):
     def __init__(self):
@@ -306,16 +340,16 @@ class Settings(Cog):
         await ctx.channel.send(embed=lem.get_embed())
 
     @commands.command()
-    async def settings(self, ctx):
+    async def settings(self, ctx, category = "general"):
         '''Open an interactive settings dialog'''
         settings = self.bot.settings[ctx.guild]
         if ctx.author.id not in settings.admins_ids:
             await ctx.channel.send('nope, sorry')
             return
 
-        msg = await ctx.channel.send(embed=await self.get_embed(ctx, settings))
+        msg = await ctx.channel.send(embed=await self.get_embed(ctx, settings, category))
 
-        for setting in self.settings_elements:
+        for setting in filter(lambda s: s.category == category, self.settings_elements):
             await msg.add_reaction(setting.emoji)
 
         then = datetime.now() + timedelta(seconds=Settings.SETTINGS_MENU_TIMEOUT_SEC)
@@ -344,10 +378,10 @@ class Settings(Cog):
                     else:
                         setattr(settings, setting.setting, value)
                         await ctx.send(setting.success_msg)
-                        await msg.edit(embed=await self.get_embed(ctx, settings))
+                        await msg.edit(embed=await self.get_embed(ctx, settings, category))
         await msg.edit(content="*Settings menu expired.*", embed=None)
 
-    async def get_embed(self, ctx, settings):
+    async def get_embed(self, ctx, settings, category):
         '''makes the pretty embed menu'''
         em = discord.Embed(
             title="⚙ Settings",
@@ -356,7 +390,7 @@ class Settings(Cog):
             url=f'https://{domain_name}/app/{ctx.guild.id}/settings')
         em.set_author(name='Architus Server Settings', icon_url=str(ctx.guild.icon_url))
 
-        for setting in self.settings_elements:
+        for setting in filter(lambda s: s.category == category, self.settings_elements):
             value = await setting.formatted_value(self.bot, ctx, settings)
             em.add_field(name=setting.title, value=f"Value: {value}", inline=True)
         return em

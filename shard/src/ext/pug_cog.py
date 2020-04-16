@@ -17,8 +17,9 @@ class Pug(commands.Cog):
         '''
         settings = self.bot.settings[ctx.guild]
         pug_emoji = settings.pug_emoji
-
-        t_end = time.time() + 60 * 30
+        pug_timeout_speed = settings.pug_timeout_speed
+        
+        t_end = time.time() + 60 * pug_timeout_speed
         user_list = []
         msg = await ctx.send(f"{requiredPlayers} more {pug_emoji}'s for pugs")
         await msg.add_reaction(pug_emoji)
@@ -35,7 +36,7 @@ class Pug(commands.Cog):
                 if task_add in done:
                     task_remove.cancel()
                     react, user = task_add.result()
-                    t_end += int((settings.pug_timeout_speed / 2) * 60)
+                    t_end += int((pug_timeout_speed / 2) * 60)
                 elif task_remove in done:
                     task_add.cancel()
                     react, user = task_remove.result()
