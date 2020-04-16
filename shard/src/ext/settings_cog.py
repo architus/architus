@@ -40,14 +40,14 @@ class SettingsElement:
             success_msg: str = "Setting Updated",
             failure_msg: str = "Setting Unchanged",
             *,
-            category="general"):
+            tags=["general"]):
         self._title = title
         self.emoji = emoji
         self._description = description
         self.setting = setting
         self.success_msg = success_msg
         self.failure_msg = failure_msg
-        self.category = category
+        self.tags = tags
 
     @property
     def title(self):
@@ -271,7 +271,7 @@ class PugTimeoutSpeed(SettingsElement):
             'This is number of minutes before a pug vote expires. '
             'Half again per extra vote. Enter a number to modify it:',
             'pug_timeout_speed',
-            category="pug")
+            tags=["pug"])
 
     async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
@@ -285,7 +285,7 @@ class PugEmoji(SettingsElement):
             'This is the emoji that is used to tally up pug votes '
             'Enter an emoji to modify it',
             'pug_emoji',
-            category="pug")
+            tags==["pug"])
 
     async def parse(self, ctx, msg, settings):
         try:
@@ -343,16 +343,21 @@ class Settings(Cog):
         await ctx.channel.send(embed=lem.get_embed())
 
     @commands.command()
-    async def settings(self, ctx, category="general"):
+    async def settings(self, ctx, tag="general"):
         '''Open an interactive settings dialog'''
         settings = self.bot.settings[ctx.guild]
         if ctx.author.id not in settings.admins_ids:
             await ctx.channel.send('nope, sorry')
             return
 
-        msg = await ctx.channel.send(embed=await self.get_embed(ctx, settings, category))
+        settings_with_tag = filter(lambda s: tag in s.tags, self.settings_elements)
+        if settings_with_tag == 0:
+            await ctx.channel.send(f'no settings were found with tag: {tag}')
+            return
 
-        for setting in filter(lambda s: s.category == category, self.settings_elements):
+        msg = await ctx.channel.send(embed=await self.get_embed(ctx, settings, settings_with_tag))
+
+        for setting in settings_with_tag:
             await msg.add_reaction(setting.emoji)
 
         then = datetime.now() + timedelta(seconds=Settings.SETTINGS_MENU_TIMEOUT_SEC)
@@ -381,10 +386,10 @@ class Settings(Cog):
                     else:
                         setattr(settings, setting.setting, value)
                         await ctx.send(setting.success_msg)
-                        await msg.edit(embed=await self.get_embed(ctx, settings, category))
+                        await msg.edit(embed=await self.get_embed(ctx, settings, settings_with_tag))
         await msg.edit(content="*Settings menu expired.*", embed=None)
 
-    async def get_embed(self, ctx, settings, category):
+    async def get_embed(self, ctx, settings, settings_with_tag):
         '''makes the pretty embed menu'''
         em = discord.Embed(
             title="⚙ Settings",
@@ -393,7 +398,7 @@ class Settings(Cog):
             url=f'https://{domain_name}/app/{ctx.guild.id}/settings')
         em.set_author(name='Architus Server Settings', icon_url=str(ctx.guild.icon_url))
 
-        for setting in filter(lambda s: s.category == category, self.settings_elements):
+        for setting in settings_with_tag:
             value = await setting.formatted_value(self.bot, ctx, settings)
             em.add_field(name=setting.title, value=f"Value: {value}", inline=True)
         return em
