@@ -27,10 +27,6 @@ class Pug(commands.Cog):
             def check(r, u):
                 return r.message.id == msg.id and str(r.emoji) == pug_emoji
 
-            async def update():
-                num_left = max(0, (requiredPlayers - len(user_list)))
-                await msg.edit(content=f"{num_left} more {pug_emoji}'s for pugs")
-
             with suppress(TimeoutError):
                 task_add = asyncio.ensure_future(self.bot.wait_for('reaction_add', check=check))
                 task_remove = asyncio.ensure_future(self.bot.wait_for('reaction_remove', check=check))
@@ -39,16 +35,16 @@ class Pug(commands.Cog):
                 if task_add in done:
                     task_remove.cancel()
                     react, user = task_add.result()
-                    if user and user not in user_list and user != self.bot.user:
-                        user_list.append(user)
-                        t_end += int((settings.pug_timeout_speed / 2) * 60)
-                        await update()
+                    t_end += int((settings.pug_timeout_speed / 2) * 60)
                 elif task_remove in done:
                     task_add.cancel()
                     react, user = task_remove.result()
-                    if user and user in user_list and user != self.bot.user:
-                        user_list = [u for u in user_list if u.id != user.id]
-                        await update()
+                else:
+                    continue
+            
+            user_list = [u for u in await react.users().flatten() if u != self.bot.user]
+            num_left = max(0, (requiredPlayers - len(user_list)))
+            await msg.edit(content=f"{num_left} more {pug_emoji}'s for pugs")
 
             if len(user_list) >= requiredPlayers:
                 await ctx.channel.send(f"GET ON FOR PUGS {' '.join(map(lambda x: x.mention, user_list))}")
