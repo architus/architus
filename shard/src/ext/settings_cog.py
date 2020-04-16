@@ -37,8 +37,8 @@ class SettingsElement:
             emoji: str,
             description: str,
             setting: str,
-            success_msg: str="Setting Updated",
-            failure_msg: str="Setting Unchanged",
+            success_msg: str = "Setting Updated",
+            failure_msg: str = "Setting Unchanged",
             *,
             category="general"):
         self._title = title
