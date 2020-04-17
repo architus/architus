@@ -1,51 +1,147 @@
 import discord
 from discord.ext import commands
-import os
 import re
-import aiofiles
-import aiohttp
 from src.utils import send_message_webhook
+from src.architus_emoji import ArchitusEmoji
+from src.generate.emoji_list import generate
 from lib.config import logger
 
 EMOJI_DIR = 'emojis'
 
 
-class emoji_manager():
+class emoji_manager:
+
     def __init__(self, bot, guild):
         self.bot = bot
         self.guild = guild
-        self._priorities = list(self.guild.emojis)
-        if not os.path.exists(EMOJI_DIR + '/' + str(self.guild.id)):
-            os.makedirs(EMOJI_DIR + '/' + str(self.guild.id))
+        self.emojis = []
+
+    @property
+    def guild_emojis(self):
+        return [e for e in self.guild.emojis if not (e.animated or e.managed)]
+
+    async def cache_worst_emoji(self):
+        worst_emoji = next(e for e in reversed(self.emojis) if e.loaded)
+        worst_emoji_discord = self.bot.get_emoji(worst_emoji.discord_id)
+        await worst_emoji_discord.delete(reason="cached")
+        worst_emoji.cache()
+
+    async def initialize(self):
+        # populate emojis from db here
+        dupes = await self.synchronize()
+        if self.bot.settings[self.guild].manage_emojis:
+            for e in dupes:
+                await self.notify_deletion(e)
+                await e.delete(reason="duplicate")
+
+            if len(self.guild_emojis) >= self.max_emojis:
+                await self.cache_worst_emoji()
+
+    def sort(self):
+        self.emojis.sort(key=lambda e: e.priority, reverse=True)
+
+    async def synchronize(self):
+        '''sync in memory list with any changes from real life'''
+
+        loaded_ids = []
+        matched_indices = []
+        duplicate_emojis = []
+
+        # update emojis loaded while we were offline
+        for emoji in self.guild_emojis:
+            loaded_ids.append(emoji.id)
+            # TODO this could be optimized later to not redownload images
+            a_emoji = await ArchitusEmoji.from_discord(emoji)
+
+            try:
+                i = self.emojis.index(a_emoji)
+                # for if name/discord id changed
+                self.emojis[i].update(a_emoji)
+            except ValueError:
+                self.emojis.append(a_emoji)
+                i = len(self.emojis) - 1
+
+            # check if a 'real' emoji matched more than one architus emoji
+            if i in matched_indices:
+                duplicate_emojis.append(emoji)
+            else:
+                matched_indices.append(i)
+
+        # update emojis unloaded while we were offline
+        for emoji in self.emojis:
+            if emoji.discord_id not in loaded_ids:
+                emoji.cache()
+
+        self.sort()
+        return duplicate_emojis
+
+    async def notify_deletion(self, emoji: discord.Emoji):
+        user = emoji.user
+        if user is None:
+            logger.debug("I don't know who created this emoji")
+            return
+        await user.send(
+            f"**Notice:** your emoji has been deleted from {self.guild.name} because it is a duplicate.\n"
+            "Type the emoji name as you normally would (`:{emoji.name}:`) if it was cached.\n"
+            f"emoji: {emoji.url}")
+
+    def bump_emoji(self, emoji: ArchitusEmoji):
+        '''boost an emoji's priority, while lowering all others'''
+        if emoji.priority >= 100:
+            return
+        penalty = 0.5 / len(self.emojis)
+        emoji.priority += 1
+
+        for e in self.emojis:
+            if e.priority <= -100:
+                continue
+            e.priority -= penalty
+
+        self.sort()
 
     @property
     def max_emojis(self):
-        maxes = (49, 99, 149, 249)
-        return maxes[self.guild.premium_tier]
+        '''get the max number of emojis the guild can hold'''
+        return (50, 100, 150, 250)[self.guild.premium_tier]
+
+    async def rename_emoji(self, before, after):
+        logger.debug(f'renamed emoji {before.name}->{after.name}')
+        e = next((e for e in self.emojis if before.id == e.discord_id), None)
+        if e is None:
+            logger.warning(f"someone renamed an emoji that I don't know about! {after.name}:{after.id}")
+        else:
+            e.update_from_discord(after)
+
+    async def add_emoji(self, emoji):
+        logger.debug(f"added emoji: {emoji}")
+        if emoji.animated or emoji.managed:
+            return
+        if emoji.user != self.bot.user:
+            a_emoji = await ArchitusEmoji.from_discord(emoji)
+
+            # check if new emoji is a duplicate
+            if a_emoji in self.emojis:
+                logger.debug(f"duplicate emoji added!: {emoji}")
+                if self.bot.settings[self.guild].manage_emojis:
+                    await emoji.delete(reason="duplicate")
+                    await self.notify_deletion(emoji)
+            else:
+                self.emojis.append(a_emoji)
+
+            if len(self.guild_emojis) >= self.max_emojis:
+                await self.cache_worst_emoji()
+            self.sort()
 
     def list_unloaded(self):
-        loaded_names = [emoji.name for emoji in self.guild.emojis]
-        return [n for n in os.listdir(f"{EMOJI_DIR}/{self.guild.id}") if n not in loaded_names] or ('No cached emojis',)
-
-    async def clean(self):
-        '''renames any emoji on the server that shares a name with an emoji on the disk or on the server'''
-        return
-        logger.debug("renaming dupes")
-        names = os.listdir(f"{EMOJI_DIR}/{self.guild.id}")
-        for emoji in self.guild.emojis:
-            if emoji.animated:
-                continue
-            count = 1
-            name = emoji.name
-            if name in names:
-                while name + str(count) in names:
-                    count += 1
-                logger.debug("renaming %s to %s" % (emoji.name, emoji.name + str(count)))
-                await emoji.edit(name=emoji.name + str(count))
-            names.append(emoji.name)
-        if len(self.guild.emojis) > self.max_emojis and False:
-            logger.debug("caching one emoji...")
-            await self.guild.emojis[-1].delete(reason="cached")
+        # return [e.name for e in self.emojis if not e.loaded] or ('No cached emojis',)
+        unloaded = [e for e in self.emojis if not e.loaded]
+        return generate(unloaded)
+        # data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
+        # em = discord.Embed(title="Cached Emojis", description=ctx.guild.name)
+        # em.set_image(url=data['url'])
+        # em.color = 0x7b8fb7
+        # if len(unloaded) == 0:
+        # retur
 
     async def scan(self, message):
         pattern = re.compile(r'(?:<:(?P<name>\w+):(?P<id>\d+)>)|(?::(?P<nameonly>\w+):)')
@@ -77,66 +173,6 @@ class emoji_manager():
                 if emoji:
                     await self.bump_emoji(emoji)
 
-    async def rename_emoji(self, before, after):
-        logger.debug(f'renamed emoji {before.name}->{after.name}')
-        await self.clean()
-
-    async def add_emoji(self, emoji):
-        '''call this when an emoji is added to the server'''
-        await self.clean()
-        logger.debug('added ' + str(emoji))
-        if emoji in self._priorities:
-            # this can happen if the emoji manager is instantiated after the emoji is added
-            self._priorities.remove(emoji)
-        if len(self.guild.emojis) > self.max_emojis:
-            await self._save(self._priorities[-1])
-            await self._priorities[-1].delete(reason="cached")
-        logger.debug("inserting")
-        self._priorities.insert(0, emoji)
-
-    async def bump_emoji(self, emoji):
-        '''call this when an emoji is used or requested'''
-        logger.debug('bumped ' + str(emoji))
-        if emoji in self.guild.emojis:
-            i = self._priorities.index(emoji)
-            if i != 0:
-                self._priorities[i] = self._priorities[i - 1]
-                self._priorities[i - 1] = emoji
-        else:
-            image = await self._load(emoji)
-            return await self.guild.create_custom_emoji(name=emoji, image=image)
-
-    def del_emoji(self, emoji):
-        logger.debug('deleted ' + str(emoji))
-        '''call this when an emoji is deleted (even if by the manager)'''
-        self._priorities.remove(emoji)
-
-    def _path(self, emoji):
-        try:
-            return "%s/%s/%s" % (EMOJI_DIR, self.guild.id, emoji.name)
-        except Exception:
-            return "%s/%s/%s" % (EMOJI_DIR, self.guild.id, emoji)
-
-    async def _load(self, emoji):
-        logger.debug('loaded ' + str(emoji))
-        f = await aiofiles.open(self._path(emoji), 'rb')
-        binary = await f.read()
-        await f.close()
-        # os.remove(self._path(emoji))
-        return binary
-
-    async def _save(self, emoji):
-        logger.debug('saving ' + str(emoji) + ' from ' + str(emoji.url))
-        '''load all emojis in the server into memory'''
-        async with aiohttp.ClientSession() as session:
-            async with session.get(str(emoji.url)) as resp:
-                if resp.status == 200:
-                    f = await aiofiles.open(self._path(emoji), mode='wb')
-                    await f.write(await resp.read())
-                    await f.close()
-                else:
-                    logger.debug("API gave unexpected response (%d) emoji not saved" % resp.status)
-
 
 class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
     '''
@@ -150,8 +186,16 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
 
     @property
     def managers(self):
-        self._managers = self._managers or {guild.id: emoji_manager(self.bot, guild) for guild in self.bot.guilds}
+        if self._managers is None:
+            self._managers = {guild.id: emoji_manager(self.bot, guild) for guild in self.bot.guilds}
         return self._managers
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        logger.debug("initializing emojis")
+        for g, m in self.managers.items():
+            await m.initialize()
+        logger.debug("done initializing emojis")
 
     @commands.command(aliases=['emotes', 'emoji', 'emote'])
     async def emojis(self, ctx):
@@ -163,10 +207,11 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
         if not settings.manage_emojis:
             message = f"The emoji manager is disabled, you can enable it in `{settings.command_prefix}settings`"
         else:
-            message = '```\n • ' + '\n • '.join(self.managers[ctx.guild.id].list_unloaded()) + '```\n'
-            message += "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
+            # message = '```\n • ' + '\n • '.join(self.managers[ctx.guild.id].list_unloaded()) + '```\n'
+            file = self.managers[ctx.guild.id].list_unloaded()
+            message = "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
 
-        await ctx.channel.send(message)
+        await ctx.channel.send(message, file=discord.File(file, "cool.png"))
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -187,7 +232,8 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
 
         elif len(before) > len(after):  # if removed
             for emoji in (emoji for emoji in before if emoji not in after and not emoji.animated):
-                self.managers[guild.id].del_emoji(emoji)
+                continue
+                # self.managers[guild.id].del_emoji(emoji)
 
         elif len(after) > len(before):  # if added
             for emoji in (emoji for emoji in after if emoji not in before and not emoji.animated):

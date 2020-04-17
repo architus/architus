@@ -23,17 +23,20 @@ SET default_tablespace = '';
 SET default_with_oids = false;
 
 --
--- Name: tb_admins; Type: TABLE; Schema: public; Owner: postgres
+-- Name: tb_emojis; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.tb_admins (
-    discord_id bigint NOT NULL,
-    server_id bigint NOT NULL,
-    username text NOT NULL
+CREATE TABLE public.tb_emojis (
+    img bytea NOT NULL,
+    name text NOT NULL,
+    discord_id bigint,
+    num_uses integer NOT NULL,
+    priority double precision NOT NULL,
+    id bigint NOT NULL
+
 );
 
-
-ALTER TABLE public.tb_admins OWNER TO postgres;
+ALTER TABLE public.tb_emojis OWNER TO postgres;
 
 --
 -- Name: tb_commands; Type: TABLE; Schema: public; Owner: postgres
@@ -152,13 +155,12 @@ ALTER SEQUENCE public.tb_users_user_id_seq OWNED BY public.tb_users.user_id;
 
 ALTER TABLE ONLY public.tb_users ALTER COLUMN user_id SET DEFAULT nextval('public.tb_users_user_id_seq'::regclass);
 
-
 --
--- Name: tb_admins tb_admins_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: tb_emojis tb_emojis_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.tb_admins
-    ADD CONSTRAINT tb_admins_pkey PRIMARY KEY (discord_id);
+ALTER TABLE ONLY public.tb_emojis
+    ADD CONSTRAINT tb_emojis_pkey PRIMARY KEY (id);
 
 
 --
@@ -202,11 +204,10 @@ ALTER TABLE ONLY public.tb_users
 
 
 --
--- Name: TABLE tb_admins; Type: ACL; Schema: public; Owner: postgres
+-- Name: TABLE tb_emojis; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.tb_admins TO autbot;
-
+GRANT ALL ON TABLE public.tb_emojis TO autbot;
 
 --
 -- Name: TABLE tb_commands; Type: ACL; Schema: public; Owner: postgres
