@@ -19,7 +19,7 @@ class Pug(commands.Cog):
             return f"{players} more {emoji}'s for {game}{' ' if game != '' else ''}pugs"
 
         if requiredPlayers < 1:
-            ctx.send("Please specify a playercount greater than 0 :rage:")
+            await ctx.send("Please specify a playercount greater than 0 :rage:")
             return
 
         settings = self.bot.settings[ctx.guild]
