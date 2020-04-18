@@ -269,7 +269,7 @@ class PugTimeoutSpeed(SettingsElement):
             "Pug Timeout Speed",
             CLOCK,
             'This is number of minutes before a pug vote expires. '
-            'Half again per extra vote. Enter a number to modify it:',
+            'Enter a number to modify it:',
             'pug_timeout_speed',
             tags=["pug"])
 

@@ -15,8 +15,11 @@ class Pug(commands.Cog):
         '''
         Starts a tally for pugs
         '''
+        def advertise_message(players, emoji, game):
+            return f"{players} more {emoji}'s for {game}{' ' if game != '' else ''}pugs"
+
         if requiredPlayers < 1:
-            ctx.channel.send("Please specify a playercount greater than 0 :rage:")
+            ctx.send("Please specify a playercount greater than 0 :rage:")
             return
 
         settings = self.bot.settings[ctx.guild]
@@ -25,7 +28,7 @@ class Pug(commands.Cog):
 
         t_end = time.time() + 60 * pug_timeout_speed
         user_list = []
-        msg = await ctx.send(f"{requiredPlayers} more {pug_emoji}'s for {game}{' ' if game != '' else ''}pugs")
+        msg = await ctx.send(advertise_message(requiredPlayers, pug_emoji, game))
         await msg.add_reaction(pug_emoji)
         while time.time() < t_end:
 
@@ -40,7 +43,6 @@ class Pug(commands.Cog):
                 if task_add in done:
                     task_remove.cancel()
                     react, user = task_add.result()
-                    t_end += int((pug_timeout_speed / 2) * 60)
                 elif task_remove in done:
                     task_add.cancel()
                     react, user = task_remove.result()
@@ -49,7 +51,7 @@ class Pug(commands.Cog):
 
             user_list = [u for u in await react.users().flatten() if u != self.bot.user]
             num_left = max(0, (requiredPlayers - len(user_list)))
-            await msg.edit(content=f"{num_left} more {pug_emoji}'s for pugs")
+            await msg.edit(content=advertise_message(num_left, pug_emoji, game))
 
             if len(user_list) >= requiredPlayers:
                 await ctx.channel.send(f"GET ON FOR {game}{' ' if game != '' else ''}PUGS "
