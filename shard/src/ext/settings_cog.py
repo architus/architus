@@ -350,8 +350,8 @@ class Settings(Cog):
             await ctx.channel.send('nope, sorry')
             return
 
-        settings_with_tag = filter(lambda s: tag in s.tags, self.settings_elements)
-        if settings_with_tag == 0:
+        settings_with_tag = [s for s in self.settings_elements if tag in s.tags]
+        if len(settings_with_tag) == 0:
             await ctx.channel.send(f'no settings were found with tag: {tag}')
             return
 
@@ -398,7 +398,7 @@ class Settings(Cog):
             url=f'https://{domain_name}/app/{ctx.guild.id}/settings')
         em.set_author(name='Architus Server Settings', icon_url=str(ctx.guild.icon_url))
 
-        for setting in filter(lambda s: tag in s.tags, self.settings_elements):
+        for setting in [s for s in self.settings_elements if tag in s.tags]:
             value = await setting.formatted_value(self.bot, ctx, settings)
             em.add_field(name=setting.title, value=f"Value: {value}", inline=True)
         return em
