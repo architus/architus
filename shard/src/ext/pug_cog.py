@@ -17,6 +17,7 @@ class Pug(commands.Cog):
         '''
         if requiredPlayers < 1:
             ctx.channel.send("Please specify a playercount greater than 0 :rage:")
+            return
 
         settings = self.bot.settings[ctx.guild]
         pug_emoji = settings.pug_emoji
