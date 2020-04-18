@@ -10,18 +10,21 @@ class Pug(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command()
-    async def startpug(self, ctx, requiredPlayers: int = 10):
+    @commands.command(aliases=['pug', 'pugs', 'startpugs', 'anypuggers'])
+    async def startpug(self, ctx, requiredPlayers: int = 10, game: str = ""):
         '''
         Starts a tally for pugs
         '''
+        if requiredPlayers < 1:
+            ctx.channel.send("Please specify a playercount greater than 0 :rage:")
+
         settings = self.bot.settings[ctx.guild]
         pug_emoji = settings.pug_emoji
         pug_timeout_speed = settings.pug_timeout_speed
 
         t_end = time.time() + 60 * pug_timeout_speed
         user_list = []
-        msg = await ctx.send(f"{requiredPlayers} more {pug_emoji}'s for pugs")
+        msg = await ctx.send(f"{requiredPlayers} more {pug_emoji}'s for {game}{' ' if game != '' else ''}pugs")
         await msg.add_reaction(pug_emoji)
         while time.time() < t_end:
 
@@ -48,7 +51,7 @@ class Pug(commands.Cog):
             await msg.edit(content=f"{num_left} more {pug_emoji}'s for pugs")
 
             if len(user_list) >= requiredPlayers:
-                await ctx.channel.send(f"GET ON FOR PUGS {' '.join(map(lambda x: x.mention, user_list))}")
+                await ctx.channel.send(f"GET ON FOR {game}{' ' if game != '' else ''}PUGS {' '.join(map(lambda x: x.mention, user_list))}")
                 break
 
         await msg.edit(content=f"Pugs are {'dead. :cry:' if len(user_list) < requiredPlayers else 'poppin! :fire:'}")
