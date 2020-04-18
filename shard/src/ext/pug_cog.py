@@ -51,7 +51,8 @@ class Pug(commands.Cog):
             await msg.edit(content=f"{num_left} more {pug_emoji}'s for pugs")
 
             if len(user_list) >= requiredPlayers:
-                await ctx.channel.send(f"GET ON FOR {game}{' ' if game != '' else ''}PUGS {' '.join(map(lambda x: x.mention, user_list))}")
+                await ctx.channel.send(f"GET ON FOR {game}{' ' if game != '' else ''}PUGS "
+                                       f"{' '.join(map(lambda x: x.mention, user_list))}")
                 break
 
         await msg.edit(content=f"Pugs are {'dead. :cry:' if len(user_list) < requiredPlayers else 'poppin! :fire:'}")
