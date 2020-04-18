@@ -56,6 +56,24 @@ class Setting:
         self._update_db()
 
     @property
+    def pug_emoji(self) -> str:
+        return self._settings_dict['pug_emoji'] if 'pug_emoji' in self._settings_dict else "✅"
+
+    @pug_emoji.setter
+    def pug_emoji(self, new_emoji: str):
+        self._settings_dict['pug_emoji'] = new_emoji
+        self._update_db()
+
+    @property
+    def pug_timeout_speed(self) -> int:
+        return self._settings_dict['pug_timeout_speed'] if 'pug_timeout_speed' in self._settings_dict else 5
+
+    @pug_timeout_speed.setter
+    def pug_timeout_speed(self, new_timeout_speed: int):
+        self._settings_dict['pug_timeout_speed'] = new_timeout_speed
+        self._update_db()
+
+    @property
     def responses_limit(self) -> int:
         return self._settings_dict['responses_limit'] if 'responses_limit' in self._settings_dict else None
 
