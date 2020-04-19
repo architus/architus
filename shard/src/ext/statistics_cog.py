@@ -8,6 +8,7 @@ from discord import Forbidden, HTTPException
 import discord
 import json
 import aiohttp
+import asyncio.sleep
 
 import src.generate.wordcount as wordcount_gen
 from src.generate import corona
@@ -46,7 +47,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     async def cache_channel(self, channel):
         async for message in channel.history(limit=None, oldest_first=True):
-            self.cache[guild.id].append(MessageData(
+            self.cache[channel.guild.id].append(MessageData(
                 message.id,
                 message.author,
                 channel.id,
@@ -76,7 +77,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         logger.debug(f"Caching messages for {len(self.bot.guilds)} guilds...")
         for guild in self.bot.guilds:
             await self.cache_guild(guild)
-        logger.debug(f"Message cache up-to-date")
+        logger.debug(f"Message cache up-to-date for {len(self.bot.guilds)} guilds...")
 
     @commands.Cog.listener()
     async def on_message(self, msg):

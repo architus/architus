@@ -364,4 +364,4 @@ class LogCog(commands.Cog):
 
 def setup(bot):
     pass
-    #bot.add_cog(LogCog(bot))
+    # bot.add_cog(LogCog(bot))
