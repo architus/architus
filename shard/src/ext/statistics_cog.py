@@ -22,6 +22,7 @@ class MessageData:
         self.channel_id = channel_id
         self.total_words = total_words
         self.correct_words = correct_words
+        self.cache_up_to_date = {}
 
     def __hash__(self):
         return hash(self.message_id)
@@ -43,23 +44,32 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         '''returns the number of correctly spelled words in a string'''
         return len([w for w in string.split() if w in self.dictionary or w.upper() in ('A', 'I')])
 
+    async def cache_channel(self, channel):
+        async for message in channel.history(limit=None, oldest_first=True):
+            self.cache[guild.id].append(MessageData(
+                message.id,
+                message.author,
+                channel.id,
+                len(message.clean_content.split()),
+                self.count_correct(message.clean_content)
+            ))
+
     async def cache_guild(self, guild):
         '''cache interesting information about all the messages in a guild'''
         logger.debug(f"Downloading messages in {len(guild.channels)} channels for '{guild.name}'...")
         for channel in guild.text_channels:
             try:
-                async for message in channel.history(limit=None, oldest_first=True):
-                    self.cache[guild.id].append(MessageData(
-                        message.id,
-                        message.author,
-                        channel.id,
-                        len(message.clean_content.split()),
-                        self.count_correct(message.clean_content)
-                    ))
+                await self.cache_channel(channel)
             except Forbidden:
                 logger.warning(f"Insuffcient permissions to download messages from '{guild.name}.{channel.name}'")
             except HTTPException as e:
                 logger.error(f"Caught {e} when downloading '{guild.name}.{channel.name}'")
+                logger.error("trying again in 10 seconds...")
+                asyncio.sleep(10)
+                try:
+                    await self.cache_channel(channel)
+                except Exception:
+                    logger.exception("failed to download channel a second time, giving up :(")
 
     @commands.Cog.listener()
     async def on_ready(self):
