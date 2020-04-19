@@ -66,7 +66,7 @@ class Setting:
 
     @property
     def pug_timeout_speed(self) -> int:
-        return self._settings_dict['pug_timeout_speed'] if 'pug_timeout_speed' in self._settings_dict else 5
+        return self._settings_dict['pug_timeout_speed'] if 'pug_timeout_speed' in self._settings_dict else 15
 
     @pug_timeout_speed.setter
     def pug_timeout_speed(self, new_timeout_speed: int):
