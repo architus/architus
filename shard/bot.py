@@ -38,6 +38,7 @@ class Architus(Bot):
     def run(self, token):
         self.emitter = Emitter(self.loop)
         self.loop.create_task(self.list_guilds())
+        self.loop.create_task(self.heartbeat())
         self.loop.create_task(
             async_rpc_server.start_server(
                 self.loop,
@@ -73,7 +74,7 @@ class Architus(Bot):
         await self.initialize_user_commands()
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
-            name=f"the tragedy of darth plagueis the wise {self.shard_id}", type=2))
+            name=f"the trageedy of darth plagueis the wise {self.shard_id}", type=2))
         await self.manager_client.guild_update(self.shard_id, self.guilds_as_dicts)
 
     async def on_guild_join(self, guild):
@@ -109,6 +110,12 @@ class Architus(Bot):
             guild_dict.update({'admin_ids': self.settings[guild].admins_ids})
             guilds.append(guild_dict)
         return guilds
+
+    async def heartbeat(self):
+        await self.wait_until_ready()
+        while not self.is_closed():
+            await asyncio.sleep(0.5)
+            await self.manager_client.checkin(self.shard_id)
 
     async def list_guilds(self):
         """Update the manager with the guilds that we know about"""
