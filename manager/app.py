@@ -1,6 +1,6 @@
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import base64
 
 from lib.ipc import async_rpc_server
@@ -14,7 +14,7 @@ class Manager:
         logger.info(f"Number of shards: {total_shards}")
         self.hoarfrost_gen = HoarFrostGenerator()
         self.total_shards = total_shards
-        self.registered = 0
+        self.registered = [False for _ in range(total_shards)]
         self.last_checkin = {}
         self.store = {}
 
@@ -25,14 +25,24 @@ class Manager:
             logger.exception(f"caught: '{e}' while executing '{method}'")
             return {'message': f"caught: '{e}' while executing '{method}'"}
 
+    async def health_check(self):
+        while True:
+            await asyncio.sleep(1)
+            for shard, last_checkin in self.last_checkin.items():
+                if last_checkin is not None and last_checkin < datetime.now() - timedelta(seconds=3):
+                    logger.error(f"--- SHARD {shard} MISSED ITS HEARTBEAT, DEREGISTERING... ---")
+                    self.registered[shard] = False
+                    self.last_checkin[shard] = None
+
     async def register(self):
         """Returns the next shard id that needs to be filled as well as the total shards"""
-        if self.registered >= self.total_shards:
+        if all(self.registered):
             raise Exception("Shard trying to register even though we're full")
-        self.registered += 1
-        logger.info(f'Shard requested id, assigning {self.registered}/{self.total_shards}...')
-        self.store[self.registered - 1] = {'shard_id': self.registered - 1}
-        return {'shard_id': self.registered - 1, 'shard_count': self.total_shards}
+        i = next(i for i in range(self.total_shards) if not self.registered[i])
+        logger.info(f'Shard requested id, assigning {i + 1}/{self.total_shards}...')
+        self.store[i] = {'shard_id': i}
+        self.registered[i] = True
+        return {'shard_id': i, 'shard_count': self.total_shards}
 
     async def all_guilds(self):
         """Return information about all guilds that the bot is in, including their admins"""
@@ -60,6 +70,7 @@ class Manager:
 
     async def checkin(self, shard_id):
         self.last_checkin[shard_id] = datetime.now()
+        self.registered[shard_id] = True
         return "nice"
 
     async def publish_file(self, location: str = 'assets', name: str = '', filetype: str = 'png', data: str = ''):
@@ -79,6 +90,7 @@ class Manager:
 loop = asyncio.get_event_loop()
 manager = Manager(int(os.environ['NUM_SHARDS']))
 
+loop.create_task(manager.health_check())
 loop.create_task(
     async_rpc_server.start_server(
         loop,

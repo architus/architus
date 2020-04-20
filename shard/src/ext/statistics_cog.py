@@ -8,7 +8,7 @@ from discord import Forbidden, HTTPException
 import discord
 import json
 import aiohttp
-import asyncio.sleep
+import asyncio
 
 import src.generate.wordcount as wordcount_gen
 from src.generate import corona
@@ -66,7 +66,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
             except HTTPException as e:
                 logger.error(f"Caught {e} when downloading '{guild.name}.{channel.name}'")
                 logger.error("trying again in 10 seconds...")
-                asyncio.sleep(10)
+                await asyncio.sleep(10)
                 try:
                     await self.cache_channel(channel)
                 except Exception:
