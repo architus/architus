@@ -50,7 +50,8 @@ class Gulag(commands.Cog):
 
             if user and user not in user_list and user != self.bot.user:
                 user_list.append(user)
-                await msg.edit(content=f"{max(0, (settings.gulag_threshold - len(user_list)))} more {gulag_emoji}'s to gulag {comrade.display_name}")
+                await msg.edit(content=f"{max(0, (settings.gulag_threshold - len(user_list)))} more {gulag_emoji}'s "
+                                       f"to gulag {comrade.display_name}")
                 t_end += int((settings.gulag_severity / 2) * 60)
             if len(user_list) >= settings.gulag_threshold and gulag_role not in comrade.roles:
                 try:
@@ -76,8 +77,9 @@ class Gulag(commands.Cog):
             elif timer_msg or timer_msg_gulag:
                 await timer_msg.edit(content=f"⏰ {int(max(0, t_end - time.time()))} seconds")
                 with suppress(AttributeError):
-                    await timer_msg_gulag.edit(content=f"⏰ {int(max(0, t_end - time.time()))} seconds, {comrade.display_name}")
-                
+                    await timer_msg_gulag.edit(content=f"⏰ {int(max(0, t_end - time.time()))} seconds,"
+                                                       f" {comrade.display_name}")
+
         if gulag_role not in comrade.roles:
             await msg.edit(content=f"Vote for {comrade.display_name} failed to pass")
 
