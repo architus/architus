@@ -2,6 +2,8 @@ FROM ubuntu:18.04
 
 WORKDIR /app
 #ENV MAGICK_HOME=/usr
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=America/New_York
 
 #RUN apt install build-base musl-dev python3
 #RUN apt install gcc python3-dev build-base wget freetype-dev libpng-dev postgresql-dev libffi-dev libxml2-dev libxslt-dev jpeg-dev
@@ -10,6 +12,9 @@ WORKDIR /app
 
 RUN apt-get -y update
 RUN apt-get -y install python3-pip ffmpeg
+RUN apt-get -y install imagemagick texlive texlive-latex-extra
+
+RUN mv /etc/ImageMagick-6/policy.xml /etc/ImageMagick-6/policy.xml.off
 
 COPY ./shard/requirements.txt /app
 
