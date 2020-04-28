@@ -270,7 +270,7 @@ class GulagEmoji(SettingsElement):
     async def get_value(self, ctx, settings):
         msg = await ctx.send(self.description)
         user_react, user = await ctx.bot.wait_for(
-            'reaction_add', check=lambda r, u: u == ctx.author and r.message == msg and self.check(r))
+            'reaction_add', check=lambda r, u: u == ctx.author and r.message.id == msg.id and self.check(r))
         try:
             value = await self.parse(ctx, user_react, settings)
         except ValueError:
@@ -341,7 +341,7 @@ class PugEmoji(SettingsElement):
     async def get_value(self, ctx, settings):
         msg = await ctx.send(self.description)
         user_react, user = await ctx.bot.wait_for(
-            'reaction_add', check=lambda r, u: u == ctx.author and r.message == msg and self.check(r))
+            'reaction_add', check=lambda r, u: u == ctx.author and r.message.id == msg.id and self.check(r))
         try:
             value = await self.parse(ctx, user_react, settings)
         except ValueError:
