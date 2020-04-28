@@ -58,7 +58,7 @@ class ArchitusEmoji:
         try:
             return ImageChops.difference(self.im, o.im).getbbox() is None
         except ValueError:
-            logger.debug("VALUE ERROR IN IM_EQ")
+            # logger.debug("VALUE ERROR IN IM_EQ")
             return False
 
     def __eq__(self, o):

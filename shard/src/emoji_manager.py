@@ -20,6 +20,21 @@ class emoji_manager:
     def guild_emojis(self):
         return [e for e in self.guild.emojis if not (e.animated or e.managed)]
 
+    def find_emoji(self, d_id=None, a_id=None, name=None):
+        '''prioritize id, then loaded name, then unloaded name'''
+        emoji = next((e for e in self.emojis if e.id == a_id or e.discord_id == d_id), None)
+
+        if emoji is not None or name is None:
+            return emoji
+
+        for e in self.emojis:
+            if e.name == name and e.loaded:
+                return e
+            elif e.name == name and emoji is None:
+                emoji = e
+
+        return emoji
+
     async def cache_worst_emoji(self):
         worst_emoji = next(e for e in reversed(self.emojis) if e.loaded)
         worst_emoji_discord = self.bot.get_emoji(worst_emoji.discord_id)
@@ -85,7 +100,7 @@ class emoji_manager:
             "Type the emoji name as you normally would (`:{emoji.name}:`) if it was cached.\n"
             f"emoji: {emoji.url}")
 
-    def bump_emoji(self, emoji: ArchitusEmoji):
+    async def bump_emoji(self, emoji: ArchitusEmoji):
         '''boost an emoji's priority, while lowering all others'''
         if emoji.priority >= 100:
             return
@@ -149,7 +164,7 @@ class emoji_manager:
         for emojistr in emojis:
             if emojistr['nameonly']:
                 try:
-                    emoji = await self.bump_emoji(emojistr['nameonly'])
+                    emoji = await self.bump_emoji(self.find_emoji(name=emojistr['nameonly']))
                 except Exception:
                     logger.exception('')
                     continue
@@ -169,7 +184,7 @@ class emoji_manager:
                 break
 
             elif emojistr['name']:
-                emoji = discord.utils.get(self.guild.emojis, id=emojistr['id'], name=emojistr['name'])
+                emoji = self.find_emoji(d_id=emojistr['id'], a_id=emojistr['id'], name=emojistr['name'])
                 if emoji:
                     await self.bump_emoji(emoji)
 
