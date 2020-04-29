@@ -11,14 +11,18 @@ ENV TZ=America/New_York
 #RUN apt-get install imagemagi
 
 RUN apt-get -y update
-RUN apt-get -y install python3-pip ffmpeg
+RUN apt install -y software-properties-common
+RUN add-apt-repository ppa:deadsnakes/ppa
+RUN apt-get -y update
+RUN apt-get -y install python3.8-dev python3-pip ffmpeg pkg-config
 RUN apt-get -y install texlive texlive-latex-extra dvipng
+RUN apt-get -y install libxml2-dev libxslt-dev python-libxslt1 libpq-dev libffi-dev
 
 COPY ./shard/requirements.txt /app
 
 
 # Install any needed packages specified in requirements.txt
-RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
+RUN python3.8 -m pip install --trusted-host pypi.python.org -r requirements.txt
 #RUN apk del libpng-dev jpeg-dev libffi-dev libxml2-dev python3-dev libxslt-dev freetype-dev
 
 ENV PYTHONIOENCODING UTF-8
@@ -29,4 +33,4 @@ COPY  ./shard/ /app/
 COPY ./lib /app/lib
 
 # Run app.py when the container launches
-CMD ["python3", "-u", "bot.py"]
+CMD ["python3.8", "-u", "bot.py"]

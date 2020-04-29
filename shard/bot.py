@@ -5,7 +5,7 @@ from discord.ext.commands import Bot
 import discord
 
 from src.user_command import UserCommand
-from src.utils import guild_to_dict, _Py38ThreadedChildWatcher
+from src.utils import guild_to_dict
 from lib.config import get_session, secret_token, logger
 from lib.models import Command
 from lib.ipc import async_rpc_server, async_rpc_client, blocking_rpc_client
@@ -146,5 +146,4 @@ architus.load_extension('src.api.api')
 architus.load_extension('src.guild_settings')
 
 if __name__ == '__main__':
-    asyncio.get_event_loop_policy().set_child_watcher(_Py38ThreadedChildWatcher())
     architus.run(secret_token)

@@ -47,7 +47,7 @@ async def webcomic(ctx, comic):
 
     # Send SMBC comic to the channel
     if comic.lower() == 'smbc':
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(headers={'connection': 'close'}) as session:
             # Simply scrapes the SMBC home page for necessary data
             async with session.get("https://smbc-comics.com") as resp:
                 text = await resp.text()
