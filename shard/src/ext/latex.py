@@ -7,8 +7,7 @@ from discord import File
 from string import Template
 import tempfile
 import os
-import asyncio
-from asyncio import create_subprocess_shell
+from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 
 
@@ -22,33 +21,29 @@ async def latex(ctx, latex):
         with open(os.path.join(work_dir, 'out.tex'), 'w') as f:
             f.write(out_txt)
 
-        loop = asyncio.get_event_loop()
-
-        tex = await create_subprocess_shell(" ".join(['pdflatex', '-halt-on-error', 'out.tex']),
-                                            cwd=work_dir,
-                                            stdout=DEVNULL,
-                                            stderr=DEVNULL,
-                                            loop=loop)
+        tex = await create_subprocess_exec('latex', '-halt-on-error', 'out.tex',
+                                           cwd=work_dir,
+                                           stdout=DEVNULL,
+                                           stderr=DEVNULL,
+                                           close_fds=True)
         await tex.wait()
 
-        if not os.path.isfile(os.path.join(work_dir, 'out.pdf')):
+        if not os.path.isfile(os.path.join(work_dir, 'out.dvi')):
             await ctx.send("Compilation failed")
             return
 
-        convert = await create_subprocess_shell(" ".join(['convert', '-density', '300', 'out.pdf',
-                                                          '-quality', '100', '-sharpen', '0x1.0',
-                                                          'out.png']),
-                                                cwd=work_dir,
-                                                stdout=DEVNULL,
-                                                stderr=DEVNULL,
-                                                loop=loop)
+        convert = await create_subprocess_exec('dvipng', '-T', 'tight', '-D', '300', 'out.dvi',
+                                               cwd=work_dir,
+                                               stdout=DEVNULL,
+                                               stderr=DEVNULL,
+                                               close_fds=True)
         await convert.wait()
 
-        if not os.path.isfile(os.path.join(work_dir, 'out.png')):
+        if not os.path.isfile(os.path.join(work_dir, 'out1.png')):
             await ctx.send("Image conversion failed")
             return
 
-        f = File(os.path.join(work_dir, 'out.png'))
+        f = File(os.path.join(work_dir, 'out1.png'))
         await ctx.send(file=f)
 
 

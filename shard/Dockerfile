@@ -12,9 +12,7 @@ ENV TZ=America/New_York
 
 RUN apt-get -y update
 RUN apt-get -y install python3-pip ffmpeg
-RUN apt-get -y install imagemagick texlive texlive-latex-extra
-
-RUN mv /etc/ImageMagick-6/policy.xml /etc/ImageMagick-6/policy.xml.off
+RUN apt-get -y install texlive texlive-latex-extra dvipng
 
 COPY ./shard/requirements.txt /app
 
