@@ -26,7 +26,11 @@ async def webcomic(ctx, comic):
 
     # Send an error message if invalid comic request
     if comic.lower() not in comics:
-        await ctx.channel.send(f"Architus does not support the {comic} webcomic")
+        # TODO: Used allowed mentions parameter when discord.py finally releases 1.4.0a
+        if '@' in comic:
+            await ctx.channel.send("Architus does not support that webcomic")
+        else:
+            await ctx.channel.send(f"Architus does not support the {comic} webcomic")
         return
 
     # Send an XKCD embed to the channel
