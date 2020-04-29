@@ -6,8 +6,10 @@ from discord import File
 
 from string import Template
 import tempfile
-import subprocess
 import os
+import asyncio
+from asyncio import create_subprocess_shell
+from asyncio.subprocess import DEVNULL
 
 
 @commands.command(aliases=['tex'])
@@ -20,17 +22,28 @@ async def latex(ctx, latex):
         with open(os.path.join(work_dir, 'out.tex'), 'w') as f:
             f.write(out_txt)
 
-        subprocess.run(['pdflatex', '-halt-on-error', 'out.tex'],
-                       cwd=work_dir, stdout=None, stderr=None)
+        loop = asyncio.get_event_loop()
+
+        tex = await create_subprocess_shell(" ".join(['pdflatex', '-halt-on-error', 'out.tex']),
+                                            cwd=work_dir,
+                                            stdout=DEVNULL,
+                                            stderr=DEVNULL,
+                                            loop=loop)
+        await tex.wait()
 
         if not os.path.isfile(os.path.join(work_dir, 'out.pdf')):
             await ctx.send("Compilation failed")
             return
 
-        subprocess.run(['convert', '-density', '300', 'out.pdf',
-                        '-quality', '100', '-sharpen', '0x1.0',
-                        'out.png'], cwd=work_dir, stdout=None,
-                       stderr=None)
+        convert = await create_subprocess_shell(" ".join(['convert', '-density', '300', 'out.pdf',
+                                                          '-quality', '100', '-sharpen', '0x1.0',
+                                                          'out.png']),
+                                                cwd=work_dir,
+                                                stdout=DEVNULL,
+                                                stderr=DEVNULL,
+                                                loop=loop)
+        await convert.wait()
+
         if not os.path.isfile(os.path.join(work_dir, 'out.png')):
             await ctx.send("Image conversion failed")
             return
