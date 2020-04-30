@@ -92,6 +92,15 @@ class Setting:
         self._update_db()
 
     @property
+    def gulag_emoji(self) -> str:
+        return self._settings_dict['gulag_emoji'] if 'gulag_emoji' in self._settings_dict else "⚒️"
+
+    @gulag_emoji.setter
+    def gulag_emoji(self, new_emoji: str):
+        self._settings_dict['gulag_emoji'] = new_emoji
+        self._update_db()
+
+    @property
     def gulag_threshold(self) -> int:
         return self._settings_dict['gulag_threshold'] if 'gulag_threshold' in self._settings_dict else 5
 
