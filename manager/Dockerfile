@@ -9,7 +9,7 @@ RUN apk update && apk add build-base python3 python3-dev
 
 
 # Install any needed packages specified in requirements.txt
-RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
+RUN python3 -m pip install --trusted-host pypi.python.org -r requirements.txt
 RUN apk del build-base python3-dev
 
 COPY ./manager /app/
