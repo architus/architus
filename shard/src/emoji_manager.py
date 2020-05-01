@@ -209,6 +209,7 @@ class EmojiManager:
     async def load_emoji(self, emoji: ArchitusEmoji) -> ArchitusEmoji:
         if emoji.loaded:
             logger.debug(f"{emoji} already loaded")
+            self.sort()
             return emoji
         while len(self.guild_emojis) >= self.max_emojis - 1:
             await self.cache_worst_emoji()
@@ -242,9 +243,7 @@ class EmojiManager:
                 continue
             e.priority -= penalty
 
-        emoji = await self.load_emoji(emoji)
-        logger.debug(emoji.priority)
-        return emoji
+        return await self.load_emoji(emoji)
 
     @property
     def max_emojis(self) -> int:
@@ -266,7 +265,7 @@ class EmojiManager:
         does not check for duplicates
         """
         logger.debug(f"added emoji: {emoji}")
-        while len(self.guild_emojis) >= self.max_emojis - 1:
+        while len(self.guild_emojis) >= self.max_emojis:
             await self.cache_worst_emoji()
 
         self.emojis.append(emoji)
@@ -281,6 +280,11 @@ class EmojiManager:
         if emoji:
             emoji.cache()
             self._update_emojis_db((emoji,))
+
+    async def on_react(self, react: discord.Reaction) -> None:
+        emoji = self.find_emoji(d_id=react.emoji.id, name=react.emoji.name)
+        if emoji:
+            await self.bump_emoji(emoji)
 
     async def on_emoji_added(self, emoji: discord.Emoji) -> None:
         """checks if the new emoji is a duplicate and adds it if not. also fetches the uploader
@@ -311,13 +315,9 @@ class EmojiManager:
         """generates an image preview list of the unloaded emojis"""
         # return [e.name for e in self.emojis if not e.loaded] or ('No cached emojis',)
         unloaded = [e for e in self.emojis if not e.loaded]
+        if len(unloaded) == 0:
+            return None
         return generate(unloaded)
-        # data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
-        # em = discord.Embed(title="Cached Emojis", description=ctx.guild.name)
-        # em.set_image(url=data['url'])
-        # em.color = 0x7b8fb7
-        # if len(unloaded) == 0:
-        # retur
 
     async def scan(self, msg):
         """scans a message for cached emoji and, if it finds any, loads the emoji and replaces the message"""
@@ -395,14 +395,36 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
         else:
             # message = '```\n • ' + '\n • '.join(self.managers[ctx.guild.id].list_unloaded()) + '```\n'
             file = self.managers[ctx.guild.id].list_unloaded()
-            message = "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
+            if file:
+                message = "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
+                msg = await ctx.send(message, file=discord.File(file, "cool.png"))
+        # data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
+                em = discord.Embed(title="Cached Emojis", description=ctx.guild.name)
+                em.set_image(url=msg.attachments[0].url)
+                em.color = 0x7b8fb7
+                em.set_footer(text=message)
+                await ctx.send(embed=em)
+            else:
+                await ctx.send("No cached emoji")
 
-        await ctx.channel.send(message, file=discord.File(file, "cool.png"))
+    @commands.command(aliases=['emoji_ranks', 'emoji_elo'], hidden=True)
+    async def emojilo(self, ctx):
+        """display the elo of each emoji in the guild"""
+        settings = self.bot.settings[ctx.guild]
+        if settings.bot_commands_channels and ctx.channel.id not in settings.bot_commands_channels:
+            await ctx.send(f"Please use <#{settings.bot_commands_channels[0]}>")
+            return
+        manager = self.managers[ctx.guild.id]
+        message = '```\n' + "\n".join([f" • {e.priority:5.2f} : {e.name}" for e in manager.emojis]) + '```\n'
+        await ctx.send(message)
 
     @commands.Cog.listener()
     async def on_message(self, msg):
-        if self.bot.settings[msg.guild].manage_emojis:
-            await self.managers[msg.guild.id].scan(msg)
+        await self.managers[msg.guild.id].scan(msg)
+
+    @commands.Cog.listener()
+    async def on_reaction_add(self, react, user):
+        await self.managers[react.message.channel.guild.id].on_react(react)
 
     @commands.Cog.listener()
     async def on_guild_emojis_update(self, guild, before, after):
