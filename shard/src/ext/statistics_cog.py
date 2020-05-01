@@ -81,6 +81,8 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     @commands.Cog.listener()
     async def on_message(self, msg):
+        if not msg.channel.guild:
+            return
         self.cache[msg.channel.guild.id].append(MessageData(
             msg.id,
             msg.author,

@@ -191,7 +191,7 @@ class EmojiManager:
         try:
             await user.send(
                 f"**Notice:** your emoji has been deleted from {self.guild.name} because it is a duplicate.\n"
-                "Type the emoji name as you normally would (`:{emoji.name}:`) if it was cached.\n"
+                f"Type the emoji name as you normally would (`:{emoji.name}:`) if it was cached.\n"
                 f"emoji: {emoji.url}")
         except Exception:
             logger.exception('')
@@ -399,7 +399,7 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
             if file:
                 message = "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
                 # msg = await ctx.send(message, file=discord.File(file, "cool.png"))
-                data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(file).decode('ascii'))
+                data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(file.getvalue()).decode('ascii'))
                 em = discord.Embed(title="Cached Emojis", description=ctx.guild.name)
                 # em.set_image(url=msg.attachments[0].url)
                 em.set_image(url=data['url'])
