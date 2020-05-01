@@ -27,13 +27,14 @@ SET default_with_oids = false;
 --
 
 CREATE TABLE public.tb_emojis (
-    img bytea NOT NULL,
-    name text NOT NULL,
+    id bigint NOT NULL,
     discord_id bigint,
+    author_id bigint,
+    guild_id bigint,
+    name text NOT NULL,
     num_uses integer NOT NULL,
     priority double precision NOT NULL,
-    id bigint NOT NULL
-
+    img bytea NOT NULL
 );
 
 ALTER TABLE public.tb_emojis OWNER TO postgres;

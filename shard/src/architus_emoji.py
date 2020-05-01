@@ -15,7 +15,7 @@ class ArchitusEmoji:
     async def from_discord(cls, emoji: Emoji):
         '''creates an architus emoji from a discord emoji'''
         im = Image.open(await download_emoji(emoji))
-        return cls(im, emoji.name, None, emoji.id)
+        return cls(im, emoji.name, None, emoji.id, emoji.user.id if emoji.user is not None else None)
 
     def __init__(
             self,
@@ -23,6 +23,7 @@ class ArchitusEmoji:
             name: str,
             id: int = None,
             discord_id: int = None,
+            author_id: int = None,
             num_uses: int = 0,
             priority: float = 0.0):
 
@@ -34,6 +35,7 @@ class ArchitusEmoji:
         else:
             self.id = id
 
+        self.author_id = author_id
         self.discord_id = discord_id
         self.num_uses = num_uses
         self.priority = priority
@@ -42,16 +44,24 @@ class ArchitusEmoji:
     def loaded(self):
         return self.discord_id is not None
 
-    def cache(self):
+    def cache(self) -> None:
         self.discord_id = None
 
     def update(self, o):
         self.name = o.name
         self.discord_id = o.discord_id
+        return self
 
     def update_from_discord(self, e: Emoji):
         self.name = e.name
         self.discord_id = e.id
+        if e.user is not None:
+            self.author_id = e.user.id
+        return self
+
+    def to_discord_str(self):
+        logger.debug(f"to_discord_str: <:{self.name}:{self.discord_id}>")
+        return f"<:{self.name}:{self.discord_id}>"
 
     def _im_eq(self, o):
         '''tell if two emojis have the same image'''

@@ -10,10 +10,9 @@ SIZE = 64
 def generate(emojis):
     '''takes a list of architus emojis and makes an image'''
 
-    im = Image.new('RGB', (600, int(len(emojis) * SIZE * 1.3)), color)
+    im = Image.new('RGB', (600, int(len(emojis) * SIZE * 1.3) + SIZE // 4), color)
 
     for (i, e) in enumerate(emojis):
-        print(f"{e} thing")
         im.paste(e.im.resize((SIZE, SIZE)), (16, int(i * SIZE * 1.3) + 16))
         d = ImageDraw.Draw(im)
 
