@@ -1,7 +1,6 @@
 import re
 from datetime import datetime, timedelta
 from asyncio import TimeoutError
-
 import discord
 from discord.ext.commands import Cog, MemberConverter, RoleConverter, CommandError
 from discord.ext import commands
@@ -10,6 +9,7 @@ from src.list_embed import ListEmbed
 from lib.config import domain_name, logger
 
 STAR = "⭐"
+PICK = u"\U000026CF"
 CLOCK = u"\U000023f0"
 WHITE_HEAVY_CHECK_MARK = "✅"
 TRASH = u"\U0001F5D1"
@@ -72,6 +72,22 @@ class SettingsElement:
         elif msg.clean_content.lower() in SettingsElement.FALSE_STRINGS:
             return False
         raise ValueError
+
+    async def get_value(self, ctx, settings):
+        await ctx.send(self.description)
+        user_msg = await ctx.bot.wait_for(
+            'message', check=lambda m: m.author == ctx.author and self.check(m))
+        try:
+            value = await self.parse(ctx, user_msg, settings)
+        except ValueError:
+            await ctx.send(self.failure_msg)
+        except Exception:
+            await ctx.send("Something bad happened... try again?")
+            logger.exception(f"Caught exception, continuing...")
+            return
+        else:
+            setattr(settings, self.setting, value)
+            await ctx.send(self.success_msg)
 
 
 class StarboardThreshold(SettingsElement):
@@ -238,13 +254,44 @@ class JoinableRoles(SettingsElement):
         return roles
 
 
+class GulagEmoji(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Gulag Emoji",
+            PICK,
+            'This is the emoji that is used to tally up gulag votes. '
+            'React to this message to modify it:',
+            'gulag_emoji',
+            tags=["gulag"])
+
+    async def parse(self, ctx, msg, settings):
+        return str(msg)
+
+    async def get_value(self, ctx, settings):
+        msg = await ctx.send(self.description)
+        user_react, user = await ctx.bot.wait_for(
+            'reaction_add', check=lambda r, u: u == ctx.author and r.message.id == msg.id and self.check(r))
+        try:
+            value = await self.parse(ctx, user_react, settings)
+        except ValueError:
+            await ctx.send(self.failure_msg)
+        except Exception:
+            await ctx.send("Something bad happened... try again?")
+            logger.exception(f"Caught exception, continuing...")
+            return
+        else:
+            setattr(settings, self.setting, value)
+            await ctx.send(self.success_msg)
+
+
 class GulagThreshold(SettingsElement):
     def __init__(self):
         super().__init__(
             "Gulag Threshold",
             HAMMER_PICK,
             'This is the number of reacts a gulag vote must get to be pass. Enter a number to modify it:',
-            'gulag_threshold')
+            'gulag_threshold',
+            tags=['general', 'gulag'])
 
     async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
@@ -257,7 +304,8 @@ class GulagSeverity(SettingsElement):
             HAMMER,
             'This is the number of minutes a member will be confined to gulag. '
             'Half again per extra vote. Enter a number to modify it:',
-            'gulag_severity')
+            'gulag_severity',
+            tags=['general', 'gulag'])
 
     async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
@@ -283,16 +331,28 @@ class PugEmoji(SettingsElement):
             "Pug Emoji",
             WHITE_HEAVY_CHECK_MARK,
             'This is the emoji that is used to tally up pug votes. '
-            'Enter an emoji to modify it:',
+            'React to this message to modify it:',
             'pug_emoji',
             tags=["pug"])
 
     async def parse(self, ctx, msg, settings):
+        return str(msg)
+
+    async def get_value(self, ctx, settings):
+        msg = await ctx.send(self.description)
+        user_react, user = await ctx.bot.wait_for(
+            'reaction_add', check=lambda r, u: u == ctx.author and r.message.id == msg.id and self.check(r))
         try:
-            await msg.add_reaction(msg.content)
+            value = await self.parse(ctx, user_react, settings)
+        except ValueError:
+            await ctx.send(self.failure_msg)
         except Exception:
-            raise ValueError
-        return str(msg.content)
+            await ctx.send("Something bad happened... try again?")
+            logger.exception(f"Caught exception, continuing...")
+            return
+        else:
+            setattr(settings, self.setting, value)
+            await ctx.send(self.success_msg)
 
 
 class MusicEnabled(SettingsElement):
@@ -326,7 +386,11 @@ class Settings(Cog):
     '''
     Manage server specific architus settings
     '''
-
+    TAGS = {
+        'general': ['general', 'g'],
+        'gulag': ['gulag', 'ГУЛАГ'],
+        'pug': ['p', 'pug', 'pugs', 'pugger']
+    }
     SETTINGS_MENU_TIMEOUT_SEC = 60 * 60
 
     def __init__(self, bot):
@@ -342,6 +406,11 @@ class Settings(Cog):
             lem.add(role.name, role.id)
         await ctx.channel.send(embed=lem.get_embed())
 
+    @commands.command(aliases=['listsettingstags', 'settingstags', 'stags'])
+    async def list_settings_tags(self, ctx):
+        '''Get the list of tags for the settings command'''
+        await ctx.channel.send(f"Tags for settings are: {self.list_tags()}")
+
     @commands.command()
     async def settings(self, ctx, tag="general"):
         '''Open an interactive settings dialog'''
@@ -350,14 +419,15 @@ class Settings(Cog):
             await ctx.channel.send('nope, sorry')
             return
 
-        settings_with_tag = [s for s in self.settings_elements if tag in s.tags]
-        if len(settings_with_tag) == 0:
-            await ctx.channel.send(f'no settings were found with tag: {tag}')
+        try:
+            tag = self.get_tag(tag)
+        except ValueError:
+            await ctx.channel.send(f'no settings were found with tag: {tag}, try: {self.list_tags()}')
             return
 
         msg = await ctx.channel.send(embed=await self.get_embed(ctx, settings, tag))
 
-        for setting in settings_with_tag:
+        for setting in [s for s in self.settings_elements if tag in s.tags]:
             await msg.add_reaction(setting.emoji)
 
         then = datetime.now() + timedelta(seconds=Settings.SETTINGS_MENU_TIMEOUT_SEC)
@@ -372,22 +442,18 @@ class Settings(Cog):
             await react.remove(user)
             for setting in self.settings_elements:
                 if react.emoji == setting.emoji:
-                    await ctx.send(setting.description)
-                    user_msg = await self.bot.wait_for(
-                        'message', check=lambda m: m.author == ctx.author and setting.check(m))
-                    try:
-                        value = await setting.parse(ctx, user_msg, settings)
-                    except ValueError:
-                        await ctx.send(setting.failure_msg)
-                    except Exception:
-                        await ctx.send("Something bad happened... try again?")
-                        logger.exception(f"Caught exception, continuing...")
-                        continue
-                    else:
-                        setattr(settings, setting.setting, value)
-                        await ctx.send(setting.success_msg)
-                        await msg.edit(embed=await self.get_embed(ctx, settings, tag))
+                    await setting.get_value(ctx, settings)
+                    await msg.edit(embed=await self.get_embed(ctx, settings, tag))
         await msg.edit(content="*Settings menu expired.*", embed=None)
+
+    def list_tags(self):
+        return ', '.join(self.TAGS)
+
+    def get_tag(self, tag):
+        for t in self.TAGS:
+            if tag.lower() in self.TAGS[t]:
+                return t
+        raise ValueError('tag was not found in list of tags')
 
     async def get_embed(self, ctx, settings, tag):
         '''makes the pretty embed menu'''
