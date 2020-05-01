@@ -393,6 +393,7 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
         settings = self.bot.settings[ctx.guild]
         if not settings.manage_emojis:
             message = f"The emoji manager is disabled, you can enable it in `{settings.command_prefix}settings`"
+            await ctx.send(message)
         else:
             # message = '```\n • ' + '\n • '.join(self.managers[ctx.guild.id].list_unloaded()) + '```\n'
             logger.debug("generating list image")
@@ -400,12 +401,12 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
             if file is not None:
                 logger.debug("file is good")
                 message = "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
-                msg = await ctx.send(message, file=discord.File(file, "cool.png"))
+                # msg = await ctx.send(message, file=discord.File(file, "cool.png"))
                 data, _ = await self.bot.manager_client.publish_file(
                     data=base64.b64encode(file.getvalue()).decode('ascii'))
                 em = discord.Embed(title="Cached Emojis", description=ctx.guild.name)
-                em.set_image(url=msg.attachments[0].url)
-                # em.set_image(url=data['url'])
+                # em.set_image(url=msg.attachments[0].url)
+                em.set_image(url=data['url'])
                 em.color = 0x7b8fb7
                 em.set_footer(text=message)
                 await ctx.send(embed=em)
