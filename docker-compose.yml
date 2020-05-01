@@ -41,6 +41,8 @@ services:
           memory: 500M
     ports:
       - "5000:5000"
+    depends_on:
+      - rabbit
     networks:
       - webnet
   gateway:

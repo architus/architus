@@ -1,46 +1,30 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, BigInteger, Float, Text, DateTime
+from sqlalchemy import Column, Integer, BigInteger, Float, Text, DateTime, LargeBinary
 
 Base = declarative_base()
 
 
-class User(Base):
-    __tablename__ = 'tb_users'
-    discord_id = Column('discord_id', BigInteger, primary_key=True)
-    aut_score = Column('aut_score', Float)
-    norm_score = Column('norm_score', Float)
-    nice_score = Column('nice_score', Float)
-    toxic_score = Column('toxic_score', Float)
-    awareness_score = Column('awareness_score', Integer)
+class Emoji(Base):
 
-    def __init__(self, discord_id, scores):
+    __tablename__ = 'tb_emojis'
+    id = Column('id', BigInteger, primary_key=True)
+    name = Column('name', Text)
+    discord_id = Column('discord_id', BigInteger)
+    author_id = Column('author_id', BigInteger)
+    guild_id = Column('guild_id', BigInteger)
+    num_uses = Column('num_uses', Integer)
+    priority = Column('priority', Float)
+    img = Column('img', LargeBinary)
+
+    def __init__(self, id, discord_id, author_id, guild_id, name, num_uses, priority, img):
+        self.id = id
         self.discord_id = discord_id
-        self.aut_score = scores[0]
-        self.norm_score = scores[1]
-        self.nice_score = scores[2]
-        self.toxic_score = scores[3]
-        self.toxic_score = scores[4]
-
-    def as_dict(self):
-        return {
-            'discord_id': self.discord_id,
-            'scores': [self.aut_score, self.norm_score, self.nice_score, self.toxic_score, self.awareness_score]
-        }
-
-    def as_entry(self):
-        return [self.aut_score, self.norm_score, self.nice_score, self.toxic_score, self.awareness_score]
-
-
-class Admin(Base):
-    __tablename__ = 'tb_admins'
-    discord_id = Column('discord_id', BigInteger, primary_key=True)
-    server_id = Column('server_id', BigInteger)
-    username = Column('username', Text)
-
-    def __init__(self, server_id, discord_id, username):
-        self.server_id = server_id
-        self.discord_id = discord_id
-        self.username = username
+        self.author_id = author_id
+        self.guild_id = guild_id
+        self.name = name
+        self.num_uses = num_uses
+        self.priority = priority
+        self.img = img
 
 
 class Settings(Base):
@@ -51,28 +35,6 @@ class Settings(Base):
     def __init__(self, server_id, json_blob):
         self.server_id = server_id
         self.json_blob = json_blob
-
-
-class AppSession(Base):
-    __tablename__ = 'tb_session'
-    autbot_access_token = Column('autbot_access_token', Text, primary_key=True)
-    discord_access_token = Column('discord_access_token', Text)
-    discord_refresh_token = Column('discord_refresh_token', Text)
-    discord_expiration = Column('discord_expiration', DateTime)
-    autbot_expiration = Column('autbot_expiration', DateTime)
-    last_login = Column('last_login', DateTime)
-    discord_id = Column('discord_id', BigInteger)
-
-    def __init__(self, autbot_access_token, discord_access_token,
-                 discord_refresh_token, discord_expiration, autbot_expiration, discord_id, last_login=None):
-
-        self.autbot_access_token = autbot_access_token
-        self.discord_access_token = discord_access_token
-        self.discord_refresh_token = discord_refresh_token
-        self.discord_expiration = discord_expiration
-        self.autbot_expiration = autbot_expiration
-        self.last_login = last_login
-        self.discord_id = discord_id
 
 
 class Log(Base):

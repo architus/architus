@@ -1,7 +1,23 @@
 from datetime import datetime
 from pytz import timezone
+from aiohttp import ClientSession
+import io
 
 import discord
+
+from lib.config import logger
+
+
+async def download_emoji(emoji: discord.Emoji) -> io.BytesIO:
+    async with ClientSession() as session:
+        async with session.get(str(emoji.url)) as resp:
+            if resp.status == 200:
+                buf = io.BytesIO()
+                buf.write(await resp.read())
+                buf.seek(0)
+                return buf
+    logger.debug("API gave unexpected response (%d) emoji not saved" % resp.status)
+    return None
 
 
 async def send_message_webhook(channel, content, avatar_url=None, username=None, embeds=None):
