@@ -14,7 +14,7 @@ import aiohttp
 # function. The supported comics can be listed by the command
 # [prefix]webcomic list
 @commands.command(aliases=['wc', 'comic'])
-async def webcomic(ctx, comic):
+async def webcomic(ctx, comic='list'):
     # list of the supported comics
     comics = ['xkcd', 'smbc']
 
