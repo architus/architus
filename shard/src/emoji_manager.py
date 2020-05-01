@@ -399,7 +399,8 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
             if file:
                 message = "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
                 # msg = await ctx.send(message, file=discord.File(file, "cool.png"))
-                data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(file.getvalue()).decode('ascii'))
+                data, _ = await self.bot.manager_client.publish_file(
+                    data=base64.b64encode(file.getvalue()).decode('ascii'))
                 em = discord.Embed(title="Cached Emojis", description=ctx.guild.name)
                 # em.set_image(url=msg.attachments[0].url)
                 em.set_image(url=data['url'])
@@ -418,7 +419,9 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
             return
         manager = self.managers[ctx.guild.id]
         message = '```\n' + "\n".join([f" • {e.priority:5.2f} : {e.name}" for e in manager.emojis]) + '```\n'
-        await ctx.send(message)
+        await ctx.send(message[:1997] + '```')
+        if len(message > 2000):
+            await ctx.send('```' + message[1997:])
 
     @commands.Cog.listener()
     async def on_message(self, msg):
