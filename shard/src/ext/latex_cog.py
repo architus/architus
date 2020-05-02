@@ -20,7 +20,8 @@ class Latexify(commands.Cog, name="Latex Compiler"):
         self.base_tex = Template(s)
 
     @commands.command(aliases=['tex'])
-    async def latex(self, ctx, latex):
+    async def latex(self, ctx, *latex):
+        latex = " ".join(latex)
         with tempfile.TemporaryDirectory() as work_dir:
             out_txt = self.base_tex.substitute(my_text=latex)
 
