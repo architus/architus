@@ -3,6 +3,7 @@ from lib.models import Settings
 from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog
 import discord
+from typing import List
 
 RYTHMS_ID = 235088799074484224
 
@@ -139,32 +140,32 @@ class Setting:
         self._update_db()
 
     @property
-    def bot_commands_channels(self) -> list:
+    def bot_commands_channels(self) -> List[int]:
         return self._settings_dict['bot_commands'] if 'bot_commands' in self._settings_dict else []
 
     @bot_commands_channels.setter
-    def bot_commands_channels(self, new_bot_commands: list):
+    def bot_commands_channels(self, new_bot_commands: List[int]):
         self._settings_dict['bot_commands'] = new_bot_commands
         self._update_db()
 
     @property
-    def admin_ids(self) -> list:
+    def admin_ids(self) -> List[int]:
         '''stupid alias'''
         return self.admins_ids
 
     @property
-    def admins_ids(self) -> list:
-        default_admins = [self.guild.owner.id, 214037134477230080]
+    def admins_ids(self) -> List[int]:
+        default_admins = [self.guild.owner.id]
 
         return list(set(default_admins + [int(a) for a in self._settings_dict.get('admins', [])]))
 
     @admin_ids.setter
-    def admin_ids(self, new_admins: list):
+    def admin_ids(self, new_admins: List[int]):
         '''stupid alias'''
         self.admins_ids = new_admins
 
     @admins_ids.setter
-    def admins_ids(self, new_admins: list):
+    def admins_ids(self, new_admins: List[int]):
         self._settings_dict['admins'] = new_admins
         self._update_db()
 

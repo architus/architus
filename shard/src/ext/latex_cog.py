@@ -70,6 +70,7 @@ class Latexify(commands.Cog, name="Latex Compiler"):
                 await wait_for(tex.wait(), timeout=3)
             except TimeoutError:
                 await ctx.send("Compilation took too long")
+                tex.kill()
                 return
 
             if not os.path.isfile(os.path.join(work_dir, 'out.dvi')):

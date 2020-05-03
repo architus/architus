@@ -33,7 +33,7 @@ class Invite(Resource):
                             '&response_type=code'
                             f'&redirect_uri={REDIRECT_URI}'
                             '&permissions=2134207679')
-        response.set_cookie('next', request.args.get('return'), domain=f'api.{DOMAIN}', secure=True, httponly=True)
+        response.set_cookie('next', request.args.get('return', ''), domain=f'api.{DOMAIN}', secure=True, httponly=True)
         return response
 
 
