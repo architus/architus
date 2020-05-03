@@ -29,7 +29,7 @@ class Manager:
         while True:
             await asyncio.sleep(1)
             for shard, last_checkin in self.last_checkin.items():
-                if last_checkin is not None and last_checkin < datetime.now() - timedelta(seconds=3):
+                if last_checkin is not None and last_checkin < datetime.now() - timedelta(seconds=5):
                     logger.error(f"--- SHARD {shard} MISSED ITS HEARTBEAT, DEREGISTERING... ---")
                     self.registered[shard] = False
                     self.last_checkin[shard] = None

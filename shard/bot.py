@@ -74,7 +74,7 @@ class Architus(Bot):
         await self.initialize_user_commands()
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
-            name=f"the trageedy of darth plagueis the wise {self.shard_id}", type=2))
+            name=f"the tragedy of darth plagueis the wise {self.shard_id}", type=2))
         await self.manager_client.guild_update(self.shard_id, self.guilds_as_dicts)
 
     async def on_guild_join(self, guild):
@@ -136,7 +136,7 @@ def command_prefix(bot: Architus, msg: discord.Message):
     return bot.settings[msg.guild].command_prefix
 
 
-architus = Architus(command_prefix=command_prefix)
+architus = Architus(command_prefix=command_prefix, max_messages=10000)
 
 for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
     architus.load_extension(f"src.ext.{ext[:-3]}")
