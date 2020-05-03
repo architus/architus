@@ -3,12 +3,15 @@
 # Inspired by: https://github.com/chuanshi/slacklatex
 from discord.ext import commands
 from discord.ext.commands import cooldown, BucketType
+
 from discord import File
 
 from string import Template
 import tempfile
 import os
+
 from asyncio import create_subprocess_exec, wait_for, TimeoutError
+from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 
 
@@ -40,11 +43,13 @@ class Latexify(commands.Cog, name="Latex Compiler"):
                     await ctx.send("Illegal latex command")
                     return
         latex = " ".join(latex)
+
         with tempfile.TemporaryDirectory() as work_dir:
             out_txt = self.base_tex.substitute(my_text=latex)
 
             with open(os.path.join(work_dir, 'out.tex'), 'w') as f:
                 f.write(out_txt)
+
 
             tex = await create_subprocess_exec('latex', '-halt-on-error', '-no-shell-escape',
                                                '-interaction batchmode', 'out.tex',
@@ -52,6 +57,7 @@ class Latexify(commands.Cog, name="Latex Compiler"):
                                                stdout=DEVNULL,
                                                stderr=DEVNULL,
                                                close_fds=True)
+
             try:
                 await wait_for(tex.wait(), timeout=3)
             except TimeoutError:
