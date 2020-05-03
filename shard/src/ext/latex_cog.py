@@ -21,19 +21,27 @@ class Latexify(commands.Cog, name="Latex Compiler"):
         self.base_tex = Template(s)
 
         self.illegal_commands = [
-            "\\write",
-            "\\tempfile",
-            "\\openout",
-            "\\newwrite",
-            "\\write",
-            "\\input",
-            "\\usepackage",
-            "\\include"
+            r"\write",
+            r"\tempfile",
+            r"\openout",
+            r"\newwrite",
+            r"\write",
+            r"\input",
+            r"\usepackage",
+            r"\include"
         ]
 
     @commands.command(aliases=['tex'])
     @cooldown(2, 15, BucketType.user)
     async def latex(self, ctx, *latex):
+        """
+        Use: !latex [valid latex code]
+        Parameters do not need to be passed inside of quotes. They will
+        be automatically joined together with a space in between them.
+        Latex code is just inside of a plain document environment so add
+        dollar signs if you need them. The packages mathrsfs and amsmath
+        are included by default.
+        """
         for l in latex:
             for c in self.illegal_commands:
                 if l.find(c) != -1:
