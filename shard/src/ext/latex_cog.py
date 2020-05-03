@@ -2,11 +2,15 @@
 # Takes a string of latex and returns the compiled version as a png
 # Inspired by: https://github.com/chuanshi/slacklatex
 from discord.ext import commands
+from discord.ext.commands import cooldown, BucketType
+
 from discord import File
 
 from string import Template
 import tempfile
 import os
+
+from asyncio import create_subprocess_exec, wait_for, TimeoutError
 from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 
@@ -19,20 +23,54 @@ class Latexify(commands.Cog, name="Latex Compiler"):
             s = f.read()
         self.base_tex = Template(s)
 
+        self.illegal_commands = [
+            r"\write",
+            r"\tempfile",
+            r"\openout",
+            r"\newwrite",
+            r"\write",
+            r"\input",
+            r"\usepackage",
+            r"\include"
+        ]
+
     @commands.command(aliases=['tex'])
-    async def latex(self, ctx, latex):
+    @cooldown(2, 15, BucketType.user)
+    async def latex(self, ctx, *latex):
+        """
+        Use: !latex [valid latex code]
+        Parameters do not need to be passed inside of quotes. They will
+        be automatically joined together with a space in between them.
+        Latex code is just inside of a plain document environment so add
+        dollar signs if you need them. The packages mathrsfs and amsmath
+        are included by default.
+        """
+        for l in latex:
+            for c in self.illegal_commands:
+                if l.find(c) != -1:
+                    await ctx.send("Illegal latex command")
+                    return
+        latex = " ".join(latex)
+
         with tempfile.TemporaryDirectory() as work_dir:
             out_txt = self.base_tex.substitute(my_text=latex)
 
             with open(os.path.join(work_dir, 'out.tex'), 'w') as f:
                 f.write(out_txt)
 
-            tex = await create_subprocess_exec('latex', '-halt-on-error', 'out.tex',
+
+            tex = await create_subprocess_exec('latex', '-halt-on-error', '-no-shell-escape',
+                                               '-interaction batchmode', 'out.tex',
                                                cwd=work_dir,
                                                stdout=DEVNULL,
                                                stderr=DEVNULL,
                                                close_fds=True)
-            await tex.wait()
+
+            try:
+                await wait_for(tex.wait(), timeout=3)
+            except TimeoutError:
+                await ctx.send("Compilation took too long")
+                return
 
             if not os.path.isfile(os.path.join(work_dir, 'out.dvi')):
                 await ctx.send("Compilation failed")
