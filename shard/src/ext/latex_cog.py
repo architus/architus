@@ -11,7 +11,6 @@ import tempfile
 import os
 
 from asyncio import create_subprocess_exec, wait_for, TimeoutError
-from asyncio import create_subprocess_exec
 from asyncio.subprocess import DEVNULL
 
 
@@ -31,7 +30,10 @@ class Latexify(commands.Cog, name="Latex Compiler"):
             r"\write",
             r"\input",
             r"\usepackage",
-            r"\include"
+            r"\include",
+            r"\def",
+            r"\newcommand",
+            r"\immediate",
         ]
 
     @commands.command(aliases=['tex'])
@@ -57,7 +59,6 @@ class Latexify(commands.Cog, name="Latex Compiler"):
 
             with open(os.path.join(work_dir, 'out.tex'), 'w') as f:
                 f.write(out_txt)
-
 
             tex = await create_subprocess_exec('latex', '-halt-on-error', '-no-shell-escape',
                                                '-interaction batchmode', 'out.tex',
