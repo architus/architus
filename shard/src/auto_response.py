@@ -98,27 +98,14 @@ class AutoResponse:
 
         return pattern
 
-    def validate(self, bot, ctx):
-        settings = bot.settings[ctx.guild]
-        guild_responses = bot.autoresponses[ctx.guild]
-
-        if settings.responses_limit is not None:
-            author_count = len([r for r in guild_responses if r.author_id == self.author_id])
-            if author_count >= settings.responses_limit:
-                raise UserLimitException
-
-        if len(self.response) > settings.responses_response_length:
-            raise LongResponseException
-
-        if len(self.trigger) < settings.responses_trigger_length:
-            raise ShortTriggerException
-
         # fsm = FSM(self.trigger_regex)
         # if any(fsm.intersects(FSM(other.trigger_regex)) for other in guild_responses):
             # raise TriggerCollisionException
 
-    async def triggered(self, msg):
-        pass
+    async def execute(self, msg):
+        match = self.trigger_reggy.fullmatch(msg.content)
+        if match is None:
+            return False
 
     def __repr__(self):
         return f"<{self.trigger}::{self.response}> MODE: '{self.mode}' COUNT: '{self.count}'"
@@ -132,7 +119,12 @@ class GuildAutoResponses:
         self.settings = self.bot.settings[guild]
         self.auto_responses = []
 
-    def validate(self, response: AutoResponse) -> bool:
+    async def execute(self, msg):
+        for r in self.auto_responses:
+            if await r.execute(msg):
+                break
+
+    def validate(self, response: AutoResponse) -> None:
         if self.settings.responses_limit is not None:
             author_count = len([r for r in self.auto_responses if r.author_id == self.author_id])
             if author_count >= self.settings.responses_limit:
@@ -144,8 +136,11 @@ class GuildAutoResponses:
         if len(response.trigger) < self.settings.responses_trigger_length:
             raise ShortTriggerException
 
+        if not is_disjoint(response):
+            raise TriggerCollisionException
+
     def is_disjoint(self, response: AutoResponse) -> bool:
-        all(r.trigger_fsm.isdisjoint(response.trigger_fsm) for r in self.auto_responses)
+        all(r.trigger_reggy.isdisjoint(response.trigger_reggy) for r in self.auto_responses)
 
 
 class AutoResponseException(Exception):
