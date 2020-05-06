@@ -32,6 +32,7 @@ CREATE TABLE public.tb_emojis (
     author_id bigint,
     guild_id bigint,
     name text NOT NULL,
+    url text NOT NULL,
     num_uses integer NOT NULL,
     priority double precision NOT NULL,
     img bytea NOT NULL

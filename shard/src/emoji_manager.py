@@ -33,11 +33,13 @@ class EmojiManager:
         emojis = self.session.query(EmojiModel).filter_by(guild_id=self.guild.id).order_by(EmojiModel.priority).all()
         self.emojis = [
             ArchitusEmoji(
+                self.bot,
                 Image.open(BytesIO(e.img)),
                 e.name,
                 e.id,
                 e.discord_id,
                 e.author_id,
+                e.url,
                 e.num_uses,
                 e.priority)
             for e in emojis]
@@ -55,6 +57,7 @@ class EmojiManager:
             emoji.author_id,
             self.guild.id,
             emoji.name,
+            emoji.url,
             emoji.num_uses,
             emoji.priority,
             binary)
@@ -157,7 +160,7 @@ class EmojiManager:
 
             loaded_ids.append(emoji.id)
             # TODO this could be optimized later to not redownload images
-            a_emoji = await ArchitusEmoji.from_discord(emoji)
+            a_emoji = await ArchitusEmoji.from_discord(self.bot, emoji)
 
             try:
                 i = self.emojis.index(a_emoji)

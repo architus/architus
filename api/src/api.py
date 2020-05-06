@@ -90,6 +90,7 @@ class Logs(CustomResource):
 
 
 class AutoResponses(CustomResource):
+    @authenticated
     def get(self, guild_id: int):
         # TODO this should probably be authenticated
         rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
@@ -180,6 +181,14 @@ class Stats(CustomResource):
         }, StatusCodes.OK_200
 
 
+class Emojis(CustomResource):
+
+    def get(self, guild_id: int):
+        data, sc = self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
+        camelcase_keys(data)
+        return data, sc
+
+
 class ListGuilds(CustomResource):
     @authenticated
     def get(self, jwt: JWT):
@@ -207,6 +216,7 @@ def app_factory():
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Stats, "/stats/<int:guild_id>")
+    api.add_resource(Emojis, "/emojis/<int:guild_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")
