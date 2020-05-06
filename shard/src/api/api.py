@@ -124,8 +124,8 @@ class Api(Cog):
             'id': e.id,
             'name': e.name,
             'loaded': e.loaded,
-            'num_uses': e.num_uses,
-            'discord_id': str(e.discord_id),
+            'numUses': e.num_uses,
+            'discordId': str(e.discord_id),
             'url': await e.url(),
         } for e in emoji_manager.emojis]}, sc.OK_200
 

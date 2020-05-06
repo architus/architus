@@ -184,9 +184,7 @@ class Stats(CustomResource):
 class Emojis(CustomResource):
 
     def get(self, guild_id: int):
-        data, sc = self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
-        camelcase_keys(data)
-        return data, sc
+        return self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
 
 
 class ListGuilds(CustomResource):
