@@ -121,7 +121,7 @@ class Api(Cog):
     async def get_guild_emojis(self, guild_id):
         emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild_id]
         return {'emojis': [{
-            'id': e.id,
+            'id': str(e.id),
             'name': e.name,
             'loaded': e.loaded,
             'numUses': e.num_uses,
