@@ -6,6 +6,7 @@ just_shortcode = re.compile(r"\[:([A-Za-z]+):\]")
 shortcode_id = re.compile(r"\[<:([A-Za-z]+):(\\d+)>\]")
 animated = re.compile(r"\[<a:([A-Za-z]+):(\\d+)>\]")
 capture = re.compile("\[(\\d+)\]")
+url = re.compile("(https?://[\\w\\.-]{2,})")
 
 
 class ParseError(Exception):
@@ -24,7 +25,8 @@ class NodeType(Enum):
     Count = auto(),
     Member = auto(),
     Author = auto(),
-    Capture = auto()
+    Capture = auto(),
+    Url = auto()
 
 
 def serialize(obj):
@@ -66,8 +68,56 @@ class Response:
         self.parent = None
         self.type = NodeType.Root
 
-    def to_json(self):
-        return json.dumps(self, default=serialize)
+    def stringify(self):
+        return tree_string(self)
+
+
+def tree_string(node, tree=[]):
+    if (node.type == NodeType.List):
+        tree.append(["open", "["])
+        for c in node.children:
+            tree = tree_string(c, tree)
+        tree.append(["close", "]"])
+        return tree
+    elif (node.type == NodeType.ListElement):
+        for c in node.children:
+            tree = tree_string(c, tree)
+        return tree
+    elif (node.type == NodeType.PlainText):
+        tree.append(["text", node.text])
+        return tree
+    elif (node.type == NodeType.React):
+        tree.append(["reaction", node.text])
+        return tree
+    elif (node.type == NodeType.Noun):
+        tree.append(["noun", node.text])
+        return tree
+    elif (node.type == NodeType.Adj):
+        tree.append(["adj", node.text])
+        return tree
+    elif (node.type == NodeType.Adv):
+        tree.append(["adv", node.text])
+        return tree
+    elif (node.type == NodeType.Count):
+        tree.append(["count", node.text])
+        return tree
+    elif (node.type == NodeType.Member):
+        tree.append(["member", node.text])
+        return tree
+    elif (node.type == NodeType.Author):
+        tree.append(["author", node.text])
+        return tree
+    elif (node.type == NodeType.Capture):
+        tree.append(["capture", node.text])
+        return tree
+    elif (node.type == NodeType.Url):
+        tree.append(["url", node.text])
+        return tree
+    else:
+        tree = []
+        for c in node.children:
+            tree = tree_string(c, tree)
+        return tree
 
 
 def parse_react(string, i=0):
@@ -210,14 +260,36 @@ def parse(string):
                     text += string[i+1]
                     i += 2
                     continue
+                if string[i] != " ":
+                    ends = [string.find(" ", i), string.find("]", i), string.find(",", i)]
+                    end = len(string)
+                    for e in ends:
+                        if e != -1 and e < end:
+                            end = e
+                    m = url.fullmatch(string[i:end])
+                    if m is not None:
+                        if text != "":
+                            node = Node()
+                            node.type = NodeType.PlainText
+                            node.text = text
+                            node.parent = curr
+                            curr.children.append(node)
+                        node = Node()
+                        node.type = NodeType.Url
+                        node.text = string[i:end]
+                        node.parent = curr
+                        curr.children.append(node)
+                        text = ""
+                        i = end
+                        continue
                 if string[i] == "," and curr.type == NodeType.ListElement:
                     break
                 text += string[i]
                 i += 1
-            if text.strip() != "":
+            if text != "":
                 node = Node()
                 node.type = NodeType.PlainText
-                node.text = text.strip()
+                node.text = text
                 node.parent = curr
                 curr.children.append(node)
 
@@ -248,4 +320,4 @@ if __name__ == "__main__":
     data = data.strip()
 
     tree = parse(data)
-    print(tree.to_json())
+    print(tree.stringify())
