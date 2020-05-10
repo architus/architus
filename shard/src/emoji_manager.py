@@ -44,7 +44,7 @@ class EmojiManager:
                 e.priority)
             for e in emojis]
 
-    def _insert_into_db(self, emoji: ArchitusEmoji) -> None:
+    async def _insert_into_db(self, emoji: ArchitusEmoji) -> None:
         """stores an emoji in the database"""
 
         with BytesIO() as buf:
@@ -57,7 +57,7 @@ class EmojiManager:
             emoji.author_id,
             self.guild.id,
             emoji.name,
-            emoji.url,
+            await emoji.url(),
             emoji.num_uses,
             emoji.priority,
             binary)
@@ -168,7 +168,7 @@ class EmojiManager:
                 self.emojis[i].update(a_emoji)
             except ValueError:
                 self.emojis.append(a_emoji)
-                self._insert_into_db(a_emoji)
+                await self._insert_into_db(a_emoji)
                 i = len(self.emojis) - 1
 
             # check if a 'real' emoji matched more than one architus emoji
@@ -273,7 +273,7 @@ class EmojiManager:
             await self.cache_worst_emoji()
 
         self.emojis.append(emoji)
-        self._insert_into_db(emoji)
+        await self._insert_into_db(emoji)
         self.sort()
 
     async def on_emoji_removed(self, emoji: discord.Emoji) -> None:
@@ -379,6 +379,11 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
         if self._managers is None:
             self._managers = {guild.id: EmojiManager(self.bot, guild) for guild in self.bot.guilds}
         return self._managers
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        self._managers[guild.id] = EmojiManager(self.bot, guild)
+        await self.managers[guild.id].initialize()
 
     @commands.Cog.listener()
     async def on_ready(self):
