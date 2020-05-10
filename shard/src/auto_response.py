@@ -1,6 +1,7 @@
 import string
 from contextlib import suppress
 from typing import Optional, Tuple
+from random import choice
 
 
 class ResponseMode:
@@ -100,12 +101,31 @@ class AutoResponse:
 
         # fsm = FSM(self.trigger_regex)
         # if any(fsm.intersects(FSM(other.trigger_regex)) for other in guild_responses):
-            # raise TriggerCollisionException
+        # raise TriggerCollisionException
+
+    def resolve_token(self, token):
+        if token[0] == 'list':
+            return self.resolve_token(choice(token[1]))
+        elif token[0] == 'text':
+            return token[1]
+        elif token[0] == 'react':
+            return
+        elif token[0] == 'noun':
+            return
+        elif token[0] == 'adj':
+            return
+        elif token[0] == 'adv':
+            return
+        elif token[0] == 'count':
+            return str(self.count)
 
     async def execute(self, msg):
         match = self.trigger_reggy.fullmatch(msg.content)
         if match is None:
             return False
+
+        for token in self.response_ast:
+            pass
 
     def __repr__(self):
         return f"<{self.trigger}::{self.response}> MODE: '{self.mode}' COUNT: '{self.count}'"
@@ -136,7 +156,7 @@ class GuildAutoResponses:
         if len(response.trigger) < self.settings.responses_trigger_length:
             raise ShortTriggerException
 
-        if not is_disjoint(response):
+        if not self.is_disjoint(response):
             raise TriggerCollisionException
 
     def is_disjoint(self, response: AutoResponse) -> bool:
