@@ -123,7 +123,7 @@ class Api(Cog):
         return {'emojis': [{
             'id': str(e.id),
             'name': e.name,
-            'authorId': str(e.author_id),
+            'authorId': str(e.author_id) if e.author_id is not None else None,
             'loaded': e.loaded,
             'numUses': e.num_uses,
             'discordId': str(e.discord_id),
