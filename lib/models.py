@@ -26,6 +26,12 @@ class Emoji(Base):
         self.priority = priority
         self.img = img
 
+class AutoResponse(Base):
+
+    __tablename__ = 'tb_auto_responses'
+    #trigger = Column(
+
+
 
 class Settings(Base):
     __tablename__ = 'tb_settings'
