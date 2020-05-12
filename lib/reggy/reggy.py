@@ -1,4 +1,4 @@
-import fsm
+from lib.reggy import fsm
 from functools import reduce
 import json
 import re2 as re

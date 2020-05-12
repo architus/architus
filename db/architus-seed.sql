@@ -35,7 +35,7 @@ CREATE TABLE public.tb_auto_responses (
     trigger_regex text NOT NULL,
     trigger_punctuation char[],
     response_ast text,
-    mode text CHECK (mode IN ('regex', 'punctuated', 'naive')),
+    mode varchar(10) CHECK (mode IN ('regex', 'punctuated', 'naive')),
     count int NOT NULL
 );
 
@@ -183,7 +183,7 @@ ALTER TABLE ONLY public.tb_emojis
     ADD CONSTRAINT tb_emojis_pkey PRIMARY KEY (id);
 
 --
--- Name: tb_auto_responses tb_emojis_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: tb_auto_responses tb_auto_responses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.tb_auto_responses

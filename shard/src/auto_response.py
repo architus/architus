@@ -3,6 +3,9 @@ from contextlib import suppress
 from typing import Optional, Tuple
 from random import choice
 
+from lib.reggy.reggy import Reggy
+from lib.response_grammar.response import parse as parse_response
+
 
 class ResponseMode:
 
@@ -35,7 +38,7 @@ class AutoResponse:
         self.count = count
 
         if id is None:
-            self.id = bot.hoar_frost_gen.generate()
+            self.id = bot.hoarfrost_gen.generate()
         else:
             self.id = id
 
@@ -59,9 +62,11 @@ class AutoResponse:
         else:
             self.trigger_regex = trigger_regex
 
+        self.trigger_reggy = Reggy(trigger_regex)
+
     def _parse_response(self):
         """parse the response into its ast"""
-        pass
+        return parse_response(self.response)
 
     def _extract_punctuation(self) -> Tuple[str, ...]:
         return tuple(c for c in self.trigger if c in string.punctuation)
@@ -82,7 +87,7 @@ class AutoResponse:
         pattern = self.trigger
 
         if self.mode == ResponseMode.REGEX:
-            pass
+            pattern = pattern[1:-1]
         elif self.mode == ResponseMode.PUNCTUATED:
             for c in string.punctuation:
                 if c not in self.trigger_punctuation:
@@ -143,6 +148,9 @@ class GuildAutoResponses:
         for r in self.auto_responses:
             if await r.execute(msg):
                 break
+
+    def new(self, trigger, response, guild, author):
+        return AutoResponse(self.bot, trigger, response, guild.id, author.id)
 
     def validate(self, response: AutoResponse) -> None:
         if self.settings.responses_limit is not None:
