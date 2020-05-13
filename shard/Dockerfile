@@ -14,7 +14,7 @@ RUN apt-get -y update
 RUN apt install -y software-properties-common
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get -y update
-RUN apt-get -y install python3.8-dev python3-pip ffmpeg pkg-config
+RUN apt-get -y install python3.8-dev python3-pip ffmpeg pkg-config cron
 RUN apt-get -y install texlive texlive-latex-extra dvipng
 RUN apt-get -y install libxml2-dev libxslt-dev python-libxslt1 libpq-dev libffi-dev
 
@@ -25,6 +25,13 @@ COPY ./shard/requirements.txt /app
 RUN python3.8 -m pip install --trusted-host pypi.python.org -r requirements.txt
 #RUN apk del libpng-dev jpeg-dev libffi-dev libxml2-dev python3-dev libxslt-dev freetype-dev
 
+RUN mkdir -p /etc/cron.d
+RUN touch /var/log/cron.log
+RUN echo "@hourly root python3.8 -m pip install youtube-dl --upgrade > /var/log/cron.log 2>&1\n# Empty line for syntax" >> /etc/cron.d/youtube-dl_update
+RUN chmod 0744 /etc/cron.d/youtube-dl_update
+RUN crontab /etc/cron.d/youtube-dl_update
+RUN cron
+
 ENV PYTHONIOENCODING UTF-8
 
 
@@ -33,4 +40,4 @@ COPY  ./shard/ /app/
 COPY ./lib /app/lib
 
 # Run app.py when the container launches
-CMD ["python3.8", "-u", "bot.py"]
+CMD cron && pyhton3.8 -u bot.py
