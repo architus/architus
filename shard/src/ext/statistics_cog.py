@@ -95,9 +95,28 @@ class MessageStats(commands.Cog, name="Server Statistics"):
     async def on_guild_join(self, guild):
         await self.cache_guild(guild)
 
+    @commands.command(aliases=['exclude'])
+    async def optout(self, ctx):
+        """Prevents Architus from displaying statistics about you
+        run again to reallow collection
+        """
+        settings = self.bot.settings[ctx.guild]
+        excludes = settings.stats_exclude
+        author = ctx.author
+        if author.id in excludes:
+            excludes.remove(author.id)
+            await ctx.send(f"{author.display_name}'s message data is now available")
+        else:
+            excludes.append(author.id)
+            await ctx.send(f"{author.display_name}'s message data is now hidden")
+        settings.stats_exclude = excludes
+
     @commands.command()
     async def spellcheck(self, ctx, victim: discord.Member):
         '''Checks the spelling of a user'''
+        if ctx.author.id in self.bot.settings[ctx.guild].stats_exclude:
+            await ctx.send(f"Sorry, {victim.display_name} has requested that their stats not be recorded :confused:")
+            return
         words = 1
         correct_words = 0
         async with ctx.channel.typing():
@@ -113,6 +132,8 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         word_counts = {}
         message_counts = {}
         for msgdata in self.cache[guild.id]:
+            if msgdata.author.id in self.bot.settings[guild].stats_exclude:
+                continue
             message_counts[msgdata.author] = message_counts.get(msgdata.author, 0) + 1
             word_counts[msgdata.author] = word_counts.get(msgdata.author, 0) + msgdata.total_words
 
@@ -125,7 +146,8 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         for msgdata in self.cache[guild.id]:
             date = msgdata.created_at - ((msgdata.created_at - DISCORD_EPOCH) % time_granularity)
             time_bins[date.isoformat()] += 1
-            member_bins[msgdata.author.id] += 1
+            if msgdata.author.id not in self.bot.settings[guild].stats_exclude:
+                member_bins[msgdata.author.id] += 1
             channel_bins[msgdata.channel_id] += 1
         return member_bins, channel_bins, time_bins
 
@@ -142,8 +164,11 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         em.set_image(url=data['url'])
         em.color = 0x7b8fb7
         if victim:
-            em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
-                victim.display_name, word_counts[victim], message_counts[victim]), icon_url=victim.avatar_url)
+            if victim.id in self.bot.settings[ctx.guild].stats_exclude:
+                em.set_footer(text=f"{victim.display_name} has hidden their stats")
+            else:
+                em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
+                    victim.display_name, word_counts[victim], message_counts[victim]), icon_url=victim.avatar_url)
 
         await ctx.channel.send(embed=em)
 
