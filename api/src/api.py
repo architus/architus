@@ -75,8 +75,8 @@ class GuildCounter(CustomResource):
 
 
 class Logs(CustomResource):
+    @authenticated(member=True)
     def get(self, guild_id: int):
-        # TODO this should probably be authenticated
         rows = self.session.query(Log).filter(Log.guild_id == guild_id).order_by(Log.timestamp.desc()).limit(400).all()
         logs = []
         for log in rows:
@@ -90,8 +90,8 @@ class Logs(CustomResource):
 
 
 class AutoResponses(CustomResource):
-    def get(self, guild_id: int):
-        # TODO this should probably be authenticated
+    @authenticated(member=True)
+    def get(self, guild_id: int, jwt: JWT):
         rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
         commands = []
         authors = {}
@@ -136,6 +136,7 @@ class AutoResponses(CustomResource):
 
 
 class Settings(CustomResource):
+    @authenticated(member=True)
     def get(self, guild_id: int, setting: str = None):
         if setting is None:
             with open('settings.json') as f:
@@ -163,7 +164,8 @@ class Coggers(CustomResource):
 
 
 class Stats(CustomResource):
-    def get(self, guild_id: int):
+    @authenticated(member=True)
+    def get(self, guild_id: int, jwt: JWT):
         '''Request message count statistics from shard and return'''
         msg_data, _ = self.shard.bin_messages(guild_id, routing_guild=guild_id)
         guild_data, _ = self.shard.get_guild_data(guild_id, routing_guild=guild_id)
