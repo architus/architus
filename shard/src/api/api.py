@@ -8,8 +8,10 @@ import discord
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 from lib.status_codes import StatusCodes as sc
+from lib.pool_types import PoolType
 from lib.config import logger
 from src.api.util import fetch_guild
+from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions
 
 
@@ -18,6 +20,7 @@ class Api(Cog):
     def __init__(self, bot):
         self.bot = bot
         self.fake_messages = {}
+        self.pools = Pools(bot)
 
     async def api_entry(self, method_name, *args, **kwargs):
         """Callback method for the rpc server
@@ -166,6 +169,27 @@ class Api(Cog):
             else:
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
         return {'guilds': guild_list}, sc.OK_200
+
+    @fetch_guild
+    async def pool_all_request(self, guild, pool_type: str):
+        if pool_type == PoolType.MEMBER:
+            return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
+        elif pool_type == PoolType.CHANNEL:
+            return {'data': self.pools.get_all_channels()}, 200
+        elif pool_type == PoolType.ROLE:
+            pass
+        elif pool_type == PoolType.USER:
+            return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
+        elif pool_type == PoolType.EMOJI:
+            return {'data': self.pools.get_all_emoji()}, 200
+        elif pool_type == PoolType.GUILD:
+            pass
+        elif pool_type == PoolType.AUTO_RESPONSE:
+            pass
+        elif pool_type == PoolType.SETTING_VALUE:
+            pass
+        else:
+            return {'error': "Unkown Pool"}, sc.BAD_REQUEST_400
 
     async def handle_mock_user_action(
             self,

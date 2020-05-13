@@ -81,3 +81,13 @@ class ArchitusEmoji:
 
     def __repr__(self):
         return f"<:{self.name}:{self.id}>"
+
+    def as_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'author_id': self.author_id,
+            'discord_id': self.discord_id,
+            'num_uses': self.num_uses,
+            'priority': self.priority,
+        }

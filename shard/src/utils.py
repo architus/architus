@@ -42,3 +42,10 @@ def guild_to_dict(guild: discord.Guild) -> dict:
         'premium_subscription_count', 'preferred_locale', 'member_count',
     )
     return {p: getattr(guild, p) for p in parameters}
+
+
+def channel_to_dict(ch: discord.Channel) -> dict:
+    return {
+        'id': ch.id,
+        'name': ch.name,
+    }

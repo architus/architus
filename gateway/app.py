@@ -7,7 +7,7 @@ import socketio
 from aio_pika import IncomingMessage
 from jwt.exceptions import InvalidTokenError
 
-from lib.config import which_shard
+from lib.config import which_shard, logger
 from lib.auth import JWT
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
@@ -71,36 +71,41 @@ async def event_callback(msg: IncomingMessage):
 
 @sio.event
 async def connect(sid: str, environ: dict):
-    print(f"{environ['REMOTE_ADDR']} has connected with sid: {sid}")
+    logger.debug(f"{environ['REMOTE_ADDR']} has connected with sid: {sid}")
     request = environ['aiohttp.request']
     try:
         jwt = JWT(token=request.cookies['token'])
     except (InvalidTokenError, KeyError):
-        print("No valid token found, logging into unprivileged gateway...")
+        logger.info("No valid token found, logging into unprivileged gateway...")
     else:
-        print("Found valid token, logging into elevated gateway...")
+        logger.info("Found valid token, logging into elevated gateway...")
         sio.enter_room(sid, f"{sid}_auth")
         async with sio.session(sid) as session:
             session['token'] = jwt
 
 
 @sio.event
+async def pool_all_request(sid: str, _id: int, pool_type: str, guild_id: str):
+    resp, _ = await shard_client.pool_all_request(guild_id, pool_type, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+
+
+@sio.event
 def disconnect(sid: str):
-    print(f'client ({sid}) disconnected')
+    logger.debug(f'client ({sid}) disconnected')
 
 
 @sio.event
 # @payload_params('nonce')
 async def request_elevation(sid: str, nonce: int):
-    print(f"{sid} requesting elevation...")
+    logger.debug(f"{sid} requesting elevation...")
     try:
         jwt = JWT(token=auth_nonces[nonce])
         del auth_nonces[nonce]
     except (InvalidTokenError, KeyError):
-        print(f"{sid} requested room elevation but didn't provide a valid jwt")
+        logger.info(f"{sid} requested room elevation but didn't provide a valid jwt")
         await sio.emit('elevation_return', {'message': "Missing or invalid jwt"}, room=sid)
     else:
-        print(f"valid nonce provided, granting access...")
+        logger.debug(f"valid nonce provided, granting access...")
         sio.enter_room(sid, f"{sid}_auth")
         await sio.emit('elevation_return', {'message': "success"}, room=sid)
         async with sio.session(sid) as session:
