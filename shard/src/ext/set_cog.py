@@ -2,7 +2,7 @@ from discord.ext import commands
 from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
 from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 from src.user_command import UserLimitException
-from src.config import get_session
+
 import re
 import discord
 
@@ -11,11 +11,7 @@ class SetCog(commands.Cog, name="Auto Responses"):
 
     def __init__(self, bot):
         self.bot = bot
-        self.session = get_session()
-
-    @property
-    def guild_settings(self):
-        return self.bot.get_cog('GuildSettings')
+        self.session = self.bot.session
 
     @commands.command()
     async def remove(self, ctx, trigger):
@@ -40,7 +36,8 @@ class SetCog(commands.Cog, name="Auto Responses"):
         [noun], [adj], [adv], [member], [owl], [:reaction:], [count], [comma,separated,choices]
         '''
         user_commands = self.bot.user_commands
-        settings = self.guild_settings.get_guild(ctx.guild, session=self.session)
+        settings = self.bot.settings[ctx.guild]
+        prefix = settings.command_prefix
         from_admin = ctx.author.id in settings.admins_ids
         if settings.bot_commands_channels and ctx.channel.id not in settings.bot_commands_channels and not from_admin:
             for channelid in settings.bot_commands_channels:
@@ -49,7 +46,7 @@ class SetCog(commands.Cog, name="Auto Responses"):
                     await ctx.channel.send(botcommands.mention + '?')
                     return
 
-        parser = re.search('!set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+        parser = re.search(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
         msg = "try actually reading the syntax"
         if parser:
             try:
@@ -61,16 +58,16 @@ class SetCog(commands.Cog, name="Auto Responses"):
                 msg = str(e)
             except ResponseKeywordException:
                 if parser.group(2).strip() == "remove":
-                    msg = "please use `!remove` instead"
+                    msg = f"please use `{prefix}remove` instead"
                 elif parser.group(2).strip() in ("author", "list"):
-                    msg = f"please check https://aut-bot.com/app/{ctx.guild.id}/responses"
+                    msg = f"please check https://archit.us/app/{ctx.guild.id}/responses"
             except UserLimitException as e:
                 msg = str(e)
             except DuplicatedTriggerException:
-                msg = "That's a dupe idiot"
+                msg = "A response with that triggered already exists."
             else:
                 user_commands[ctx.guild.id].append(command)
-                msg = 'command set'
+                msg = 'Command set.'
 
         await ctx.channel.send(msg)
 

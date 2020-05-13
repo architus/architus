@@ -139,7 +139,6 @@ class EventCog(Cog, name="Events"):
         parsed_time = None
         for i in range(len(args)):
             with suppress(ValueError):
-                # print(" ".join(args))
                 parsed_time = dateutil.parser.parse(' '.join(args))
                 # parsed_time = tz.localize(parsed_time)
                 break
