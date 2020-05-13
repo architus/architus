@@ -74,44 +74,44 @@ class Response:
 
 def tree_string(node, tree=[]):
     if (node.type == NodeType.List):
-        tree.append(["open", "["])
+        tree.append(("open", "["))
         for c in node.children:
             tree = tree_string(c, tree)
-        tree.append(["close", "]"])
+        tree.append(("close", "]"))
         return tree
     elif (node.type == NodeType.ListElement):
         for c in node.children:
             tree = tree_string(c, tree)
         return tree
     elif (node.type == NodeType.PlainText):
-        tree.append(["text", node.text])
+        tree.append(("text", node.text))
         return tree
     elif (node.type == NodeType.React):
-        tree.append(["reaction", node.text])
+        tree.append(("react", node.text))
         return tree
     elif (node.type == NodeType.Noun):
-        tree.append(["noun", node.text])
+        tree.append(("noun", node.text))
         return tree
     elif (node.type == NodeType.Adj):
-        tree.append(["adj", node.text])
+        tree.append(("adj", node.text))
         return tree
     elif (node.type == NodeType.Adv):
-        tree.append(["adv", node.text])
+        tree.append(("adv", node.text))
         return tree
     elif (node.type == NodeType.Count):
-        tree.append(["count", node.text])
+        tree.append(("count", node.text))
         return tree
     elif (node.type == NodeType.Member):
-        tree.append(["member", node.text])
+        tree.append(("member", node.text))
         return tree
     elif (node.type == NodeType.Author):
-        tree.append(["author", node.text])
+        tree.append(("author", node.text))
         return tree
     elif (node.type == NodeType.Capture):
-        tree.append(["capture", node.text])
+        tree.append(("capture", node.text))
         return tree
     elif (node.type == NodeType.Url):
-        tree.append(["url", node.text])
+        tree.append(("url", node.text))
         return tree
     else:
         tree = []
@@ -179,7 +179,7 @@ def parse(string):
                 node = Node()
                 node.type = NodeType.Capture
                 node.parent = curr
-                node.capture = capture
+                node.capture_group = capture
                 node.text = string[i:k]
                 curr.children.append(node)
                 i = k

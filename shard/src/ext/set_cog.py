@@ -1,5 +1,5 @@
 from discord.ext import commands
-from src.auto_response import GuildAutoResponses
+from src.auto_response import GuildAutoResponses, TriggerCollisionException
 from src.utils import bot_commands_only
 from lib.config import logger
 
@@ -42,13 +42,14 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
         match = re.search(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
         if match:
-            resp = self.responses[ctx.guild.id].new(match[1], match[2], ctx.guild, ctx.author)
+            try:
+                resp = self.responses[ctx.guild.id].new(match[1], match[2], ctx.guild, ctx.author)
+                await ctx.send(f"`{resp}`")
+            except TriggerCollisionException as e:
+                await ctx.send(f"Sorry that trigger collides with these other responses: " + '\n'.join([str(r) for r in e.others]))
 
-            await ctx.send(f"`{resp}`")
-            await ctx.send(f"id: `{resp.id}`")
-            await ctx.send(f"regex: `{resp.trigger_regex}`")
-            await ctx.send(f"punc: `{resp.trigger_punctuation}`")
-            await ctx.send(f"tokens: `{resp.response_ast.stringify()}`")
+            # await ctx.send(f"regex: `{resp.trigger_regex}`")
+            # await ctx.send(f"tokens: `{resp.response_ast.stringify()}`")
 
 
 def setup(bot):

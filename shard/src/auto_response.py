@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 from random import choice
 
 from lib.reggy.reggy import Reggy
-from lib.response_grammar.response import parse as parse_response
+from lib.response_grammar.response import parse as parse_response, NodeType
 from lib.config import logger
 
 
@@ -109,30 +109,56 @@ class AutoResponse:
         # if any(fsm.intersects(FSM(other.trigger_regex)) for other in guild_responses):
         # raise TriggerCollisionException
 
-    def resolve_token(self, token):
-        if token[0] == 'list':
-            return self.resolve_token(choice(token[1]))
-        elif token[0] == 'text':
-            return token[1]
-        elif token[0] == 'react':
-            return
-        elif token[0] == 'noun':
-            return
-        elif token[0] == 'adj':
-            return
-        elif token[0] == 'adv':
-            return
-        elif token[0] == 'count':
-            return str(self.count)
+    def resolve_resp(self, node, match, msg, content=None, reacts=None):
+        if (node.type == NodeType.List):
+            logger.debug(len(node.children))
+            self.resolve_resp(choice(node.children), match, msg, content, reacts)
+        elif (node.type == NodeType.ListElement):
+            for c in node.children:
+                self.resolve_resp(c, match, msg, content, reacts)
+        elif (node.type == NodeType.PlainText):
+            content.append(node.text)
+        elif (node.type == NodeType.React):
+            # TODO
+            reacts.append(node.text)
+        elif (node.type == NodeType.Noun):
+            content.append("NOUN")
+        elif (node.type == NodeType.Adj):
+            content.append("ADJ")
+        elif (node.type == NodeType.Adv):
+            content.append("ADV")
+        elif (node.type == NodeType.Count):
+            content.append(str(self.count))
+        elif (node.type == NodeType.Member):
+            content.append("MEMBER")
+        elif (node.type == NodeType.Author):
+            content.append(msg.author.display_name)
+        elif (node.type == NodeType.Capture):
+            with suppress(IndexError):
+                logger.debug(match.groups())
+                logger.debug(node.capture_group)
+                content.append(match.groups()[node.capture_group])
+
+        elif (node.type == NodeType.Url):
+            content.append(node.text)
+        else:
+            content = []
+            reacts = []
+            for c in node.children:
+                self.resolve_resp(c, match, msg, content, reacts)
+            return content, reacts
 
     async def execute(self, msg):
-        # match = self.trigger_reggy.fullmatch(msg.content)
-        match = None
+        match = self.trigger_reggy.matches(msg.content)
         if match is None:
             return False
 
-        for token in self.response_ast:
-            pass
+        self.count += 1
+        content, reacts = self.resolve_resp(self.response_ast, match, msg)
+
+        await msg.channel.send("".join(content))
+        if reacts:
+            await msg.channel.send(reacts)
 
     def __repr__(self):
         return f"<{self.trigger}::{self.response}> MODE: '{self.mode}' COUNT: '{self.count}'"
@@ -147,6 +173,8 @@ class GuildAutoResponses:
         self.auto_responses = []
 
     async def execute(self, msg):
+        if msg.author.bot:
+            return
         for r in self.auto_responses:
             if await r.execute(msg):
                 break
@@ -169,17 +197,18 @@ class GuildAutoResponses:
         if len(response.trigger) < self.settings.responses_trigger_length:
             raise ShortTriggerException
 
-        if not self.is_disjoint(response):
-            raise TriggerCollisionException
+        others = self.is_disjoint(response)
+        if others:
+            raise TriggerCollisionException(others)
 
     def is_disjoint(self, response: AutoResponse) -> bool:
         # all(r.trigger_reggy.isdisjoint(response.trigger_reggy) for r in self.auto_responses)
+        others = []
         for r in self.auto_responses:
-            logger.debug(f"checking {r.trigger_reggy} against {response.trigger_reggy} {r.trigger_reggy.isdisjoint(response.trigger_reggy)}")
             if not r.trigger_reggy.isdisjoint(response.trigger_reggy):
+                others.append(r)
                 logger.debug(f"{response} collides with {r}")
-                return False
-        return True
+        return others
 
 
 class AutoResponseException(Exception):
@@ -199,4 +228,5 @@ class UserLimitException(AutoResponseException):
 
 
 class TriggerCollisionException(AutoResponseException):
-    pass
+    def __init__(self, others):
+        self.others = others
