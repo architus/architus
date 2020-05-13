@@ -17,6 +17,10 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         self.responses = {g.id: GuildAutoResponses(self.bot, g) for g in self.bot.guilds}
 
     @commands.Cog.listener()
+    async def on_message(self, msg):
+        await self.responses[msg.guild.id].execute(msg)
+
+    @commands.Cog.listener()
     async def on_guild_join(self, guild):
         self.responses[guild.id] = GuildAutoResponses(self.bot, guild)
 

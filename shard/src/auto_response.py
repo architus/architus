@@ -5,6 +5,7 @@ from random import choice
 
 from lib.reggy.reggy import Reggy
 from lib.response_grammar.response import parse as parse_response
+from lib.config import logger
 
 
 class ResponseMode:
@@ -62,7 +63,7 @@ class AutoResponse:
         else:
             self.trigger_regex = trigger_regex
 
-        self.trigger_reggy = Reggy(trigger_regex)
+        self.trigger_reggy = Reggy(self.trigger_regex)
 
     def _parse_response(self):
         """parse the response into its ast"""
@@ -125,7 +126,8 @@ class AutoResponse:
             return str(self.count)
 
     async def execute(self, msg):
-        match = self.trigger_reggy.fullmatch(msg.content)
+        # match = self.trigger_reggy.fullmatch(msg.content)
+        match = None
         if match is None:
             return False
 
@@ -150,7 +152,10 @@ class GuildAutoResponses:
                 break
 
     def new(self, trigger, response, guild, author):
-        return AutoResponse(self.bot, trigger, response, guild.id, author.id)
+        r = AutoResponse(self.bot, trigger, response, guild.id, author.id)
+        self.validate(r)
+        self.auto_responses.append(r)
+        return r
 
     def validate(self, response: AutoResponse) -> None:
         if self.settings.responses_limit is not None:
@@ -168,7 +173,13 @@ class GuildAutoResponses:
             raise TriggerCollisionException
 
     def is_disjoint(self, response: AutoResponse) -> bool:
-        all(r.trigger_reggy.isdisjoint(response.trigger_reggy) for r in self.auto_responses)
+        # all(r.trigger_reggy.isdisjoint(response.trigger_reggy) for r in self.auto_responses)
+        for r in self.auto_responses:
+            logger.debug(f"checking {r.trigger_reggy} against {response.trigger_reggy} {r.trigger_reggy.isdisjoint(response.trigger_reggy)}")
+            if not r.trigger_reggy.isdisjoint(response.trigger_reggy):
+                logger.debug(f"{response} collides with {r}")
+                return False
+        return True
 
 
 class AutoResponseException(Exception):

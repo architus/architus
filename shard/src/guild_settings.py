@@ -84,6 +84,24 @@ class Setting:
         self._update_db()
 
     @property
+    def responses_trigger_length(self) -> int:
+        return self._settings_dict.get('responses_trigger_length', 3)
+
+    @responses_trigger_length.setter
+    def responses_trigger_length(self, new_length: int) -> None:
+        self._settings_dict['responses_trigger_length'] = new_length
+        self._update_db()
+
+    @property
+    def responses_response_length(self) -> int:
+        return self._settings_dict.get('responses_response_length', 200)
+
+    @responses_response_length.setter
+    def responses_response_length(self, new_length: int) -> None:
+        self._settings_dict['responses_response_length'] = new_length
+        self._update_db()
+
+    @property
     def starboard_threshold(self) -> int:
         return self._settings_dict['starboard_threshold'] if 'starboard_threshold' in self._settings_dict else 5
 
