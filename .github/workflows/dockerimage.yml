@@ -1,0 +1,33 @@
+#name: Build
+#
+#on:
+#  push:
+#    branches:
+#      - master
+#      - develop
+#  pull_request:
+#    branches:
+#      - master
+#      - develop
+#
+#jobs:
+#
+#  build:
+#
+#    runs-on: ubuntu-latest
+#    env:
+#      NUM_SHARDS: 2
+#
+#    steps:
+#    - uses: actions/checkout@v1
+#    - name: Environment garbage
+#      run: mv example.env architus.env
+#
+#    - name: Build the Docker images
+#      run: TAG="${GITHUB_REF##*/}" docker-compose build
+#
+#    - name: Login to Docker
+#      run: echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+#
+#    - name: Push the images
+#      run: TAG="${GITHUB_REF##*/}" docker-compose push

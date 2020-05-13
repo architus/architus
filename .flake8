@@ -1,10 +1,8 @@
 [flake8]
 max_line_length = 120
-ignore = W606,W503
+ignore = W606,W503,F541,E741
 exclude =
-    bot.py
-    ./src/ext/settings_cog.py
-    ./src/ext/say_command.py
-    ./src/spotify_tools.py
-    ./src/generate/*
+    ./gateway/client.py
+    ./shard/src/generate/*
+    ./lib/response_grammar/*
     .venv/*
