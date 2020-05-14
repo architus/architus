@@ -20,10 +20,10 @@ def flask_authenticated(member=False):
                 jwt = JWT(token=request.cookies.get('token'))
                 # TODO check token expiration
             except pyjwt.exceptions.InvalidTokenError:
-                return (StatusCodes.UNAUTHORIZED_401, "Not Authorized")
+                return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
             if member and not self.shard.is_member(jwt.id, kwargs['guild_id'], routing_guild=kwargs['guild_id']):
-                return (StatusCodes.UNAUTHORIZED_401, "Not a member")
-            return func(self, *args, jwt=jwt, **kwargs)
+                return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
+            return func(self, *args, **kwargs, jwt=jwt)
         return wrapper
     return decorator
 

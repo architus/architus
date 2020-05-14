@@ -118,17 +118,17 @@ class AutoResponses(CustomResource):
         return resp, StatusCodes.OK_200
 
     @reqparams(trigger=str, response=str)
-    @authenticated
+    @authenticated()
     def post(self, guild_id: int, trigger: str, response: str, jwt: JWT):
         return self.shard.set_response(jwt.id, guild_id, trigger, response, routing_guild=guild_id)
 
     @reqparams(trigger=str)
-    @authenticated
+    @authenticated()
     def delete(self, guild_id: int, trigger: str, jwt: JWT):
         return self.shard.delete_response(jwt.id, guild_id, trigger, routing_guild=guild_id)
 
     @reqparams(trigger=str, response=str)
-    @authenticated
+    @authenticated()
     def patch(self, guild_id: int, trigger: str, response: str, jwt: JWT):
         _, sc = self.shard.delete_response(jwt.id, guild_id, trigger, routing_guild=guild_id)
 
@@ -137,7 +137,7 @@ class AutoResponses(CustomResource):
 
 class Settings(CustomResource):
     @authenticated(member=True)
-    def get(self, guild_id: int, setting: str = None):
+    def get(self, guild_id: int, setting: str = None, jwt: JWT = None):
         if setting is None:
             with open('settings.json') as f:
                 return json.loads(f.read()), 200
@@ -150,13 +150,13 @@ class Settings(CustomResource):
 
 class Coggers(CustomResource):
     '''provide an endpoint to reload cogs in the bot'''
-    @authenticated
-    def get(self, jwt: JWT = None, extension: str = None):
+    @authenticated()
+    def get(self, extension: str = None, jwt: JWT = None):
         if jwt.id == 214037134477230080:  # johnyburd
             return self.shard.get_extensions()
         return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
-    @authenticated
+    @authenticated()
     def post(self, extension: str, jwt: JWT):
         if jwt.id == 214037134477230080:  # johnyburd
             return self.shard.reload_extension(extension)
@@ -183,7 +183,7 @@ class Stats(CustomResource):
 
 
 class ListGuilds(CustomResource):
-    @authenticated
+    @authenticated()
     def get(self, jwt: JWT):
         '''Forward guild list request to discord and return response'''
         resp, status_code = list_guilds_request(jwt)
