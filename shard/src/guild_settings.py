@@ -149,6 +149,15 @@ class Setting:
         self._update_db()
 
     @property
+    def stats_exclude(self) -> List[int]:
+        return list(set(self._settings_dict.get('stats_exclude', [])))
+
+    @stats_exclude.setter
+    def stats_exclude(self, new_excludes: List[int]) -> None:
+        self._settings_dict['stats_exclude'] = new_excludes
+        self._update_db()
+
+    @property
     def admin_ids(self) -> List[int]:
         '''stupid alias'''
         return self.admins_ids
