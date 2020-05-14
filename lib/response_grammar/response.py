@@ -132,7 +132,7 @@ def parse_react(string, i=0):
     if m is not None:
         groups = m.groups()
         return (end + 1, False, groups[0], int(groups[1]))
-    m = shortcode_id.fullmatch(string[i:end+1])
+    m = animated.fullmatch(string[i:end+1])
     if m is not None:
         groups = m.groups()
         return (end + 1, False, groups[0], int(groups[1]))
@@ -153,10 +153,12 @@ def parse_capture(string, i=0):
 def parse(string):
     base = Response()
     curr = base
+    root_ctx = True
     i = 0
     while i < len(string):
         if curr == None:
             raise ParseError
+        root_ctx = True if curr == base else False
         if string[i] == ']':
             curr = curr.parent
             curr = curr.parent
@@ -245,7 +247,7 @@ def parse(string):
                 curr = node
                 i += 1
             continue
-        elif string[i] == ",":
+        elif string[i] == "," and not root_ctx:
             curr = curr.parent
             node = Node()
             node.parent = curr
