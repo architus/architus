@@ -1,5 +1,6 @@
 from discord.ext import commands
-from src.auto_response import GuildAutoResponses, TriggerCollisionException
+from src.auto_response import GuildAutoResponses, TriggerCollisionException, LongResponseException,\
+    ShortTriggerException, UserLimitException, UnknownResponseException
 from src.utils import bot_commands_only
 from lib.config import logger
 
@@ -27,7 +28,20 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     @commands.command()
     @bot_commands_only
     async def remove(self, ctx, trigger):
-        pass
+        settings = self.bot.settings[ctx.guild]
+        prefix = settings.command_prefix
+
+        match = re.search(f'{prefix}remove (.+)', ctx.message.content, re.IGNORECASE)
+        if match:
+            try:
+                logger.debug(match[1])
+                resp = self.responses[ctx.guild.id].remove(match[1])
+            except UnknownResponseException:
+                pass
+            else:
+                await ctx.send(f"removed `{resp}`")
+                return
+        await ctx.send("idk what response you want me to remove")
 
     @commands.command()
     @bot_commands_only
@@ -44,9 +58,19 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         if match:
             try:
                 resp = self.responses[ctx.guild.id].new(match[1], match[2], ctx.guild, ctx.author)
-                await ctx.send(f"`{resp}`")
             except TriggerCollisionException as e:
-                await ctx.send(f"Sorry that trigger collides with these other responses: " + '\n'.join([str(r) for r in e.others]))
+                await ctx.send(f"sorry that trigger collides with these other responses: " + '\n'.join([str(r) for r in e.conflicts]))
+            except LongResponseException:
+                await ctx.send(f"that response is too long :confused:")
+            except ShortTriggerException:
+                await ctx.send(f"please make your trigger longer")
+            except UserLimitException:
+                await ctx.send(f"looks like you've already used all your auto responses in this server, try deleting some")
+            else:
+                await ctx.send(f"autoresponse: `{resp}` succesfully set")
+                logger.debug("`{resp.response_ast.stringify()}`")
+        else:
+            await ctx.send("use the syntax: `trigger::response`")
 
             # await ctx.send(f"regex: `{resp.trigger_regex}`")
             # await ctx.send(f"tokens: `{resp.response_ast.stringify()}`")
