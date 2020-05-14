@@ -11,7 +11,7 @@ def flask_authenticated(member=False):
     and prepends a JWT object to the kwargs for id data
 
     if member is True, checks if the logged in user is a member of the guild
-    passed in the first argument
+    passed in the via kwargs['guild_id']
     """
     def decorator(func):
         @wraps(func)
@@ -21,7 +21,7 @@ def flask_authenticated(member=False):
                 # TODO check token expiration
             except pyjwt.exceptions.InvalidTokenError:
                 return (StatusCodes.UNAUTHORIZED_401, "Not Authorized")
-            if member and not self.shard.is_member(jwt.id, args[0], routing_guild=args[0]):
+            if member and not self.shard.is_member(jwt.id, kwargs['guild_id'], routing_guild=kwargs['guild_id']):
                 return (StatusCodes.UNAUTHORIZED_401, "Not a member")
             return func(self, *args, jwt=jwt, **kwargs)
         return wrapper
