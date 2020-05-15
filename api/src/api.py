@@ -98,16 +98,16 @@ class AutoResponses(CustomResource):
                 'id': str(r.id),
                 'trigger': r.trigger,
                 'response': r.response,
-                'author_id': str(r.author_id),
-                'guild_id': str(r.guild_id),
-                'trigger_regex': r.trigger_regex,
-                'trigger_punctuation': r.trigger_punctuation,
-                'response_ast': r.response_ast,
+                'authorId': str(r.author_id),
+                'guildId': str(r.guild_id),
+                'triggerRegex': r.trigger_regex,
+                'triggerPunctuation': r.trigger_punctuation,
+                'responseAst': r.response_ast,
                 'count': r.count,
             })
 
         resp = {
-            'auto_responses': responses
+            'autoResponses': responses
         }
         return resp, StatusCodes.OK_200
 
