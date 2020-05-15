@@ -75,6 +75,15 @@ class Setting:
         self._update_db()
 
     @property
+    def responses_whois_emoji(self) -> str:
+        return self._settings_dict.get('responses_whois_emoji', '💬')
+
+    @responses_whois_emoji.setter
+    def responses_whois_emoji(self, new_emoji: str) -> None:
+        self._settings_dict['responses_whois_emoji'] = new_emoji
+        self._update_db()
+
+    @property
     def responses_limit(self) -> int:
         return self._settings_dict['responses_limit'] if 'responses_limit' in self._settings_dict else None
 

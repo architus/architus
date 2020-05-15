@@ -1,5 +1,4 @@
 import json
-import re
 
 from flask import Flask, redirect, request, g
 from flask_restful import Api, Resource
@@ -7,7 +6,7 @@ from flask_cors import CORS
 
 from lib.status_codes import StatusCodes
 from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI
-from lib.models import Command, Log
+from lib.models import AutoResponse as AutoResponseModel, Log
 from lib.auth import JWT, flask_authenticated as authenticated
 
 from src.discord_requests import list_guilds_request
@@ -92,28 +91,23 @@ class Logs(CustomResource):
 class AutoResponses(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int, jwt: JWT):
-        rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
-        commands = []
-        authors = {}
-        emojis = {}
-        p = re.compile(r"<:\S+:(?P<emoji_id>\d{15,30})\>")
-        for cmd in rows:
-            commands.append({
-                'trigger': cmd.trigger.replace(str(cmd.server_id), "", 1),
-                'response': cmd.response,
-                'count': cmd.count,
-                'author_id': str(cmd.author_id)
+        rows = self.session.query(AutoResponseModel).filter_by(guild_id=guild_id).all()
+        responses = []
+        for r in rows:
+            responses.append({
+                'id': str(r.id),
+                'trigger': r.trigger,
+                'response': r.response,
+                'author_id': str(r.author_id),
+                'guild_id': str(r.guild_id),
+                'trigger_regex': r.trigger_regex,
+                'trigger_punctuation': r.trigger_punctuation,
+                'response_ast': r.response_ast,
+                'count': r.count,
             })
-            match = p.search(cmd.response)
-            if match and str(match.group("emoji_id")) not in emojis:
-                emojis[str(match.group("emoji_id"))], sc = self.shard.get_emoji(match.group('emoji_id'))
-            if str(cmd.author_id) not in authors:
-                authors[str(cmd.author_id)], sc = self.shard.fetch_user_dict(cmd.author_id)
 
         resp = {
-            'authors': authors,
-            'emojis': emojis,
-            'commands': commands
+            'auto_responses': responses
         }
         return resp, StatusCodes.OK_200
 

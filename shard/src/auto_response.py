@@ -4,6 +4,8 @@ from typing import Optional, Tuple
 from random import choice
 import json
 
+from discord import Message
+
 from src.emoji_manager import EmojiManager
 from lib.reggy.reggy import Reggy
 from lib.response_grammar.response import parse as parse_response, NodeType
@@ -93,6 +95,7 @@ class AutoResponse:
             self.trigger_regex = trigger_regex
 
         self.trigger_reggy = Reggy(self.trigger_regex)
+        self.not_trigger_punctuation = "".join([c for c in string.punctuation if c not in self.trigger_punctuation])
 
     def _parse_response(self):
         """parse the response into its ast"""
@@ -114,7 +117,7 @@ class AutoResponse:
 
     def _generate_trigger_regex(self) -> str:
         special_chars = ['\\', '.', '*', '+', '?', '[', ']', '(', ')', '|']
-        pattern = self.trigger
+        pattern = self.trigger.lower()
 
         if self.mode == ResponseMode.REGEX:
             pattern = pattern[1:-1]
@@ -180,19 +183,26 @@ class AutoResponse:
                 self.resolve_resp(c, match, msg, content, reacts)
             return content, reacts
 
-    async def execute(self, msg):
-        match = self.trigger_reggy.matches(msg.content)
+    async def execute(self, msg: Message) -> Optional[Message]:
+        content = msg.content.lower()
+
+        if self.mode == ResponseMode.REGEX:
+            pass
+        else:
+            content = content.translate(str.maketrans('', '', self.not_trigger_punctuation))
+
+        match = self.trigger_reggy.matches(content)
         if match is None:
-            return False
+            return
 
         self.count += 1
         content, reacts = self.resolve_resp(self.response_ast, match, msg)
 
-        await msg.channel.send("".join(content))
+        resp_msg = await msg.channel.send("".join(content))
         for emoji in reacts:
             await msg.add_reaction(emoji)
 
-        return True
+        return resp_msg
 
     def __repr__(self):
         return f"{self.trigger}::{self.response}"
@@ -215,9 +225,7 @@ class GuildAutoResponses:
         return self.bot.aiosession
 
     def _init_from_db(self) -> None:
-        logger.debug(self.guild.id)
         responses = self.session.query(AutoResponseModel).filter_by(guild_id=self.guild.id).all()
-        logger.debug(responses)
         self.auto_responses = [AutoResponse(
             self.bot,
             r.trigger,
@@ -261,13 +269,15 @@ class GuildAutoResponses:
     async def _update_resp_db(self, resp: AutoResponse) -> None:
         await self.tb_auto_responses.update_by_id({'count': resp.count}, resp.id)
 
-    async def execute(self, msg):
+    async def execute(self, msg) -> Tuple[Optional[Message], Optional[AutoResponse]]:
         if msg.author.bot:
-            return
+            return None, None
         for r in self.auto_responses:
-            if await r.execute(msg):
+            resp_msg = await r.execute(msg)
+            if resp_msg is not None:
                 await self._update_resp_db(r)
-                break
+                return resp_msg, r
+        return None, None
 
     def new(self, trigger, response, guild, author):
         manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
@@ -288,8 +298,6 @@ class GuildAutoResponses:
 
     def remove(self, trigger: str) -> AutoResponse:
         for r in self.auto_responses:
-            logger.debug(f"`{r.trigger}` == `{trigger}`")
-            logger.debug(f"`{r.trigger == trigger}`")
             if r.trigger == trigger:
                 self.auto_responses.remove(r)
                 self._delete_from_db(r)

@@ -77,7 +77,7 @@ class shardRPC:
         """
         assert routing_key is not None
         while True:
-            now = time.time()
+            # now = time.time()
             with self.hb_lock:
                 logger.debug(f'calling {method} on queue: {routing_key}')
                 self.resp = None
@@ -90,8 +90,8 @@ class shardRPC:
                         correlation_id=self.corr_id,
                     ),
                     body=json.dumps({'method': method, 'args': args, 'kwargs': kwargs}))
-                while self.resp is None and retry_in != -1 and now - time.time() < retry_in:
-                    self.connection.process_data_events(time_limit=0)
+                #while self.resp is None: # and retry_in != -1 or now - time.time() < retry_in:
+                self.connection.process_data_events(time_limit=retry_in)
                 if self.resp is None:
                     continue
                 return self.resp, self.status_code
