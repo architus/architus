@@ -67,7 +67,7 @@ class shardRPC:
     def __getattr__(self, name: str):
         return partial(self.call, name)
 
-    def call(self, method: str, *args, routing_key: str = None, retry_in: int = -1, **kwargs):
+    def call(self, method: str, *args, routing_key: str = None, retry_in: int = None, **kwargs):
         """Remotely call a method
 
         :param method: name of method to call

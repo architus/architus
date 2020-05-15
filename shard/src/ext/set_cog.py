@@ -73,7 +73,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             try:
                 resp = self.responses[ctx.guild.id].new(match[1], match[2], ctx.guild, ctx.author)
             except TriggerCollisionException as e:
-                msg = "❌ sorry that trigger collides with the following auto responses: \n"
+                msg = "❌ sorry that trigger collides with the following auto responses:\n"
                 msg += '\n'.join([f"`{r}`" for r in e.conflicts[:4]])
                 if len(e.conflicts) > 4:
                     msg += f"\n_...{len(e.conflicts) - 4} more not shown_"

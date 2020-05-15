@@ -197,6 +197,7 @@ class AutoResponse:
 
         self.count += 1
         content, reacts = self.resolve_resp(self.response_ast, match, msg)
+        content = content.replace("@everyone", "\\@everyone").replace("@here", "\\@here")
 
         resp_msg = await msg.channel.send("".join(content))
         for emoji in reacts:
