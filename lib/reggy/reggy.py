@@ -95,8 +95,8 @@ class Bound:
 
     def __eq__(self, other):
         if isinstance(other, Bound):
-            return (self.bound == other.bound and
-                    self.infinite == other.infinite)
+            return (self.bound == other.bound
+                    and self.infinite == other.infinite)
         else:
             return False
 
@@ -177,8 +177,8 @@ class Multiplier:
     def __eq__(self, other):
         if not isinstance(other, Multiplier):
             return False
-        return (self.minimum == other.minimum and
-                self.maximum == other.maximum)
+        return (self.minimum == other.minimum
+                and self.maximum == other.maximum)
 
     def __hash__(self):
         return hash((self.minimum, self.maximum))
@@ -248,8 +248,8 @@ class Multiplier:
         """
         Range multiplication is wacky.
         """
-        return (other.optional == Bound(0) or
-                self.optional * other.mandatory + Bound(1) >= self.mandatory)
+        return (other.optional == Bound(0)
+                or self.optional * other.mandatory + Bound(1) >= self.mandatory)
 
     def __mul__(self, other):
         if not self.canmultiply(other):
@@ -270,8 +270,8 @@ class Multiplier:
         return Multiplier(mandatory, mandatory + optional)
 
     def canintersect(self, other):
-        return not (self.maximum < other.minimum or
-                    other.maximum < self.minimum)
+        return not (self.maximum < other.minimum
+                    or other.maximum < self.minimum)
 
     def __and__(self, other):
         if not self.canintersect(other):
@@ -281,8 +281,8 @@ class Multiplier:
         return Multiplier(a, b)
 
     def canunion(self, other):
-        return not (self.maximum + one < other.minimum or
-                    other.maximum + one < self.minimum)
+        return not (self.maximum + one < other.minimum
+                    or other.maximum + one < self.minimum)
 
     def __or__(self, other):
         if not self.canunion(other):
@@ -398,8 +398,8 @@ class Mult(ABCReggy):
     def __eq__(self, other):
         if not isinstance(other, Mult):
             return False
-        return (self.multiplicand == other.multiplicand and
-                other.multiplier == other.multiplier)
+        return (self.multiplicand == other.multiplicand
+                and other.multiplier == other.multiplier)
 
     def __hash__(self):
         return hash((self.multiplicand, self.multiplier))
@@ -441,8 +441,8 @@ class Mult(ABCReggy):
             other = Mult(other, one)
 
         if isinstance(other, Mult):
-            if (self.multiplicand == other.multiplicand and
-                    self.canintersect(other)):
+            if (self.multiplicand == other.multiplicand
+                    and self.canintersect(other)):
                 return Mult(self.multiplicand,
                             self.multiplier & other.multiplier)
 
@@ -550,7 +550,7 @@ class CharacterClass(ABCReggy):
         char_range = set()
         for char in self.chars:
             if char in CharacterClass.special1:
-                char_range.add("\\"+char)
+                char_range.add("\\" + char)
             elif char in escapes.keys():
                 char_range.add(escapes[char])
             else:

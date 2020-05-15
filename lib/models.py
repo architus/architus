@@ -28,6 +28,7 @@ class Emoji(Base):
         self.priority = priority
         self.img = img
 
+
 class AutoResponse(Base):
 
     __tablename__ = 'tb_auto_responses'
@@ -42,7 +43,8 @@ class AutoResponse(Base):
     mode = Column('mode', VARCHAR(10))
     count = Column('count', Integer)
 
-    def __init__(self, id, trigger, response, author_id, guild_id, trigger_regex, trigger_punctuation, response_ast, mode, count):
+    def __init__(self, id, trigger, response, author_id, guild_id,
+                 trigger_regex, trigger_punctuation, response_ast, mode, count):
         self.id = id
         self.trigger = trigger
         self.response = response

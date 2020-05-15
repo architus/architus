@@ -58,12 +58,14 @@ def get_session():
     Session = sessionmaker(bind=engine)
     return Session()
 
+
 class AsyncConnWrapper:
     def __init__(self):
         self.conn = None
 
     async def connect(self):
         self.conn = await asyncpg.connect(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
+
 
 def which_shard(guild_id=None):
     return randint(0, NUM_SHARDS - 1) if guild_id is None else (int(guild_id) >> 22) % NUM_SHARDS

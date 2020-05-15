@@ -75,8 +75,8 @@ class FSM:
             if unspecified in self.alphabet and symbol not in self.alphabet:
                 symbol = unspecified
 
-            if not (curr_state in self.transition and
-                    symbol in self.transition[curr_state]):
+            if not (curr_state in self.transition
+                    and symbol in self.transition[curr_state]):
                 return False
 
             curr_state = self.transition[curr_state][symbol]
@@ -130,8 +130,8 @@ class FSM:
             else:
                 row.append("False")
             for symbol in self.alphabet:
-                if (state in self.transition and
-                        symbol in self.transition[state]):
+                if (state in self.transition
+                        and symbol in self.transition[state]):
                     row.append(str(self.transition[state][symbol]))
                 else:
                     row.append("")
@@ -217,8 +217,8 @@ class FSM:
                 if self.valid_transition(substate, symbol):
                     next_states.add(self.transition[substate][symbol])
 
-                if (substate in self.accepting and
-                        symbol in self.transition[self.initial]):
+                if (substate in self.accepting
+                        and symbol in self.transition[self.initial]):
                     next_states.add(self.transition[self.initial][symbol])
 
             if len(next_states) == 0:
@@ -251,17 +251,17 @@ class FSM:
 
         def accepts(state):
             for (substate, iteration) in state:
-                if ((substate == self.initial) and
-                        (self.initial in self.accepting or
-                         iteration == multiplier)):
+                if ((substate == self.initial)
+                        and (self.initial in self.accepting
+                             or iteration == multiplier)):
                     return True
             return False
 
         def follow(current, symbol):
             next_states = set()
             for (substate, iteration) in current:
-                if (iteration < multiplier and
-                        self.valid_transition(substate, symbol)):
+                if (iteration < multiplier
+                        and self.valid_transition(substate, symbol)):
                     next_states.add((self.transition[substate][symbol],
                                      iteration))
                     if (self.transition[substate][symbol] in self.accepting):
@@ -305,8 +305,8 @@ class FSM:
 
         def follow(current, symbol):
             next_states = dict()
-            if (0 in current and current[0] in self.transition and
-                    symbol in self.transition[current[0]]):
+            if (0 in current and current[0] in self.transition
+                    and symbol in self.transition[current[0]]):
                 next_states[0] = self.transition[current[0]][symbol]
             return next_states
 
@@ -324,8 +324,8 @@ class FSM:
                 prev
                 for prev in self.transition
                 for state in current
-                if symbol in self.transition[prev] and
-                self.transition[prev][symbol] == state
+                if symbol in self.transition[prev]
+                and self.transition[prev][symbol] == state
             ])
             if len(next_states) == 0:
                 raise OblivionError
@@ -490,8 +490,8 @@ def parallel(fsms, test):
                 actual_symbol = unspecified
             else:
                 actual_symbol = symbol
-            if (i in current and current[i] in f.transition and
-                    actual_symbol in f.transition[current[i]]):
+            if (i in current and current[i] in f.transition
+                    and actual_symbol in f.transition[current[i]]):
                 next_states[i] = f.transition[current[i]][actual_symbol]
         if not next_states:
             raise OblivionError
