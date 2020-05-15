@@ -9,6 +9,7 @@ from lib.reggy.reggy import Reggy
 from lib.response_grammar.response import parse as parse_response, NodeType
 from lib.config import logger
 from lib.models import AutoResponse as AutoResponseModel
+from lib.aiomodels import TbAutoResponses
 
 
 class WordGen:
@@ -203,10 +204,15 @@ class GuildAutoResponses:
         self.guild = guild
         self.bot = bot
         self.session = bot.session
+        self.tb_auto_responses = TbAutoResponses(self.bot.asyncpg_wrapper)
         self.settings = self.bot.settings[guild]
         self.auto_responses = []
         self.word_gen = WordGen()
         self._init_from_db()
+
+    @property
+    def aiosession(self):
+        return self.bot.aiosession
 
     def _init_from_db(self) -> None:
         logger.debug(self.guild.id)
@@ -252,30 +258,15 @@ class GuildAutoResponses:
     def _delete_from_db(self, resp: AutoResponse) -> None:
         self.session.query(AutoResponseModel).filter_by(id=resp.id).delete()
 
-    def _update_resp_db(self, resp: AutoResponse) -> None:
-        cols = {
-            'trigger': resp.trigger,
-            'response': resp.response,
-            'trigger_regex': resp.trigger_regex,
-            'trigger_punctuation': resp.trigger_punctuation,
-            'response_ast': json.dumps(resp.response_ast.stringify()),
-            'mode': resp.mode,
-            'count': resp.count,
-        }
-        try:
-            self.session.query(AutoResponseModel).filter_by(id=resp.id).update(cols)
-        except Exception:
-            self.session.rollback()
-            raise
-        else:
-            self.session.commit()
+    async def _update_resp_db(self, resp: AutoResponse) -> None:
+        await self.tb_auto_responses.update_by_id({'count': resp.count}, resp.id)
 
     async def execute(self, msg):
         if msg.author.bot:
             return
         for r in self.auto_responses:
             if await r.execute(msg):
-                self._update_resp_db(r)
+                await self._update_resp_db(r)
                 break
 
     def new(self, trigger, response, guild, author):

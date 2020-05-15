@@ -6,7 +6,7 @@ import discord
 
 from src.user_command import UserCommand
 from src.utils import guild_to_dict
-from lib.config import get_session, secret_token, logger
+from lib.config import get_session, secret_token, logger, AsyncConnWrapper
 from lib.models import Command
 from lib.ipc import async_rpc_server, async_rpc_client, blocking_rpc_client
 from lib.ipc.async_emitter import Emitter
@@ -18,17 +18,14 @@ class Architus(Bot):
     def __init__(self, **kwargs):
         self.user_commands = {}
         self.session = get_session()
+        self.asyncpg_wrapper = AsyncConnWrapper()
         self.deletable_messages = []
 
         self.hoarfrost_gen = HoarFrostGenerator()
 
+        logger.debug("registering with manager...")
         manager_client = blocking_rpc_client.shardRPC()
-        # wait for manager to come up; this is scuffed
-        import time
-        time.sleep(2)
-        logger.debug("asking for shard id")
-
-        shard_info, sc = manager_client.register(routing_key='manager_rpc')
+        shard_info, _ = manager_client.register(routing_key='manager_rpc', retry_in=1)
         self.shard_id = shard_info['shard_id']
         logger.info(f"Got shard_id {self.shard_id}")
 
@@ -71,7 +68,8 @@ class Architus(Bot):
 
     async def on_ready(self):
         """pull autoresponses from the db, then set activity"""
-        await self.initialize_user_commands()
+        self.initialize_user_commands()
+        await self.asyncpg_wrapper.connect()
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
             name=f"the tragedy of darth plagueis the wise {self.shard_id}", type=2))
@@ -82,7 +80,7 @@ class Architus(Bot):
         self.user_commands.setdefault(guild.id, [])
         await self.manager_client.guild_update(self.shard_id, self.guilds_as_dicts)
 
-    async def initialize_user_commands(self):
+    def initialize_user_commands(self):
         command_list = self.session.query(Command).all()
         for guild in self.guilds:
             self.user_commands.setdefault(int(guild.id), [])
