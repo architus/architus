@@ -9,7 +9,6 @@ def flask_authenticated(member=False):
     """decorator for rest endpoint functions
     returns 401 if user is not logged in
     and prepends a JWT object to the kwargs for id data
-
     if member is True, checks if the logged in user is a member of the guild
     passed in the via kwargs['guild_id']
     """
@@ -29,7 +28,6 @@ def flask_authenticated(member=False):
 
         return wrapper
     return decorator
-
 
 class JWT:
     def __init__(self, data=None, token=None):
