@@ -14,7 +14,7 @@ class ParseError(Exception):
 
 
 class NodeType(Enum):
-    Root, = auto(),
+    Root = auto(),
     List = auto(),
     ListElement = auto(),
     PlainText = auto(),
