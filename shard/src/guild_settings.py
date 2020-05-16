@@ -75,12 +75,39 @@ class Setting:
         self._update_db()
 
     @property
+    def responses_whois_emoji(self) -> str:
+        return self._settings_dict.get('responses_whois_emoji', '💬')
+
+    @responses_whois_emoji.setter
+    def responses_whois_emoji(self, new_emoji: str) -> None:
+        self._settings_dict['responses_whois_emoji'] = new_emoji
+        self._update_db()
+
+    @property
     def responses_limit(self) -> int:
         return self._settings_dict['responses_limit'] if 'responses_limit' in self._settings_dict else None
 
     @responses_limit.setter
     def responses_limit(self, new_threshold: int):
         self._settings_dict['responses_limit'] = new_threshold
+        self._update_db()
+
+    @property
+    def responses_trigger_length(self) -> int:
+        return self._settings_dict.get('responses_trigger_length', 3)
+
+    @responses_trigger_length.setter
+    def responses_trigger_length(self, new_length: int) -> None:
+        self._settings_dict['responses_trigger_length'] = new_length
+        self._update_db()
+
+    @property
+    def responses_response_length(self) -> int:
+        return self._settings_dict.get('responses_response_length', 200)
+
+    @responses_response_length.setter
+    def responses_response_length(self, new_length: int) -> None:
+        self._settings_dict['responses_response_length'] = new_length
         self._update_db()
 
     @property
@@ -146,6 +173,15 @@ class Setting:
     @bot_commands_channels.setter
     def bot_commands_channels(self, new_bot_commands: List[int]):
         self._settings_dict['bot_commands'] = new_bot_commands
+        self._update_db()
+
+    @property
+    def stats_exclude(self) -> List[int]:
+        return list(set(self._settings_dict.get('stats_exclude', [])))
+
+    @stats_exclude.setter
+    def stats_exclude(self, new_excludes: List[int]) -> None:
+        self._settings_dict['stats_exclude'] = new_excludes
         self._update_db()
 
     @property

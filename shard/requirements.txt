@@ -60,3 +60,4 @@ youtube-dl
 pyyaml
 pika
 aio-pika
+asyncpg

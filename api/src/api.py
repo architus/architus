@@ -1,5 +1,4 @@
 import json
-import re
 
 from flask import Flask, redirect, request, g
 from flask_restful import Api, Resource
@@ -7,7 +6,7 @@ from flask_cors import CORS
 
 from lib.status_codes import StatusCodes
 from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI
-from lib.models import Command, Log
+from lib.models import AutoResponse as AutoResponseModel, Log
 from lib.auth import JWT, flask_authenticated as authenticated
 
 from src.discord_requests import list_guilds_request
@@ -75,8 +74,8 @@ class GuildCounter(CustomResource):
 
 
 class Logs(CustomResource):
+    @authenticated(member=True)
     def get(self, guild_id: int):
-        # TODO this should probably be authenticated
         rows = self.session.query(Log).filter(Log.guild_id == guild_id).order_by(Log.timestamp.desc()).limit(400).all()
         logs = []
         for log in rows:
@@ -90,45 +89,40 @@ class Logs(CustomResource):
 
 
 class AutoResponses(CustomResource):
-    def get(self, guild_id: int):
-        # TODO this should probably be authenticated
-        rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
-        commands = []
-        authors = {}
-        emojis = {}
-        p = re.compile(r"<:\S+:(?P<emoji_id>\d{15,30})\>")
-        for cmd in rows:
-            commands.append({
-                'trigger': cmd.trigger.replace(str(cmd.server_id), "", 1),
-                'response': cmd.response,
-                'count': cmd.count,
-                'author_id': str(cmd.author_id)
+    @authenticated(member=True)
+    def get(self, guild_id: int, jwt: JWT):
+        rows = self.session.query(AutoResponseModel).filter_by(guild_id=guild_id).all()
+        responses = []
+        for r in rows:
+            responses.append({
+                'id': str(r.id),
+                'trigger': r.trigger,
+                'response': r.response,
+                'authorId': str(r.author_id),
+                'guildId': str(r.guild_id),
+                'triggerRegex': r.trigger_regex,
+                'triggerPunctuation': r.trigger_punctuation,
+                'responseAst': r.response_ast,
+                'count': r.count,
             })
-            match = p.search(cmd.response)
-            if match and str(match.group("emoji_id")) not in emojis:
-                emojis[str(match.group("emoji_id"))], sc = self.shard.get_emoji(match.group('emoji_id'))
-            if str(cmd.author_id) not in authors:
-                authors[str(cmd.author_id)], sc = self.shard.fetch_user_dict(cmd.author_id)
 
         resp = {
-            'authors': authors,
-            'emojis': emojis,
-            'commands': commands
+            'autoResponses': responses
         }
         return resp, StatusCodes.OK_200
 
     @reqparams(trigger=str, response=str)
-    @authenticated
+    @authenticated()
     def post(self, guild_id: int, trigger: str, response: str, jwt: JWT):
         return self.shard.set_response(jwt.id, guild_id, trigger, response, routing_guild=guild_id)
 
     @reqparams(trigger=str)
-    @authenticated
+    @authenticated()
     def delete(self, guild_id: int, trigger: str, jwt: JWT):
         return self.shard.delete_response(jwt.id, guild_id, trigger, routing_guild=guild_id)
 
     @reqparams(trigger=str, response=str)
-    @authenticated
+    @authenticated()
     def patch(self, guild_id: int, trigger: str, response: str, jwt: JWT):
         _, sc = self.shard.delete_response(jwt.id, guild_id, trigger, routing_guild=guild_id)
 
@@ -136,7 +130,8 @@ class AutoResponses(CustomResource):
 
 
 class Settings(CustomResource):
-    def get(self, guild_id: int, setting: str = None):
+    @authenticated(member=True)
+    def get(self, guild_id: int, setting: str = None, jwt: JWT = None):
         if setting is None:
             with open('settings.json') as f:
                 return json.loads(f.read()), 200
@@ -149,13 +144,13 @@ class Settings(CustomResource):
 
 class Coggers(CustomResource):
     '''provide an endpoint to reload cogs in the bot'''
-    @authenticated
-    def get(self, jwt: JWT = None, extension: str = None):
+    @authenticated()
+    def get(self, extension: str = None, jwt: JWT = None):
         if jwt.id == 214037134477230080:  # johnyburd
             return self.shard.get_extensions()
         return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
 
-    @authenticated
+    @authenticated()
     def post(self, extension: str, jwt: JWT):
         if jwt.id == 214037134477230080:  # johnyburd
             return self.shard.reload_extension(extension)
@@ -163,7 +158,8 @@ class Coggers(CustomResource):
 
 
 class Stats(CustomResource):
-    def get(self, guild_id: int):
+    @authenticated(member=True)
+    def get(self, guild_id: int, jwt: JWT):
         '''Request message count statistics from shard and return'''
         msg_data, _ = self.shard.bin_messages(guild_id, routing_guild=guild_id)
         guild_data, _ = self.shard.get_guild_data(guild_id, routing_guild=guild_id)
@@ -181,7 +177,7 @@ class Stats(CustomResource):
 
 
 class ListGuilds(CustomResource):
-    @authenticated
+    @authenticated()
     def get(self, jwt: JWT):
         '''Forward guild list request to discord and return response'''
         resp, status_code = list_guilds_request(jwt)
