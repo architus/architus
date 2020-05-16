@@ -1,11 +1,14 @@
-from lib.reggy import fsm
+# from lib.reggy import fsm
+import fsm
 from functools import reduce
 import json
 import re2 as re
 
 
 class NotParseable(Exception):
-    pass
+    def __init__(self, message, position):
+        self.message = message
+        self.position = position
 
 
 class ABCReggy:
@@ -36,7 +39,7 @@ class ABCReggy:
         """
         obj, i = cls.match(string, 0)
         if i != len(string):
-            raise Exception("Could not parse entire string.")
+            raise NotParseable(f"Found unexpected {string[i]}.", i + 1)
         return obj
 
     def __reversed__(self):
@@ -79,14 +82,14 @@ class Bound:
         found = False
         # First try matching for integers
         try:
-            while i < len(string):
+            while i < len(string) and string[i] != "," and string[i] != "}":
                 v = int(string[i])
                 b *= 10
                 b += v
                 i += 1
                 found = True
         except ValueError:
-            pass
+            raise NotParseable("Found bad value in brackets", i + 1)
 
         if found:
             return cls(b), i
@@ -197,15 +200,15 @@ class Multiplier:
         # First check if multiplier is a special character
         elif string[i] == "?":
             if i + 1 < len(string) and string[i + 1] in {"*", "?", "+"}:
-                raise NotParseable
+                raise NotParseable("Stacked multipliers are not supported", i + 1)
             return cls(Bound(0), Bound(1)), i + 1
         elif string[i] == "*":
             if i + 1 < len(string) and string[i + 1] in {"*", "?", "+"}:
-                raise NotParseable
+                raise NotParseable("Stacked multipliers are not supported", i + 1)
             return cls(Bound(0), Bound(None)), i + 1
         elif string[i] == "+":
             if i + 1 < len(string) and string[i + 1] in {"*", "?", "+"}:
-                raise NotParseable
+                raise NotParseable("Stacked multipliers are not supported", i + 1)
             return cls(Bound(1), Bound(None)), i + 1
 
         # Check if curly brackets
@@ -213,21 +216,33 @@ class Multiplier:
             lower, j = Bound.match(string, i + 1)
 
             # If now at end brackets, require specifically that many
+            if j >= len(string):
+                raise NotParseable("Unmatched bracket", i)
             if string[j] == "}":
                 if j + 1 < len(string) and string[j + 1] in {"*", "?", "+"}:
-                    raise NotParseable
+                    raise NotParseable("Stacked multipliers are not supported", j + 1)
                 return cls(lower, lower), j + 1
             # Then string[j] must be a comma.
+            if string[j] != ",":
+                raise NotParseable("Expected comma, found something else", j + 1)
             # If string[j + 1] is a } then it's lower - inf
+            if j + 1 >= len(string):
+                raise NotParseable("Incomplete bound.", j)
             if string[j + 1] == "}":
-                if i + 1 < len(string) and string[i + 1] in {"*", "?", "+"}:
-                    raise NotParseable
+                if i + 1 < len(string) and string[j + 1] in {"*", "?", "+"}:
+                    raise NotParseable("Stacked multipliers are not supported", j + 1)
+                if lower.infinite:
+                    raise NotParseable("Lower bound cannot be infinite", i)
                 return cls(lower, Bound(None)), j + 2
 
             # Last case is to parse the second part of the {}
             upper, j = Bound.match(string, j + 1)
             if j < len(string) and string[j] in {"*", "?", "+"}:
-                raise NotParseable
+                raise NotParseable("Stacked multipliers are not supported", i + 1)
+            if lower.infinite:
+                raise NotParseable("Lower bound for range can't be infinite", i)
+            if lower > upper:
+                raise NotParseable("Lower bound can't be larger than upper bound", i)
             return cls(lower, upper), j + 1
 
         # if none of those things were found then return {1,1}
@@ -472,7 +487,8 @@ class Mult(ABCReggy):
             return None, i
         elif string[i] == "(":
             multiplicand, j = Pattern.match(string, i + 1)
-            assert string[j] == ")"
+            if j >= len(string) or string[j] != ")":
+                raise NotParseable("Missing a close paren", j + 1)
             j += 1
         else:
             multiplicand, j = CharacterClass.match(string, i)
@@ -612,14 +628,14 @@ class CharacterClass(ABCReggy):
             s = ord(string[i - 1]) + 1
             e = ord(string[i + 1]) + 1
             if e < s:
-                raise NotParseable
+                raise NotParseable("Character range is backwards", i + 1)
             chars = ""
             for v in range(s, e):
                 chars += chr(v)
             return chars, i + 2
         elif string[i] == '\\':
             if string[i + 1] not in CharacterClass.special1:
-                raise NotParseable
+                raise NotParseable("Escaping non-special characters is not supported", i + 1)
             return string[i + 1], i + 2
         elif string[i] in CharacterClass.special1 and not brackets:
             return None, i
@@ -650,7 +666,7 @@ class CharacterClass(ABCReggy):
     @classmethod
     def match(cls, string, i=0):
         if i >= len(string):
-            raise NotParseable
+            raise NotParseable("Tried to parse past end of string.", i + 1)
 
         cc, j = CharacterClass.match_wildcard(string, i)
         if cc is not None:
@@ -659,7 +675,7 @@ class CharacterClass(ABCReggy):
         if string[i] == "[":
             end = string.find("]", i)
             if end == -1:
-                raise NotParseable
+                raise NotParseable("This bracket is not closed.", i + 1)
             return CharacterClass.match_bracket(string, i + 1, end)
 
         c, i = CharacterClass.match_unit(string, i)
@@ -801,9 +817,13 @@ class Pattern(ABCReggy):
         concs.append(c)
 
         while c is not None and i < len(string):
+            if string[i] == "]":
+                raise NotParseable("Found an unopened bracket", i + 1)
             if string[i] == ")":
                 return Pattern(*concs), i
             if string[i] == "|":
+                if i + 1 >= len(string):
+                    raise NotParseable("Can't or with an empty expression", i + 1)
                 c, i = Conc.match(string, i + 1)
                 concs.append(c)
 
@@ -859,12 +879,18 @@ class Reggy():
             )
             self.pattern = re.compile(self.re)
             return
-        if regex.find("[[") != -1:
-            raise NotParseable
-        if regex.find("\\p") != -1:
-            raise NotParseable
-        if regex.find("(?") != -1:
-            raise NotParseable
+        double_brackets = regex.find("[[")
+        if double_brackets != -1:
+            raise NotParseable("Reggy does not support this form of character classes.",
+                               double_brackets + 1)
+        unicode_class = regex.find("\\p")
+        if unicode_class != -1:
+            raise NotParseable("Reggy does not support unicode character classes.",
+                               unicode_class + 1)
+        named = regex.find("(?")
+        if named != -1:
+            raise NotParseable("Reggy does not support named capture groups.",
+                               named + 1)
         self.re = regex
         self.fsm = Pattern.parse(self.re).to_fsm().reduce()
         self.pattern = re.compile(self.re)
