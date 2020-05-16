@@ -20,3 +20,10 @@ class Pools:
 
     def get_all_guilds(self):
         return []
+
+    def get_all_auto_responses(self):
+        try:
+            auto_responses = self.bot.get_cog("Auto Responses").responses[guild.id]
+        except KeyError:
+            return []
+        return [r.as_dict() for r in auto_responses]

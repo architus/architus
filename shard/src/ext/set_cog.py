@@ -95,6 +95,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
                 await ctx.send("❌ unable to parse your trigger")
             except Exception:
                 await ctx.send("❌ unknown error 😵")
+                logger.exception()
             else:
                 await ctx.send(f"✅ `{resp}` _successfully set_")
         else:

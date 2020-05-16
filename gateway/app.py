@@ -8,7 +8,7 @@ from aio_pika import IncomingMessage
 from jwt.exceptions import InvalidTokenError
 
 from lib.config import which_shard, logger
-from lib.auth import JWT
+from lib.auth import JWT, gateway_authenticated as authenticated
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
 from lib.ipc.async_rpc_server import start_server
@@ -85,8 +85,10 @@ async def connect(sid: str, environ: dict):
 
 
 @sio.event
-async def pool_all_request(sid: str, _id: int, pool_type: str, guild_id: str):
+@authenticated(shard_client, sio)
+async def pool_all_request(sid: str, _id: int, pool_type: str, guild_id: str, _jwt: JWT = None):
     resp, _ = await shard_client.pool_all_request(guild_id, pool_type, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+    await sio.emit('pool_all_request_return', resp, room=f"{sid}_auth")
 
 
 @sio.event

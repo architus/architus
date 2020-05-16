@@ -151,7 +151,7 @@ class Api(Cog):
         elif pool_type == PoolType.GUILD:
             pass
         elif pool_type == PoolType.AUTO_RESPONSE:
-            pass
+            return {'data': self.pools.get_all_emoji()}, 200
         elif pool_type == PoolType.SETTING_VALUE:
             pass
         else:
