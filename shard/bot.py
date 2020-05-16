@@ -4,10 +4,8 @@ import os
 from discord.ext.commands import Bot
 import discord
 
-from src.user_command import UserCommand
 from src.utils import guild_to_dict
 from lib.config import get_session, secret_token, logger, AsyncConnWrapper
-from lib.models import Command
 from lib.ipc import async_rpc_server, async_rpc_client, blocking_rpc_client
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
