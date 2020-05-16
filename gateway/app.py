@@ -1,6 +1,5 @@
 import json
 import asyncio
-from functools import wraps
 
 from aiohttp import web
 import socketio
@@ -12,7 +11,9 @@ from lib.auth import JWT, gateway_authenticated as authenticated
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
 from lib.ipc.async_rpc_server import start_server
-from lib.status_codes import StatusCodes as sc
+from lib.status_codes import StatusCodes as s
+from lib.discord_requests import async_list_guilds_request
+from lib.pool_types import PoolType
 
 
 sio = socketio.AsyncServer(
@@ -29,18 +30,17 @@ event_subscriber = Subscriber(loop)
 auth_nonces = {}
 
 
-def payload_params(*params):
-    '''wraps sio events to make extracting parameters a little easier'''
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            # args should look like: (sid, msg), so we're interested in 2nd element
-            extracted = {k: v for k, v in args[1]['payload'].items() if k in params}
-            kwargs.update(extracted)
-            print(kwargs)
-            return await func(*args, **kwargs)
-        return wrapper
-    return decorator
+class Counter:
+    def __init__(self):
+        self._count = -2
+
+    @property
+    def count(self):
+        self._count += 2
+        return self._count
+
+
+counter = Counter()
 
 
 async def register_nonce(method, *args, **kwargs):
@@ -50,11 +50,11 @@ async def register_nonce(method, *args, **kwargs):
         except IndexError:
             pass
         else:
-            return {'message': 'registered'}, sc.OK_200
+            return {'message': 'registered'}, s.OK_200
     elif method == 'demote_connection':
         # TODO
-        return {'message': 'demoted :)'}, sc.OK_200
-    return {'message': 'invaild arguments'}, sc.BAD_REQUEST_400
+        return {'message': 'demoted :)'}, s.OK_200
+    return {'message': 'invaild arguments'}, s.BAD_REQUEST_400
 
 
 async def event_callback(msg: IncomingMessage):
@@ -86,9 +86,33 @@ async def connect(sid: str, environ: dict):
 
 @sio.event
 @authenticated(shard_client, sio)
-async def pool_all_request(sid: str, _id: int, pool_type: str, guild_id: str, _jwt: JWT = None):
-    resp, _ = await shard_client.pool_all_request(guild_id, pool_type, routing_key=f"shard_rpc_{which_shard(guild_id)}")
-    await sio.emit('pool_all_request_return', resp, room=f"{sid}_auth")
+async def pool_all_request(sid: str, _id: int = None, type: str = None, guild_id: str = None, _jwt: JWT = None):
+    if type == PoolType.GUILD:
+        resp, sc = await async_list_guilds_request(_jwt)
+        if sc == s.OK_200:
+            resp, sc = await shard_client.tag_autbot_guilds(resp, _jwt.id)
+            if sc == s.OK_200:
+                await sio.emit(
+                    'pool_all_request_response',
+                    _id=_id,
+                    data=resp['data'],
+                    finished=True,
+                    room=f"{sid}_auth"
+                )
+                return
+
+    else:
+        resp, sc = await shard_client.pool_all_request(guild_id, type, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+        if sc == s.OK_200:
+            await sio.emit(
+                'pool_all_request_response',
+                _id=_id,
+                data=resp['data'],
+                finished=True,
+                room=f"{sid}_auth"
+            )
+            return
+    await sio.emit('error', room=sid)
 
 
 @sio.event
@@ -97,7 +121,6 @@ def disconnect(sid: str):
 
 
 @sio.event
-# @payload_params('nonce')
 async def request_elevation(sid: str, nonce: int):
     logger.debug(f"{sid} requesting elevation...")
     try:

@@ -36,7 +36,7 @@ def timezone_aware_format(time: datetime, timezone_str: str = 'US/Eastern') -> s
     return tz.strftime("%Y-%m-%d %I:%M %p")
 
 
-def channel_to_dict(ch: discord.Channel) -> dict:
+def channel_to_dict(ch) -> dict:
     return {'id': ch.id, 'name': ch.name}
 
 

@@ -8,8 +8,8 @@ from lib.status_codes import StatusCodes
 from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI
 from lib.models import AutoResponse as AutoResponseModel, Log
 from lib.auth import JWT, flask_authenticated as authenticated
+from lib.discord_requests import list_guilds_request
 
-from src.discord_requests import list_guilds_request
 from src.util import CustomResource, reqparams, camelcase_keys
 from src.session import Identify, Login, RefreshToken, TokenExchange, End
 

@@ -1,4 +1,8 @@
 import requests
+try:
+    import aiohttp
+except ImportError:
+    pass
 
 from lib.config import client_id, client_secret, REDIRECT_URI, API_ENDPOINT
 
@@ -40,6 +44,17 @@ def list_guilds_request(jwt):
     r = requests.get('%s/users/@me/guilds' % API_ENDPOINT, headers=headers)
 
     return r.json(), r.status_code
+
+
+async def async_list_guilds_request(jwt):
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': f"Bearer {jwt.access_token}"
+    }
+    async with aiohttp.ClientSession() as session:
+        url = f"{API_ENDPOINT}/users/@me/guilds"
+        async with session.get(url, headers=headers) as resp:
+            return await resp.json(), resp.status
 
 
 def refresh_token_request(refresh_token):

@@ -8,9 +8,9 @@ from flask import redirect, request
 from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN
 from lib.status_codes import StatusCodes
 from lib.auth import JWT, flask_authenticated as authenticated
+from lib.discord_requests import identify_request, token_exchange_request, refresh_token_request
 
 from src.util import CustomResource, reqparams, time_to_refresh
-from src.discord_requests import identify_request, token_exchange_request, refresh_token_request
 
 SAFE_REDIRECT_URI = quote_plus(REDIRECT_URI)
 

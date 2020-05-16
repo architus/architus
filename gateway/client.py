@@ -12,8 +12,8 @@ guild_id = 607637793107345431
 @sio.event
 async def connect():
     print("connected to server...")
-    await sio.emit('mock_user_event', {'guild_id': guild_id, 'content': '!set testing::pwned', 'message_id': 2, 'allowed_commands': ('set'), 'silent': True})
-    nonce = 1923512129
+    # await sio.emit('mock_user_event', {'guild_id': guild_id, 'content': '!set testing::pwned', 'message_id': 2, 'allowed_commands': ('set'), 'silent': True})
+    # nonce = 1923512129
     if len(sys.argv) > 1:
         print("requesting elevated gateway...")
         await sio.emit('request_elevation', int(sys.argv[1]))
@@ -21,10 +21,17 @@ async def connect():
     print(f"requesting spectate guild {guild_id}")
     await sio.emit('spectate', guild_id)
 
+    # await th
+
 
 @sio.event
 async def elevation_return(*data):
     print(f'elevation_return: {data}')
+
+@sio.event
+async def pool_all_request_response(*args, **kwargs):
+    print(f"{args}")
+    print(f"{kwargs}")
 
 
 @sio.event

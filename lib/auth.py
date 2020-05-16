@@ -39,12 +39,14 @@ def gateway_authenticated(sio, shard, member=False):
                 try:
                     jwt = JWT(token=session['token'])
                 except (KeyError, pyjwt.exceptions.InvalidTokenError):
-                    return "ERROR"
+                    await sio.emit('error', room=sid)
+                    return
 
                 if member:
                     data, sc = shard.is_member(jwt.id, kwargs['guild_id'], routing_guild=kwargs['guild_id'])
                     if sc != 200 or not data['member']:
-                        return "ERROR"
+                        await sio.emit('error', room=sid)
+                        return
                 return await func(sio, *args, **kwargs, _jwt=jwt)
         return wrapper
     return decorator
