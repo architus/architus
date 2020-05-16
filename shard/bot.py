@@ -68,7 +68,6 @@ class Architus(Bot):
 
     async def on_ready(self):
         """pull autoresponses from the db, then set activity"""
-        self.initialize_user_commands()
         await self.asyncpg_wrapper.connect()
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
@@ -79,22 +78,6 @@ class Architus(Bot):
         logger.info(f" -- JOINED NEW GUILD: {guild.name} -- ")
         self.user_commands.setdefault(guild.id, [])
         await self.manager_client.guild_update(self.shard_id, self.guilds_as_dicts)
-
-    def initialize_user_commands(self):
-        command_list = self.session.query(Command).all()
-        for guild in self.guilds:
-            self.user_commands.setdefault(int(guild.id), [])
-        for command in command_list:
-            self.user_commands.setdefault(command.server_id, [])
-            self.user_commands[command.server_id].append(UserCommand(
-                self.session,
-                self,
-                command.trigger.replace(str(command.server_id), '', 1),
-                command.response, command.count,
-                self.get_guild(command.server_id),
-                command.author_id))
-            for guild, cmds in self.user_commands.items():
-                self.user_commands[guild].sort()
 
     @property
     def settings(self):

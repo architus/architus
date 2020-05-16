@@ -1,6 +1,8 @@
 from discord.ext import commands
 from src.auto_response import GuildAutoResponses, TriggerCollisionException, LongResponseException,\
     ShortTriggerException, UserLimitException, UnknownResponseException
+from lib.response_grammar.response import ParseError
+from lib.reggy.reggy import NotParseable
 from src.utils import bot_commands_only
 from lib.config import logger
 
@@ -87,6 +89,12 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             except UserLimitException:
                 await ctx.send(f"❌ looks like you've already used all your auto responses "
                                f"in this server ({settings.responses_limit}), try deleting some")
+            except ParseError:
+                await ctx.send("❌ unable to parse that response; make sure your `[]`s match or are escaped")
+            except NotParseable:
+                await ctx.send("❌ unable to parse your trigger")
+            except Exception:
+                await ctx.send("❌ unknown error 😵")
             else:
                 await ctx.send(f"✅ `{resp}` _successfully set_")
         else:
