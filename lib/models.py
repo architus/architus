@@ -1,5 +1,7 @@
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, BigInteger, Float, Text, DateTime, LargeBinary
+from sqlalchemy.dialects.postgresql import VARCHAR, ARRAY, CHAR
+
 
 Base = declarative_base()
 
@@ -25,6 +27,34 @@ class Emoji(Base):
         self.num_uses = num_uses
         self.priority = priority
         self.img = img
+
+
+class AutoResponse(Base):
+
+    __tablename__ = 'tb_auto_responses'
+    id = Column('id', BigInteger, primary_key=True)
+    trigger = Column('trigger', Text)
+    response = Column('response', Text)
+    author_id = Column('author_id', BigInteger)
+    guild_id = Column('guild_id', BigInteger)
+    trigger_regex = Column('trigger_regex', Text)
+    trigger_punctuation = Column('trigger_punctuation', ARRAY(CHAR))
+    response_ast = Column('response_ast', Text)
+    mode = Column('mode', VARCHAR(10))
+    count = Column('count', Integer)
+
+    def __init__(self, id, trigger, response, author_id, guild_id,
+                 trigger_regex, trigger_punctuation, response_ast, mode, count):
+        self.id = id
+        self.trigger = trigger
+        self.response = response
+        self.author_id = author_id
+        self.guild_id = guild_id
+        self.trigger_regex = trigger_regex
+        self.trigger_punctuation = trigger_punctuation
+        self.response_ast = response_ast
+        self.mode = mode
+        self.count = count
 
 
 class Settings(Base):
