@@ -3,8 +3,12 @@ from random import randint
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime, timezone
+from contextlib import suppress
 import re
 import logging
+
+with suppress(ImportError):
+    import asyncpg
 
 """
 This file loads the environment secrets into memory and also manages database connections
@@ -53,6 +57,14 @@ def get_session():
     logger.debug("creating a new db session")
     Session = sessionmaker(bind=engine)
     return Session()
+
+
+class AsyncConnWrapper:
+    def __init__(self):
+        self.conn = None
+
+    async def connect(self):
+        self.conn = await asyncpg.connect(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
 
 
 def which_shard(guild_id=None):

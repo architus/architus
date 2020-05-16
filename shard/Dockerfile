@@ -14,12 +14,26 @@ RUN apt-get -y update
 RUN apt install -y software-properties-common
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get -y update
-RUN apt-get -y install python3.8-dev python3-pip ffmpeg pkg-config cron
+RUN apt-get -y install python3.8-dev python3-pip ffmpeg pkg-config cron git
 RUN apt-get -y install texlive texlive-latex-extra dvipng
 RUN apt-get -y install libxml2-dev libxslt-dev python-libxslt1 libpq-dev libffi-dev
 
-COPY ./shard/requirements.txt /app
+# Install architus re2 library
+RUN git clone https://github.com/architus/re2
+WORKDIR ./re2
+RUN make install
 
+# Install pyre2 python library
+WORKDIR /app
+RUN git clone https://github.com/facebook/pyre2
+WORKDIR ./pyre2
+RUN python3.8 setup.py build
+RUN python3.8 setup.py install
+RUN python3.8 setup.py check
+
+WORKDIR /app
+
+COPY ./shard/requirements.txt /app
 
 # Install any needed packages specified in requirements.txt
 RUN python3.8 -m pip install --trusted-host pypi.python.org -r requirements.txt
@@ -40,4 +54,7 @@ COPY  ./shard/ /app/
 COPY ./lib /app/lib
 
 # Run app.py when the container launches
+ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
 CMD cron && pyhton3.8 -u bot.py
+ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
+CMD ["python3.8", "-u", "bot.py"]
