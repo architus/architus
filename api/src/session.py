@@ -8,6 +8,7 @@ from flask import redirect, request
 from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN
 from lib.status_codes import StatusCodes
 from lib.auth import JWT, flask_authenticated as authenticated
+from lib.config import logger
 
 from src.util import CustomResource, reqparams, time_to_refresh
 from src.discord_requests import identify_request, token_exchange_request, refresh_token_request
@@ -134,9 +135,10 @@ class Identify(Resource):
             if time_to_refresh(jwt):
                 data, *rest = generate_refresh_response(jwt)
                 data['user'] = id_data
+                logger.debug((data, *rest))
                 return (data, *rest)
             else:
-                return {
+                a = {
                     'user': id_data,
                     'access': {
                         'issuedAt': jwt.issued_at,
@@ -144,4 +146,7 @@ class Identify(Resource):
                         'refreshIn': jwt.expires_in // 2,
                     }
                 }, StatusCodes.OK_200
+                logger.debug(a)
+                return a
+        logger.debug((id_data, sc))
         return id_data, sc
