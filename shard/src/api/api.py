@@ -225,7 +225,7 @@ class Api(Cog):
                     })
                     # override send, so ctx sends go to our list
                     ctx.send = lambda content: sends.append(content)
-                    await ctx.invoke(triggered_command, *args[1:])
+                    # await ctx.invoke(triggered_command, *args[1:])
                 else:
                     # no builtin, check for user set commands in this "guild"
                     for command in ():

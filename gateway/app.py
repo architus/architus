@@ -86,7 +86,9 @@ async def connect(sid: str, environ: dict):
 
 @sio.event
 @authenticated(shard_client, sio)
-async def pool_all_request(sid: str, _id: int = None, type: str = None, guild_id: str = None, _jwt: JWT = None):
+async def pool_all_request(sid: str, data):
+    _id = data['_id']
+    _jwt = data['_jwt']
     if type == PoolType.GUILD:
         resp, sc = await async_list_guilds_request(_jwt)
         if sc == s.OK_200:
