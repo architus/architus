@@ -139,7 +139,8 @@ class Api(Cog):
     @fetch_guild
     async def pool_all_request(self, guild, pool_type: str):
         if pool_type == PoolType.MEMBER:
-            return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
+            #return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
+            return {'data': self.pools.get_all_members(guild)}, 200
         elif pool_type == PoolType.CHANNEL:
             return {'data': self.pools.get_all_channels()}, 200
         elif pool_type == PoolType.ROLE:

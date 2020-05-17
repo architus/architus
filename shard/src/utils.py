@@ -37,16 +37,34 @@ def timezone_aware_format(time: datetime, timezone_str: str = 'US/Eastern') -> s
 
 
 def channel_to_dict(ch) -> dict:
+    # TODO
     return {'id': ch.id, 'name': ch.name}
 
 
 def guild_to_dict(guild: discord.Guild) -> dict:
-    parameters = (
+    params = (
         'id', 'name', 'icon', 'splash', 'owner_id', 'region', 'afk_timeout', 'unavailable',
         'max_members', 'banner', 'description', 'mfa_level', 'features', 'premium_tier',
         'premium_subscription_count', 'preferred_locale', 'member_count',
     )
-    return {p: getattr(guild, p) for p in parameters}
+    return {p: getattr(guild, p) for p in params}
+
+
+def member_to_dict(member: discord.Member) -> dict:
+    # joined_at
+    # color
+    params = ('id', 'name', 'nick', 'avatar', 'discriminator')
+    data = {p: getattr(member, p) for p in params}
+    data['roles'] = [r.id for r in member.roles]
+    return data
+
+
+def role_to_dict(role: discord.Role) -> dict:
+    # color
+    params = ('id', 'name', 'hoist', 'position', 'managed', 'mentionable')
+    data = {p: getattr(role, p) for p in params}
+    data['members'] = [m.id for m in role.members]
+    return data
 
 
 def bot_commands_only(cmd):

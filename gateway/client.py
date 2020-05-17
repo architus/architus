@@ -16,10 +16,12 @@ async def connect():
     # nonce = 1923512129
     if len(sys.argv) > 1:
         print("requesting elevated gateway...")
-        await sio.emit('request_elevation', int(sys.argv[1]))
+        await sio.emit('free_elevation', {'token': sys.argv[1]})
 
-    print(f"requesting spectate guild {guild_id}")
-    await sio.emit('spectate', guild_id)
+    #print(f"requesting spectate guild {guild_id}")
+    #await sio.emit('spectate', guild_id)
+
+    await sio.emit('pool_all_request', {'type': 'autoResponse', 'guildId': guild_id, '_id': 1})
 
     # await th
 
@@ -29,10 +31,14 @@ async def elevation_return(*data):
     print(f'elevation_return: {data}')
 
 @sio.event
-async def pool_all_request_response(*args, **kwargs):
+async def pool_response(*args, **kwargs):
     print(f"{args}")
     print(f"{kwargs}")
 
+@sio.event
+async def error(*args, **kwargs):
+    print("error")
+    print(args)
 
 @sio.event
 async def log_pool(*data):
@@ -46,8 +52,8 @@ async def mock_bot_event(*data):
 
 async def start_server():
     print('hello I\'m a UI :)')
-    await sio.connect('https://gateway.develop.archit.us')
-    # await sio.connect('http://127.0.0.1:6000')
+    # await sio.connect('https://gateway.develop.archit.us')
+    await sio.connect('http://127.0.0.1:6000')
     await sio.wait()
 
 

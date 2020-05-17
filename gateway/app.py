@@ -128,6 +128,11 @@ class CustomNamespace(socketio.AsyncNamespace):
     def on_disconnect(self, sid: str):
         logger.debug(f'client ({sid}) disconnected')
 
+    async def free_elevation(self, sid, data):
+        async with self.session(sid) as session:
+            session['jwt'] = JWT(token=data['token'])
+            self.enter_room(sid, f"{sid}_auth")
+
     async def on_request_elevation(self, sid: str, nonce: int):
         logger.debug(f"{sid} requesting elevation...")
         try:
