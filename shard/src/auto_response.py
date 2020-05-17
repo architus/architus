@@ -217,7 +217,7 @@ class AutoResponse:
             'id': self.id,
             'triggerRegex': self.trigger_regex,
             'triggerPunctuation': self.trigger_punctuation,
-            'responseAst': json.dumps(self.response_ast.stringify()),
+            'responseTokens': self.response_ast.stringify(),
             'mode': self.mode,
             'count': self.count,
         }

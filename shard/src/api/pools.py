@@ -21,7 +21,7 @@ class Pools:
     def get_all_guilds(self):
         return []
 
-    def get_all_auto_responses(self):
+    def get_all_responses(self):
         try:
             auto_responses = self.bot.get_cog("Auto Responses").responses[guild.id]
         except KeyError:

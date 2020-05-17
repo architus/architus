@@ -90,7 +90,7 @@ class CustomNamespace(socketio.AsyncNamespace):
         async with self.session(sid) as session:
             _jwt = session['jwt']
         _id = data['_id']
-        guild_id = data.get('guild_id', None)
+        guild_id = data.get('guildId', None)
         type = data['type']
         if type == PoolType.GUILD:
             resp, sc = await async_list_guilds_request(_jwt)
@@ -114,7 +114,7 @@ class CustomNamespace(socketio.AsyncNamespace):
                 guild_id, type, routing_key=f"shard_rpc_{which_shard(guild_id)}")
             if sc == s.OK_200:
                 await sio.emit(
-                    'pool_all_response',
+                    'pool_response',
                     _id=_id,
                     data=resp['data'],
                     finished=True,
