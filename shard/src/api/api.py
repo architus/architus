@@ -5,8 +5,6 @@ from typing import List
 from discord.ext.commands import Cog, Context
 import discord
 
-from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
-from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
 from lib.status_codes import StatusCodes as sc
 from lib.config import logger
 from src.api.util import fetch_guild
@@ -65,7 +63,7 @@ class Api(Cog):
             msg = "Remove duplicated trigger first."
             code = sc.CONFLICT_409
         else:
-            self.bot.user_commands[guild_id].append(command)
+            # self.bot.user_commands[guild_id].append(command)
             msg = 'Successfully Set'
             code = sc.OK_200
         return {'message': msg}, code
@@ -89,14 +87,6 @@ class Api(Cog):
     async def delete_response(self, user_id, guild_id, trigger):
         guild = self.bot.get_guild(int(guild_id))
 
-        for oldcommand in self.bot.user_commands[guild_id]:
-            if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
-                if oldcommand.author_id == user_id or user_id in self.bot.settings[guild].admin_ids:
-                    self.bot.user_commands[guild_id].remove(oldcommand)
-                    update_command(self.bot.session, oldcommand.raw_trigger, '', 0, guild, user_id, delete=True)
-                    return {'message': "Successfully Deleted"}, sc.OK_200
-                else:
-                    return {'message': "Not authorized"}, sc.UNAUTHORIZED_401
         return {'message': "No such command."}, sc.NOT_FOUND_404
 
     async def fetch_user_dict(self, id):
@@ -222,7 +212,7 @@ class Api(Cog):
                                            resp_id=resp_id)
                 self.fake_messages[guild_id][message_id] = mock_message
 
-                self.bot.user_commands.setdefault(int(guild_id), [])
+                # self.bot.user_commands.setdefault(int(guild_id), [])
                 if triggered_command:
                     # found builtin command, creating fake context
                     ctx = Context(**{
@@ -238,7 +228,7 @@ class Api(Cog):
                     await ctx.invoke(triggered_command, *args[1:])
                 else:
                     # no builtin, check for user set commands in this "guild"
-                    for command in self.bot.user_commands[mock_message.guild.id]:
+                    for command in ():
                         if command.triggered(mock_message.content):
                             await command.execute(mock_message)
                             break
