@@ -7,7 +7,7 @@ from aio_pika import IncomingMessage
 from jwt.exceptions import InvalidTokenError
 
 from lib.config import which_shard, logger
-from lib.auth import JWT#, gateway_authenticated as authenticated
+from lib.auth import JWT  # , gateway_authenticated as authenticated
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
 from lib.ipc.async_rpc_server import start_server
@@ -87,19 +87,20 @@ class CustomNamespace(socketio.AsyncNamespace):
                 session['jwt'] = jwt
 
     async def on_pool_all_request(self, sid: str, data):
-        async with self.session(sid) as s:
-            _jwt = s['jwt']
+        async with self.session(sid) as session:
+            _jwt = session['jwt']
         _id = data['_id']
-        guild_id = data['guild_id']
+        guild_id = data.get('guild_id', None)
+        type = data['type']
         if type == PoolType.GUILD:
             resp, sc = await async_list_guilds_request(_jwt)
             if sc == s.OK_200:
-                resp, sc = await shard_client.tag_autbot_guilds(resp, _jwt.id)
+                resp, sc = await shard_client.tag_autbot_guilds(resp, _jwt.id, routing_key=f"shard_rpc_{which_shard()}")
                 if sc == s.OK_200:
                     await sio.emit(
                         'pool_all_request_response',
                         _id=_id,
-                        data=resp['data'],
+                        data=resp,
                         finished=True,
                         room=f"{sid}_auth"
                     )
