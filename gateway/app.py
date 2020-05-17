@@ -98,10 +98,13 @@ class CustomNamespace(socketio.AsyncNamespace):
                 resp, sc = await shard_client.tag_autbot_guilds(resp, _jwt.id, routing_key=f"shard_rpc_{which_shard()}")
                 if sc == s.OK_200:
                     await sio.emit(
-                        'pool_all_response',
-                        _id=_id,
-                        data=resp['guilds'],
-                        finished=True,
+                        'pool_response',
+                        {
+                            '_id': _id,
+                            'finished': False,
+                            'nonexistant': [],
+                            'data': resp['guilds'],
+                        },
                         room=f"{sid}_auth"
                     )
                     return
@@ -111,7 +114,7 @@ class CustomNamespace(socketio.AsyncNamespace):
                 guild_id, type, routing_key=f"shard_rpc_{which_shard(guild_id)}")
             if sc == s.OK_200:
                 await sio.emit(
-                    'pool_all_request_response',
+                    'pool_all_response',
                     _id=_id,
                     data=resp['data'],
                     finished=True,
