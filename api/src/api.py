@@ -91,7 +91,7 @@ class Logs(CustomResource):
 class AutoResponses(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int, jwt: JWT):
-        return self.shard.get_all_pools('guild', guild_id, routing_guild=guild_id)
+        return self.shard.pool_all_request('autoResponse', guild_id, routing_guild=guild_id)
 
     @reqparams(trigger=str, response=str)
     @authenticated()

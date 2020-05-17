@@ -5,5 +5,5 @@ class PoolType:
     USER = 'user'
     EMOJI = 'emoji'
     GUILD = 'guild'
-    AUTO_RESPONSE = 'auto-response'
-    SETTING_VALUE = 'setting-value'
+    AUTO_RESPONSE = 'autoResponse'
+    SETTING_VALUE = 'settingValue'
