@@ -64,7 +64,7 @@ class Login(CustomResource):
 
 
 class End(CustomResource):
-    @authenticated
+    @authenticated()
     def post(self, jwt: JWT):
         self.shard.client.call(
             'demote_connection',
@@ -75,7 +75,7 @@ class End(CustomResource):
 
 
 class RefreshToken(CustomResource):
-    @authenticated
+    @authenticated()
     def post(self, jwt: JWT):
         if time_to_refresh(jwt):
             return generate_refresh_response(jwt)
@@ -126,7 +126,7 @@ class TokenExchange(CustomResource):
 
 
 class Identify(Resource):
-    @authenticated
+    @authenticated()
     def get(self, jwt: JWT):
         '''Forward identify request to discord and return response'''
         id_data, sc = identify_request(jwt.access_token)
@@ -136,7 +136,7 @@ class Identify(Resource):
                 data['user'] = id_data
                 return (data, *rest)
             else:
-                a = {
+                return {
                     'user': id_data,
                     'access': {
                         'issuedAt': jwt.issued_at,
@@ -144,5 +144,4 @@ class Identify(Resource):
                         'refreshIn': jwt.expires_in // 2,
                     }
                 }, StatusCodes.OK_200
-                return a
         return id_data, sc
