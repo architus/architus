@@ -44,28 +44,8 @@ class Api(Cog):
         return await self.bot.manager_client.guild_count()
 
     async def set_response(self, user_id, guild_id, trigger, response):
-        guild = self.bot.get_guild(int(guild_id))
-        try:
-            command = UserCommand(self.bot.session, self.bot, trigger, response, 0, guild, user_id, new=True)
-        except VaguePatternError:
-            msg = "Capture group too broad."
-            code = sc.NOT_ACCEPTABLE_406
-        except LongResponseException:
-            msg = "Response is too long."
-            code = sc.PAYLOAD_TOO_LARGE_413
-        except ShortTriggerException:
-            msg = "Trigger is too short."
-            code = sc.LENGTH_REQUIRED_411
-        except ResponseKeywordException:
-            msg = "That response is protected, please use another."
-            code = sc.NOT_ACCEPTABLE_406
-        except DuplicatedTriggerException:
-            msg = "Remove duplicated trigger first."
-            code = sc.CONFLICT_409
-        else:
-            # self.bot.user_commands[guild_id].append(command)
-            msg = 'Successfully Set'
-            code = sc.OK_200
+        msg = 'Successfully Set'
+        code = sc.OK_200
         return {'message': msg}, code
 
     async def is_member(self, user_id, guild_id, admin=False):
@@ -85,7 +65,6 @@ class Api(Cog):
         return {'permissions': 274 if default else 65535}
 
     async def delete_response(self, user_id, guild_id, trigger):
-        guild = self.bot.get_guild(int(guild_id))
 
         return {'message': "No such command."}, sc.NOT_FOUND_404
 
