@@ -142,9 +142,9 @@ class Api(Cog):
             #return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
             return {'data': self.pools.get_all_members(guild)}, 200
         elif pool_type == PoolType.CHANNEL:
-            return {'data': self.pools.get_all_channels()}, 200
+            return {'data': self.pools.get_all_channels(guild)}, 200
         elif pool_type == PoolType.ROLE:
-            pass
+            return {'data': self.pools.get_all_roles(guild)}, 200
         elif pool_type == PoolType.USER:
             return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
         elif pool_type == PoolType.EMOJI:
