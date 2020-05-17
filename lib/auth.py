@@ -29,6 +29,7 @@ def flask_authenticated(member=False):
         return wrapper
     return decorator
 
+
 class JWT:
     def __init__(self, data=None, token=None):
         if data is None and token is None:
