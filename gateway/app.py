@@ -6,7 +6,7 @@ import socketio
 from aio_pika import IncomingMessage
 from jwt.exceptions import InvalidTokenError
 
-from lib.config import which_shard, logger
+from lib.config import which_shard, logger, is_prod, domain_name
 from lib.auth import JWT  # , gateway_authenticated as authenticated
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
@@ -18,7 +18,7 @@ from lib.pool_types import PoolType
 
 sio = socketio.AsyncServer(
     async_mode='aiohttp',
-    cors_allowed_origins='*'  # ('https://*.archit.us:443', 'https://archit.us:443', 'http://localhost:3000')
+    cors_allowed_origins=[f'https://{domain_name}/', f'https://api.{domain_name}/'] if is_prod else '*'
 )
 app = web.Application()
 sio.attach(app)
@@ -32,12 +32,11 @@ auth_nonces = {}
 
 class Counter:
     def __init__(self):
-        self._count = -2
+        self.count = -2
 
-    @property
-    def count(self):
-        self._count += 2
-        return self._count
+    def __call__(self):
+        self.count += 2
+        return self.count
 
 
 async def register_nonce(method, *args, **kwargs):
