@@ -4,4 +4,4 @@ Include a brief description of the motivation and context for this change. List 
 Link to Issue:
 
 - [ ] Manually tested locally
-- [ ] Issue created in docs repo (if necessary)
+- [ ] Issue created in [docs repo](https://github.com/architus/docs.archit.us/issues) (if necessary)
