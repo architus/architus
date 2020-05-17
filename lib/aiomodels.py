@@ -1,3 +1,4 @@
+import datetime
 
 
 class Base:
@@ -8,6 +9,14 @@ class Base:
     @property
     def conn(self):
         return self.conn_wrapper.conn
+
+    async def insert(self, cols):
+        await self.conn.execute(
+            f'''UPDATE {self.__class__.__tablename__} SET
+            {','.join(assigns)}
+            WHERE id = $1
+            ''', id, *cols.values()
+        )
 
     async def update_by_id(self, cols, id):
         assigns = (f"{c} = ${n + 2}" for n, c in enumerate(cols.keys()))
@@ -21,3 +30,26 @@ class Base:
 
 class TbAutoResponses(Base):
     __tablename__ = 'tb_auto_responses'
+
+class TbReactEvents(Base):
+    __tablename__ = 'tb_react_events'
+
+    async def insert(self, message_id: int, guild_id: int, channel_id: int, command: int, expires_on: datetime.datetime):
+        cols = {
+            'message_id': message_id,
+            'guild_id': guild_id,
+            'channel_id': channel_id,
+            'command': command,
+            'expires_on': expires_on
+        }
+
+        await super().insert(self, cols)
+
+
+    async def get_by_id(self, message_id:int, guild_id: int):
+        return await conn.fetchrow(
+            f'''SELECT *
+            FROM {self.__class__.__tablename__}
+            WHERE (guild_id, message_id) = ($1, $2)
+            '''
+        )
