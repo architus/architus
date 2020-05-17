@@ -55,6 +55,4 @@ COPY ./lib /app/lib
 
 # Run app.py when the container launches
 ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
-CMD cron && pyhton3.8 -u bot.py
-ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
-CMD ["python3.8", "-u", "bot.py"]
+CMD cron && python3.8 -u bot.py
