@@ -147,11 +147,11 @@ class Api(Cog):
         elif pool_type == PoolType.USER:
             return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
         elif pool_type == PoolType.EMOJI:
-            return {'data': self.pools.get_all_emoji()}, 200
+            return {'data': self.pools.get_all_emoji(guild)}, 200
         elif pool_type == PoolType.GUILD:
             return {'error': "Invalid Pool"}, sc.BAD_REQUEST_400
         elif pool_type == PoolType.AUTO_RESPONSE:
-            return {'data': self.pools.get_all_responses()}, 200
+            return {'data': self.pools.get_all_responses(guild)}, 200
         elif pool_type == PoolType.SETTING_VALUE:
             pass
         else:
