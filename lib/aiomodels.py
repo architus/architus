@@ -11,11 +11,11 @@ class Base:
         return self.conn_wrapper.conn
 
     async def insert(self, cols):
+        columns, values = zip(*dict.items())
         await self.conn.execute(
-            f'''UPDATE {self.__class__.__tablename__} SET
-            {','.join(assigns)}
-            WHERE id = $1
-            ''', id, *cols.values()
+            f'''INSERT INTO {self.__class__.__tablename__}({','.join(columns)})
+            VALUES {','.join(values)}
+            '''
         )
 
     async def update_by_id(self, cols, id):
@@ -34,16 +34,17 @@ class TbAutoResponses(Base):
 class TbReactEvents(Base):
     __tablename__ = 'tb_react_events'
 
-    async def insert(self, message_id: int, guild_id: int, channel_id: int, command: int, expires_on: datetime.datetime):
+    async def insert(self, message_id: int, guild_id: int, channel_id: int, command: int, payload: str, expires_on: datetime.datetime):
         cols = {
             'message_id': message_id,
             'guild_id': guild_id,
             'channel_id': channel_id,
             'command': command,
+            'payload': payload,
             'expires_on': expires_on
         }
 
-        await super().insert(self, cols)
+        await super().insert(cols)
 
 
     async def get_by_id(self, message_id:int, guild_id: int):
@@ -51,5 +52,6 @@ class TbReactEvents(Base):
             f'''SELECT *
             FROM {self.__class__.__tablename__}
             WHERE (guild_id, message_id) = ($1, $2)
-            '''
+            ''', guild_id, message_id
         )
+

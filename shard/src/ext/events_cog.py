@@ -5,27 +5,17 @@ from unidecode import unidecode
 from contextlib import suppress
 from discord.ext.commands import Cog
 from discord.ext import commands
+from enum import Enum
+import datetime
+import json
 
+from lib.aiomodels import TbReactEvents
 from lib.config import logger
 
 
-class ScheduleEvent(object):
-    def __init__(self, msg, title, time_str):
-        self.msg = msg
-        self.title_str = title
-        self.parsed_time = time_str
-        self.yes = set()
-        self.no = set()
-        self.maybe = set()
-
-
-class PollEvent(object):
-    def __init__(self, msg, title, options, votes, exclusive):
-        self.msg = msg
-        self.title = title
-        self.options = options
-        self.votes = votes
-        self.exclusive = exclusive
+class ReactionEvent(Enum):
+    poll = 0,
+    schedule = 1
 
 
 class EventCog(Cog, name="Events"):
@@ -52,59 +42,91 @@ class EventCog(Cog, name="Events"):
 
     def __init__(self, bot):
         self.bot = bot
-        self.schedule_messages = {}
-        self.poll_messages = {}
+        self.tb_react_events = TbReactEvents(self.bot.asyncpg_wrapper)
 
     @commands.Cog.listener()
-    async def on_reaction_add(self, react, user):
-        if not user.bot and react.message.id in self.schedule_messages:
-            event = self.schedule_messages[react.message.id]
-            with suppress(KeyError):
-                event.yes.remove(user)
-            with suppress(KeyError):
-                event.no.remove(user)
-            with suppress(KeyError):
-                event.maybe.remove(user)
-            for r in react.message.reactions:
-                if r != react:
-                    await r.remove(user)
+    async def on_raw_reaction_add(self, payload):
+        message = await self.bot.get_message(payload.channel_id, payload.message_id)
+        user = payload.member
+        emoji = payload.emoji
+        if self.bot.id != message.author.id or user.bot: 
+            return
 
-            if self.YES_EMOJI in str(react.emoji):
-                event.yes.add(user)
-            elif self.NO_EMOJI in str(react.emoji):
-                event.no.add(user)
-            elif self.MAYBE_EMOJI in str(react.emoji):
-                event.maybe.add(user)
-            await react.message.edit(
-                content=self.render_schedule_text(event.title_str, event.parsed_time, event.yes, event.no, event.maybe))
+        react_event = await self.tb_react_events.get_by_id(message.id, message.guild.id)
+        if react_event is None:
+            return
 
-        elif not user.bot and react.message.id in self.poll_messages:
-            event = self.poll_messages[react.message.id]
-            for r in react.message.reactions:
-                with suppress(ValueError):
-                    i = self.ANSWERS.index(str(r.emoji))
-                    event.votes[i] = [u for u in await r.users().flatten() if u != self.bot.user]
-                    if event.exclusive:
-                        if i != self.ANSWERS.index(str(react.emoji)):
-                            event.votes[i].remove(user)
-                            await r.remove(user)
+        react_event_payload = json.loads(react_event.payload)
+        if react_event.command == ReactionEvent.schedule:
+            self.schedule_react_add(emoji, user, message, react_event_payload)
+            return
+        elif react_event.command == ReactionEvent.poll:
+            self.poll_react_add(emoji, user, message, react_event_payload)
+            return
 
-            await react.message.edit(
-                content=self.render_poll_text(event.title, event.options, event.votes))
+    async def schedule_react_add(self, emoji, user, message, payload):
+        reactions = self.message.reactions
+        yes = [r.user for r in reactions if str(r.emoji) == self.YES_EMOJI]
+        no = [r.user for r in reactions if str(r.emoji) == self.NO_EMOJI]
+        maybe = [r.user for r in reactions if str(r.emoji) == self.MAYBE_EMOJI]
+        with suppress(KeyError):
+            yes.remove(user)
+        with suppress(KeyError):
+            no.remove(user)
+        with suppress(KeyError):
+            maybe.remove(user)
+        for r in reactions:
+            if r.emoji != emoji:
+                await r.remove(user)
+
+        if self.YES_EMOJI in str(emoji):
+            yes.add(user)
+        elif self.NO_EMOJI in str(emoji):
+            no.add(user)
+        elif self.MAYBE_EMOJI in str(emoji):
+            maybe.add(user)
+        await message.edit(
+            content=self.render_schedule_text(payload.title_str, payload.parsed_time, yes, no, maybe))
+
+    async def poll_react_add(self, emoji, user, message, payload):
+        votes = {}
+        for r in message.reactions:
+            with suppress(ValueError):
+                i = self.ANSWERS.index(str(r.emoji))
+                votes[i] = [u for u in await r.users().flatten() if u != self.bot.user]
+                if payload.exclusive:
+                    if i != self.ANSWERS.index(str(emoji)):
+                        votes[i].remove(user)
+                        await r.remove(user)
+
+        await message.edit(
+            content=self.render_poll_text(payload.title, payload.options, votes))
 
     @commands.Cog.listener()
-    async def on_reaction_remove(self, react, user):
+    async def on_raw_reaction_remove(self, payload):
+        message = await self.bot.get_message(payload.channel_id, payload.message_id)
+        user = await self.bot.get_member(payload.user_id)
+        emoji = payload.emoji
+        if self.bot.id != message.author.id or user.bot: 
+            return
 
-        if not user.bot and react.message.id in self.poll_messages:
-            event = self.poll_messages[react.message.id]
-            if event.exclusive:
-                with suppress(ValueError):
-                    i = self.ANSWERS.index(str(react.emoji))
-                    event.votes[i].remove(user)
-                    await react.message.edit(
-                        content=self.render_poll_text(event.title, event.options, event.votes))
-            else:
-                await self.on_reaction_add(react, user)
+        react_event = await self.tb_react_events.get_by_id(message.id, message.guild.id)
+        if react_event is None:
+            return
+
+        react_event_payload = json.loads(react_event.payload)
+        if react_event.command == ReactionEvent.poll:
+            await self.poll_react_remove(emoji, user, message, react_event_payload)
+            return
+
+    async def poll_react_remove(self, emoji, user, message, payload):
+        votes = {}
+        if payload.exclusive:
+            with suppress(ValueError):
+                i = self.ANSWERS.index(str(emoji))
+                votes[i].remove(user)
+                await message.edit(
+                    content=self.render_poll_text(payload.title, payload.options, votes))
 
     async def prompt_date(self, ctx, author):
         await ctx.channel.send("what time?")
@@ -165,7 +187,14 @@ class EventCog(Cog, name="Events"):
         await msg.add_reaction(self.YES_EMOJI)
         await msg.add_reaction(self.NO_EMOJI)
         await msg.add_reaction(self.MAYBE_EMOJI)
-        self.schedule_messages[msg.id] = ScheduleEvent(msg, title_str, parsed_time)
+
+        event_id = ReactionEvent.schedule
+        expires = datetime.datetime.now() + datetime.timedelta(days=1)
+        payload = {
+            'title_str': title_str,
+            'parsed_time': parsed_time
+        }
+        self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload), expires)
 
     @commands.command()
     async def poll(self, ctx, *args):
@@ -205,7 +234,14 @@ class EventCog(Cog, name="Events"):
         for i in range(len(options)):
             await msg.add_reaction(self.ANSWERS[i])
 
-        self.poll_messages[msg.id] = PollEvent(msg, title, options, votes, exclusive)
+        event_id = ReactionEvent.poll
+        expires = datetime.datetime.now() + datetime.timedelta(days=1)
+        payload = {
+            'exclusive': exclusive,
+            'title': title,
+            'options': options   
+        }
+        self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload), expires)
 
     def get_timezone(self, region):
         region = str(region)
