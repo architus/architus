@@ -191,7 +191,7 @@ class Api(Cog):
                                            resp_id=resp_id)
                 self.fake_messages[guild_id][message_id] = mock_message
 
-                self.bot.user_commands.setdefault(int(guild_id), [])
+                # self.bot.user_commands.setdefault(int(guild_id), [])
                 if triggered_command:
                     # found builtin command, creating fake context
                     ctx = Context(**{
@@ -207,7 +207,7 @@ class Api(Cog):
                     await ctx.invoke(triggered_command, *args[1:])
                 else:
                     # no builtin, check for user set commands in this "guild"
-                    for command in self.bot.user_commands[mock_message.guild.id]:
+                    for command in ():
                         if command.triggered(mock_message.content):
                             await command.execute(mock_message)
                             break
