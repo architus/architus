@@ -7,7 +7,7 @@ from aio_pika import IncomingMessage
 from jwt.exceptions import InvalidTokenError
 
 from lib.config import which_shard, logger
-from lib.auth import JWT, gateway_authenticated as authenticated
+from lib.auth import JWT#, gateway_authenticated as authenticated
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
 from lib.ipc.async_rpc_server import start_server
@@ -84,12 +84,12 @@ class CustomNamespace(socketio.AsyncNamespace):
             logger.info("Found valid token, logging into elevated gateway...")
             sio.enter_room(sid, f"{sid}_auth")
             async with sio.session(sid) as session:
-                session['token'] = jwt
+                session['jwt'] = jwt
 
-    @authenticated(shard_client)
     async def on_pool_all_request(self, sid: str, data):
+        async with self.session(sid) as s:
+            _jwt = s['jwt']
         _id = data['_id']
-        _jwt = data['_jwt']
         guild_id = data['guild_id']
         if type == PoolType.GUILD:
             resp, sc = await async_list_guilds_request(_jwt)
