@@ -26,4 +26,4 @@ class Pools:
             auto_responses = self.bot.get_cog("Auto Responses").responses[guild.id]
         except KeyError:
             return []
-        return [r.as_dict() for r in auto_responses]
+        return [r.as_dict() for r in auto_responses.auto_responses]
