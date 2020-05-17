@@ -98,9 +98,9 @@ class CustomNamespace(socketio.AsyncNamespace):
                 resp, sc = await shard_client.tag_autbot_guilds(resp, _jwt.id, routing_key=f"shard_rpc_{which_shard()}")
                 if sc == s.OK_200:
                     await sio.emit(
-                        'pool_all_request_response',
+                        'pool_all_response',
                         _id=_id,
-                        data=resp,
+                        data=resp['guilds'],
                         finished=True,
                         room=f"{sid}_auth"
                     )
