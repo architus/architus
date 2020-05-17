@@ -6,7 +6,7 @@ from flask_cors import CORS
 
 from lib.status_codes import StatusCodes
 from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI
-from lib.models import AutoResponse as AutoResponseModel, Log
+from lib.models import Log
 from lib.auth import JWT, flask_authenticated as authenticated
 from lib.discord_requests import list_guilds_request
 
@@ -91,25 +91,7 @@ class Logs(CustomResource):
 class AutoResponses(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int, jwt: JWT):
-        rows = self.session.query(AutoResponseModel).filter_by(guild_id=guild_id).all()
-        responses = []
-        for r in rows:
-            responses.append({
-                'id': str(r.id),
-                'trigger': r.trigger,
-                'response': r.response,
-                'authorId': str(r.author_id),
-                'guildId': str(r.guild_id),
-                'triggerRegex': r.trigger_regex,
-                'triggerPunctuation': r.trigger_punctuation,
-                'responseAst': r.response_ast,
-                'count': r.count,
-            })
-
-        resp = {
-            'autoResponses': responses
-        }
-        return resp, StatusCodes.OK_200
+        return self.shard.get_all_pools('guild', guild_id, routing_guild=guild_id)
 
     @reqparams(trigger=str, response=str)
     @authenticated()

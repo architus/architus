@@ -101,7 +101,7 @@ class CustomNamespace(socketio.AsyncNamespace):
                         'pool_response',
                         {
                             '_id': _id,
-                            'finished': False,
+                            'finished': True,
                             'nonexistant': [],
                             'data': resp['guilds'],
                         },
@@ -115,9 +115,12 @@ class CustomNamespace(socketio.AsyncNamespace):
             if sc == s.OK_200:
                 await sio.emit(
                     'pool_response',
-                    _id=_id,
-                    data=resp['data'],
-                    finished=True,
+                    {
+                        '_id': _id,
+                        'finished': True,
+                        'nonexistant': [],
+                        'data': resp['data'],
+                    },
                     room=f"{sid}_auth"
                 )
                 return
