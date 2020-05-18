@@ -128,7 +128,7 @@ class Api(Cog):
         all_guilds, _ = await self.bot.manager_client.all_guilds()
         for guild_dict in guild_list:
             for guild in all_guilds:
-                if str(guild['id']) == guild_dict['id']:
+                if int(guild['id']) == int(guild_dict['id']):
                     guild_dict['has_architus'] = True
                     guild_dict['architus_admin'] = user_id in guild['admin_ids']
                     break
