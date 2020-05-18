@@ -46,7 +46,8 @@ class EventCog(Cog, name="Events"):
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
-        message = await self.bot.get_message(payload.channel_id, payload.message_id)
+        channel = await self.bot.fetch_channel(payload.channel_id)
+        message = await channel.fetch_message(payload.channel_id, payload.message_id)
         user = payload.member
         emoji = payload.emoji
         if self.bot.id != message.author.id or user.bot: 
