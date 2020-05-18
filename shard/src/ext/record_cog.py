@@ -3,16 +3,16 @@
 from discord.ext import commands
 import discord
 from discord import AudioSink
-# from lib.config import logger
 
 import tempfile
 import os
 import asyncio
 from io import BytesIO
 from struct import pack
+import base64
 
-# from asyncio import create_subprocess_exec, wait_for, TimeoutError
-# from asyncio.subprocess import DEVNULL
+from asyncio import create_subprocess_exec, wait_for, TimeoutError
+from asyncio.subprocess import DEVNULL
 
 
 class AsyncThreadEvent(asyncio.Event):
@@ -31,6 +31,10 @@ class AsyncThreadEvent(asyncio.Event):
 class WavFile(AudioSink):
     """
     Custom wave file sink to write recorded voice to.
+
+    The discord bot sends 3840 bytes of 16bit PCM data in each packet as soon as possible.
+    This class then does its darndest to transform that live real time data into something
+    more synchronized.
 
     The specific WAV file that this rights will have a couple of hard coded values.
     ChunkID: RIFF
@@ -70,6 +74,8 @@ class WavFile(AudioSink):
         # Check to see which channel the data should be written to.
         # Each user will get their own channel
         if data.user == self.bot_user:
+            # I don't think the bot actually ever sends voice data,
+            # but just to make sure.
             return
         channel = -1
         for i, u in enumerate(self.user_list):
@@ -81,20 +87,25 @@ class WavFile(AudioSink):
             self.user_list.append(data.user)
             self.num_channels += 1
             self.channels.append([])
+
+            # To keep audio roughly synced, add silence up until the current time.
+            # The current time is taken as the channel with the most amount of
+            # audio currently in it.
             longest = max([len(c) for c in self.channels])
             for _ in range(longest):
                 self.channels[-1].append(self.silence)
 
         # The data comes in as two channel audio. Both channels have the same data
-        # and we only need one channel so just take every other 16 bit chunk.
+        # and we only need one channel so just take every other 16 bit chunk to
+        # compress it down to a single channel.
         d = b"".join([data.data[i:i + 2] for i in range(0, len(data.data), 4)])
         self.channels[channel].append(d)
         self.packet_count += 1
 
         # roughly once a second, see if any of the channels is falling far behind the
-        # others. If they are, this means that person has exited the channeland their
+        # others. If they are, this means that person has exited the channel and their
         # audio needs to be caught up with the rest of the channels.
-        if self.packet_count > 25:
+        if self.packet_count > 10:
             self.packet_count = 0
             longest = max([len(c) for c in self.channels])
             for i in range(self.num_channels):
@@ -118,25 +129,21 @@ class WavFile(AudioSink):
         The actual data can mostly just be left alone apart from putting it in the
         right place.
         """
-        # self.end_time = round(time.time() * 100000)
-        wav_data = []
-        for c in self.channels:
-            wav_data.append(b"".join(c))
-        size = max([len(c) for c in wav_data])
-        for i in range(len(wav_data)):
-            if len(wav_data[i]) < size:
-                add = size - len(wav_data[i])
-                wav_data[i] = wav_data[i] + (b"\x00" * add)
 
-        # Definte values for header values that need to be generated on the fly
+        wav_data = []
+        size = max([len(c) for c in self.channels])
+        for c in self.channels:
+            if len(c) < size:
+                c.append(b"\x00" * (size - len(c)))
+            wav_data.append(b"".join(c))
+
+        # Header values that can't be hardcoded
         data_chunk_size = self.num_channels * len(wav_data[0])
         chunk_size = pack("<L", 36 + data_chunk_size)
         data_chunk_size = pack("<L", data_chunk_size)
         byte_rate = pack("<L", 48000 * self.num_channels * 2)
         block_align = pack("<H", self.num_channels * 2)
         n_chan = pack("<H", self.num_channels)
-
-        print([len(n) for n in wav_data])
 
         with open(self.f, "wb") as wav:
             # RIFF chunk descriptor
@@ -219,10 +226,8 @@ class RecordCog(commands.Cog):
             await ctx.send("Something went wrong")
             await self.cleanup(ctx)
 
-        """
         # everything was now successful so convert to mp3
-        convert = await create_subprocess_exec('ffmpeg', '-i', 'voice.wav',
-                                               '-vn', 'voice.mp4',
+        convert = await create_subprocess_exec('zip', 'voice.zip', 'voice.wav',
                                                cwd=self.temp_dir.name,
                                                stdout=DEVNULL,
                                                stderr=DEVNULL,
@@ -230,18 +235,22 @@ class RecordCog(commands.Cog):
         try:
             await wait_for(convert.wait(), timeout=10)
         except TimeoutError:
-            await ctx.send("File conversion took too long")
+            await ctx.send("Could not compress file")
             convert.kill()
             await self.cleanup(ctx)
             return
-        """
 
-        if not os.path.isfile(os.path.join(self.temp_dir.name, 'voice.wav')):
-            await ctx.send("File conversion failed")
+        if not os.path.isfile(os.path.join(self.temp_dir.name, 'voice.zip')):
+            await ctx.send("File compression failed")
             return
 
-        f = discord.File(os.path.join(self.temp_dir.name, "voice.wav"))
-        await ctx.send(file=f)
+        with open(os.path.join(self.temp_dir.name, 'voice.zip')) as voice_zip:
+            url, _ = await self.bot.manager_client.publish_file(
+                data=base64.b64encode(voice_zip).decode('ascii'),
+                filetype='zip',
+                location='recordings')
+
+        await ctx.send(f"You can find your voice recording here {url['url']}")
         await self.cleanup(ctx)
 
     async def cleanup(self, ctx):
@@ -259,9 +268,9 @@ class RecordCog(commands.Cog):
         if ctx.author.voice:
             # Connect to author's voice channel before recording.
             await ctx.author.voice.channel.connect()
+            return True
         else:
             await ctx.send("Need to be in a voice channel to record.")
-            raise commands.CommandError("Recording while not in a voice channel")
 
 
 def setup(bot):
