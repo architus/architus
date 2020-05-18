@@ -2,10 +2,10 @@ from enum import Enum, auto
 import re2 as re
 import json
 
-just_shortcode = re.compile(r"\[ ?:([\w]+): ?\]")
-shortcode_id = re.compile(r"\[ ?<:([\w]+):(\d+)> ?\]")
+just_shortcode = re.compile(r"\[ ?:(\w+): ?\]")
+shortcode_id = re.compile(r"\[ ?<:(\w+):(\d+)> ?\]")
 unicode_react = re.compile(r"\[ ?(\p{So}+) ?\]")
-animated = re.compile(r"\[ ?<a:([\w]+):(\d+)> ?\]")
+animated = re.compile(r"\[ ?<a:(\w+):(\d+)> ?\]")
 capture = re.compile("\[(\\d+)\]")
 url = re.compile("(https?://[\\w\\.-]{2,})")
 
@@ -133,7 +133,7 @@ def parse_react(string, i=0):
     m = unicode_react.fullmatch(string[i:end+1])
     if m is not None:
         groups = m.groups()
-        return (end + 1, False, groups[0], None, True)
+        return (end + 1, False, groups[0][:-1], None, True)
     m = shortcode_id.fullmatch(string[i:end+1])
     if m is not None:
         groups = m.groups()
@@ -141,7 +141,7 @@ def parse_react(string, i=0):
     m = animated.fullmatch(string[i:end+1])
     if m is not None:
         groups = m.groups()
-        return (end + 1, False, groups[0], int(groups[1]), False)
+        return (end + 1, True, groups[0], int(groups[1]), False)
     return (i, False, None, None, False)
 
 
@@ -308,8 +308,10 @@ def parse(string):
 
 
 def walk(tree, discovered=[]):
-    if hasattr(tree, "text"):
-        if tree.text != None:
+    if tree.type != NodeType.Root:
+        if tree.type == NodeType.React:
+            print(f"( {tree.type}: {tree.animated}, {tree.shortcode}, {tree.id}, {tree.unicode}")
+        elif tree.text != None:
             print(f"( {tree.type}: {tree.text}")
         else:
             print(f"( {tree.type}")
@@ -329,4 +331,4 @@ if __name__ == "__main__":
     data = data.strip()
 
     tree = parse(data)
-    print(tree.stringify())
+    walk(tree)
