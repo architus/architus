@@ -4,15 +4,11 @@ from discord.ext import commands
 import discord
 from discord import AudioSink
 
-import tempfile
-import os
+import zipfile
 import asyncio
 from io import BytesIO
 from struct import pack
 import base64
-
-from asyncio import create_subprocess_exec, wait_for, TimeoutError
-from asyncio.subprocess import DEVNULL
 
 
 class AsyncThreadEvent(asyncio.Event):
@@ -49,7 +45,7 @@ class WavFile(AudioSink):
 
     def __init__(self, f, user_list, event, bot_user):
         """
-        :param: f Where to write the wave file to. Include the .wav when passing string.
+        :param: f Where to write the wave file to. This should just be a BytesIO object.
         :param: user_list List of users in the voice channel to include in recording
         """
         self.bot_user = bot_user
@@ -67,8 +63,9 @@ class WavFile(AudioSink):
 
     def write(self, data):
         """
-        This won't actually write the data to a wave file but will store it in
-        an internal buffer where it can be properly written to a wav file later.
+        This method will just properly store the data internally in the class
+        so that it can be properly written out later with all of the proper
+        header data.
         """
 
         # Check to see which channel the data should be written to.
@@ -145,30 +142,29 @@ class WavFile(AudioSink):
         block_align = pack("<H", self.num_channels * 2)
         n_chan = pack("<H", self.num_channels)
 
-        with open(self.f, "wb") as wav:
-            # RIFF chunk descriptor
-            wav.write(b"\x52\x49\x46\x46")              # "RIFF", specifies RIFF file type
-            wav.write(chunk_size)                       # Size of the file minus this and "RIFF"
-            wav.write(b"\x57\x41\x56\x45")              # "WAVE", specifies wave subtype
+        # RIFF chunk descriptor
+        self.f.write(b"\x52\x49\x46\x46")              # "RIFF", specifies RIFF file type
+        self.f.write(chunk_size)                       # Size of the file minus this and "RIFF"
+        self.f.write(b"\x57\x41\x56\x45")              # "WAVE", specifies wave subtype
 
-            # fmt sub chunk
-            wav.write(b"\x66\x6d\x74\x20")              # "fmt ", starts format section
-            wav.write(b"\x10\x00\x00\x00")              # 16, size of this part of header
-            wav.write(b"\x01\x00")                      # 1, PCM mode
-            wav.write(n_chan)                           # number of channels
-            wav.write(b"\x80\xBB\x00\x00")              # 48000, sample rate of file
-            wav.write(byte_rate)                        # byte rate
-            wav.write(block_align)                      # number of bytes in an entire sample of all channels
-            wav.write(b"\x10\x00")                      # Bits in a sample of one channel
+        # fmt sub chunk
+        self.f.write(b"\x66\x6d\x74\x20")              # "fmt ", starts format section
+        self.f.write(b"\x10\x00\x00\x00")              # 16, size of this part of header
+        self.f.write(b"\x01\x00")                      # 1, PCM mode
+        self.f.write(n_chan)                           # number of channels
+        self.f.write(b"\x80\xBB\x00\x00")              # 48000, sample rate of file
+        self.f.write(byte_rate)                        # byte rate
+        self.f.write(block_align)                      # number of bytes in an entire sample of all channels
+        self.f.write(b"\x10\x00")                      # Bits in a sample of one channel
 
-            # data chunk
-            wav.write(b"\x64\x61\x74\x61")              # "data", in data header now
-            wav.write(data_chunk_size)                  # size of the data chunk
+        # data chunk
+        self.f.write(b"\x64\x61\x74\x61")              # "data", in data header now
+        self.f.write(data_chunk_size)                  # size of the data chunk
 
-            # write the actual PCM data
-            for j in range(0, len(wav_data[0]), 2):
-                for i in range(self.num_channels):
-                    wav.write(wav_data[i][j:j + 2])     # make sure to write two bytes as sample size is 16 bits
+        # write the actual PCM data
+        for j in range(0, len(wav_data[0]), 2):
+            for i in range(self.num_channels):
+                self.f.write(wav_data[i][j:j + 2])     # make sure to write two bytes as sample size is 16 bits
 
         self.event.set()
 
@@ -177,7 +173,7 @@ class RecordCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.recording = False
-        self.temp_dir = None
+        self.wav_file = None
         self.event = AsyncThreadEvent()
 
         # Ensure the opus library is loaded as it is needed to do voice things.
@@ -200,12 +196,9 @@ class RecordCog(commands.Cog):
 
         self.recording = True
 
-        # Use a temporary directory to store the wav file in
-        members = [m for m in ctx.author.voice.channel.members
-                   if not m.bot]
-        self.temp_dir = tempfile.TemporaryDirectory()
-        sink = WavFile(os.path.join(self.temp_dir.name, "voice.wav"),
-                       members, self.event, self.bot.user)
+        members = [m for m in ctx.author.voice.channel.members if not m.bot]
+        self.wav_file = BytesIO()
+        sink = WavFile(self.wav_file, members, self.event, self.bot.user)
         ctx.voice_client.listen(sink)
 
     @commands.command()
@@ -217,38 +210,20 @@ class RecordCog(commands.Cog):
         try:
             ctx.voice_client.stop_listening()
             await self.event.wait()
-
-            if not os.path.isfile(os.path.join(self.temp_dir.name, "voice.wav")):
-                await ctx.send("Something went bork. Sorry :(")
-                await self.cleanup(ctx)
-                return
         except Exception:
             await ctx.send("Something went wrong")
             await self.cleanup(ctx)
 
-        # everything was now successful so convert to mp3
-        convert = await create_subprocess_exec('zip', 'voice.zip', 'voice.wav',
-                                               cwd=self.temp_dir.name,
-                                               stdout=DEVNULL,
-                                               stderr=DEVNULL,
-                                               close_fds=True)
-        try:
-            await wait_for(convert.wait(), timeout=10)
-        except TimeoutError:
-            await ctx.send("Could not compress file")
-            convert.kill()
-            await self.cleanup(ctx)
-            return
+        zip_file = BytesIO()
+        zipper = zipfile.ZipFile(zip_file, mode='w', compression=zipfile.ZIP_DEFLATED,
+                                 allowZip64=True, compresslevel=6)
+        zipper.writestr("voice.wav", self.wav_file.getvalue())
+        zipper.close()
 
-        if not os.path.isfile(os.path.join(self.temp_dir.name, 'voice.zip')):
-            await ctx.send("File compression failed")
-            return
-
-        with open(os.path.join(self.temp_dir.name, 'voice.zip')) as voice_zip:
-            url, _ = await self.bot.manager_client.publish_file(
-                data=base64.b64encode(voice_zip).decode('ascii'),
-                filetype='zip',
-                location='recordings')
+        url, _ = await self.bot.manager_client.publish_file(
+            data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
+            filetype='zip',
+            location='recordings')
 
         await ctx.send(f"You can find your voice recording here {url['url']}")
         await self.cleanup(ctx)
@@ -257,8 +232,8 @@ class RecordCog(commands.Cog):
         await ctx.voice_client.disconnect()
         self.event.clear()
         self.recording = False
-        self.temp_dir.cleanup()
-        self.temp_dir = None
+        self.wav_file.close()
+        self.wav_file = None
 
     async def ensure_voice(self, ctx):
         """
