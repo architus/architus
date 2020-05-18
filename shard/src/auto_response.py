@@ -5,6 +5,7 @@ from random import choice
 import json
 
 from discord import Message
+from emoji import demojize
 
 from src.emoji_manager import EmojiManager
 from lib.reggy.reggy import Reggy
@@ -94,8 +95,15 @@ class AutoResponse:
         else:
             self.trigger_regex = trigger_regex
 
+        self._emoji_manager = emoji_manager
         self.trigger_reggy = Reggy(self.trigger_regex)
         self.not_trigger_punctuation = "".join([c for c in string.punctuation if c not in self.trigger_punctuation])
+
+    @property
+    def emoji_manager(self):
+        if self._emoji_manager is None:
+            self._emoji_manager = self.bot.get_cog("Emoji Manager").managers[self.guild_id]
+        return self._emoji_manager
 
     def _parse_response(self):
         """parse the response into its ast"""
@@ -155,7 +163,7 @@ class AutoResponse:
             if emoji:
                 reacts.append(emoji)
             else:
-                reacts.append(node.shortcode)
+                reacts.append(demojize(node.shortcode))
         elif (node.type == NodeType.Noun):
             content.append(self.word_gen.noun)
         elif (node.type == NodeType.Adj):
@@ -170,8 +178,6 @@ class AutoResponse:
             content.append(msg.author.display_name)
         elif (node.type == NodeType.Capture):
             with suppress(IndexError):
-                logger.debug(match.groups())
-                logger.debug(node.capture_group)
                 content.append(match.groups()[node.capture_group])
 
         elif (node.type == NodeType.Url):
@@ -199,8 +205,10 @@ class AutoResponse:
         content, reacts = self.resolve_resp(self.response_ast, match, msg)
         content = "".join(content).replace("@everyone", "\\@everyone").replace("@here", "\\@here")
 
-        resp_msg = await msg.channel.send(content)
+        if content.strip() != "":
+            resp_msg = await msg.channel.send(content)
         for emoji in reacts:
+            logger.debug(emoji)
             await msg.add_reaction(emoji)
 
         return resp_msg
