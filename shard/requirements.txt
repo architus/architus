@@ -36,6 +36,7 @@ pycodestyle
 pycparser
 pyflakes
 PyNaCl
+gTTS
 pyparsing
 python-dateutil
 python-twitter

@@ -3,7 +3,6 @@ from contextlib import suppress
 from typing import Optional, Tuple
 from random import choice
 import json
-from re import IGNORECASE
 
 from discord import Message, Guild, Member
 
@@ -200,7 +199,7 @@ class AutoResponse:
         else:
             content = content.translate(str.maketrans('', '', self.not_trigger_punctuation))
 
-        match = self.trigger_reggy.matches(content, IGNORECASE)
+        match = self.trigger_reggy.matches(content)
         if match is None:
             return
 
