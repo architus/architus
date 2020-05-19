@@ -10,7 +10,9 @@ url = re.compile("(https?://[\\w\\.-]{2,})")
 
 
 class ParseError(Exception):
-    pass
+    def __init__(self, message, position):
+        self.message = message
+        self.position = position
 
 
 class NodeType(Enum):
@@ -122,8 +124,6 @@ def tree_string(node, tree=[]):
 
 def parse_react(string, i=0):
     end = string.find(']', i)
-    if end == -1:
-        raise ParseError
     m = just_shortcode.fullmatch(string[i:end+1])
     if m is not None:
         groups = m.groups()
@@ -141,8 +141,6 @@ def parse_react(string, i=0):
 
 def parse_capture(string, i=0):
     end = string.find(']', i)
-    if end == -1:
-        raise ParseError
     m = capture.fullmatch(string[i:end+1])
     if m is not None:
         groups = m.groups()
@@ -156,12 +154,16 @@ def parse(string):
     root_ctx = True
     i = 0
     while i < len(string):
-        if curr == None:
-            raise ParseError
         root_ctx = True if curr == base else False
+        if string[i] == '[' and string.find(']', i) == -1:
+            raise ParseError("Unmatched bracket", i)
         if string[i] == ']':
             curr = curr.parent
+            if curr == None:
+                raise ParseError("This bracket has no opening bracket", i + 1)
             curr = curr.parent
+            if curr == None:
+                raise ParseError("This bracket has no opening bracket", i + 1)
             i += 1
             continue
         elif string[i] == '[':
@@ -296,7 +298,7 @@ def parse(string):
                 curr.children.append(node)
 
     if curr != base:
-        raise ParseError
+        raise ParseError("Missed a closing bracket somewhere", len(string))
     return base
 
 

@@ -89,10 +89,10 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             except UserLimitException:
                 await ctx.send(f"❌ looks like you've already used all your auto responses "
                                f"in this server ({settings.responses_limit}), try deleting some")
-            except ParseError:
-                await ctx.send("❌ unable to parse that response; make sure your `[]`s match or are escaped")
-            except NotParseable:
-                await ctx.send("❌ unable to parse your trigger")
+            except ParseError as e:
+                await ctx.send(f"❌ unable to parse that response: `{e}`")
+            except NotParseable as e:
+                await ctx.send(f"❌ unable to parse your trigger: `{e}`")
             except Exception:
                 await ctx.send("❌ unknown error 😵")
                 logger.exception()
