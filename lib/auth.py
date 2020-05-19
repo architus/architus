@@ -2,20 +2,32 @@ import jwt as pyjwt
 from flask import request
 from lib.status_codes import StatusCodes
 
+from functools import wraps
 
-def flask_authenticated(func):
+
+def flask_authenticated(member=False):
     """decorator for rest endpoint functions
     returns 401 if user is not logged in
     and prepends a JWT object to the kwargs for id data
+    if member is True, checks if the logged in user is a member of the guild
+    passed in the via kwargs['guild_id']
     """
-    def authed_func(self, *args, **kwargs):
-        try:
-            jwt = JWT(token=request.cookies.get('token'))
-            # TODO check token expiration
-        except pyjwt.exceptions.InvalidTokenError:
-            return (StatusCodes.UNAUTHORIZED_401, "Not Authorized")
-        return func(self, *args, jwt=jwt, **kwargs)
-    return authed_func
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            try:
+                jwt = JWT(token=request.cookies.get('token'))
+                # TODO check token expiration
+            except pyjwt.exceptions.InvalidTokenError:
+                return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
+            if member:
+                data, sc = self.shard.is_member(jwt.id, kwargs['guild_id'], routing_guild=kwargs['guild_id'])
+                if sc != 200 or not data['member']:
+                    return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
+            return func(self, *args, **kwargs, jwt=jwt)
+
+        return wrapper
+    return decorator
 
 
 class JWT:

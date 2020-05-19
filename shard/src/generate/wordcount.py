@@ -17,7 +17,10 @@ def generate(message_counts, word_counts, victim) -> bytes:
     top_5_mesages = sorted(message_counts.items(), key=operator.itemgetter(1))[-5:]
 
     if victim and victim not in [m[0] for m in top_5_mesages]:
-        top_5_mesages[0] = (victim, message_counts[victim])
+        try:
+            top_5_mesages[0] = (victim, message_counts[victim])
+        except (KeyError, IndexError):
+            pass
 
     n_groups = len(top_5_mesages)
 

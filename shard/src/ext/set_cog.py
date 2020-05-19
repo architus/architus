@@ -1,76 +1,112 @@
 from discord.ext import commands
-from src.user_command import UserCommand, VaguePatternError, LongResponseException, ShortTriggerException
-from src.user_command import ResponseKeywordException, DuplicatedTriggerException, update_command
-from src.user_command import UserLimitException
+from src.auto_response import GuildAutoResponses, TriggerCollisionException, LongResponseException,\
+    ShortTriggerException, UserLimitException, UnknownResponseException
+from lib.response_grammar.response import ParseError
+from lib.reggy.reggy import NotParseable
+from src.utils import bot_commands_only
+from lib.config import logger
 
 import re
-import discord
 
 
-class SetCog(commands.Cog, name="Auto Responses"):
+class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
     def __init__(self, bot):
         self.bot = bot
-        self.session = self.bot.session
+        self.responses = {}
+        self.response_msgs = {}
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        self.responses = {g.id: GuildAutoResponses(self.bot, g) for g in self.bot.guilds}
+
+    @commands.Cog.listener()
+    async def on_message(self, msg):
+        msg, response = await self.responses[msg.guild.id].execute(msg)
+        if msg is not None:
+            self.response_msgs[msg.id] = response
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        self.responses[guild.id] = GuildAutoResponses(self.bot, guild)
+
+    @commands.Cog.listener()
+    async def on_reaction_add(self, react, user):
+        msg = react.message
+        settings = self.bot.settings[msg.guild]
+        if str(react.emoji) == settings.responses_whois_emoji:
+            resp = self.response_msgs[msg.id]
+            if resp:
+                author = msg.channel.guild.get_member(resp.author_id)
+                await msg.channel.send(
+                    f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, created by {author}")
 
     @commands.command()
+    @bot_commands_only
     async def remove(self, ctx, trigger):
-        '''Remove a user command.'''
-        msg = 'no command with that trigger'
-        for oldcommand in self.bot.user_commands[ctx.guild.id]:
-            if oldcommand.raw_trigger == oldcommand.filter_trigger(trigger):
-                self.bot.user_commands[ctx.guild.id].remove(oldcommand)
-                update_command(self.session, oldcommand.raw_trigger, '', 0, ctx.guild, ctx.author.id, delete=True)
-                msg = 'removed `' + oldcommand.raw_trigger + "::" + oldcommand.raw_response + '`'
-        await ctx.channel.send(msg)
+        settings = self.bot.settings[ctx.guild]
+        prefix = settings.command_prefix
 
-    def validate(self, guild_id, command):
-        return not any(command == oldcommand for oldcommand in self.bot.user_commands[guild_id])\
-            and not len(command.raw_trigger) == 0 and command.raw_response not in ['remove', 'author']
+        match = re.search(f'{prefix}remove (.+)', ctx.message.content, re.IGNORECASE)
+        if match:
+            try:
+                logger.debug(match[1])
+                resp = self.responses[ctx.guild.id].remove(match[1])
+            except UnknownResponseException:
+                pass
+            else:
+                await ctx.send(f"✅ `{resp}` _successfully removed_")
+                return
+        await ctx.send("❌ idk what response you want me to remove")
 
     @commands.command()
+    @bot_commands_only
     async def set(self, ctx, *args):
         '''
         Sets a custom command
         You may include the following options:
         [noun], [adj], [adv], [member], [owl], [:reaction:], [count], [comma,separated,choices]
         '''
-        user_commands = self.bot.user_commands
         settings = self.bot.settings[ctx.guild]
         prefix = settings.command_prefix
-        from_admin = ctx.author.id in settings.admins_ids
-        if settings.bot_commands_channels and ctx.channel.id not in settings.bot_commands_channels and not from_admin:
-            for channelid in settings.bot_commands_channels:
-                botcommands = discord.utils.get(ctx.guild.channels, id=channelid)
-                if botcommands:
-                    await ctx.channel.send(botcommands.mention + '?')
-                    return
 
-        parser = re.search(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
-        msg = "try actually reading the syntax"
-        if parser:
+        match = re.search(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+        if match:
             try:
-                command = UserCommand(self.session, self.bot, parser.group(1), parser.group(2),
-                                      0, ctx.guild, ctx.author.id, new=True)
-            except VaguePatternError:
-                msg = "let's try making that a little more specific please"
-            except (LongResponseException, ShortTriggerException) as e:
-                msg = str(e)
-            except ResponseKeywordException:
-                if parser.group(2).strip() == "remove":
-                    msg = f"please use `{prefix}remove` instead"
-                elif parser.group(2).strip() in ("author", "list"):
-                    msg = f"please check https://archit.us/app/{ctx.guild.id}/responses"
-            except UserLimitException as e:
-                msg = str(e)
-            except DuplicatedTriggerException:
-                msg = "A response with that triggered already exists."
+                resp = self.responses[ctx.guild.id].new(match[1], match[2], ctx.guild, ctx.author)
+            except TriggerCollisionException as e:
+                msg = "❌ sorry that trigger collides with the following auto responses:\n"
+                msg += '\n'.join([f"`{r}`" for r in e.conflicts[:4]])
+                if len(e.conflicts) > 4:
+                    msg += f"\n_...{len(e.conflicts) - 4} more not shown_"
+                await ctx.send(msg)
+            except LongResponseException:
+                await ctx.send(f"❌ that response is too long :confused: max length is "
+                               f"{settings.responses_trigger_length} characters")
+            except ShortTriggerException:
+                await ctx.send(
+                    f"❌ please make your trigger longer than {settings.responses_trigger_length} characters")
+            except UserLimitException:
+                await ctx.send(f"❌ looks like you've already used all your auto responses "
+                               f"in this server ({settings.responses_limit}), try deleting some")
+            except ParseError as e:
+                await ctx.send(f"❌ unable to parse that response: `{e}`")
+            except NotParseable as e:
+                await ctx.send(f"❌ unable to parse your trigger: `{e}`")
+            except Exception:
+                await ctx.send("❌ unknown error 😵")
             else:
-                user_commands[ctx.guild.id].append(command)
-                msg = 'Command set.'
+                await ctx.send(f"✅ `{resp}` _successfully set_")
+        else:
+            match = re.search(f'{prefix}set (.+?):(.+)', ctx.message.content, re.IGNORECASE)
+            if match:
+                await ctx.send(f"❌ **nice brain** use two `::`\n`{prefix}set {match[1]}::{match[2]}`")
+            else:
+                await ctx.send("❌ use the syntax: `trigger::response`")
 
-        await ctx.channel.send(msg)
+            # await ctx.send(f"regex: `{resp.trigger_regex}`")
+            # await ctx.send(f"tokens: `{resp.response_ast.stringify()}`")
 
 
 def setup(bot):
-    bot.add_cog(SetCog(bot))
+    bot.add_cog(AutoResponseCog(bot))
