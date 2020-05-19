@@ -1,4 +1,6 @@
-# Cog for recording a voice channel
+"""
+Cog for recording a voice channel
+"""
 
 from discord.ext import commands
 import discord
@@ -243,9 +245,9 @@ class RecordCog(commands.Cog):
         if ctx.author.voice:
             # Connect to author's voice channel before recording.
             await ctx.author.voice.channel.connect()
-            return True
         else:
             await ctx.send("Need to be in a voice channel to record.")
+            raise discord.command.CommandError("Need to connect to channel.")
 
 
 def setup(bot):
