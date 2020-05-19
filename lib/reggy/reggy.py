@@ -893,7 +893,7 @@ class Reggy():
                                named + 1)
         self.re = regex
         self.fsm = Pattern.parse(self.re).to_fsm().reduce()
-        self.pattern = re.compile(self.re)
+        self.pattern = re.compile(f"(?i){self.re}")
 
     def __str__(self):
         return self.re

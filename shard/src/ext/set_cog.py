@@ -45,9 +45,9 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     @bot_commands_only
     async def remove(self, ctx, trigger):
         settings = self.bot.settings[ctx.guild]
-        prefix = settings.command_prefix
+        prefix = re.escape(settings.command_prefix)
 
-        match = re.search(f'{prefix}remove (.+)', ctx.message.content, re.IGNORECASE)
+        match = re.match(f'{prefix}remove (.+)', ctx.message.content, re.IGNORECASE)
         if match:
             try:
                 logger.debug(match[1])
@@ -68,9 +68,9 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         [noun], [adj], [adv], [member], [owl], [:reaction:], [count], [comma,separated,choices]
         '''
         settings = self.bot.settings[ctx.guild]
-        prefix = settings.command_prefix
+        prefix = re.escape(settings.command_prefix)
 
-        match = re.search(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+        match = re.match(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
         if match:
             try:
                 resp = self.responses[ctx.guild.id].new(match[1], match[2], ctx.guild, ctx.author)
@@ -94,11 +94,12 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             except NotParseable as e:
                 await ctx.send(f"❌ unable to parse your trigger: `{e}`")
             except Exception:
+                logger.exception("")
                 await ctx.send("❌ unknown error 😵")
             else:
                 await ctx.send(f"✅ `{resp}` _successfully set_")
         else:
-            match = re.search(f'{prefix}set (.+?):(.+)', ctx.message.content, re.IGNORECASE)
+            match = re.match(f'{prefix}set (.+?):(.+)', ctx.message.content, re.IGNORECASE)
             if match:
                 await ctx.send(f"❌ **nice brain** use two `::`\n`{prefix}set {match[1]}::{match[2]}`")
             else:
