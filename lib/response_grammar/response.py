@@ -2,9 +2,10 @@ from enum import Enum, auto
 import re2 as re
 import json
 
-just_shortcode = re.compile(r"\[:([A-Za-z]+):\]")
-shortcode_id = re.compile(r"\[<:([A-Za-z]+):(\\d+)>\]")
-animated = re.compile(r"\[<a:([A-Za-z]+):(\\d+)>\]")
+just_shortcode = re.compile(r"\[ ?:(\w+): ?\]")
+shortcode_id = re.compile(r"\[ ?<:(\w+):(\d+)> ?\]")
+unicode_react = re.compile(r"\[ ?([^\x00-\x7F]+) ?\]")
+animated = re.compile(r"\[ ?<a:(\w+):(\d+)> ?\]")
 capture = re.compile("\[(\\d+)\]")
 url = re.compile("(https?://[\\w\\.-]{2,})")
 
@@ -62,6 +63,7 @@ class Node:
         self.id = -1
         self.animated = False
         self.capture_group = -1
+        self.unicode = False
 
 
 class Response:
@@ -127,16 +129,20 @@ def parse_react(string, i=0):
     m = just_shortcode.fullmatch(string[i:end+1])
     if m is not None:
         groups = m.groups()
-        return (end + 1, False, groups[0], None)
+        return (end + 1, False, groups[0], None, False)
+    m = unicode_react.fullmatch(string[i:end+1])
+    if m is not None:
+        groups = m.groups()
+        return (end + 1, False, groups[0][:-1], None, True)
     m = shortcode_id.fullmatch(string[i:end+1])
     if m is not None:
         groups = m.groups()
-        return (end + 1, False, groups[0], int(groups[1]))
+        return (end + 1, False, groups[0], int(groups[1]), False)
     m = animated.fullmatch(string[i:end+1])
     if m is not None:
         groups = m.groups()
-        return (end + 1, False, groups[0], int(groups[1]))
-    return (i, False, None, None)
+        return (end + 1, True, groups[0], int(groups[1]), False)
+    return (i, False, None, None, False)
 
 
 def parse_capture(string, i=0):
@@ -167,7 +173,7 @@ def parse(string):
             i += 1
             continue
         elif string[i] == '[':
-            j, a, shortcode, cid = parse_react(string, i)
+            j, a, shortcode, cid, uni = parse_react(string, i)
             k, capture = parse_capture(string, i)
             if shortcode is not None:
                 node = Node()
@@ -176,6 +182,7 @@ def parse(string):
                 node.shortcode = shortcode
                 node.animated = a
                 node.id = cid
+                node.unicode = uni
                 node.text = string[i:j]
                 curr.children.append(node)
                 i = j
@@ -303,8 +310,10 @@ def parse(string):
 
 
 def walk(tree, discovered=[]):
-    if hasattr(tree, "text"):
-        if tree.text != None:
+    if tree.type != NodeType.Root:
+        if tree.type == NodeType.React:
+            print(f"( {tree.type}: {tree.animated}, {tree.shortcode}, {tree.id}, {tree.unicode}")
+        elif tree.text != None:
             print(f"( {tree.type}: {tree.text}")
         else:
             print(f"( {tree.type}")
@@ -324,4 +333,4 @@ if __name__ == "__main__":
     data = data.strip()
 
     tree = parse(data)
-    print(tree.stringify())
+    walk(tree)
