@@ -14,11 +14,16 @@ RUN apt-get -y update
 RUN apt install -y software-properties-common
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt-get -y update
-RUN apt-get -y install python3.8-dev python3-pip ffmpeg pkg-config
+RUN apt-get -y install python3.8-dev python3-pip ffmpeg pkg-config git
 RUN apt-get -y install texlive texlive-latex-extra dvipng
 RUN apt-get -y install libxml2-dev libxslt-dev python-libxslt1 libpq-dev libffi-dev
 
 COPY ./shard/requirements.txt /app
+
+RUN git clone https://github.com/architus/discord.py
+WORKDIR ./discord.py
+RUN python3.8 -m pip install -U .[voice]
+WORKDIR /app
 
 
 # Install any needed packages specified in requirements.txt
