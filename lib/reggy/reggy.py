@@ -901,11 +901,11 @@ class Reggy():
     def __repr__(self):
         return self.re
 
-    def matches(self, string):
-        return self.pattern.fullmatch(string)
+    def matches(self, string, *args):
+        return self.pattern.fullmatch(string, *args)
 
-    def accepts(self, string):
-        return self.pattern.fullmatch(string)
+    def accepts(self, string, *args):
+        return self.pattern.fullmatch(string, *args)
 
     def __contains__(self, string):
         return self.fsm.accepts(string)

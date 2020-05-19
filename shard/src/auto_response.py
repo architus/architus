@@ -3,9 +3,9 @@ from contextlib import suppress
 from typing import Optional, Tuple
 from random import choice
 import json
+from re import IGNORECASE
 
-from discord import Message
-from emoji import demojize
+from discord import Message, Guild, Member
 
 from src.emoji_manager import EmojiManager
 from lib.reggy.reggy import Reggy
@@ -149,21 +149,24 @@ class AutoResponse:
         # if any(fsm.intersects(FSM(other.trigger_regex)) for other in guild_responses):
         # raise TriggerCollisionException
 
-    def resolve_resp(self, node, match, msg, content=None, reacts=None):
+    async def resolve_resp(self, node, match, msg, content=None, reacts=None):
         if (node.type == NodeType.List):
             logger.debug(len(node.children))
-            self.resolve_resp(choice(node.children), match, msg, content, reacts)
+            await self.resolve_resp(choice(node.children), match, msg, content, reacts)
         elif (node.type == NodeType.ListElement):
             for c in node.children:
-                self.resolve_resp(c, match, msg, content, reacts)
+                await self.resolve_resp(c, match, msg, content, reacts)
         elif (node.type == NodeType.PlainText):
             content.append(node.text)
         elif (node.type == NodeType.React):
+            logger.debug(f"id: {node.id}, shortcade: {node.shortcode}")
             emoji = self.emoji_manager.find_emoji(node.id, node.id, node.shortcode)
             if emoji:
-                reacts.append(emoji)
+                logger.debug(f"found {emoji} in manager, making sure it's loaded")
+                await self.emoji_manager.load_emoji(emoji)
+                reacts.append(emoji.to_discord_str())
             else:
-                reacts.append(demojize(node.shortcode))
+                reacts.append(node.shortcode)
         elif (node.type == NodeType.Noun):
             content.append(self.word_gen.noun)
         elif (node.type == NodeType.Adj):
@@ -186,29 +189,29 @@ class AutoResponse:
             content = []
             reacts = []
             for c in node.children:
-                self.resolve_resp(c, match, msg, content, reacts)
+                await self.resolve_resp(c, match, msg, content, reacts)
             return content, reacts
 
     async def execute(self, msg: Message) -> Optional[Message]:
-        content = msg.content.lower()
+        content = msg.content
 
         if self.mode == ResponseMode.REGEX:
             pass
         else:
             content = content.translate(str.maketrans('', '', self.not_trigger_punctuation))
 
-        match = self.trigger_reggy.matches(content)
+        match = self.trigger_reggy.matches(content, IGNORECASE)
         if match is None:
             return
 
         self.count += 1
-        content, reacts = self.resolve_resp(self.response_ast, match, msg)
+        content, reacts = await self.resolve_resp(self.response_ast, match, msg)
         content = "".join(content).replace("@everyone", "\\@everyone").replace("@here", "\\@here")
 
         if content.strip() != "":
             resp_msg = await msg.channel.send(content)
         for emoji in reacts:
-            logger.debug(emoji)
+            logger.debug(f"trying to react: {emoji}")
             await msg.add_reaction(emoji)
 
         return resp_msg
@@ -288,7 +291,8 @@ class GuildAutoResponses:
                 return resp_msg, r
         return None, None
 
-    def new(self, trigger, response, guild, author):
+    def new(self, trigger: str, response: str, guild: Guild, author: Member) -> AutoResponse:
+        """factory method for creating a guild-specific auto response"""
         manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
 
         r = AutoResponse(
@@ -306,6 +310,7 @@ class GuildAutoResponses:
         return r
 
     def remove(self, trigger: str) -> AutoResponse:
+        """helper method for removing guild-specific auto response"""
         for r in self.auto_responses:
             if r.trigger == trigger:
                 self.auto_responses.remove(r)

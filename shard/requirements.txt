@@ -12,11 +12,8 @@ Click
 cycler
 discord
 discord.py
-emoji
 entrypoints
 flake8
-gTTS
-gTTS-token
 idna
 idna-ssl
 itsdangerous
