@@ -39,7 +39,7 @@ class GuildPool:
             return []
         remaining = []
         for guild in resp:
-            if guild['id'] not in self.return_guilds:
+            if str(guild['id']) not in self.return_guilds:
                 guild.update({
                     'has_architus': False,
                     'architus_admin': False,
