@@ -20,12 +20,14 @@ class GuildPool:
                 self.jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
             if resp['member']:
                 guild.update({
+                    'id': str(guild['id']),
                     'has_architus': True,
                     'architus_admin': resp['admin'],
                     'owner': guild['owner_id'] == self.jwt.id,
                     'permissions': resp['permissions']
                 })
                 del guild['owner_id']
+                del guild['admin_ids']
                 self.return_guilds.append(guild)
 
         return self.return_guilds
