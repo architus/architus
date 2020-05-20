@@ -22,7 +22,10 @@ class GuildPool:
                 guild.update({
                     'has_architus': True,
                     'architus_admin': resp['admin'],
+                    'owner': guild['owner_id'] == self.jwt.id,
+                    'permissions': resp['permissions']
                 })
+                del guild['owner_id']
                 self.return_guilds.append(guild)
 
         return self.return_guilds

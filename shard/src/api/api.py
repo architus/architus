@@ -55,9 +55,11 @@ class Api(Cog):
         if not guild:
             return {'member': False, 'admin': False}, sc.OK_200
         settings = self.bot.settings[guild]
+        member = guild.get_member(int(user_id))
         return {
-            'member': bool(guild.get_member(int(user_id))),
-            'admin': int(user_id) in settings.admins_ids
+            'member': bool(member),
+            'admin': int(user_id) in settings.admins_ids,
+            'permissions': member.guild_permissions.value if member else 0,
         }, sc.OK_200
 
     async def get_permissions(self, user_id: int, guild_id: int):
