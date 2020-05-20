@@ -38,8 +38,9 @@ class GuildPool:
             logger.debug(resp)
             return []
         remaining = []
+        ids = [g['id'] for g in self.return_guilds]
         for guild in resp:
-            if str(guild['id']) not in self.return_guilds:
+            if str(guild['id']) not in ids:
                 guild.update({
                     'has_architus': False,
                     'architus_admin': False,
