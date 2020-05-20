@@ -22,6 +22,8 @@ async def connect():
     #await sio.emit('spectate', guild_id)
 
     await sio.emit('pool_all_request', {'type': 'guild', 'guildId': guild_id, '_id': 1})
+    await sio.emit('pool_all_request', {'type': 'member', 'guildId': guild_id, '_id': 2})
+    await sio.emit('pool_all_request', {'type': 'role', 'guildId': guild_id, '_id': 2})
 
     # await th
 

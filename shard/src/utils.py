@@ -51,19 +51,20 @@ def guild_to_dict(guild: discord.Guild) -> dict:
 
 
 def member_to_dict(member: discord.Member) -> dict:
-    # joined_at
-    # color
     params = ('id', 'name', 'nick', 'avatar', 'discriminator')
     data = {p: getattr(member, p) for p in params}
     data['roles'] = [r.id for r in member.roles]
+    data['color'] = member.color.value
+    data['joined_at'] = member.joined_at.isoformat()
+    logger.debug(data)
     return data
 
 
 def role_to_dict(role: discord.Role) -> dict:
-    # color
     params = ('id', 'name', 'hoist', 'position', 'managed', 'mentionable')
     data = {p: getattr(role, p) for p in params}
     data['members'] = [m.id for m in role.members]
+    data['color'] = role.color.value
     return data
 
 

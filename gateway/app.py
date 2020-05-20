@@ -7,7 +7,7 @@ from aio_pika import IncomingMessage
 from jwt.exceptions import InvalidTokenError
 
 from lib.config import which_shard, logger, is_prod, domain_name
-from lib.auth import JWT  # , gateway_authenticated as authenticated
+from lib.auth import JWT, gateway_authenticated as authenticated
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
 from lib.ipc.async_rpc_server import start_server
@@ -87,14 +87,21 @@ class CustomNamespace(socketio.AsyncNamespace):
             async with sio.session(sid) as session:
                 session['jwt'] = jwt
 
-    async def on_pool_all_request(self, sid: str, data):
-        async with self.session(sid) as session:
-            _jwt = session['jwt']
+    @authenticated(shard_client)
+    async def on_pool_request(self, sid: str, data, jwt):
+        # _id = data['_id']
+        guild_id = data.get('guildId', None)
+        # entity_id = data['entityId']
+        resp, sc = await shard_client.pool_request(
+            guild_id, type, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+
+    @authenticated(shard_client)
+    async def on_pool_all_request(self, sid: str, data, jwt):
         _id = data['_id']
         guild_id = data.get('guildId', None)
         type = data['type']
         if type == PoolType.GUILD:
-            pool = GuildPool(manager_client, shard_client, _jwt)
+            pool = GuildPool(manager_client, shard_client, jwt)
 
             await sio.emit(
                 'pool_response',
@@ -138,7 +145,9 @@ class CustomNamespace(socketio.AsyncNamespace):
     def on_disconnect(self, sid: str):
         logger.debug(f'client ({sid}) disconnected')
 
-    async def free_elevation(self, sid, data):
+    async def on_free_elevation(self, sid, data):
+        if True:
+            return
         async with self.session(sid) as session:
             session['jwt'] = JWT(token=data['token'])
             self.enter_room(sid, f"{sid}_auth")

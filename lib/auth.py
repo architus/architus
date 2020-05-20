@@ -31,22 +31,22 @@ def flask_authenticated(member=False):
 
 
 def gateway_authenticated(shard, member=False):
-    async def decorator(func):
+    def decorator(func):
         @wraps(func)
         async def wrapper(self, sid, data, *args, **kwargs):
             async with self.session(sid) as session:
                 try:
-                    data['_jwt'] = session['jwt']
+                    jwt = session['jwt']
                 except KeyError:
-                    await sio.emit('error', room=sid)
+                    await self.emit('error', room=sid)
                     return
 
                 if member:
                     resp, sc = shard.is_member(jwt.id, data['guild_id'], routing_guild=data['guild_id'])
                     if sc != 200 or not resp['member']:
-                        await sio.emit('error', room=sid)
+                        await self.emit('error', room=sid)
                         return
-                return await func(self, sio, data, *args, **kwargs, _jwt=jwt)
+                return await func(self, sid, data, *args, **kwargs, jwt=jwt)
         return wrapper
     return decorator
 
