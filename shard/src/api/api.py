@@ -49,14 +49,15 @@ class Api(Cog):
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
 
-    async def is_member(self, user_id, guild_id, admin=False):
+    async def is_member(self, user_id, guild_id):
         '''check if user is a member or admin of the given guild'''
         guild = self.bot.get_guild(int(guild_id))
         if not guild:
-            return {'member': False}, sc.OK_200
+            return {'member': False, 'admin': False}, sc.OK_200
         settings = self.bot.settings[guild]
         return {
-            'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)
+            'member': bool(guild.get_member(int(user_id))),
+            'admin': int(user_id) in settings.admins_ids
         }, sc.OK_200
 
     async def get_permissions(self, user_id: int, guild_id: int):
@@ -139,7 +140,7 @@ class Api(Cog):
     @fetch_guild
     async def pool_all_request(self, guild, pool_type: str):
         if pool_type == PoolType.MEMBER:
-            #return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
+            # return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
             return {'data': self.pools.get_all_members(guild)}, 200
         elif pool_type == PoolType.CHANNEL:
             return {'data': self.pools.get_all_channels(guild)}, 200

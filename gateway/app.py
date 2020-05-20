@@ -12,8 +12,9 @@ from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
 from lib.ipc.async_rpc_server import start_server
 from lib.status_codes import StatusCodes as s
-from lib.discord_requests import async_list_guilds_request
 from lib.pool_types import PoolType
+
+from src.pools import GuildPool
 
 
 sio = socketio.AsyncServer(
@@ -26,6 +27,7 @@ sio.attach(app)
 loop = asyncio.get_event_loop()
 shard_client = shardRPC(loop)
 event_subscriber = Subscriber(loop)
+manager_client = shardRPC(loop, default_key='manager_rpc')
 
 auth_nonces = {}
 
@@ -92,21 +94,29 @@ class CustomNamespace(socketio.AsyncNamespace):
         guild_id = data.get('guildId', None)
         type = data['type']
         if type == PoolType.GUILD:
-            resp, sc = await async_list_guilds_request(_jwt)
-            if sc == s.OK_200:
-                resp, sc = await shard_client.tag_autbot_guilds(resp, _jwt.id, routing_key=f"shard_rpc_{which_shard()}")
-                if sc == s.OK_200:
-                    await sio.emit(
-                        'pool_response',
-                        {
-                            '_id': _id,
-                            'finished': True,
-                            'nonexistant': [],
-                            'data': resp['guilds'],
-                        },
-                        room=f"{sid}_auth"
-                    )
-                    return
+            pool = GuildPool(manager_client, shard_client, _jwt)
+
+            await sio.emit(
+                'pool_response',
+                {
+                    '_id': _id,
+                    'finished': False,
+                    'nonexistant': [],
+                    'data': await pool.fetch_architus_guilds(),
+                },
+                room=f"{sid}_auth"
+            )
+            await sio.emit(
+                'pool_response',
+                {
+                    '_id': _id,
+                    'finished': True,
+                    'nonexistant': [],
+                    'data': await pool.fetch_remaining_guilds(),
+                },
+                room=f"{sid}_auth"
+            )
+            return
 
         else:
             resp, sc = await shard_client.pool_all_request(
@@ -174,6 +184,7 @@ app.router.add_get('/', index)
 if __name__ == '__main__':
     async def register_clients(shard_client, event_sub):
         await shard_client.connect()
+        await manager_client.connect()
         await (await (await event_sub.connect()).bind_key("gateway.*")).bind_callback(event_callback)
 
     sio.start_background_task(register_clients, shard_client, event_subscriber)

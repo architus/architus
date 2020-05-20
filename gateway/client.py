@@ -21,7 +21,7 @@ async def connect():
     #print(f"requesting spectate guild {guild_id}")
     #await sio.emit('spectate', guild_id)
 
-    await sio.emit('pool_all_request', {'type': 'autoResponse', 'guildId': guild_id, '_id': 1})
+    await sio.emit('pool_all_request', {'type': 'guild', 'guildId': guild_id, '_id': 1})
 
     # await th
 
