@@ -37,14 +37,26 @@ def gateway_authenticated(shard, member=False):
             async with self.session(sid) as session:
                 try:
                     jwt = session['jwt']
-                except KeyError:
-                    await self.emit('error', room=sid)
+                except KeyError as e:
+                    await self.emit('error', {
+                        'message': 'not authenticated',
+                        'human': 'There was an error authenticating your request.',
+                        'details': 'session did not contain jwt',
+                        'context': [str(e)],
+                        'code': 401,
+                    }, room=sid)
                     return
 
                 if member:
                     resp, sc = shard.is_member(jwt.id, data['guild_id'], routing_guild=data['guild_id'])
                     if sc != 200 or not resp['member']:
-                        await self.emit('error', room=sid)
+                        await self.emit('error', {
+                            'message': 'not a member',
+                            'human': 'Unable to verify membership of the server.',
+                            'details': 'shard reported not a member',
+                            'context': [resp],
+                            'code': 401,
+                        }, room=sid)
                         return
                 return await func(self, sid, data, *args, **kwargs, jwt=jwt)
         return wrapper
