@@ -77,26 +77,20 @@ class Recording:
             await self.cleanup()
             return 0
 
-        zip_file = BytesIO()
-        zipper = zipfile.ZipFile(zip_file, mode='w', compression=zipfile.ZIP_DEFLATED,
-                                 allowZip64=True, compresslevel=6)
-        zipper.writestr("voice.wav", self.wav_file.getvalue())
-        zipper.close()
+        async with self.ctx.typing():
+            zip_file = BytesIO()
+            zipper = zipfile.ZipFile(zip_file, mode='w', compression=zipfile.ZIP_DEFLATED,
+                                     allowZip64=True, compresslevel=6)
+            zipper.writestr("voice.wav", self.wav_file.getvalue())
+            zipper.close()
 
-        with tempfile.TemporaryDirectory() as work_dir:
-            with open(os.path.join(work_dir, "voice.zip"), "wb") as zf:
-                zf.write(zip_file.getvalue())
+            url, _ = await self.bot.manager_client.publish_file(
+                data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
+                filetype='zip',
+                location='recordings')
 
-            f = discord.File(os.path.join(work_dir, "voice.zip"))
-            await self.ctx.send(file=f)
-        """
-        url, _ = await self.bot.manager_client.publish_file(
-            data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
-            filetype='zip',
-            location='recordings')
+            await self.ctx.send(f"You can find your voice recording here {url['url']}")
 
-        await self.ctx.send(f"You can find your voice recording here {url['url']}")
-        """
         num_bytes = len(self.wav_file.getvalue())
         await self.cleanup()
         return num_bytes
@@ -121,18 +115,20 @@ class Recording:
                     await self.cleanup()
                     return
 
-                zip_file = BytesIO()
-                zipper = zipfile.ZipFile(zip_file, mode='w', compression=zipfile.ZIP_DEFLATED,
-                                         allowZip64=True, compresslevel=6)
-                zipper.writestr("voice.wav", self.wav_file.getvalue())
-                zipper.close()
+                async with self.ctx.typing():
+                    zip_file = BytesIO()
+                    zipper = zipfile.ZipFile(zip_file, mode='w', compression=zipfile.ZIP_DEFLATED,
+                                             allowZip64=True, compresslevel=6)
+                    zipper.writestr("voice.wav", self.wav_file.getvalue())
+                    zipper.close()
 
-                url, _ = await self.bot.manager_client.publish_file(
-                    data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
-                    filetype='zip',
-                    location='recordings')
+                    url, _ = await self.bot.manager_client.publish_file(
+                        data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
+                        filetype='zip',
+                        location='recordings')
 
-                await self.ctx.send(f"You can find your voice recording here {url['url']}")
+                    await self.ctx.send(f"You can find your voice recording here {url['url']}")
+
                 num_bytes = len(self.wav_file.getvalue())
                 await self.cleanup()
                 return num_bytes
