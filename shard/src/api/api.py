@@ -141,13 +141,16 @@ class Api(Cog):
 
     async def pool_request(self, guild_id, pool_type: str, entity_id):
         guild = self.bot.get_guild(int(guild_id))
-        if pool_type == PoolType.MEMBER:
-            return {'data': await self.pools.get_member(guild, entity_id)}, 200
-        elif pool_type == PoolType.USER:
-            return {'data': await self.pools.get_user(entity_id)}, 200
+        try:
+            if pool_type == PoolType.MEMBER:
+                return {'data': await self.pools.get_member(guild, entity_id)}, 200
+            elif pool_type == PoolType.USER:
+                return {'data': await self.pools.get_user(entity_id)}, 200
+        except Exception:
+            logger.exception('')
+            return {'data': {}}, sc.NOT_FOUND_404
 
-
-    #@fetch_guild
+    # @fetch_guild
     async def pool_all_request(self, guild_id, pool_type: str):
         guild = self.bot.get_guild(int(guild_id))
         if pool_type == PoolType.MEMBER:
