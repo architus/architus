@@ -38,7 +38,7 @@ def timezone_aware_format(time: datetime, timezone_str: str = 'US/Eastern') -> s
 
 def channel_to_dict(ch) -> dict:
     # TODO
-    return {'id': ch.id, 'name': ch.name}
+    return {'id': str(ch.id), 'name': ch.name}
 
 
 def guild_to_dict(guild: discord.Guild) -> dict:
@@ -47,36 +47,35 @@ def guild_to_dict(guild: discord.Guild) -> dict:
         'max_members', 'banner', 'description', 'mfa_level', 'features', 'premium_tier',
         'premium_subscription_count', 'preferred_locale', 'member_count',
     )
-    return {p: getattr(guild, p) for p in params}
+    data = {p: getattr(guild, p) for p in params}
+    data['id'] = str(data['id'])
+    return data
 
 
 def user_to_dict(user: discord.User) -> dict:
     params = ('id', 'name', 'avatar', 'discriminator')
     data = {p: getattr(user, p) for p in params}
+    data['id'] = str(data['id'])
     return data
 
 
 def member_to_dict(member: discord.Member) -> dict:
     params = ('id', 'name', 'nick', 'avatar', 'discriminator')
     data = {p: getattr(member, p) for p in params}
-    data['roles'] = [r.id for r in member.roles]
-    data['color'] = member.color.value
+    data['id'] = str(data['id'])
+    data['roles'] = [str(r.id) for r in member.roles]
+    data['color'] = str(member.color)
     data['joined_at'] = member.joined_at.isoformat()
     logger.debug(data)
-    return data
-
-
-def member_to_dict(member: discord.Member) -> dict:
-    params = ('id', 'name', 'avatar', 'discriminator')
-    data = {p: getattr(member, p) for p in params}
     return data
 
 
 def role_to_dict(role: discord.Role) -> dict:
     params = ('id', 'name', 'hoist', 'position', 'managed', 'mentionable')
     data = {p: getattr(role, p) for p in params}
-    data['members'] = [m.id for m in role.members]
-    data['color'] = role.color.value
+    data['id'] = str(data['id'])
+    data['members'] = [str(m.id) for m in role.members]
+    data['color'] = str(role.color)
     return data
 
 
