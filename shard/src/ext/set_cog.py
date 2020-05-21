@@ -1,6 +1,6 @@
 from discord.ext import commands
 from src.auto_response import GuildAutoResponses, TriggerCollisionException, LongResponseException,\
-    ShortTriggerException, UserLimitException, UnknownResponseException
+    ShortTriggerException, UserLimitException, UnknownResponseException, DisabledException
 from lib.response_grammar.response import ParseError
 from lib.reggy.reggy import NotParseable
 from src.utils import bot_commands_only
@@ -93,6 +93,8 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
                 await ctx.send(f"❌ unable to parse that response: `{e}`")
             except NotParseable as e:
                 await ctx.send(f"❌ unable to parse your trigger: `{e}`")
+            except DisabledException as e:
+                await ctx.send(f"❌ {e} disabled, you can enable in `{settings.prefix}settings responses`")
             except Exception:
                 logger.exception("")
                 await ctx.send("❌ unknown error 😵")

@@ -318,6 +318,11 @@ class GuildAutoResponses:
         raise UnknownResponseException
 
     def validate(self, response: AutoResponse) -> None:
+        if not self.settings.responses_enabled:
+            raise DisabledException("auto responses")
+        if response.mode == ResponseMode.REGEX and not self.settings.responses_allow_regex:
+            raise DisabledException("regex responses")
+
         if self.settings.responses_limit is not None:
             author_count = len([r for r in self.auto_responses if r.author_id == self.author_id])
             if author_count >= self.settings.responses_limit:
@@ -344,6 +349,10 @@ class GuildAutoResponses:
 
 
 class AutoResponseException(Exception):
+    pass
+
+
+class DisabledException(AutoResponseException):
     pass
 
 

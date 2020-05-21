@@ -111,6 +111,33 @@ class Setting:
         self._update_db()
 
     @property
+    def responses_allow_regex(self) -> bool:
+        return self._settings_dict.get('responses_allow_regex', False)
+
+    @responses_allow_regex.setter
+    def responses_allow_regex(self, allow: bool) -> None:
+        self._settings_dict['responses_allow_regex'] = allow
+        self._update_db()
+
+    @property
+    def responses_allow_collision(self) -> bool:
+        return self._settings_dict.get('responses_allow_collision', False)
+
+    @responses_allow_collision.setter
+    def responses_allow_collision(self, allow: bool) -> None:
+        self._settings_dict['responses_allow_collision'] = allow
+        self._update_db()
+
+    @property
+    def responses_enabled(self) -> bool:
+        return self._settings_dict.get('responses_enabled', True)
+
+    @responses_enabled.setter
+    def responses_enabled(self, enabled: bool) -> None:
+        self._settings_dict['responses_enabled'] = enabled
+        self._update_db()
+
+    @property
     def starboard_threshold(self) -> int:
         return self._settings_dict['starboard_threshold'] if 'starboard_threshold' in self._settings_dict else 5
 
