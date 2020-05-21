@@ -89,11 +89,29 @@ class CustomNamespace(socketio.AsyncNamespace):
 
     @authenticated(shard_client)
     async def on_pool_request(self, sid: str, data, jwt):
-        # _id = data['_id']
+        _id = data['_id']
         guild_id = data.get('guildId', None)
-        # entity_id = data['entityId']
-        resp, sc = await shard_client.pool_request(
-            guild_id, type, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+        type = data['type']
+        return_data = []
+        nonexistant = []
+        for entity in data['ids']:
+            resp, sc = await shard_client.pool_request(
+                guild_id, type, entity, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+            if resp['data']:
+                return_data.append(resp['data'])
+            else:
+                nonexistant.append(entity)
+
+        await sio.emit(
+            'pool_response',
+            {
+                '_id': _id,
+                'finished': True,
+                'nonexistant': nonexistant,
+                'data': return_data,
+            },
+            room=f"{sid}_auth"
+        )
 
     @authenticated(shard_client)
     async def on_pool_all_request(self, sid: str, data, jwt):
@@ -146,7 +164,7 @@ class CustomNamespace(socketio.AsyncNamespace):
         logger.debug(f'client ({sid}) disconnected')
 
     async def on_free_elevation(self, sid, data):
-        if True:
+        if True and False:
             return
         async with self.session(sid) as session:
             session['jwt'] = JWT(token=data['token'])

@@ -50,6 +50,12 @@ def guild_to_dict(guild: discord.Guild) -> dict:
     return {p: getattr(guild, p) for p in params}
 
 
+def user_to_dict(user: discord.User) -> dict:
+    params = ('id', 'name', 'avatar', 'discriminator')
+    data = {p: getattr(user, p) for p in params}
+    return data
+
+
 def member_to_dict(member: discord.Member) -> dict:
     params = ('id', 'name', 'nick', 'avatar', 'discriminator')
     data = {p: getattr(member, p) for p in params}
@@ -57,6 +63,12 @@ def member_to_dict(member: discord.Member) -> dict:
     data['color'] = member.color.value
     data['joined_at'] = member.joined_at.isoformat()
     logger.debug(data)
+    return data
+
+
+def member_to_dict(member: discord.Member) -> dict:
+    params = ('id', 'name', 'avatar', 'discriminator')
+    data = {p: getattr(member, p) for p in params}
     return data
 
 

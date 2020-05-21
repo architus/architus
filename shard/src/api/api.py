@@ -139,8 +139,17 @@ class Api(Cog):
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
         return {'guilds': guild_list}, sc.OK_200
 
-    @fetch_guild
-    async def pool_all_request(self, guild, pool_type: str):
+    async def pool_request(self, guild_id, pool_type: str, entity_id):
+        guild = self.bot.get_guild(int(guild_id))
+        if pool_type == PoolType.MEMBER:
+            return {'data': await self.pools.get_member(guild, entity_id)}, 200
+        elif pool_type == PoolType.USER:
+            return {'data': await self.pools.get_user(entity_id)}, 200
+
+
+    #@fetch_guild
+    async def pool_all_request(self, guild_id, pool_type: str):
+        guild = self.bot.get_guild(int(guild_id))
         if pool_type == PoolType.MEMBER:
             # return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
             return {'data': self.pools.get_all_members(guild)}, 200

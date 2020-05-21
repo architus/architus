@@ -1,6 +1,6 @@
 from discord import Guild
 
-from src.utils import channel_to_dict, member_to_dict, role_to_dict
+from src.utils import channel_to_dict, member_to_dict, role_to_dict, user_to_dict
 
 
 class Pools:
@@ -23,6 +23,18 @@ class Pools:
 
     def get_all_members(self, guild: Guild):
         return [member_to_dict(m) for m in guild.members]
+
+    async def get_member(self, guild: Guild, member_id):
+        member = guild.get_member(int(member_id))
+        if member is None:
+            member = await guild.fetch_member(int(member_id))
+        return member_to_dict(member) if member else {}
+
+    async def get_user(self, user_id):
+        user = self.bot.get_user(int(user_id))
+        if user is None:
+            user = await self.bot.fetch_user(int(user_id))
+        return user_to_dict(user) if user else {}
 
     def get_all_responses(self, guild: Guild):
         try:
