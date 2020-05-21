@@ -1,21 +1,21 @@
 """
 Cog for recording a voice channel
 """
-import zipfile
 from io import BytesIO
 import base64
 from collections import defaultdict
 import asyncio
 import time
 from functools import partial
-import tempfile
-import os
+import secrets
+import string
 
 from src.utils import AsyncThreadEvent
 
 import discord
 from discord.ext import commands
 from discord import WavFile
+import pyzipper
 
 
 class Recording:
@@ -78,9 +78,16 @@ class Recording:
             return 0
 
         async with self.ctx.typing():
+            pw = "".join([secrets.choice(string.ascii_letters + string.digits)
+                          for _ in range(15)])
             zip_file = BytesIO()
-            zipper = zipfile.ZipFile(zip_file, mode='w', compression=zipfile.ZIP_DEFLATED,
-                                     allowZip64=True, compresslevel=6)
+            zipper = pyzipper.AESZipFile(zip_file,
+                                         mode='w',
+                                         compression=pyzipper.ZIP_DEFLATED,
+                                         allowZip64=True,
+                                         compresslevel=6,
+                                         encryption=pyzipper.WZ_AES)
+            zipper.setpassword(pw)
             zipper.writestr("voice.wav", self.wav_file.getvalue())
             zipper.close()
 
@@ -89,7 +96,13 @@ class Recording:
                 filetype='zip',
                 location='recordings')
 
-            await self.ctx.send(f"You can find your voice recording here {url['url']}")
+            embed = discord.Embed(title="Voice Recording")
+            embed.add_field(name="URL", value=url['url'])
+            embed.add_field(name="Password", value=pw)
+            embed.add_field(name="Channels", value=str(self.sink.num_channels))
+            embed.add_field(name="Note", value="File will not work well in normal audio players."
+                                               "Try using audacity to listen to the file.")
+            await self.ctx.send(embed)
 
         num_bytes = len(self.wav_file.getvalue())
         await self.cleanup()
@@ -116,9 +129,16 @@ class Recording:
                     return
 
                 async with self.ctx.typing():
+                    pw = "".join([secrets.choice(string.ascii_letters + string.digits)
+                                  for _ in range(15)])
                     zip_file = BytesIO()
-                    zipper = zipfile.ZipFile(zip_file, mode='w', compression=zipfile.ZIP_DEFLATED,
-                                             allowZip64=True, compresslevel=6)
+                    zipper = pyzipper.ZipFile(zip_file,
+                                              mode='w',
+                                              compression=pyzipper.ZIP_DEFLATED,
+                                              allowZip64=True,
+                                              compresslevel=6,
+                                              encryption=pyzipper.WZ_AES)
+                    zipper.setpassword(pw)
                     zipper.writestr("voice.wav", self.wav_file.getvalue())
                     zipper.close()
 
@@ -127,7 +147,12 @@ class Recording:
                         filetype='zip',
                         location='recordings')
 
-                    await self.ctx.send(f"You can find your voice recording here {url['url']}")
+                    embed = discord.Embed(title="Voice Recording")
+                    embed.add_field(name="URL", value=url['url'])
+                    embed.add_field(name="Password", value=pw)
+                    embed.add_field(name="Channels", value=str(self.sink.num_channels))
+                    embed.add_field(name="Note", value="File will not work well in normal audio players."
+                                                       "Try using audacity to listen to the file.")
 
                 num_bytes = len(self.wav_file.getvalue())
                 await self.cleanup()
