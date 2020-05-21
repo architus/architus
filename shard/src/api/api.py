@@ -139,20 +139,19 @@ class Api(Cog):
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
         return {'guilds': guild_list}, sc.OK_200
 
-    async def pool_request(self, guild_id, pool_type: str, entity_id):
-        guild = self.bot.get_guild(int(guild_id))
+    async def pool_request(self, guild_id, pool_type: str, entity_id, fetch=False):
+        guild = self.bot.get_guild(int(guild_id)) if guild_id else None
         try:
             if pool_type == PoolType.MEMBER:
-                return {'data': await self.pools.get_member(guild, entity_id)}, 200
+                return {'data': await self.pools.get_member(guild, entity_id, fetch)}, 200
             elif pool_type == PoolType.USER:
-                return {'data': await self.pools.get_user(entity_id)}, 200
+                return {'data': await self.pools.get_user(entity_id, fetch)}, 200
         except Exception:
             logger.exception('')
             return {'data': {}}, sc.NOT_FOUND_404
 
-    # @fetch_guild
-    async def pool_all_request(self, guild_id, pool_type: str):
-        guild = self.bot.get_guild(int(guild_id))
+    @fetch_guild
+    async def pool_all_request(self, guild, pool_type: str):
         if pool_type == PoolType.MEMBER:
             # return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
             return {'data': self.pools.get_all_members(guild)}, 200

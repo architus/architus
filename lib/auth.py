@@ -66,9 +66,9 @@ class JWT:
 
     def get_token(self):
         if self._dirty:
-            self._token = self._encode(self._data)
+            self._token = self._encode(self._data).decode()
             self._dirty = False
-        return self._token.decode()
+        return self._token
 
     def __getattr__(self, name):
         try:

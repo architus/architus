@@ -21,9 +21,12 @@ async def connect():
     #print(f"requesting spectate guild {guild_id}")
     #await sio.emit('spectate', guild_id)
 
-    await sio.emit('pool_all_request', {'type': 'guild', 'guildId': guild_id, '_id': 1})
-    await sio.emit('pool_all_request', {'type': 'member', 'guildId': guild_id, '_id': 2})
-    await sio.emit('pool_all_request', {'type': 'role', 'guildId': guild_id, '_id': 2})
+    #await sio.emit('pool_all_request', {'type': 'guild', 'guildId': guild_id, '_id': 1})
+   # await sio.emit('pool_all_request', {'type': 'member', 'guildId': guild_id, '_id': 2})
+    #await sio.emit('pool_all_request', {'type': 'role', 'guildId': guild_id, '_id': 3})
+    await sio.emit('pool_all_request', {'type': 'autoResponse', 'guildId': guild_id, '_id': 5})
+    await sio.emit('pool_request', {'type': 'member', 'guildId': guild_id, 'ids': ['214037134477230080', '1111111111111'], '_id': 7})
+    await sio.emit('pool_request', {'type': 'user', 'guildId': None, 'ids': ['214037134477230080', '109462069484486656'], '_id': 9})
 
     # await th
 
@@ -35,7 +38,6 @@ async def elevation_return(*data):
 @sio.event
 async def pool_response(*args, **kwargs):
     print(f"{args}")
-    print(f"{kwargs}")
 
 @sio.event
 async def error(*args, **kwargs):
@@ -54,7 +56,7 @@ async def mock_bot_event(*data):
 
 async def start_server():
     print('hello I\'m a UI :)')
-    # await sio.connect('https://gateway.develop.archit.us')
+    #await sio.connect('https://gateway.develop.archit.us')
     await sio.connect('http://gateway.local.archit.us:6000')
     await sio.wait()
 

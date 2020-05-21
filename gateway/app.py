@@ -93,15 +93,38 @@ class CustomNamespace(socketio.AsyncNamespace):
         guild_id = data.get('guildId', None)
         type = data['type']
         return_data = []
-        nonexistant = []
+        not_cached = []
         for entity in data['ids']:
             resp, sc = await shard_client.pool_request(
                 guild_id, type, entity, routing_key=f"shard_rpc_{which_shard(guild_id)}")
             if resp['data']:
                 return_data.append(resp['data'])
             else:
-                nonexistant.append(entity)
+                not_cached.append(entity)
 
+        finished = len(not_cached) == 0
+        if len(return_data) > 0:
+            await sio.emit(
+                'pool_response',
+                {
+                    '_id': _id,
+                    'finished': finished,
+                    'nonexistant': [],
+                    'data': return_data,
+                },
+                room=f"{sid}_auth"
+            )
+            if finished:
+                return
+        return_data = []
+        nonexistant = []
+        for entity in not_cached:
+            resp, sc = await shard_client.pool_request(
+                guild_id, type, entity, fetch=True, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+            if resp['data']:
+                return_data.append(resp['data'])
+            else:
+                nonexistant.append(entity)
         await sio.emit(
             'pool_response',
             {
