@@ -25,9 +25,12 @@ class Pools:
         return [member_to_dict(m) for m in guild.members]
 
     async def get_member(self, guild: Guild, member_id):
+        from lib.config import logger
+        logger.debug("get_member called")
         member = guild.get_member(int(member_id))
         if member is None:
             member = await guild.fetch_member(int(member_id))
+        logger.debug(member)
         return member_to_dict(member) if member else {}
 
     async def get_user(self, user_id):
