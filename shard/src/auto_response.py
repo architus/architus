@@ -212,9 +212,9 @@ class AutoResponse:
         return {
             'trigger': self.trigger,
             'response': self.response,
-            'authorId': self.author_id,
-            'guildId': self.guild_id,
-            'id': self.id,
+            'authorId': str(self.author_id),
+            'guildId': str(self.guild_id),
+            'id': str(self.id),
             'triggerRegex': self.trigger_regex,
             'triggerPunctuation': self.trigger_punctuation,
             'responseTokens': self.response_ast.stringify(),
