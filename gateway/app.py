@@ -181,6 +181,14 @@ class CustomNamespace(socketio.AsyncNamespace):
                     room=f"{sid}_auth"
                 )
                 return
+            else:
+                await self.emit('error', {
+                    'message': 'shard returned error',
+                    'human': 'There was an error fetching some data from the api.',
+                    'details': None,
+                    'context': [resp],
+                    'code': sc,
+                }, room=sid)
         await sio.emit('error', room=sid)
 
     def on_disconnect(self, sid: str):
