@@ -2,10 +2,23 @@ from datetime import datetime
 from pytz import timezone
 from aiohttp import ClientSession
 import io
+import asyncio
 
 import discord
 
 from lib.config import logger
+
+class AsyncThreadEvent(asyncio.Event):
+    """
+    Custom event class for being able to safely set and clear an
+    asynchronous event from multiple threads.
+
+    Shouldn't need a thread safe clear method as the event should only be
+    referenced from the main thread by the time that that method is called.
+    """
+
+    def set(self):
+        self._loop.call_soon_threadsafe(super().set)
 
 
 async def download_emoji(emoji: discord.Emoji) -> io.BytesIO:

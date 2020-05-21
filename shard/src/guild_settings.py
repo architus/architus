@@ -149,6 +149,15 @@ class Setting:
         self._update_db()
 
     @property
+    def voice_exclude(self) -> List[int]:
+        return list(set(self._settings_dict.get('voice_exclude', [])))
+
+    @voice_exclude.setter
+    def voice_exclude(self, new_excludes: List[int]) -> None:
+        self._settings_dict['voice_exclude'] = new_excludes
+        self._update_db()
+
+    @property
     def admin_ids(self) -> List[int]:
         '''stupid alias'''
         return self.admins_ids

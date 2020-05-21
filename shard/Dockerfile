@@ -20,7 +20,7 @@ RUN apt-get -y install libxml2-dev libxslt-dev python-libxslt1 libpq-dev libffi-
 
 COPY ./shard/requirements.txt /app
 
-RUN git clone https://github.com/architus/discord.py
+RUN git clone -b master https://github.com/architus/discord.py
 WORKDIR ./discord.py
 RUN python3.8 -m pip install -U .[voice]
 WORKDIR /app
