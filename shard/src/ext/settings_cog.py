@@ -438,6 +438,14 @@ class ResponseAllowCollisions(SettingsElement):
             tags=['responses'])
 
 
+class ResponseAllowCollisions(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Allow Trigger Collisions",
+            TRIAGULAR_RULER,
+            "Maximum allowed length for auto response responses. Enter new value or `cancel`.",
+            'responses_trigger_length',
+            tags=['responses'])
 
 
 
