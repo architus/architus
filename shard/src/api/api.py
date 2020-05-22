@@ -87,6 +87,18 @@ class Api(Cog):
             'url': str(e.url)
         }, sc.OK_200
 
+    async def get_guild_emojis(self, guild_id):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild_id]
+        return {'emojis': [{
+            'id': str(e.id),
+            'name': e.name,
+            'authorId': str(e.author_id) if e.author_id is not None else None,
+            'loaded': e.loaded,
+            'numUses': e.num_uses,
+            'discordId': str(e.discord_id),
+            'url': await e.url(),
+        } for e in emoji_manager.emojis]}, sc.OK_200
+
     async def get_extensions(self):
         return {'extensions': [k for k in self.bot.extensions.keys()]}, sc.OK_200
 
