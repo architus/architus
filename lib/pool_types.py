@@ -3,7 +3,7 @@ class PoolType:
     CHANNEL = 'channel'
     ROLE = 'role'
     USER = 'user'
-    EMOJI = 'emoji'
+    EMOJI = 'customEmoji'
     GUILD = 'guild'
     AUTO_RESPONSE = 'autoResponse'
     SETTING_VALUE = 'settingValue'

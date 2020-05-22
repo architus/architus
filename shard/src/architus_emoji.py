@@ -70,7 +70,7 @@ class ArchitusEmoji:
     def update(self, o):
         self.name = o.name
         self.discord_id = o.discord_id
-        self.url = o.url
+        self._url = o.url
         return self
 
     def update_from_discord(self, e: Emoji):
@@ -105,10 +105,15 @@ class ArchitusEmoji:
 
     def as_dict(self):
         return {
-            'id': self.id,
+            'id': str(self.id),
             'name': self.name,
-            'author_id': self.author_id,
-            'discord_id': self.discord_id,
+            'author_id': str(self.author_id),
+            'discord_id': str(self.discord_id),
             'num_uses': self.num_uses,
             'priority': self.priority,
+            'url': str(self._url),
         }
+
+    async def as_dict_url(self):
+        await self.url()
+        return self.as_dict()

@@ -158,6 +158,8 @@ class Api(Cog):
                 return {'data': await self.pools.get_member(guild, entity_id, fetch)}, 200
             elif pool_type == PoolType.USER:
                 return {'data': await self.pools.get_user(entity_id, fetch)}, 200
+            elif pool_type == PoolType.EMOJI:
+                return {'data': await self.pools.get_emoji(guild, entity_id, fetch)}, 200
         except Exception:
             logger.exception('')
             return {'data': {}}, sc.NOT_FOUND_404
@@ -166,19 +168,19 @@ class Api(Cog):
     async def pool_all_request(self, guild, pool_type: str):
         if pool_type == PoolType.MEMBER:
             # return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
-            return {'data': self.pools.get_all_members(guild)}, 200
+            return {'data': self.pools.get_all_members(guild)}, sc.OK_200
         elif pool_type == PoolType.CHANNEL:
-            return {'data': self.pools.get_all_channels(guild)}, 200
+            return {'data': self.pools.get_all_channels(guild)}, sc.OK_200
         elif pool_type == PoolType.ROLE:
-            return {'data': self.pools.get_all_roles(guild)}, 200
+            return {'data': self.pools.get_all_roles(guild)}, sc.OK_200
         elif pool_type == PoolType.USER:
             return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
         elif pool_type == PoolType.EMOJI:
-            return {'data': self.pools.get_all_emoji(guild)}, 200
+            return {'data': await self.pools.get_all_emoji(guild)}, sc.OK_200
         elif pool_type == PoolType.GUILD:
             return {'error': "Invalid Pool"}, sc.BAD_REQUEST_400
         elif pool_type == PoolType.AUTO_RESPONSE:
-            return {'data': self.pools.get_all_responses(guild)}, 200
+            return {'data': self.pools.get_all_responses(guild)}, sc.OK_200
         elif pool_type == PoolType.SETTING_VALUE:
             pass
         else:

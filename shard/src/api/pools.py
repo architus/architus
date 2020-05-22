@@ -7,13 +7,24 @@ class Pools:
     def __init__(self, bot):
         self.bot = bot
 
-    def get_all_emoji(self, guild: Guild):
+    async def get_all_emoji(self, guild: Guild):
         try:
             emoji_manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
         except KeyError:
             return []
 
-        return [e.as_dict() for e in emoji_manager.emojis]
+        return [await e.as_dict_url() for e in emoji_manager.emojis]
+
+    async def get_emoji(self, guild: Guild, emoji_id, fetch=False):
+        if fetch:
+            return {}
+        try:
+            emoji_manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
+        except KeyError:
+            return []
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+
+        return (await emoji.as_dict_url()) if emoji else {}
 
     def get_all_channels(self, guild: Guild):
         return [channel_to_dict(ch) for ch in guild.channels]
