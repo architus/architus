@@ -14,16 +14,18 @@ class Emoji(Base):
     discord_id = Column('discord_id', BigInteger)
     author_id = Column('author_id', BigInteger)
     guild_id = Column('guild_id', BigInteger)
+    url = Column('url', Text)
     num_uses = Column('num_uses', Integer)
     priority = Column('priority', Float)
     img = Column('img', LargeBinary)
 
-    def __init__(self, id, discord_id, author_id, guild_id, name, num_uses, priority, img):
+    def __init__(self, id, discord_id, author_id, guild_id, name, url, num_uses, priority, img):
         self.id = id
         self.discord_id = discord_id
         self.author_id = author_id
         self.guild_id = guild_id
         self.name = name
+        self.url = url
         self.num_uses = num_uses
         self.priority = priority
         self.img = img
