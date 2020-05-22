@@ -102,7 +102,7 @@ class Recording:
             embed.add_field(name="Channels", value=str(self.sink.num_channels))
             embed.add_field(name="Note", value="File will not work well in normal audio players."
                                                "Try using audacity to listen to the file.")
-            await self.ctx.send(embed)
+            await self.ctx.send(embed=embed)
 
         num_bytes = len(self.wav_file.getvalue())
         await self.cleanup()
@@ -153,6 +153,7 @@ class Recording:
                     embed.add_field(name="Channels", value=str(self.sink.num_channels))
                     embed.add_field(name="Note", value="File will not work well in normal audio players."
                                                        "Try using audacity to listen to the file.")
+                    await self.ctx.send(embed=embed)
 
                 num_bytes = len(self.wav_file.getvalue())
                 await self.cleanup()
