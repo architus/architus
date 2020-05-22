@@ -78,8 +78,8 @@ class Recording:
             return 0
 
         async with self.ctx.typing():
-            pw = "".join([secrets.choice(string.ascii_letters + string.digits)
-                          for _ in range(15)])
+            pw = bytes("".join([secrets.choice(string.ascii_letters + string.digits)
+                                for _ in range(15)]), "ascii")
             zip_file = BytesIO()
             zipper = pyzipper.AESZipFile(zip_file,
                                          mode='w',
@@ -129,8 +129,8 @@ class Recording:
                     return
 
                 async with self.ctx.typing():
-                    pw = "".join([secrets.choice(string.ascii_letters + string.digits)
-                                  for _ in range(15)])
+                    pw = bytes("".join([secrets.choice(string.ascii_letters + string.digits)
+                                        for _ in range(15)]), "ascii")
                     zip_file = BytesIO()
                     zipper = pyzipper.ZipFile(zip_file,
                                               mode='w',
