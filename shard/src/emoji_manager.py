@@ -286,13 +286,15 @@ class EmojiManager:
             self._update_emojis_db((emoji,))
 
     async def on_react(self, react: discord.Reaction) -> None:
+        if type(react.emoji) == str:
+            return
         emoji = self.find_emoji(d_id=react.emoji.id, name=react.emoji.name)
         if emoji:
             await self.bump_emoji(emoji)
 
     async def on_emoji_added(self, emoji: discord.Emoji) -> None:
         """checks if the new emoji is a duplicate and adds it if not. also fetches the uploader
-        should be called when an emoji is removed from the guild
+        should be called when an emoji is added to the guild
         """
         if emoji.animated or emoji.managed:
             return
