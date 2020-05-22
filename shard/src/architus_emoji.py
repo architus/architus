@@ -107,13 +107,20 @@ class ArchitusEmoji:
         return {
             'id': str(self.id),
             'name': self.name,
-            'author_id': str(self.author_id),
-            'discord_id': str(self.discord_id),
-            'num_uses': self.num_uses,
+            'authorId': str(self.author_id),
+            'discordId': str(self.discord_id),
+            'numUses': self.num_uses,
             'priority': self.priority,
             'url': str(self._url),
         }
 
     async def as_dict_url(self):
-        await self.url()
-        return self.as_dict()
+        return {
+            'id': str(self.id),
+            'name': self.name,
+            'authorId': str(self.author_id),
+            'discordId': str(self.discord_id),
+            'numUses': self.num_uses,
+            'priority': self.priority,
+            'url': str(await self.url()),
+        }
