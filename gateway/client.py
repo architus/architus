@@ -56,8 +56,8 @@ async def mock_bot_event(*data):
 
 async def start_server():
     print('hello I\'m a UI :)')
-    #await sio.connect('https://gateway.develop.archit.us')
-    await sio.connect('http://gateway.local.archit.us:6000')
+    await sio.connect('https://gateway.develop.archit.us')
+    #await sio.connect('http://gateway.local.archit.us:6000')
     await sio.wait()
 
 

@@ -6,7 +6,7 @@ from lib.status_codes import StatusCodes as sc
 def fetch_guild(func):
     @wraps(func)
     async def decorator(self, *args, **kwargs):
-        guild = self.bot.get_guild(args[0])
+        guild = self.bot.get_guild(int(args[0]))
 
         if not guild:
             return {'message': "Unknown Guild"}, sc.NOT_FOUND_404

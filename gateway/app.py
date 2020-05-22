@@ -74,6 +74,12 @@ class CustomNamespace(socketio.AsyncNamespace):
 
         super().__init__(*args, **kwargs)
 
+    async def error(self, message="Unknown Error", human=None, details=None, context=(), code=0, room=None):
+        assert room is not None
+        await self.emit('error',
+                        {'message': message, 'human': human, 'details': details, 'context': context, 'code': code},
+                        room=room)
+
     async def on_connect(self, sid: str, environ: dict):
         logger.debug(f"{environ['REMOTE_ADDR']} has connected with sid: {sid}")
         request = environ['aiohttp.request']
@@ -182,14 +188,14 @@ class CustomNamespace(socketio.AsyncNamespace):
                 )
                 return
             else:
-                await self.emit('error', {
-                    'message': 'shard returned error',
-                    'human': 'There was an error fetching some data from the api.',
-                    'details': None,
-                    'context': [resp],
-                    'code': sc,
-                }, room=sid)
-        await sio.emit('error', room=sid)
+                return await self.error(
+                    message="shard returned error",
+                    human="There was an error fetching some data from the api.",
+                    context=[resp],
+                    code=sc,
+                    _id=_id,
+                    room=sid)
+        await self.error("Unknown Pool")
 
     def on_disconnect(self, sid: str):
         logger.debug(f'client ({sid}) disconnected')
