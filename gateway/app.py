@@ -74,10 +74,11 @@ class CustomNamespace(socketio.AsyncNamespace):
 
         super().__init__(*args, **kwargs)
 
-    async def error(self, message="Unknown Error", human=None, details=None, context=(), code=0, room=None):
+    async def error(self, message="Unknown Error", human=None, details=None, context=(), code=0, room=None, _id=0):
         assert room is not None
         await self.emit('error',
-                        {'message': message, 'human': human, 'details': details, 'context': context, 'code': code},
+                        {'message': message, 'human': human, 'details': details,
+                         'context': context, 'code': code, '_id': _id},
                         room=room)
 
     async def on_connect(self, sid: str, environ: dict):
