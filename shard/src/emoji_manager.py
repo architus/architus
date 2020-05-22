@@ -299,7 +299,7 @@ class EmojiManager:
         if emoji.animated or emoji.managed:
             return
 
-        a_emoji = await ArchitusEmoji.from_discord(emoji)
+        a_emoji = await ArchitusEmoji.from_discord(self.bot, emoji)
 
         if a_emoji in self.ignore_add:
             self.ignore_add.remove(a_emoji)
