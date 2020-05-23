@@ -111,7 +111,6 @@ class ArchitusEmoji:
             'discordId': str(self.discord_id),
             'numUses': self.num_uses,
             'priority': self.priority,
-            'url': str(self._url),
         }
 
     async def as_dict_url(self):
@@ -122,5 +121,5 @@ class ArchitusEmoji:
             'discordId': str(self.discord_id),
             'numUses': self.num_uses,
             'priority': self.priority,
-            'url': str(await self.url()),
+            'url': await self.url(),
         }
