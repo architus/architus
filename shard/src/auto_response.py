@@ -150,7 +150,6 @@ class AutoResponse:
 
     async def resolve_resp(self, node, match, msg, content=None, reacts=None):
         if (node.type == NodeType.List):
-            logger.debug(len(node.children))
             await self.resolve_resp(choice(node.children), match, msg, content, reacts)
         elif (node.type == NodeType.ListElement):
             for c in node.children:
@@ -158,7 +157,6 @@ class AutoResponse:
         elif (node.type == NodeType.PlainText):
             content.append(node.text)
         elif (node.type == NodeType.React):
-            logger.debug(f"id: {node.id}, shortcade: {node.shortcode}")
             emoji = self.emoji_manager.find_emoji(node.id, node.id, node.shortcode)
             if emoji:
                 logger.debug(f"found {emoji} in manager, making sure it's loaded")

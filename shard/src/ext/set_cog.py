@@ -51,7 +51,6 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         match = re.match(f'{prefix}remove (.+)', ctx.message.content, re.IGNORECASE)
         if match:
             try:
-                logger.debug(match[1])
                 resp = self.responses[ctx.guild.id].remove(match[1])
             except UnknownResponseException:
                 pass
