@@ -221,7 +221,7 @@ class AutoResponse:
 
 class GuildAutoResponses:
 
-    def __init__(self, bot, guild):
+    def __init__(self, bot, guild, no_db=False):
         self.guild = guild
         self.bot = bot
         self.session = bot.session
@@ -229,6 +229,7 @@ class GuildAutoResponses:
         self.settings = self.bot.settings[guild]
         self.auto_responses = []
         self.word_gen = WordGen()
+        self.no_db = no_db
         self._init_from_db()
 
     @property
@@ -236,6 +237,8 @@ class GuildAutoResponses:
         return self.bot.aiosession
 
     def _init_from_db(self) -> None:
+        if self.no_db:
+            return
         responses = self.session.query(AutoResponseModel).filter_by(guild_id=self.guild.id).all()
         self.auto_responses = [AutoResponse(
             self.bot,
@@ -254,6 +257,8 @@ class GuildAutoResponses:
             for r in responses]
 
     def _insert_into_db(self, resp: AutoResponse) -> None:
+        if self.no_db:
+            return
         row = AutoResponseModel(
             resp.id,
             resp.trigger,
@@ -275,9 +280,13 @@ class GuildAutoResponses:
             self.session.commit()
 
     def _delete_from_db(self, resp: AutoResponse) -> None:
+        if self.no_db:
+            return
         self.session.query(AutoResponseModel).filter_by(id=resp.id).delete()
 
     async def _update_resp_db(self, resp: AutoResponse) -> None:
+        if self.no_db:
+            return
         await self.tb_auto_responses.update_by_id({'count': resp.count}, resp.id)
 
     async def execute(self, msg) -> Tuple[Optional[Message], Optional[AutoResponse]]:
@@ -292,7 +301,10 @@ class GuildAutoResponses:
 
     def new(self, trigger: str, response: str, guild: Guild, author: Member) -> AutoResponse:
         """factory method for creating a guild-specific auto response"""
-        manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
+        if self.no_db:
+            manager = None
+        else:
+            manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
 
         r = AutoResponse(
             self.bot,
