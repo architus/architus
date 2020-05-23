@@ -23,6 +23,8 @@ logger.addHandler(handler)
 DB_HOST = 'postgres'
 DB_PORT = 5432
 
+FAKE_GUILD_IDS = 10000000
+
 DISCORD_EPOCH = datetime(2015, 1, 1, tzinfo=timezone.utc)
 
 try:

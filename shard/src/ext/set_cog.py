@@ -44,6 +44,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     @commands.command()
     @bot_commands_only
     async def remove(self, ctx, trigger):
+        """remove an auto response"""
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)
 
@@ -62,11 +63,12 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     @commands.command()
     @bot_commands_only
     async def set(self, ctx, *args):
-        '''
-        Sets a custom command
-        You may include the following options:
-        [noun], [adj], [adv], [member], [owl], [:reaction:], [count], [comma,separated,choices]
-        '''
+        """
+        Sets an auto response
+        use the syntax `set trigger::response`
+        You may include the following options in the reaction:
+        [noun], [adj], [adv], [member], [:reaction:], [count], [comma, separated, choices]
+        """
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)
 
@@ -96,7 +98,6 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             except Exception:
                 logger.exception("")
                 await ctx.send("❌ unknown error 😵")
-                logger.exception()
             else:
                 await ctx.send(f"✅ `{resp}` _successfully set_")
         else:

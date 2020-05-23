@@ -1,5 +1,6 @@
 import json
 from lib.models import Settings
+from lib.config import FAKE_GUILD_IDS
 from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog
 import discord
@@ -296,6 +297,8 @@ class Setting:
         return json.loads(settings_row.json_blob) if settings_row else {}
 
     def _update_db(self):
+        if self.guild_id < FAKE_GUILD_IDS:
+            return
         new_data = {
             'server_id': int(self.guild_id),
             'json_blob': json.dumps(self._settings_dict)
