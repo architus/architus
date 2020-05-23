@@ -9,13 +9,17 @@ import time
 from functools import partial
 import secrets
 import string
+from concurrent.futures import ThreadPoolExecutor
 
+import pyzipper
 from src.utils import AsyncThreadEvent
 
 import discord
 from discord.ext import commands
 from discord import WavFile
-import pyzipper
+
+
+NUM_ZIP_THREADS = 5
 
 
 class Recording:
@@ -23,7 +27,7 @@ class Recording:
     Class to handle a recording for a guild.
     """
 
-    def __init__(self, bot, ctx, budget):
+    def __init__(self, bot, ctx, budget, tp):
         self.bot = bot
         self.ctx = ctx
         self.budget = budget
@@ -33,6 +37,57 @@ class Recording:
 
         self.recording = True
         self.sink = None
+
+        self.thread_pool = tp
+
+    def zip_file(self, password):
+        zip_file = BytesIO()
+        zipper = pyzipper.AESZipFile(zip_file,
+                                     mode='w',
+                                     compression=pyzipper.ZIP_DEFLATED,
+                                     allowZip64=True,
+                                     compresslevel=6,
+                                     encryption=pyzipper.WZ_AES)
+        zipper.setpassword(password)
+        zipper.writestr("voice.wav", self.wav_file.getvalue())
+        zipper.close()
+
+        return zip_file
+
+    async def send_file(self):
+        try:
+            self.ctx.voice_client.stop_listening()
+            await self.event.wait()
+        except Exception:
+            await self.ctx.send("Something went wrong")
+            await self.cleanup()
+            return
+
+        if len(self.wav_file.getvalue()) == 0:
+            await self.ctx.send("Nothing was recorded")
+            await self.cleanup()
+            return
+
+        loop = asyncio.get_running_loop()
+        pw = bytes("".join([secrets.choice(string.ascii_letters + string.digits)
+                            for _ in range(15)]), "ascii")
+        zip_file = await loop.run_in_executor(self.thread_pool,
+                                              self.zip_file,
+                                              pw)
+        self.wav_file = None
+
+        url, _ = await self.bot.manager_client.publish_file(
+            data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
+            filetype='zip',
+            location='recordings')
+
+        embed = discord.Embed(title="Voice Recording")
+        embed.add_field(name="URL", value=url['url'])
+        embed.add_field(name="Password", value=pw)
+        embed.add_field(name="Channels", value=str(self.sink.num_channels))
+        embed.add_field(name="Note", value="File will not work well in normal audio players."
+                                           "Try using audacity to listen to the file.")
+        await self.ctx.send(embed=embed)
 
     async def start_recording(self, excludes):
         """
@@ -63,48 +118,11 @@ class Recording:
             return
 
         self.recording = False
-
-        try:
-            self.ctx.voice_client.stop_listening()
-            await self.event.wait()
-        except Exception:
-            await self.ctx.send("Something went wrong")
-            await self.cleanup()
-            return 0
-
-        if len(self.wav_file.getvalue()) == 0:
-            await self.ctx.send("Nothing was recorded")
-            await self.cleanup()
-            return 0
+        num_bytes = len(self.wav_file.getvalue())
 
         async with self.ctx.typing():
-            pw = bytes("".join([secrets.choice(string.ascii_letters + string.digits)
-                                for _ in range(15)]), "ascii")
-            zip_file = BytesIO()
-            zipper = pyzipper.AESZipFile(zip_file,
-                                         mode='w',
-                                         compression=pyzipper.ZIP_DEFLATED,
-                                         allowZip64=True,
-                                         compresslevel=6,
-                                         encryption=pyzipper.WZ_AES)
-            zipper.setpassword(pw)
-            zipper.writestr("voice.wav", self.wav_file.getvalue())
-            zipper.close()
+            await self.send_file()
 
-            url, _ = await self.bot.manager_client.publish_file(
-                data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
-                filetype='zip',
-                location='recordings')
-
-            embed = discord.Embed(title="Voice Recording")
-            embed.add_field(name="URL", value=url['url'])
-            embed.add_field(name="Password", value=pw)
-            embed.add_field(name="Channels", value=str(self.sink.num_channels))
-            embed.add_field(name="Note", value="File will not work well in normal audio players."
-                                               "Try using audacity to listen to the file.")
-            await self.ctx.send(embed=embed)
-
-        num_bytes = len(self.wav_file.getvalue())
         await self.cleanup()
         return num_bytes
 
@@ -113,49 +131,14 @@ class Recording:
         Ensures that the recording does not go over a certain size.
         """
         while self.recording:
-            if (len(self.sink.channels) > 0 and
-                    len(self.sink.channels[0]) * self.sink.num_channels * 3840 > self.budget):
-                try:
-                    self.ctx.voice_client.stop_listening()
-                    await self.event.wait()
-                except Exception:
-                    await self.ctx.send("Something went wrong")
-                    await self.cleanup()
-                    return 0
-
-                if len(self.wav_file.getvalue()) == 0:
-                    await self.ctx.send("Nothing was recorded")
-                    await self.cleanup()
-                    return
+            if (len(self.sink.channels) > 0
+                    and len(self.sink.channels[0]) * self.sink.num_channels * 3840 > self.budget):
+                self.recording = False
+                num_bytes = len(self.wav_file.getvalue())
 
                 async with self.ctx.typing():
-                    pw = bytes("".join([secrets.choice(string.ascii_letters + string.digits)
-                                        for _ in range(15)]), "ascii")
-                    zip_file = BytesIO()
-                    zipper = pyzipper.ZipFile(zip_file,
-                                              mode='w',
-                                              compression=pyzipper.ZIP_DEFLATED,
-                                              allowZip64=True,
-                                              compresslevel=6,
-                                              encryption=pyzipper.WZ_AES)
-                    zipper.setpassword(pw)
-                    zipper.writestr("voice.wav", self.wav_file.getvalue())
-                    zipper.close()
+                    await self.send_file()
 
-                    url, _ = await self.bot.manager_client.publish_file(
-                        data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
-                        filetype='zip',
-                        location='recordings')
-
-                    embed = discord.Embed(title="Voice Recording")
-                    embed.add_field(name="URL", value=url['url'])
-                    embed.add_field(name="Password", value=pw)
-                    embed.add_field(name="Channels", value=str(self.sink.num_channels))
-                    embed.add_field(name="Note", value="File will not work well in normal audio players."
-                                                       "Try using audacity to listen to the file.")
-                    await self.ctx.send(embed=embed)
-
-                num_bytes = len(self.wav_file.getvalue())
                 await self.cleanup()
                 return num_bytes
             await asyncio.sleep(15)
@@ -194,7 +177,9 @@ class RecordCog(commands.Cog, name="Voice Recording"):
 
         self.budgets = defaultdict(lambda: 5000000000)
         self.recordings = defaultdict(lambda: None)
-        self.last_recording = defaultdict(lambda: time.time())
+        self.last_recording = defaultdict(time.time)
+
+        self.thread_pool = ThreadPoolExecutor(max_workers=NUM_ZIP_THREADS)
 
         # Ensure the opus library is loaded as it is needed to do voice things.
         if not discord.opus.is_loaded():
@@ -217,7 +202,7 @@ class RecordCog(commands.Cog, name="Voice Recording"):
 
         excludes = [ctx.guild.get_member(uid)
                     for uid in self.bot.settings[ctx.guild].voice_exclude]
-        recording = Recording(self.bot, ctx, self.budgets[guild_id])
+        recording = Recording(self.bot, ctx, self.budgets[guild_id], self.thread_pool)
         err = await recording.start_recording(excludes)
 
         if err == 0:
