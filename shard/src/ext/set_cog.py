@@ -65,7 +65,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     async def set(self, ctx, *args):
         """
         Sets an auto response
-        use the syntax `set trigger::response`
+        use the syntax 'set trigger::response'
         You may include the following options in the reaction:
         [noun], [adj], [adv], [member], [:reaction:], [count], [comma, separated, choices]
         """

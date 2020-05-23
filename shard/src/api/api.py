@@ -214,8 +214,8 @@ class Api(Cog):
                     await ctx.invoke(triggered_command, *args[1:])
                 else:
                     # no builtin, check for user set commands in this "guild"
-                    for resp in self.mock_responses[guild_id].responses:
-                        resp_msg, r = await self.mock_responses[guild_id].execute(mock_message)
+                    for resp in responses[guild_id].responses:
+                        resp_msg, r = await responses[guild_id].execute(mock_message)
                         if r is not None:
                             break
 
