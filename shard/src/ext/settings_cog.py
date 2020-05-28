@@ -449,7 +449,6 @@ class ResponsesOnlyAuthorRemove(SettingsElement):
             tags=['responses'])
 
 
-
 class Settings(Cog):
     '''
     Manage server specific architus settings
