@@ -13,6 +13,7 @@ guild_id = 607637793107345431
 async def connect():
     print("connected to server...")
     await sio.emit('mock_user_event', {'guildId': 19, 'content': '!set testing::pwned', 'messageId': 2, 'allowedCommands': ('set', 'remove'), 'action': 3001, 'silent': False})
+    await sio.emit('mock_user_event', {'guildId': 19, 'content': '!schedule event 12pm', 'messageId': 4, 'allowedCommands': ('schedule', 'poll'), 'action': 3001, 'silent': False})
     # nonce = 1923512129
     if len(sys.argv) > 1:
         print("requesting elevated gateway...")

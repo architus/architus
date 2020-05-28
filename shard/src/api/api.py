@@ -6,11 +6,9 @@ from discord.ext.commands import Cog, Context
 import discord
 
 from lib.status_codes import StatusCodes as sc
-from lib.pool_types import PoolType
 from lib.config import logger, FAKE_GUILD_IDS
 from src.auto_response import GuildAutoResponses
 from src.api.util import fetch_guild
-from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 
 
@@ -168,7 +166,9 @@ class Api(Cog):
             args = content.split()
 
             # intersection of commands that exist and commands they're allowed to see
-            possible_commands = [cmd for cmd in self.bot.commands if cmd.name in allowed_commands]
+            all_allowed = ['poll', 'xpoll', 'schedule', 'set', 'remove']
+            possible_commands = [cmd for cmd in self.bot.commands
+                                 if cmd.name in allowed_commands and cmd.name in all_allowed]
 
             # check if they triggered help command
             if args[0][1:] == 'help':
@@ -207,6 +207,7 @@ class Api(Cog):
                         'command': triggered_command,
                         'invoked_with': args[0]
                     })
+
                     # override send, so ctx sends go to our list
                     async def ctx_send(content):
                         sends.append(content)

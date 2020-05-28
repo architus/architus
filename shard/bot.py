@@ -14,7 +14,6 @@ from lib.hoar_frost import HoarFrostGenerator
 class Architus(Bot):
 
     def __init__(self, **kwargs):
-        self.user_commands = {}
         self.session = get_session()
         self.asyncpg_wrapper = AsyncConnWrapper()
         self.deletable_messages = []
@@ -58,11 +57,6 @@ class Architus(Bot):
 
         # check for real commands
         await self.process_commands(msg)
-        # check for user commands
-        for command in self.user_commands[msg.guild.id]:
-            if (command.triggered(msg.content)):
-                await command.execute(msg)
-                break
 
     async def on_ready(self):
         """pull autoresponses from the db, then set activity"""
@@ -74,7 +68,6 @@ class Architus(Bot):
 
     async def on_guild_join(self, guild):
         logger.info(f" -- JOINED NEW GUILD: {guild.name} -- ")
-        self.user_commands.setdefault(guild.id, [])
         await self.manager_client.guild_update(self.shard_id, self.guilds_as_dicts)
 
     @property

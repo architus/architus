@@ -76,6 +76,15 @@ class Setting:
         self._update_db()
 
     @property
+    def responses_only_author_remove(self) -> bool:
+        return self._settings_dict.get('responses_only_author_remove', False)
+
+    @responses_only_author_remove.setter
+    def responses_only_author_remove(self, only: bool) -> None:
+        self._settings_dict['responses_only_author_remove'] = only
+        self._update_db()
+
+    @property
     def responses_whois_emoji(self) -> str:
         return self._settings_dict.get('responses_whois_emoji', '💬')
 

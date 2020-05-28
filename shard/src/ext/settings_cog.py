@@ -28,6 +28,7 @@ SYMBOLS = u"\U0001F523"
 RULER = u"\U0001F4CF"
 TRIAGULAR_RULER = u"\U0001F4D0"
 COLLISION = u"\U0001F4A5"
+CROSS_MARK = u"\U0000274C"
 
 
 class SettingsElement:
@@ -408,7 +409,7 @@ class ResponsesRegexEnabled(SettingsElement):
             tags=['responses'])
 
 
-class ResponseTriggerLength(SettingsElement):
+class ResponsesTriggerLength(SettingsElement):
     def __init__(self):
         super().__init__(
             "Response Trigger Length",
@@ -418,33 +419,33 @@ class ResponseTriggerLength(SettingsElement):
             tags=['responses'])
 
 
-class ResponseResponseLength(SettingsElement):
+class ResponsesResponseLength(SettingsElement):
     def __init__(self):
         super().__init__(
             "Response Response Length",
             TRIAGULAR_RULER,
             "Maximum allowed length for auto response responses. Enter new value or `cancel`.",
-            'responses_trigger_length',
+            'responses_response_length',
             tags=['responses'])
 
 
-class ResponseAllowCollisions(SettingsElement):
+class ResponsesAllowCollisions(SettingsElement):
     def __init__(self):
         super().__init__(
             "Allow Trigger Collisions",
-            TRIAGULAR_RULER,
-            "Maximum allowed length for auto response responses. Enter new value or `cancel`.",
-            'responses_trigger_length',
+            COLLISION,
+            "Whether users are allowed to set triggers that overlap. Enter `true` or `false`.",
+            'responses_allow_collision',
             tags=['responses'])
 
 
-class ResponseAllowCollisions(SettingsElement):
+class ResponsesOnlyAuthorRemove(SettingsElement):
     def __init__(self):
         super().__init__(
-            "Allow Trigger Collisions",
-            TRIAGULAR_RULER,
-            "Maximum allowed length for auto response responses. Enter new value or `cancel`.",
-            'responses_trigger_length',
+            "Restrict Remove",
+            CROSS_MARK,
+            "When enabled, only the auto response author or an admin may remove it. Enter `true` or `false.",
+            'responses_only_author_remove',
             tags=['responses'])
 
 

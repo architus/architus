@@ -1,6 +1,6 @@
 from discord.ext import commands
 from src.auto_response import GuildAutoResponses, TriggerCollisionException, LongResponseException,\
-    ShortTriggerException, UserLimitException, UnknownResponseException, DisabledException
+    ShortTriggerException, UserLimitException, UnknownResponseException, DisabledException, PermissionException
 from lib.response_grammar.response import ParseError
 from lib.reggy.reggy import NotParseable
 from src.utils import bot_commands_only
@@ -22,9 +22,11 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
     @commands.Cog.listener()
     async def on_message(self, msg):
-        msg, response = await self.responses[msg.guild.id].execute(msg)
-        if msg is not None:
-            self.response_msgs[msg.id] = response
+        if not self.bot.settings[msg.channel.guild].responses_enabled:
+            return
+        resp_msg, response = await self.responses[msg.guild.id].execute(msg)
+        if resp_msg is not None:
+            self.response_msgs[resp_msg.id] = response
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
@@ -51,13 +53,15 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         match = re.match(f'{prefix}remove (.+)', ctx.message.content, re.IGNORECASE)
         if match:
             try:
-                resp = self.responses[ctx.guild.id].remove(match[1])
+                resp = self.responses[ctx.guild.id].remove(match[1], ctx.author)
+            except PermissionException as e:
+                member = ctx.guild.get_member(e.author_id)
+                whom = f"{member.display_name} or an admin" if member else "an admin"
+                await ctx.send(f"❌ please ask {whom} to remove this response")
             except UnknownResponseException:
-                pass
+                await ctx.send("❌ idk what response you want me to remove")
             else:
                 await ctx.send(f"✅ `{resp}` _successfully removed_")
-                return
-        await ctx.send("❌ idk what response you want me to remove")
 
     @commands.command()
     @bot_commands_only
@@ -95,7 +99,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             except NotParseable as e:
                 await ctx.send(f"❌ unable to parse your trigger: `{e}`")
             except DisabledException as e:
-                await ctx.send(f"❌ {e} disabled, you can enable in `{settings.prefix}settings responses`")
+                await ctx.send(f"❌ {e} disabled, you can enable in `{settings.command_prefix}settings responses`")
             except Exception:
                 logger.exception("")
                 await ctx.send("❌ unknown error 😵")
@@ -107,9 +111,6 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
                 await ctx.send(f"❌ **nice brain** use two `::`\n`{prefix}set {match[1]}::{match[2]}`")
             else:
                 await ctx.send("❌ use the syntax: `trigger::response`")
-
-            # await ctx.send(f"regex: `{resp.trigger_regex}`")
-            # await ctx.send(f"tokens: `{resp.response_ast.stringify()}`")
 
 
 def setup(bot):
