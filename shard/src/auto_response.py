@@ -348,7 +348,7 @@ class GuildAutoResponses:
         if not admin and len(response.trigger) < self.settings.responses_trigger_length:
             raise ShortTriggerException
 
-        if not (admin or self.settings.responses_allow_collision):
+        if not self.settings.responses_allow_collision:
             conflicts = self.is_disjoint(response)
             if conflicts:
                 raise TriggerCollisionException(conflicts)

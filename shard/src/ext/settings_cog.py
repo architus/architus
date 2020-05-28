@@ -418,6 +418,9 @@ class ResponsesTriggerLength(SettingsElement):
             'responses_trigger_length',
             tags=['responses'])
 
+    async def parse(self, ctx, msg, settings):
+        return abs(int(msg.clean_content))
+
 
 class ResponsesResponseLength(SettingsElement):
     def __init__(self):
@@ -427,6 +430,9 @@ class ResponsesResponseLength(SettingsElement):
             "Maximum allowed length for auto response responses. Enter new value or `cancel`.",
             'responses_response_length',
             tags=['responses'])
+
+    async def parse(self, ctx, msg, settings):
+        return abs(int(msg.clean_content))
 
 
 class ResponsesAllowCollisions(SettingsElement):
@@ -484,7 +490,7 @@ class Settings(Cog):
         '''Open an interactive settings dialog'''
         settings = self.bot.settings[ctx.guild]
         if ctx.author.id not in settings.admins_ids:
-            await ctx.channel.send('nope, sorry')
+            await ctx.channel.send('nope, sorry, you must be an admin')
             return
 
         try:
