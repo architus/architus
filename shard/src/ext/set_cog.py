@@ -6,6 +6,8 @@ from lib.reggy.reggy import NotParseable
 from src.utils import bot_commands_only
 from lib.config import logger
 
+from contextlib import suppress
+
 import re
 
 
@@ -36,12 +38,14 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     async def on_reaction_add(self, react, user):
         msg = react.message
         settings = self.bot.settings[msg.guild]
-        if str(react.emoji) == settings.responses_whois_emoji:
+        if not user.bot and str(react.emoji) == settings.responses_whois_emoji:
             resp = self.response_msgs[msg.id]
             if resp:
                 author = msg.channel.guild.get_member(resp.author_id)
-                await msg.channel.send(
-                    f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, created by {author}")
+                with suppress(KeyError):
+                    await msg.channel.send(
+                        f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, created by {author}")
+                    del self.response_msgs[msg.id]
 
     @commands.command()
     @bot_commands_only

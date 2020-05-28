@@ -322,6 +322,7 @@ class GuildAutoResponses:
         """helper method for removing guild-specific auto response"""
         for r in self.auto_responses:
             if r.trigger == trigger:
+                admin = r.author_id in self.settings.admin_ids
                 if not admin and self.settings.responses_only_author_remove and r.author_id != author.id:
                     raise PermissionException(r.author_id)
                 self.auto_responses.remove(r)
