@@ -1,6 +1,10 @@
-from discord import Emoji
+import base64
+from typing import Optional
+from io import BytesIO
 
 from PIL import ImageChops, Image
+from discord import Emoji
+
 from lib.hoar_frost import HoarFrostGenerator
 from src.utils import download_emoji
 from lib.config import logger
@@ -12,21 +16,24 @@ hoarfrost_gen = HoarFrostGenerator()
 class ArchitusEmoji:
 
     @classmethod
-    async def from_discord(cls, emoji: Emoji):
+    async def from_discord(cls, bot, emoji: Emoji):
         '''creates an architus emoji from a discord emoji'''
         im = Image.open(await download_emoji(emoji))
-        return cls(im, emoji.name, None, emoji.id, emoji.user.id if emoji.user is not None else None)
+        return cls(bot, im, emoji.name, None, emoji.id, emoji.user.id if emoji.user is not None else None)
 
     def __init__(
             self,
+            bot,
             im: Image,
             name: str,
-            id: int = None,
-            discord_id: int = None,
-            author_id: int = None,
+            id: Optional[int] = None,
+            discord_id: Optional[int] = None,
+            author_id: Optional[int] = None,
+            url: str = "",
             num_uses: int = 0,
             priority: float = 0.0):
 
+        self.bot = bot
         self.im = im
         self.name = name
 
@@ -39,10 +46,23 @@ class ArchitusEmoji:
         self.discord_id = discord_id
         self.num_uses = num_uses
         self.priority = priority
+        self._url = url
 
     @property
     def loaded(self):
         return self.discord_id is not None
+
+    async def url(self):
+        if self._url == "":
+            with BytesIO() as buf:
+                self.im.save(buf, format="PNG")
+                binary = buf.getvalue()
+                data, _ = await self.bot.manager_client.publish_file(
+                    location="emojis",
+                    name=f"{self.id}",
+                    data=base64.b64encode(binary).decode('ascii'))
+                self._url = data['url']
+        return self._url
 
     def cache(self) -> None:
         self.discord_id = None
@@ -50,6 +70,7 @@ class ArchitusEmoji:
     def update(self, o):
         self.name = o.name
         self.discord_id = o.discord_id
+        self.url = o.url
         return self
 
     def update_from_discord(self, e: Emoji):
