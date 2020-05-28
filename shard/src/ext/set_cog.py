@@ -39,13 +39,12 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         msg = react.message
         settings = self.bot.settings[msg.guild]
         if not user.bot and str(react.emoji) == settings.responses_whois_emoji:
-            resp = self.response_msgs[msg.id]
-            if resp:
+            with suppress(KeyError):
+                resp = self.response_msgs[msg.id]
                 author = msg.channel.guild.get_member(resp.author_id)
-                with suppress(KeyError):
-                    await msg.channel.send(
-                        f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, created by {author}")
-                    del self.response_msgs[msg.id]
+                await msg.channel.send(
+                    f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, created by {author}")
+                del self.response_msgs[msg.id]
 
     @commands.command()
     @bot_commands_only
