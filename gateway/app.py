@@ -202,7 +202,7 @@ class CustomNamespace(socketio.AsyncNamespace):
         logger.debug(f'client ({sid}) disconnected')
 
     async def on_free_elevation(self, sid, data):
-        if True and False:
+        if True:
             return
         async with self.session(sid) as session:
             session['jwt'] = JWT(token=data['token'])
