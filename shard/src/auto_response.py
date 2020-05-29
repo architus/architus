@@ -207,6 +207,8 @@ class AutoResponse:
 
         if content.strip() != "":
             resp_msg = await msg.channel.send(content)
+        else:
+            resp_msg = None
         for emoji in reacts:
             logger.debug(f"trying to react: {emoji}")
             await msg.add_reaction(emoji)
@@ -366,6 +368,10 @@ class GuildAutoResponses:
             conflicts = self.is_disjoint(response)
             if conflicts:
                 raise TriggerCollisionException(conflicts)
+        else:
+            for r in self.auto_responses:
+                if r.trigger == response.trigger:
+                    raise TriggerCollisionException((r,))
 
     def is_disjoint(self, response: AutoResponse) -> bool:
         # all(r.trigger_reggy.isdisjoint(response.trigger_reggy) for r in self.auto_responses)

@@ -72,8 +72,8 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         """
         Sets an auto response
         use the syntax 'set trigger::response'
-        You may include the following options in the reaction:
-        [noun], [adj], [adv], [member], [:reaction:], [count], [comma, separated, choices]
+        check out the docs for advanced options:
+        https://docs.archit.us/features/auto-responses/
         """
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)
