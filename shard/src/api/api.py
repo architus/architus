@@ -256,6 +256,7 @@ class Api(Cog):
                         'invoked_with': args[0]
                     })
                     # override send, so ctx sends go to our list
+
                     async def ctx_send(content):
                         sends.append(content)
                     ctx.send = ctx_send
