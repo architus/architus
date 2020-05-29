@@ -30,6 +30,39 @@ def flask_authenticated(member=False):
     return decorator
 
 
+def gateway_authenticated(shard, member=False):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(self, sid, data, *args, **kwargs):
+            async with self.session(sid) as session:
+                try:
+                    jwt = session['jwt']
+                except KeyError as e:
+                    await self.emit('error', {
+                        'message': 'not authenticated',
+                        'human': 'There was an error authenticating your request.',
+                        'details': 'session did not contain jwt',
+                        'context': [str(e)],
+                        'code': 401,
+                    }, room=sid)
+                    return
+
+                if member:
+                    resp, sc = shard.is_member(jwt.id, data['guild_id'], routing_guild=data['guild_id'])
+                    if sc != 200 or not resp['member']:
+                        await self.emit('error', {
+                            'message': 'not a member',
+                            'human': 'Unable to verify membership of the server.',
+                            'details': 'shard reported not a member',
+                            'context': [resp],
+                            'code': 401,
+                        }, room=sid)
+                        return
+                return await func(self, sid, data, *args, **kwargs, jwt=jwt)
+        return wrapper
+    return decorator
+
+
 class JWT:
     def __init__(self, data=None, token=None):
         if data is None and token is None:
@@ -45,9 +78,9 @@ class JWT:
 
     def get_token(self):
         if self._dirty:
-            self._token = self._encode(self._data)
+            self._token = self._encode(self._data).decode()
             self._dirty = False
-        return self._token.decode()
+        return self._token
 
     def __getattr__(self, name):
         try:

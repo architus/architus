@@ -216,6 +216,20 @@ class AutoResponse:
     def __repr__(self):
         return f"{self.trigger}::{self.response}"
 
+    def as_dict(self):
+        return {
+            'trigger': self.trigger,
+            'response': self.response,
+            'authorId': str(self.author_id),
+            'guildId': str(self.guild_id),
+            'id': str(self.id),
+            'triggerRegex': self.trigger_regex,
+            'triggerPunctuation': self.trigger_punctuation,
+            'responseTokens': self.response_ast.stringify(),
+            'mode': self.mode,
+            'count': self.count,
+        }
+
 
 class GuildAutoResponses:
 

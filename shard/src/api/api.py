@@ -6,9 +6,11 @@ from discord.ext.commands import Cog, Context
 import discord
 
 from lib.status_codes import StatusCodes as sc
+from lib.pool_types import PoolType
 from lib.config import logger, FAKE_GUILD_IDS
 from src.auto_response import GuildAutoResponses
 from src.api.util import fetch_guild
+from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 
 
@@ -17,6 +19,7 @@ class Api(Cog):
     def __init__(self, bot):
         self.bot = bot
         self.fake_messages = {}
+        self.pools = Pools(bot)
 
     async def api_entry(self, method_name, *args, **kwargs):
         """Callback method for the rpc server
@@ -45,18 +48,19 @@ class Api(Cog):
         return await self.bot.manager_client.guild_count()
 
     async def set_response(self, user_id, guild_id, trigger, response):
-        msg = 'Successfully Set'
-        code = sc.OK_200
-        return {'message': msg}, code
+        return {'message': 'unimplemented'}, 500
 
-    async def is_member(self, user_id, guild_id, admin=False):
+    async def is_member(self, user_id, guild_id):
         '''check if user is a member or admin of the given guild'''
         guild = self.bot.get_guild(int(guild_id))
         if not guild:
-            return {'member': False}, sc.OK_200
+            return {'member': False, 'admin': False}, sc.OK_200
         settings = self.bot.settings[guild]
+        member = guild.get_member(int(user_id))
         return {
-            'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)
+            'member': bool(member),
+            'admin': int(user_id) in settings.admins_ids,
+            'permissions': member.guild_permissions.value if member else 0,
         }, sc.OK_200
 
     async def get_permissions(self, user_id: int, guild_id: int):
@@ -66,7 +70,6 @@ class Api(Cog):
         return {'permissions': 274 if default else 65535}
 
     async def delete_response(self, user_id, guild_id, trigger):
-
         return {'message': "No such command."}, sc.NOT_FOUND_404
 
     async def fetch_user_dict(self, id):
@@ -149,6 +152,41 @@ class Api(Cog):
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
         return {'guilds': guild_list}, sc.OK_200
 
+    async def pool_request(self, guild_id, pool_type: str, entity_id, fetch=False):
+        guild = self.bot.get_guild(int(guild_id)) if guild_id else None
+        try:
+            if pool_type == PoolType.MEMBER:
+                return {'data': await self.pools.get_member(guild, entity_id, fetch)}, 200
+            elif pool_type == PoolType.USER:
+                return {'data': await self.pools.get_user(entity_id, fetch)}, 200
+            elif pool_type == PoolType.EMOJI:
+                return {'data': await self.pools.get_emoji(guild, entity_id, fetch)}, 200
+        except Exception:
+            logger.exception('')
+            return {'data': {}}, sc.NOT_FOUND_404
+
+    @fetch_guild
+    async def pool_all_request(self, guild, pool_type: str):
+        if pool_type == PoolType.MEMBER:
+            # return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
+            return {'data': self.pools.get_all_members(guild)}, sc.OK_200
+        elif pool_type == PoolType.CHANNEL:
+            return {'data': self.pools.get_all_channels(guild)}, sc.OK_200
+        elif pool_type == PoolType.ROLE:
+            return {'data': self.pools.get_all_roles(guild)}, sc.OK_200
+        elif pool_type == PoolType.USER:
+            return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
+        elif pool_type == PoolType.EMOJI:
+            return {'data': await self.pools.get_all_emoji(guild)}, sc.OK_200
+        elif pool_type == PoolType.GUILD:
+            return {'error': "Invalid Pool"}, sc.BAD_REQUEST_400
+        elif pool_type == PoolType.AUTO_RESPONSE:
+            return {'data': self.pools.get_all_responses(guild)}, sc.OK_200
+        elif pool_type == PoolType.SETTING_VALUE:
+            pass
+        else:
+            return {'error': "Unknown Pool"}, sc.BAD_REQUEST_400
+
     async def handle_mock_user_action(
             self,
             action: int = None,
@@ -221,6 +259,7 @@ class Api(Cog):
                     })
 
                     # override send, so ctx sends go to our list
+
                     async def ctx_send(content):
                         sends.append(content)
                     ctx.send = ctx_send

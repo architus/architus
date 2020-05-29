@@ -5,17 +5,22 @@ from flask_restful import Api, Resource
 from flask_cors import CORS
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI
-from lib.models import AutoResponse as AutoResponseModel, Log
+from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod
+from lib.models import Log
 from lib.auth import JWT, flask_authenticated as authenticated
+from lib.discord_requests import list_guilds_request
+from lib.pool_types import PoolType
 
-from src.discord_requests import list_guilds_request
 from src.util import CustomResource, reqparams, camelcase_keys
 from src.session import Identify, Login, RefreshToken, TokenExchange, End
 
 
 app = Flask(__name__)
-cors = CORS(app, supports_credentials=True)
+cors = CORS(
+    app,
+    resources={'/*': {'origins': [f"https://{DOMAIN}/", f"https://api.{DOMAIN}/"] if is_prod else "*"}},
+    supports_credentials=True
+)
 
 
 @app.teardown_appcontext
@@ -91,25 +96,7 @@ class Logs(CustomResource):
 class AutoResponses(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int, jwt: JWT):
-        rows = self.session.query(AutoResponseModel).filter_by(guild_id=guild_id).all()
-        responses = []
-        for r in rows:
-            responses.append({
-                'id': str(r.id),
-                'trigger': r.trigger,
-                'response': r.response,
-                'authorId': str(r.author_id),
-                'guildId': str(r.guild_id),
-                'triggerRegex': r.trigger_regex,
-                'triggerPunctuation': r.trigger_punctuation,
-                'responseAst': r.response_ast,
-                'count': r.count,
-            })
-
-        resp = {
-            'autoResponses': responses
-        }
-        return resp, StatusCodes.OK_200
+        return self.shard.pool_all_request(guild_id, PoolType.AUTO_RESPONSE, routing_guild=guild_id)
 
     @reqparams(trigger=str, response=str)
     @authenticated()

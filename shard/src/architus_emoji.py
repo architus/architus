@@ -46,14 +46,14 @@ class ArchitusEmoji:
         self.discord_id = discord_id
         self.num_uses = num_uses
         self.priority = priority
-        self._url = url
+        self.str_url = url
 
     @property
     def loaded(self):
         return self.discord_id is not None
 
     async def url(self):
-        if self._url == "":
+        if self.str_url == "":
             with BytesIO() as buf:
                 self.im.save(buf, format="PNG")
                 binary = buf.getvalue()
@@ -61,8 +61,8 @@ class ArchitusEmoji:
                     location="emojis",
                     name=f"{self.id}",
                     data=base64.b64encode(binary).decode('ascii'))
-                self._url = data['url']
-        return self._url
+                self.str_url = data['url']
+        return self.str_url
 
     def cache(self) -> None:
         self.discord_id = None
@@ -70,7 +70,7 @@ class ArchitusEmoji:
     def update(self, o):
         self.name = o.name
         self.discord_id = o.discord_id
-        self.url = o.url
+        self._url = o.url
         return self
 
     def update_from_discord(self, e: Emoji):
@@ -102,3 +102,24 @@ class ArchitusEmoji:
 
     def __repr__(self):
         return f"<:{self.name}:{self.id}>"
+
+    def as_dict(self):
+        return {
+            'id': str(self.id),
+            'name': self.name,
+            'authorId': str(self.author_id),
+            'discordId': str(self.discord_id),
+            'numUses': self.num_uses,
+            'priority': self.priority,
+        }
+
+    async def as_dict_url(self):
+        return {
+            'id': str(self.id),
+            'name': self.name,
+            'authorId': str(self.author_id),
+            'discordId': str(self.discord_id),
+            'numUses': self.num_uses,
+            'priority': self.priority,
+            'url': await self.url(),
+        }
