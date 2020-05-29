@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 import json
 from collections import defaultdict
 
-from lib.models import Command, AutoResponse
+from lib.models import Command, AutoResponse, Settings
 from lib.hoar_frost import HoarFrostGenerator
 from lib.response_grammar.response import parse
 from lib.reggy.reggy import Reggy
@@ -25,6 +25,25 @@ Session = sessionmaker(bind=engine)
 session = Session()
 
 command_list = session.query(Command).all()
+
+
+def load_settings(guild_id):
+    settings_row = None
+    try:
+        settings_row = session.query(Settings).filter_by(server_id=int(guild_id)).one()
+    except Exception as e:
+        print(e)
+        new_guild = Settings(int(guild_id), json.dumps({}))
+        session.add(new_guild)
+    return json.loads(settings_row.json_blob) if settings_row else {}
+
+
+def update_settings(guild_id, settings):
+    new_data = {
+        'server_id': int(guild_id),
+        'json_blob': json.dumps(settings)
+    }
+    session.query(Settings).filter_by(server_id=int(guild_id)).update(new_data)
 
 
 def get_puncutation(trigger):
@@ -108,7 +127,10 @@ for cmd in command_list:
 
 for guild_id in responses.keys():
     reggys = []
+    uses_regex = False
     for resp in responses[guild_id]:
+        if '*' in resp.trigger:
+            uses_regex = True
         try:
             reggys.append(Reggy(resp.trigger_regex))
         except Exception as e:
@@ -125,7 +147,22 @@ for guild_id in responses.keys():
             if not reggys[i].isdisjoint(reggys[j]):
                 print(f"{reggys[i]} intersects {reggys[j]}")
                 count += 1
-    print(f"found collisions in {count}/{len(reggys)} triggers in {time.time() - now} seconds")
+                break
+        else:
+            continue
+        break
+    if count > 0:
+        print(f"found collision in {guild_id}, updating settings to allow collisions")
+        setting = load_settings(guild_id)
+        setting.update({'responses_allow_collision': True})
+        update_settings(guild_id, setting)
+    if uses_regex:
+        print(f"{guild_id} used capture group, allowing regex in settings")
+        setting = load_settings(guild_id)
+        setting.update({'responses_allow_regex': True})
+        update_settings(guild_id, setting)
+
+    # print(f"found collisions in {count}/{len(reggys)} triggers in {time.time() - now} seconds")
 
 i = input("scan complete, do you want to insert (y/n)?")
 if i.lower() != 'y':

@@ -6,9 +6,10 @@ from discord.ext.commands import Cog, Context
 import discord
 
 from lib.status_codes import StatusCodes as sc
-from lib.config import logger
+from lib.config import logger, FAKE_GUILD_IDS
+from src.auto_response import GuildAutoResponses
 from src.api.util import fetch_guild
-from src.api.mock_discord import MockMember, MockMessage, LogActions
+from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 
 
 class Api(Cog):
@@ -163,7 +164,7 @@ class Api(Cog):
         allowed_commands = allowedCommands
 
         # this is very scuffed. guilds under this number won't have their responses added to the db
-        assert guild_id < 10000000
+        assert guild_id < FAKE_GUILD_IDS
 
         if action is None or message_id is None or guild_id is None:
             return {'message': "missing arguments"}, sc.BAD_REQUEST_400
@@ -177,7 +178,9 @@ class Api(Cog):
             args = content.split()
 
             # intersection of commands that exist and commands they're allowed to see
-            possible_commands = [cmd for cmd in self.bot.commands if cmd.name in allowed_commands]
+            all_allowed = ['poll', 'xpoll', 'schedule', 'set', 'remove']
+            possible_commands = [cmd for cmd in self.bot.commands
+                                 if cmd.name in allowed_commands and cmd.name in all_allowed]
 
             # check if they triggered help command
             if args[0][1:] == 'help':
@@ -185,7 +188,7 @@ class Api(Cog):
                 for cmd in possible_commands:
                     try:
                         if args[1] in cmd.aliases or args[1] == cmd.name:
-                            help_text += f'```hi{args[1]} - {cmd.help}```'
+                            help_text += f'```{args[1]} - {cmd.help}```'
                             break
                     except IndexError:
                         help_text += f'```{cmd.name}: {cmd.help:>5}```\n'
@@ -203,7 +206,9 @@ class Api(Cog):
                                            resp_id=resp_id)
                 self.fake_messages[guild_id][message_id] = mock_message
 
-                # self.bot.user_commands.setdefault(int(guild_id), [])
+                responses = self.bot.get_cog("Auto Responses").responses
+                responses.setdefault(
+                    guild_id, GuildAutoResponses(self.bot, MockGuild(guild_id), no_db=int(guild_id) < FAKE_GUILD_IDS))
                 if triggered_command:
                     # found builtin command, creating fake context
                     ctx = Context(**{
@@ -214,14 +219,17 @@ class Api(Cog):
                         'command': triggered_command,
                         'invoked_with': args[0]
                     })
+
                     # override send, so ctx sends go to our list
-                    ctx.send = lambda content: sends.append(content)
+                    async def ctx_send(content):
+                        sends.append(content)
+                    ctx.send = ctx_send
                     await ctx.invoke(triggered_command, *args[1:])
                 else:
                     # no builtin, check for user set commands in this "guild"
-                    for command in ():
-                        if command.triggered(mock_message.content):
-                            await command.execute(mock_message)
+                    for resp in responses[guild_id].auto_responses:
+                        resp_msg, r = await responses[guild_id].execute(mock_message)
+                        if r is not None:
                             break
 
             # Prevent response sending for silent requests
