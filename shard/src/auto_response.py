@@ -150,7 +150,6 @@ class AutoResponse:
 
     async def resolve_resp(self, node, match, msg, content=None, reacts=None):
         if (node.type == NodeType.List):
-            logger.debug(len(node.children))
             await self.resolve_resp(choice(node.children), match, msg, content, reacts)
         elif (node.type == NodeType.ListElement):
             for c in node.children:
@@ -158,7 +157,6 @@ class AutoResponse:
         elif (node.type == NodeType.PlainText):
             content.append(node.text)
         elif (node.type == NodeType.React):
-            logger.debug(f"id: {node.id}, shortcade: {node.shortcode}")
             emoji = self.emoji_manager.find_emoji(node.id, node.id, node.shortcode)
             if emoji:
                 logger.debug(f"found {emoji} in manager, making sure it's loaded")
@@ -334,30 +332,40 @@ class GuildAutoResponses:
         self._insert_into_db(r)
         return r
 
-    def remove(self, trigger: str) -> AutoResponse:
+    def remove(self, trigger: str, author: Member) -> AutoResponse:
         """helper method for removing guild-specific auto response"""
         for r in self.auto_responses:
             if r.trigger == trigger:
+                admin = r.author_id in self.settings.admin_ids
+                if not admin and self.settings.responses_only_author_remove and r.author_id != author.id:
+                    raise PermissionException(r.author_id)
                 self.auto_responses.remove(r)
                 self._delete_from_db(r)
                 return r
         raise UnknownResponseException
 
     def validate(self, response: AutoResponse) -> None:
-        if self.settings.responses_limit is not None:
+        admin = response.author_id in self.settings.admin_ids
+        if not self.settings.responses_enabled:
+            raise DisabledException("auto responses")
+        if response.mode == ResponseMode.REGEX and not (self.settings.responses_allow_regex or admin):
+            raise DisabledException("regex responses")
+
+        if self.settings.responses_limit is not None and not admin:
             author_count = len([r for r in self.auto_responses if r.author_id == self.author_id])
             if author_count >= self.settings.responses_limit:
                 raise UserLimitException
 
-        if len(response.response) > self.settings.responses_response_length:
+        if not admin and len(response.response) > self.settings.responses_response_length:
             raise LongResponseException
 
-        if len(response.trigger) < self.settings.responses_trigger_length:
+        if not admin and len(response.trigger) < self.settings.responses_trigger_length:
             raise ShortTriggerException
 
-        conflicts = self.is_disjoint(response)
-        if conflicts:
-            raise TriggerCollisionException(conflicts)
+        if not self.settings.responses_allow_collision:
+            conflicts = self.is_disjoint(response)
+            if conflicts:
+                raise TriggerCollisionException(conflicts)
 
     def is_disjoint(self, response: AutoResponse) -> bool:
         # all(r.trigger_reggy.isdisjoint(response.trigger_reggy) for r in self.auto_responses)
@@ -370,6 +378,15 @@ class GuildAutoResponses:
 
 
 class AutoResponseException(Exception):
+    pass
+
+
+class PermissionException(AutoResponseException):
+    def __init__(self, author_id):
+        self.author_id = author_id
+
+
+class DisabledException(AutoResponseException):
     pass
 
 

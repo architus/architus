@@ -76,6 +76,15 @@ class Setting:
         self._update_db()
 
     @property
+    def responses_only_author_remove(self) -> bool:
+        return self._settings_dict.get('responses_only_author_remove', False)
+
+    @responses_only_author_remove.setter
+    def responses_only_author_remove(self, only: bool) -> None:
+        self._settings_dict['responses_only_author_remove'] = only
+        self._update_db()
+
+    @property
     def responses_whois_emoji(self) -> str:
         return self._settings_dict.get('responses_whois_emoji', '💬')
 
@@ -95,7 +104,7 @@ class Setting:
 
     @property
     def responses_trigger_length(self) -> int:
-        return self._settings_dict.get('responses_trigger_length', 3)
+        return self._settings_dict.get('responses_trigger_length', 2)
 
     @responses_trigger_length.setter
     def responses_trigger_length(self, new_length: int) -> None:
@@ -109,6 +118,33 @@ class Setting:
     @responses_response_length.setter
     def responses_response_length(self, new_length: int) -> None:
         self._settings_dict['responses_response_length'] = new_length
+        self._update_db()
+
+    @property
+    def responses_allow_regex(self) -> bool:
+        return self._settings_dict.get('responses_allow_regex', False)
+
+    @responses_allow_regex.setter
+    def responses_allow_regex(self, allow: bool) -> None:
+        self._settings_dict['responses_allow_regex'] = allow
+        self._update_db()
+
+    @property
+    def responses_allow_collision(self) -> bool:
+        return self._settings_dict.get('responses_allow_collision', False)
+
+    @responses_allow_collision.setter
+    def responses_allow_collision(self, allow: bool) -> None:
+        self._settings_dict['responses_allow_collision'] = allow
+        self._update_db()
+
+    @property
+    def responses_enabled(self) -> bool:
+        return self._settings_dict.get('responses_enabled', True)
+
+    @responses_enabled.setter
+    def responses_enabled(self, enabled: bool) -> None:
+        self._settings_dict['responses_enabled'] = enabled
         self._update_db()
 
     @property
@@ -193,6 +229,7 @@ class Setting:
     @property
     def admins_ids(self) -> List[int]:
         default_admins = [self.guild.owner.id]
+        default_admins += [m.id for role in self.guild.roles for m in role.members if role.permissions.administrator]
 
         return list(set(default_admins + [int(a) for a in self._settings_dict.get('admins', [])]))
 

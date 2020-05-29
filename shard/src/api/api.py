@@ -216,7 +216,9 @@ class Api(Cog):
             args = content.split()
 
             # intersection of commands that exist and commands they're allowed to see
-            possible_commands = [cmd for cmd in self.bot.commands if cmd.name in allowed_commands]
+            all_allowed = ['poll', 'xpoll', 'schedule', 'set', 'remove']
+            possible_commands = [cmd for cmd in self.bot.commands
+                                 if cmd.name in allowed_commands and cmd.name in all_allowed]
 
             # check if they triggered help command
             if args[0][1:] == 'help':
@@ -255,6 +257,7 @@ class Api(Cog):
                         'command': triggered_command,
                         'invoked_with': args[0]
                     })
+
                     # override send, so ctx sends go to our list
 
                     async def ctx_send(content):
@@ -263,8 +266,8 @@ class Api(Cog):
                     await ctx.invoke(triggered_command, *args[1:])
                 else:
                     # no builtin, check for user set commands in this "guild"
-                    for resp in self.mock_responses[guild_id].responses:
-                        resp_msg, r = await self.mock_responses[guild_id].execute(mock_message)
+                    for resp in responses[guild_id].auto_responses:
+                        resp_msg, r = await responses[guild_id].execute(mock_message)
                         if r is not None:
                             break
 
