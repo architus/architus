@@ -4,23 +4,33 @@ from aiohttp import ClientSession
 import io
 import asyncio
 import functools
+from threading import Lock
 
 import discord
 
 from lib.config import logger
 
-class AsyncThreadEvent(asyncio.Event):
+class TCPLock:
     """
-    Custom event class for being able to safely set and clear an
-    asynchronous event from multiple threads.
-
-    Shouldn't need a thread safe clear method as the event should only be
-    referenced from the main thread by the time that that method is called.
+    A basic thread safe TCP socket.
     """
+    def __init__(self, s):
+        self.connection = s
+        self.lock = Lock()
 
-    def set(self):
-        self._loop.call_soon_threadsafe(super().set)
+    def write(self, b):
+        self.lock.acquire()
+        self.connection.send(b)
+        self.lock.release()
 
+    def send(self, b):
+        self.write(b)
+
+    def recv(self, num_bytes):
+        self.lock.acquire()
+        msg = self.connection.recv(num_bytes)
+        self.lock.release()
+        return msg
 
 async def download_emoji(emoji: discord.Emoji) -> io.BytesIO:
     async with ClientSession() as session:

@@ -58,4 +58,3 @@ pyyaml
 pika
 aio-pika
 asyncpg
-pyzipper

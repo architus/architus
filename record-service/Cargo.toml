@@ -1,0 +1,14 @@
+[package]
+name = "mic"
+version = "0.1.0"
+authors = ["James Johnson <jjohnson474@gatech.edu>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+opus = "0.2.1"
+bimap = "0.4.0"
+log = "0.4"
+simple_logger = "1.6.0"
+rtp-rs = "0.5.0"

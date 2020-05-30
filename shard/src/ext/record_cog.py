@@ -1,25 +1,19 @@
 """
 Cog for recording a voice channel
 """
-from io import BytesIO
-import base64
 from collections import defaultdict
 import asyncio
 import time
 from functools import partial
-import secrets
-import string
+import socket
+import struct
 from concurrent.futures import ThreadPoolExecutor
 
-import pyzipper
-from src.utils import AsyncThreadEvent
+from src.utils import TCPLock
 
 import discord
+from discord import TCPSink
 from discord.ext import commands
-from discord import WavFile
-
-
-NUM_ZIP_THREADS = 5
 
 
 class Recording:
@@ -27,67 +21,57 @@ class Recording:
     Class to handle a recording for a guild.
     """
 
-    def __init__(self, bot, ctx, budget, tp):
-        self.bot = bot
+    def __init__(self, bot, ctx, budget):
+        self.bot_id = bot
         self.ctx = ctx
         self.budget = budget
 
         self.wav_file = None
-        self.event = AsyncThreadEvent()
 
         self.recording = True
         self.sink = None
-
-        self.thread_pool = tp
-
-    def zip_file(self, password):
-        zip_file = BytesIO()
-        zipper = pyzipper.AESZipFile(zip_file,
-                                     mode='w',
-                                     compression=pyzipper.ZIP_DEFLATED,
-                                     allowZip64=True,
-                                     compresslevel=6,
-                                     encryption=pyzipper.WZ_AES)
-        zipper.setpassword(password)
-        zipper.writestr("voice.wav", self.wav_file.getvalue())
-        zipper.close()
-
-        return zip_file
+        self.tcp = None
 
     async def send_file(self):
+        """
         try:
             self.ctx.voice_client.stop_listening()
-            await self.event.wait()
         except Exception:
             await self.ctx.send("Something went wrong")
             await self.cleanup()
             return
 
-        if len(self.wav_file.getvalue()) == 0:
-            await self.ctx.send("Nothing was recorded")
-            await self.cleanup()
-            return
-
         loop = asyncio.get_running_loop()
-        pw = bytes("".join([secrets.choice(string.ascii_letters + string.digits)
-                            for _ in range(15)]), "ascii")
-        zip_file = await loop.run_in_executor(self.thread_pool,
-                                              self.zip_file,
-                                              pw)
-        self.wav_file = None
-
         url, _ = await self.bot.manager_client.publish_file(
             data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
             filetype='zip',
             location='recordings')
 
-        embed = discord.Embed(title="Voice Recording")
-        embed.add_field(name="URL", value=url['url'])
+        embed = discord.Embed(title=f"Recording of {self.vc.name}", url=url['url'])
+        embed.add_field(name="URL", value=url['url'], inline=False)
         embed.add_field(name="Password", value=pw)
-        embed.add_field(name="Channels", value=str(self.sink.num_channels))
-        embed.add_field(name="Note", value="File will not work well in normal audio players."
-                                           "Try using audacity to listen to the file.")
+        if self.sink.num_channels > 3:
+            embed.add_field(name="Channels", value=str(self.sink.num_channels))
+        embed.set_footer(text="File will not work well in normal audio players."
+                              "Try using audacity to listen to the file.")
         await self.ctx.send(embed=embed)
+        """
+
+        msg = self.tcp.recv(8)
+        size = "I" if len(msg) == 4 else "Q"
+        num_bytes = struct.unpack(size, msg)[0]
+        await self.ctx.send(f"Recorded {num_bytes} bytes")
+        return num_bytes
+
+    def send_disallowed_ids(self, ids):
+        buf = bytearray(4096)
+        sent = 0
+        to_send = len(ids)
+        while to_send > 0:
+            sending = min(to_send, 64)
+            struct.pack_into(f">{sending}Q", buf, 0, *members[sent:sent + sending])
+            self.tcp.send(buf)
+            to_send -= sending
 
     async def start_recording(self, excludes):
         """
@@ -98,10 +82,19 @@ class Recording:
         except commands.CommandError:
             return 1
 
-        members = [m for m in self.ctx.author.voice.channel.members
+        members = [m.id for m in self.ctx.author.voice.channel.members
                    if not m.bot and m not in excludes]
-        self.wav_file = BytesIO()
-        self.sink = WavFile(self.wav_file, members, self.event, self.bot.user, excludes)
+
+        self.tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp.connect(("record-service", 7777))
+        to_send = len(members)
+        buf = bytearray(11)
+        struct.pack_into(">BQH", buf, 0, 0x03, self.bot_id, to_send)
+        self.tcp.send(buf)
+        print(f"Sending {to_send} user_ids")
+
+        self.tcp = TCPLock(self.tcp)
+        self.sink = TCPSink(self.tcp)
         self.ctx.voice_client.listen(self.sink)
         self.recording = True
 
@@ -118,26 +111,44 @@ class Recording:
             return
 
         self.recording = False
-        num_bytes = len(self.wav_file.getvalue())
+        self.ctx.voice_client.stop_listening()
+        print("Sending kill signal")
+        self.tcp.send(b"\x04")
+        print("kill sent")
 
         async with self.ctx.typing():
-            await self.send_file()
+            num_bytes = await self.send_file()
 
         await self.cleanup()
         return num_bytes
+
+    def get_curr_recording_length(self):
+        self.tcp.write(b"\x05")
+        msg = self.tcp.recv(8)
+        size = "I" if len(msg) == 4 else "Q"
+        num_bytes = struct.unpack(size, msg)
+        return num_bytes[0]
 
     async def timer(self):
         """
         Ensures that the recording does not go over a certain size.
         """
+        loop = asyncio.get_running_loop()
         while self.recording:
-            if (len(self.sink.channels) > 0
-                    and len(self.sink.channels[0]) * self.sink.num_channels * 3840 > self.budget):
+            """
+            with ThreadPoolExecutor() as pool:
+                num_bytes = await loop.run_in_executor(
+                    pool, self.get_curr_recording_length)
+            """
+            num_bytes = self.get_curr_recording_length()
+            if (num_bytes > self.budget):
                 self.recording = False
-                num_bytes = len(self.wav_file.getvalue())
+                self.ctx.voice_client.stop_listening()
+                self.tcp.send(b"\x05")
 
+                num_bytes = 0
                 async with self.ctx.typing():
-                    await self.send_file()
+                    num_bytes = await self.send_file()
 
                 await self.cleanup()
                 return num_bytes
@@ -149,9 +160,6 @@ class Recording:
         Remove bot from voice channel and clear per recording variables.
         """
         await self.ctx.voice_client.disconnect()
-        self.event.clear()
-        self.wav_file.close()
-        self.wav_file = None
 
     async def ensure_voice(self):
         """
@@ -161,6 +169,7 @@ class Recording:
         if self.ctx.author.voice:
             # Connect to author's voice channel before recording.
             await self.ctx.author.voice.channel.connect()
+            self.channel = self.ctx.author.voice.channel
         else:
             await self.ctx.send("Need to be in a voice channel to record.")
             raise Exception
@@ -173,17 +182,10 @@ class RecordCog(commands.Cog, name="Voice Recording"):
 
     def __init__(self, bot):
         self.bot = bot
-        self.event = AsyncThreadEvent()
 
         self.budgets = defaultdict(lambda: 5000000000)
         self.recordings = defaultdict(lambda: None)
         self.last_recording = defaultdict(time.time)
-
-        self.thread_pool = ThreadPoolExecutor(max_workers=NUM_ZIP_THREADS)
-
-        # Ensure the opus library is loaded as it is needed to do voice things.
-        if not discord.opus.is_loaded():
-            discord.opus.load_opus("res/libopus.so")
 
     @commands.command(aliases=['record'])
     async def start_recording(self, ctx):
@@ -202,7 +204,7 @@ class RecordCog(commands.Cog, name="Voice Recording"):
 
         excludes = [ctx.guild.get_member(uid)
                     for uid in self.bot.settings[ctx.guild].voice_exclude]
-        recording = Recording(self.bot, ctx, self.budgets[guild_id], self.thread_pool)
+        recording = Recording(self.bot.user.id, ctx, self.budgets[guild_id])
         err = await recording.start_recording(excludes)
 
         if err == 0:

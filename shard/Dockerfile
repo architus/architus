@@ -31,8 +31,8 @@ RUN python3.8 setup.py build
 RUN python3.8 setup.py install
 RUN python3.8 setup.py check
 
-
-RUN git clone -b master https://github.com/architus/discord.py
+# Install custom discord.py library
+RUN git clone https://github.com/architus/discord.py
 WORKDIR ./discord.py
 RUN python3.8 -m pip install -U .[voice]
 WORKDIR /app
