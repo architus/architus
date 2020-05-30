@@ -40,6 +40,8 @@ class MockGuild:
         self.default_role = MockRole()
         self.default_role.mention = "@everyone"
         self.emojis = []
+        self.members = []
+        self.roles = ()
 
     def get_member(self, *args):
         return None

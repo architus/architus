@@ -1,22 +1,26 @@
 import json
-import re
 
 from flask import Flask, redirect, request, g
 from flask_restful import Api, Resource
 from flask_cors import CORS
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI
-from lib.models import Command, Log
+from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod
+from lib.models import Log
 from lib.auth import JWT, flask_authenticated as authenticated
+from lib.discord_requests import list_guilds_request
+from lib.pool_types import PoolType
 
-from src.discord_requests import list_guilds_request
 from src.util import CustomResource, reqparams, camelcase_keys
 from src.session import Identify, Login, RefreshToken, TokenExchange, End
 
 
 app = Flask(__name__)
-cors = CORS(app, supports_credentials=True)
+cors = CORS(
+    app,
+    resources={'/*': {'origins': [f"https://{DOMAIN}/", f"https://api.{DOMAIN}/"] if is_prod else "*"}},
+    supports_credentials=True
+)
 
 
 @app.teardown_appcontext
@@ -92,30 +96,7 @@ class Logs(CustomResource):
 class AutoResponses(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int, jwt: JWT):
-        rows = self.session.query(Command).filter(Command.trigger.startswith(str(guild_id))).all()
-        commands = []
-        authors = {}
-        emojis = {}
-        p = re.compile(r"<:\S+:(?P<emoji_id>\d{15,30})\>")
-        for cmd in rows:
-            commands.append({
-                'trigger': cmd.trigger.replace(str(cmd.server_id), "", 1),
-                'response': cmd.response,
-                'count': cmd.count,
-                'author_id': str(cmd.author_id)
-            })
-            match = p.search(cmd.response)
-            if match and str(match.group("emoji_id")) not in emojis:
-                emojis[str(match.group("emoji_id"))], sc = self.shard.get_emoji(match.group('emoji_id'))
-            if str(cmd.author_id) not in authors:
-                authors[str(cmd.author_id)], sc = self.shard.fetch_user_dict(cmd.author_id)
-
-        resp = {
-            'authors': authors,
-            'emojis': emojis,
-            'commands': commands
-        }
-        return resp, StatusCodes.OK_200
+        return self.shard.pool_all_request(guild_id, PoolType.AUTO_RESPONSE, routing_guild=guild_id)
 
     @reqparams(trigger=str, response=str)
     @authenticated()
@@ -182,6 +163,12 @@ class Stats(CustomResource):
         }, StatusCodes.OK_200
 
 
+class Emojis(CustomResource):
+
+    def get(self, guild_id: int):
+        return self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
+
+
 class ListGuilds(CustomResource):
     @authenticated()
     def get(self, jwt: JWT):
@@ -209,6 +196,7 @@ def app_factory():
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Stats, "/stats/<int:guild_id>")
+    api.add_resource(Emojis, "/emojis/<int:guild_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")

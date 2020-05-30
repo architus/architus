@@ -3,8 +3,12 @@ from random import randint
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime, timezone
+from contextlib import suppress
 import re
 import logging
+
+with suppress(ImportError):
+    import asyncpg
 
 """
 This file loads the environment secrets into memory and also manages database connections
@@ -19,6 +23,8 @@ logger.addHandler(handler)
 DB_HOST = 'postgres'
 DB_PORT = 5432
 
+FAKE_GUILD_IDS = 10000000
+
 DISCORD_EPOCH = datetime(2015, 1, 1, tzinfo=timezone.utc)
 
 try:
@@ -30,6 +36,7 @@ try:
     client_id = os.environ['client_id']
     client_secret = os.environ['client_secret']
     domain_name = os.environ['domain_name']
+    is_prod = os.environ['domain_name'] == 'archit.us'
     alphavantage_api_key = os.environ['alphavantage_api_key']
     twitter_consumer_key = os.environ['twitter_consumer_key']
     twitter_consumer_secret = os.environ['twitter_consumer_secret']
@@ -53,6 +60,14 @@ def get_session():
     logger.debug("creating a new db session")
     Session = sessionmaker(bind=engine)
     return Session()
+
+
+class AsyncConnWrapper:
+    def __init__(self):
+        self.conn = None
+
+    async def connect(self):
+        self.conn = await asyncpg.connect(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
 
 
 def which_shard(guild_id=None):

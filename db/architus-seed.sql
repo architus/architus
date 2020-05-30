@@ -23,6 +23,25 @@ SET default_tablespace = '';
 SET default_with_oids = false;
 
 --
+-- Name: tb_auto_responses; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.tb_auto_responses (
+    id bigint NOT NULL,
+    trigger text NOT NULL,
+    response text NOT NULL,
+    author_id bigint NOT NULL,
+    guild_id bigint NOT NULL,
+    trigger_regex text NOT NULL,
+    trigger_punctuation char[],
+    response_ast text,
+    mode varchar(10) CHECK (mode IN ('regex', 'punctuated', 'naive')),
+    count int NOT NULL
+);
+
+ALTER TABLE public.tb_auto_responses OWNER TO postgres;
+
+--
 -- Name: tb_emojis; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -32,6 +51,7 @@ CREATE TABLE public.tb_emojis (
     author_id bigint,
     guild_id bigint,
     name text NOT NULL,
+    url text NOT NULL,
     num_uses integer NOT NULL,
     priority double precision NOT NULL,
     img bytea NOT NULL
@@ -162,6 +182,13 @@ ALTER TABLE ONLY public.tb_users ALTER COLUMN user_id SET DEFAULT nextval('publi
 
 ALTER TABLE ONLY public.tb_emojis
     ADD CONSTRAINT tb_emojis_pkey PRIMARY KEY (id);
+
+--
+-- Name: tb_auto_responses tb_auto_responses_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.tb_auto_responses
+    ADD CONSTRAINT tb_auto_responses_pkey PRIMARY KEY (id);
 
 
 --
