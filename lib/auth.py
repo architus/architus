@@ -25,7 +25,6 @@ def flask_authenticated(member=False):
                 if sc != 200 or not data['member']:
                     return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
             return func(self, *args, **kwargs, jwt=jwt)
-
         return wrapper
     return decorator
 
