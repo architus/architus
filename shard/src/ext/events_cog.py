@@ -47,10 +47,10 @@ class EventCog(Cog, name="Events"):
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
         channel = await self.bot.fetch_channel(payload.channel_id)
-        message = await channel.fetch_message(payload.channel_id, payload.message_id)
+        message = await channel.fetch_message(payload.message_id)
         user = payload.member
         emoji = payload.emoji
-        if self.bot.id != message.author.id or user.bot: 
+        if user.bot: 
             return
 
         react_event = await self.tb_react_events.get_by_id(message.id, message.guild.id)
@@ -58,6 +58,7 @@ class EventCog(Cog, name="Events"):
             return
 
         react_event_payload = json.loads(react_event.payload)
+        print(react_event_payload)
         if react_event.command == ReactionEvent.schedule:
             self.schedule_react_add(emoji, user, message, react_event_payload)
             return
@@ -195,7 +196,7 @@ class EventCog(Cog, name="Events"):
             'title_str': title_str,
             'parsed_time': parsed_time
         }
-        self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload), expires)
+        await self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload), expires)
 
     @commands.command()
     async def poll(self, ctx, *args):
@@ -242,7 +243,7 @@ class EventCog(Cog, name="Events"):
             'title': title,
             'options': options   
         }
-        self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload), expires)
+        await self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload), expires)
 
     def get_timezone(self, region):
         region = str(region)

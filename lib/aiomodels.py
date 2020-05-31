@@ -11,10 +11,13 @@ class Base:
         return self.conn_wrapper.conn
 
     async def insert(self, cols):
-        columns, values = zip(*dict.items())
+        columns, values = zip(*cols.items())
+        print(f'''INSERT INTO {self.__class__.__tablename__}({','.join(columns)})
+            VALUES ({','.join(str(item) for item in values)})
+            ''')
         await self.conn.execute(
             f'''INSERT INTO {self.__class__.__tablename__}({','.join(columns)})
-            VALUES {','.join(values)}
+            VALUES ({','.join(str(item) for item in values)})
             '''
         )
 
@@ -48,7 +51,7 @@ class TbReactEvents(Base):
 
 
     async def get_by_id(self, message_id:int, guild_id: int):
-        return await conn.fetchrow(
+        return await self.conn.fetchrow(
             f'''SELECT *
             FROM {self.__class__.__tablename__}
             WHERE (guild_id, message_id) = ($1, $2)
