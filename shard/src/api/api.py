@@ -6,9 +6,12 @@ from discord.ext.commands import Cog, Context
 import discord
 
 from lib.status_codes import StatusCodes as sc
-from lib.config import logger
+from lib.pool_types import PoolType
+from lib.config import logger, FAKE_GUILD_IDS
+from src.auto_response import GuildAutoResponses
 from src.api.util import fetch_guild
-from src.api.mock_discord import MockMember, MockMessage, LogActions
+from src.api.pools import Pools
+from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 
 
 class Api(Cog):
@@ -16,6 +19,7 @@ class Api(Cog):
     def __init__(self, bot):
         self.bot = bot
         self.fake_messages = {}
+        self.pools = Pools(bot)
 
     async def api_entry(self, method_name, *args, **kwargs):
         """Callback method for the rpc server
@@ -44,18 +48,19 @@ class Api(Cog):
         return await self.bot.manager_client.guild_count()
 
     async def set_response(self, user_id, guild_id, trigger, response):
-        msg = 'Successfully Set'
-        code = sc.OK_200
-        return {'message': msg}, code
+        return {'message': 'unimplemented'}, 500
 
-    async def is_member(self, user_id, guild_id, admin=False):
+    async def is_member(self, user_id, guild_id):
         '''check if user is a member or admin of the given guild'''
         guild = self.bot.get_guild(int(guild_id))
         if not guild:
-            return {'member': False}, sc.OK_200
+            return {'member': False, 'admin': False}, sc.OK_200
         settings = self.bot.settings[guild]
+        member = guild.get_member(int(user_id))
         return {
-            'member': bool(guild.get_member(int(user_id))) and (not admin or int(user_id) in settings.admins_ids)
+            'member': bool(member),
+            'admin': int(user_id) in settings.admins_ids,
+            'permissions': member.guild_permissions.value if member else 0,
         }, sc.OK_200
 
     async def get_permissions(self, user_id: int, guild_id: int):
@@ -65,7 +70,6 @@ class Api(Cog):
         return {'permissions': 274 if default else 65535}
 
     async def delete_response(self, user_id, guild_id, trigger):
-
         return {'message': "No such command."}, sc.NOT_FOUND_404
 
     async def fetch_user_dict(self, id):
@@ -86,6 +90,18 @@ class Api(Cog):
             'name': e.name,
             'url': str(e.url)
         }, sc.OK_200
+
+    async def get_guild_emojis(self, guild_id):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild_id]
+        return {'emojis': [{
+            'id': str(e.id),
+            'name': e.name,
+            'authorId': str(e.author_id) if e.author_id is not None else None,
+            'loaded': e.loaded,
+            'numUses': e.num_uses,
+            'discordId': str(e.discord_id),
+            'url': await e.url(),
+        } for e in emoji_manager.emojis]}, sc.OK_200
 
     async def get_extensions(self):
         return {'extensions': [k for k in self.bot.extensions.keys()]}, sc.OK_200
@@ -136,6 +152,41 @@ class Api(Cog):
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
         return {'guilds': guild_list}, sc.OK_200
 
+    async def pool_request(self, guild_id, pool_type: str, entity_id, fetch=False):
+        guild = self.bot.get_guild(int(guild_id)) if guild_id else None
+        try:
+            if pool_type == PoolType.MEMBER:
+                return {'data': await self.pools.get_member(guild, entity_id, fetch)}, 200
+            elif pool_type == PoolType.USER:
+                return {'data': await self.pools.get_user(entity_id, fetch)}, 200
+            elif pool_type == PoolType.EMOJI:
+                return {'data': await self.pools.get_emoji(guild, entity_id, fetch)}, 200
+        except Exception:
+            logger.exception('')
+            return {'data': {}}, sc.NOT_FOUND_404
+
+    @fetch_guild
+    async def pool_all_request(self, guild, pool_type: str):
+        if pool_type == PoolType.MEMBER:
+            # return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
+            return {'data': self.pools.get_all_members(guild)}, sc.OK_200
+        elif pool_type == PoolType.CHANNEL:
+            return {'data': self.pools.get_all_channels(guild)}, sc.OK_200
+        elif pool_type == PoolType.ROLE:
+            return {'data': self.pools.get_all_roles(guild)}, sc.OK_200
+        elif pool_type == PoolType.USER:
+            return {'message': "Invalid Request"}, sc.BAD_REQUEST_400
+        elif pool_type == PoolType.EMOJI:
+            return {'data': await self.pools.get_all_emoji(guild)}, sc.OK_200
+        elif pool_type == PoolType.GUILD:
+            return {'error': "Invalid Pool"}, sc.BAD_REQUEST_400
+        elif pool_type == PoolType.AUTO_RESPONSE:
+            return {'data': self.pools.get_all_responses(guild)}, sc.OK_200
+        elif pool_type == PoolType.SETTING_VALUE:
+            pass
+        else:
+            return {'error': "Unknown Pool"}, sc.BAD_REQUEST_400
+
     async def handle_mock_user_action(
             self,
             action: int = None,
@@ -151,7 +202,7 @@ class Api(Cog):
         allowed_commands = allowedCommands
 
         # this is very scuffed. guilds under this number won't have their responses added to the db
-        assert guild_id < 10000000
+        assert guild_id < FAKE_GUILD_IDS
 
         if action is None or message_id is None or guild_id is None:
             return {'message': "missing arguments"}, sc.BAD_REQUEST_400
@@ -165,7 +216,9 @@ class Api(Cog):
             args = content.split()
 
             # intersection of commands that exist and commands they're allowed to see
-            possible_commands = [cmd for cmd in self.bot.commands if cmd.name in allowed_commands]
+            all_allowed = ['poll', 'xpoll', 'schedule', 'set', 'remove']
+            possible_commands = [cmd for cmd in self.bot.commands
+                                 if cmd.name in allowed_commands and cmd.name in all_allowed]
 
             # check if they triggered help command
             if args[0][1:] == 'help':
@@ -173,7 +226,7 @@ class Api(Cog):
                 for cmd in possible_commands:
                     try:
                         if args[1] in cmd.aliases or args[1] == cmd.name:
-                            help_text += f'```hi{args[1]} - {cmd.help}```'
+                            help_text += f'```{args[1]} - {cmd.help}```'
                             break
                     except IndexError:
                         help_text += f'```{cmd.name}: {cmd.help:>5}```\n'
@@ -191,7 +244,9 @@ class Api(Cog):
                                            resp_id=resp_id)
                 self.fake_messages[guild_id][message_id] = mock_message
 
-                # self.bot.user_commands.setdefault(int(guild_id), [])
+                responses = self.bot.get_cog("Auto Responses").responses
+                responses.setdefault(
+                    guild_id, GuildAutoResponses(self.bot, MockGuild(guild_id), no_db=int(guild_id) < FAKE_GUILD_IDS))
                 if triggered_command:
                     # found builtin command, creating fake context
                     ctx = Context(**{
@@ -202,14 +257,18 @@ class Api(Cog):
                         'command': triggered_command,
                         'invoked_with': args[0]
                     })
+
                     # override send, so ctx sends go to our list
-                    ctx.send = lambda content: sends.append(content)
+
+                    async def ctx_send(content):
+                        sends.append(content)
+                    ctx.send = ctx_send
                     await ctx.invoke(triggered_command, *args[1:])
                 else:
                     # no builtin, check for user set commands in this "guild"
-                    for command in ():
-                        if command.triggered(mock_message.content):
-                            await command.execute(mock_message)
+                    for resp in responses[guild_id].auto_responses:
+                        resp_msg, r = await responses[guild_id].execute(mock_message)
+                        if r is not None:
                             break
 
             # Prevent response sending for silent requests

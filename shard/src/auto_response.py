@@ -150,7 +150,6 @@ class AutoResponse:
 
     async def resolve_resp(self, node, match, msg, content=None, reacts=None):
         if (node.type == NodeType.List):
-            logger.debug(len(node.children))
             await self.resolve_resp(choice(node.children), match, msg, content, reacts)
         elif (node.type == NodeType.ListElement):
             for c in node.children:
@@ -158,7 +157,6 @@ class AutoResponse:
         elif (node.type == NodeType.PlainText):
             content.append(node.text)
         elif (node.type == NodeType.React):
-            logger.debug(f"id: {node.id}, shortcade: {node.shortcode}")
             emoji = self.emoji_manager.find_emoji(node.id, node.id, node.shortcode)
             if emoji:
                 logger.debug(f"found {emoji} in manager, making sure it's loaded")
@@ -209,6 +207,8 @@ class AutoResponse:
 
         if content.strip() != "":
             resp_msg = await msg.channel.send(content)
+        else:
+            resp_msg = None
         for emoji in reacts:
             logger.debug(f"trying to react: {emoji}")
             await msg.add_reaction(emoji)
@@ -218,10 +218,24 @@ class AutoResponse:
     def __repr__(self):
         return f"{self.trigger}::{self.response}"
 
+    def as_dict(self):
+        return {
+            'trigger': self.trigger,
+            'response': self.response,
+            'authorId': str(self.author_id),
+            'guildId': str(self.guild_id),
+            'id': str(self.id),
+            'triggerRegex': self.trigger_regex,
+            'triggerPunctuation': self.trigger_punctuation,
+            'responseTokens': self.response_ast.stringify(),
+            'mode': self.mode,
+            'count': self.count,
+        }
+
 
 class GuildAutoResponses:
 
-    def __init__(self, bot, guild):
+    def __init__(self, bot, guild, no_db=False):
         self.guild = guild
         self.bot = bot
         self.session = bot.session
@@ -229,6 +243,7 @@ class GuildAutoResponses:
         self.settings = self.bot.settings[guild]
         self.auto_responses = []
         self.word_gen = WordGen()
+        self.no_db = no_db
         self._init_from_db()
 
     @property
@@ -236,6 +251,8 @@ class GuildAutoResponses:
         return self.bot.aiosession
 
     def _init_from_db(self) -> None:
+        if self.no_db:
+            return
         responses = self.session.query(AutoResponseModel).filter_by(guild_id=self.guild.id).all()
         self.auto_responses = [AutoResponse(
             self.bot,
@@ -254,6 +271,8 @@ class GuildAutoResponses:
             for r in responses]
 
     def _insert_into_db(self, resp: AutoResponse) -> None:
+        if self.no_db:
+            return
         row = AutoResponseModel(
             resp.id,
             resp.trigger,
@@ -275,9 +294,13 @@ class GuildAutoResponses:
             self.session.commit()
 
     def _delete_from_db(self, resp: AutoResponse) -> None:
+        if self.no_db:
+            return
         self.session.query(AutoResponseModel).filter_by(id=resp.id).delete()
 
     async def _update_resp_db(self, resp: AutoResponse) -> None:
+        if self.no_db:
+            return
         await self.tb_auto_responses.update_by_id({'count': resp.count}, resp.id)
 
     async def execute(self, msg) -> Tuple[Optional[Message], Optional[AutoResponse]]:
@@ -292,7 +315,10 @@ class GuildAutoResponses:
 
     def new(self, trigger: str, response: str, guild: Guild, author: Member) -> AutoResponse:
         """factory method for creating a guild-specific auto response"""
-        manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
+        if self.no_db:
+            manager = None
+        else:
+            manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
 
         r = AutoResponse(
             self.bot,
@@ -308,30 +334,44 @@ class GuildAutoResponses:
         self._insert_into_db(r)
         return r
 
-    def remove(self, trigger: str) -> AutoResponse:
+    def remove(self, trigger: str, author: Member) -> AutoResponse:
         """helper method for removing guild-specific auto response"""
         for r in self.auto_responses:
             if r.trigger == trigger:
+                admin = r.author_id in self.settings.admin_ids
+                if not admin and self.settings.responses_only_author_remove and r.author_id != author.id:
+                    raise PermissionException(r.author_id)
                 self.auto_responses.remove(r)
                 self._delete_from_db(r)
                 return r
         raise UnknownResponseException
 
     def validate(self, response: AutoResponse) -> None:
-        if self.settings.responses_limit is not None:
+        admin = response.author_id in self.settings.admin_ids
+        if not self.settings.responses_enabled:
+            raise DisabledException("auto responses")
+        if response.mode == ResponseMode.REGEX and not (self.settings.responses_allow_regex or admin):
+            raise DisabledException("regex responses")
+
+        if self.settings.responses_limit is not None and not admin:
             author_count = len([r for r in self.auto_responses if r.author_id == self.author_id])
             if author_count >= self.settings.responses_limit:
                 raise UserLimitException
 
-        if len(response.response) > self.settings.responses_response_length:
+        if not admin and len(response.response) > self.settings.responses_response_length:
             raise LongResponseException
 
-        if len(response.trigger) < self.settings.responses_trigger_length:
+        if not admin and len(response.trigger) < self.settings.responses_trigger_length:
             raise ShortTriggerException
 
-        conflicts = self.is_disjoint(response)
-        if conflicts:
-            raise TriggerCollisionException(conflicts)
+        if not self.settings.responses_allow_collision:
+            conflicts = self.is_disjoint(response)
+            if conflicts:
+                raise TriggerCollisionException(conflicts)
+        else:
+            for r in self.auto_responses:
+                if r.trigger == response.trigger:
+                    raise TriggerCollisionException((r,))
 
     def is_disjoint(self, response: AutoResponse) -> bool:
         # all(r.trigger_reggy.isdisjoint(response.trigger_reggy) for r in self.auto_responses)
@@ -344,6 +384,15 @@ class GuildAutoResponses:
 
 
 class AutoResponseException(Exception):
+    pass
+
+
+class PermissionException(AutoResponseException):
+    def __init__(self, author_id):
+        self.author_id = author_id
+
+
+class DisabledException(AutoResponseException):
     pass
 
 

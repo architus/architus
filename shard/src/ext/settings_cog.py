@@ -23,6 +23,12 @@ HAMMER = u"\U0001F528"
 CHAIN = u"\U000026D3"
 HEADPHONES = u"\U0001F3A7"
 EXCLAMATION = u"\U00002757"
+SPEAKING_HEAD = u"\U0001F5E3\U0000FE0F"
+SYMBOLS = u"\U0001F523"
+RULER = u"\U0001F4CF"
+TRIAGULAR_RULER = u"\U0001F4D0"
+COLLISION = u"\U0001F4A5"
+CROSS_MARK = u"\U0000274C"
 
 
 class SettingsElement:
@@ -108,7 +114,8 @@ class UserCommandThreshold(SettingsElement):
             "Responses Limit",
             CHAIN,
             "This is the number of custom responses each user can set. Enter a number to modify it:",
-            'responses_limit')
+            'responses_limit',
+            tags=['general', 'responses'])
 
     async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
@@ -382,6 +389,72 @@ class CommandPrefix(SettingsElement):
         return msg.clean_content
 
 
+class ResponsesEnabled(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Auto Responses Enabled",
+            SPEAKING_HEAD,
+            "Whether Auto Responses are enabled. Enter `true` or `false` to set.",
+            'responses_enabled',
+            tags=['general', 'responses'])
+
+
+class ResponsesRegexEnabled(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Regex Triggers Allowed",
+            SYMBOLS,
+            "Whether regexs are allowed for auto response triggers. Enter `true` or `false` to set.",
+            'responses_allow_regex',
+            tags=['responses'])
+
+
+class ResponsesTriggerLength(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Response Trigger Length",
+            RULER,
+            "Minimum allowed length for auto response triggers. Enter new value or `cancel`.",
+            'responses_trigger_length',
+            tags=['responses'])
+
+    async def parse(self, ctx, msg, settings):
+        return abs(int(msg.clean_content))
+
+
+class ResponsesResponseLength(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Response Response Length",
+            TRIAGULAR_RULER,
+            "Maximum allowed length for auto response responses. Enter new value or `cancel`.",
+            'responses_response_length',
+            tags=['responses'])
+
+    async def parse(self, ctx, msg, settings):
+        return abs(int(msg.clean_content))
+
+
+class ResponsesAllowCollisions(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Allow Trigger Collisions",
+            COLLISION,
+            "Whether users are allowed to set triggers that overlap. Enter `true` or `false`.",
+            'responses_allow_collision',
+            tags=['responses'])
+
+
+class ResponsesOnlyAuthorRemove(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Restrict Remove",
+            CROSS_MARK,
+            "When enabled, only the auto response author or an admin may remove it. Enter `true` or `false.",
+            'responses_only_author_remove',
+            tags=['responses'])
+
+
 class Settings(Cog):
     '''
     Manage server specific architus settings
@@ -389,7 +462,8 @@ class Settings(Cog):
     TAGS = {
         'general': ['general', 'g'],
         'gulag': ['gulag', 'ГУЛАГ'],
-        'pug': ['p', 'pug', 'pugs', 'pugger']
+        'pug': ['p', 'pug', 'pugs', 'pugger'],
+        'responses': ['responses', 'auto responses', 'autoresponses', 'r'],
     }
     SETTINGS_MENU_TIMEOUT_SEC = 60 * 60
 
@@ -416,7 +490,7 @@ class Settings(Cog):
         '''Open an interactive settings dialog'''
         settings = self.bot.settings[ctx.guild]
         if ctx.author.id not in settings.admins_ids:
-            await ctx.channel.send('nope, sorry')
+            await ctx.channel.send('nope, sorry, you must be an admin')
             return
 
         try:
