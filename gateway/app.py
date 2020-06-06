@@ -19,7 +19,7 @@ from src.pools import GuildPool
 
 sio = socketio.AsyncServer(
     async_mode='aiohttp',
-    cors_allowed_origins=[f'https://{domain_name}/', f'https://api.{domain_name}/'] if is_prod else '*'
+    cors_allowed_origins=[f'https://{domain_name}', f'https://api.{domain_name}'] if is_prod else '*'
 )
 app = web.Application()
 sio.attach(app)
