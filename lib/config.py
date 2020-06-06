@@ -36,7 +36,9 @@ try:
     client_id = os.environ['client_id']
     client_secret = os.environ['client_secret']
     domain_name = os.environ['domain_name']
-    is_prod = os.environ['domain_name'] == 'archit.us'
+    is_prod = domain_name == 'develop.archit.us'
+    jwt_secret = os.environ['jwt_secret']
+    domain_name = os.environ['domain_name']
     alphavantage_api_key = os.environ['alphavantage_api_key']
     twitter_consumer_key = os.environ['twitter_consumer_key']
     twitter_consumer_secret = os.environ['twitter_consumer_secret']
