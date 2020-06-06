@@ -58,3 +58,5 @@ pyyaml
 pika
 aio-pika
 asyncpg
+protobuf
+grpcio==1.28.*

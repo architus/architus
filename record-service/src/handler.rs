@@ -1,23 +1,22 @@
 use log::{debug, info, warn};
+use std::cmp::max;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::prelude::*;
 use std::io::ErrorKind;
 use std::net::TcpStream;
 
-use bimap::hash::BiHashMap;
-use rtp_rs::RtpReader;
+use crate::zipper::*;
+use audiopus::{coder::Decoder, packet, Channels, SampleRate};
+use tempfile::tempdir;
 
-use opus::{Channels, Decoder};
-
-const SAMPLE_RATE: u32 = 48_000;
-const CHANNELS: Channels = Channels::Stereo;
+const SAMPLE_RATE: SampleRate = SampleRate::Hz48000;
 
 /// Types of packets that we might receive from the gateway.
 #[derive(Debug, PartialEq, Eq)]
-pub enum PacketType {
+enum PacketType {
     Data,
     UserJoin,
-    UserLeave,
     Metadata,
     End,
     Checkup,
@@ -29,11 +28,24 @@ impl From<u8> for PacketType {
         match b {
             0 => PacketType::Data,
             1 => PacketType::UserJoin,
-            2 => PacketType::UserLeave,
             3 => PacketType::Metadata,
             4 => PacketType::End,
             5 => PacketType::Checkup,
             _ => PacketType::Invalid(b),
+        }
+    }
+}
+
+enum ResponseCode {
+    Success,
+    DirectoryFailure,
+}
+
+impl ResponseCode {
+    fn byte(&self) -> u8 {
+        match self {
+            ResponseCode::Success => 0x0,
+            ResponseCode::DirectoryFailure => 0x1,
         }
     }
 }
@@ -49,12 +61,6 @@ pub struct WAVReceiver {
     /// recording.
     bot_id: u64,
 
-    // This is the number of channels that will exist in the final
-    // WAV file. It is equivalent to the number of non-blocked users
-    // that have sent voice data in the channel while the bot is
-    // listening.
-    num_channels: u32,
-
     // This will hold the actual voice data received over the network.
     // Each `Vec<u16>` will be a separate channel of audio data representing
     // a single user. This bot will compress all audio data from a user to
@@ -68,20 +74,19 @@ pub struct WAVReceiver {
     // some basic sketchy synchronization of audio across channels.
     packet_count: u64,
 
-    // While the RTP does it's best to ensure that SSRCs are unique, it is not
-    // guaranteed. One user could disconnect with one SSRC and then another
-    // could reconnect using that same SSRC if luck is really against us.
-    // This bi-directional hashmap allows us to figure out which SSRC belongs
-    // to which user and disassociate them when the user leaves.
-    ssrc_to_user: BiHashMap<u32, u64>,
-
     // This will end up being a user_id of every user that gets recorded.
     // The index of the user in this list will equate to which channel
     // that user is in the WAV file.
     user_list: Vec<u64>,
 
-    // Decodes opus data into PCM
-    decoder: Decoder,
+    // Give everyone their own decoder. This might help out with making FEC
+    // actually work. It will also make the decoders work if some people are
+    // using stereo and others are using mono even though their all supposed
+    // to be encoded as stereo. I'm not sure if that's happening or not.
+    decoders: HashMap<(u64, Channels), Decoder>,
+
+    // Holds the last sequence number sent by each channel.
+    last_sequence: Vec<u16>,
 }
 
 impl WAVReceiver {
@@ -89,24 +94,23 @@ impl WAVReceiver {
         Self {
             disallowed_ids: Vec::new(),
             bot_id: 0,
-            num_channels: 0,
             audio_channels: Vec::new(),
             packet_count: 0,
-            ssrc_to_user: BiHashMap::new(),
             user_list: Vec::new(),
-            decoder: Decoder::new(SAMPLE_RATE, CHANNELS).expect("Opus failed"),
+            decoders: HashMap::new(),
+            last_sequence: Vec::new(),
         }
     }
 
     /// Main loop for recording voice data. Will do it's darndest to handle errors properly.
     /// The only things that can cause it to error out without properly recording are a
     /// dropped TCP connection and failure to send required fields: bot id, disallowed ids.
-    pub fn handle(&mut self, mut connection: TcpStream) {
+    pub fn handle(mut self, mut connection: TcpStream) {
         let mut buffer: [u8; 4096] = [0; 4096];
 
         loop {
             let okay = match connection.read(&mut buffer) {
-                Ok(num_bytes) => PacketType::from(buffer[0]) == PacketType::Metadata,
+                Ok(_) => PacketType::from(buffer[0]) == PacketType::Metadata,
                 Err(e) => {
                     if e.kind() == ErrorKind::Interrupted || e.kind() == ErrorKind::TimedOut {
                         false
@@ -140,7 +144,7 @@ impl WAVReceiver {
             }
 
             let mut i = 0;
-            while i < 64 && num_parsed_ids < num_disallowed {
+            while i < 4096 && num_parsed_ids < num_disallowed {
                 self.disallowed_ids.push(u64::from_be_bytes(
                     buffer[i..(i + 8)]
                         .try_into()
@@ -150,6 +154,8 @@ impl WAVReceiver {
                 num_parsed_ids += 1;
             }
         }
+
+        debug!("Received id: {}", self.disallowed_ids[0]);
 
         if num_disallowed as usize != self.disallowed_ids.len() {
             warn!("Did not get all disallowed ids");
@@ -161,56 +167,41 @@ impl WAVReceiver {
             connection.peer_addr().expect("Peer not found")
         );
         'record_loop: loop {
-            let num_bytes = match connection.read(&mut buffer) {
+            match connection.read(&mut buffer) {
                 Ok(nb) => nb,
                 Err(e) => {
                     if e.kind() == ErrorKind::Interrupted || e.kind() == ErrorKind::TimedOut {
                         continue;
                     } else {
+                        warn!("Errored out of record loop with bad connection.");
                         break 'record_loop;
                     }
                 }
             };
 
-            let mut index: usize = 0;
-            while index < num_bytes {
-                let pt = PacketType::from(buffer[index]);
-                match pt {
-                    PacketType::Data => {
-                        let payload_size = u16::from_be_bytes(
-                            buffer[(index + 1usize)..(index + 3usize)]
-                                .try_into()
-                                .expect("Should always work"),
-                        );
-                        self.handle_data(
-                            &buffer[(index + 2usize)..(index + 14usize + payload_size as usize)],
-                        );
-                        index += 14 + payload_size as usize;
-                    }
-                    PacketType::End => {
-                        self.close_connection(&mut connection);
-                        break 'record_loop;
-                    }
-                    PacketType::UserJoin => {
-                        self.user_join(&buffer[1..num_bytes]);
-                        index += 13;
-                    }
-                    PacketType::UserLeave => {
-                        self.user_leave(&buffer[1..num_bytes]);
-                        index += 5;
-                    }
-                    PacketType::Checkup => {
-                        self.check_up(&mut connection);
-                        index += 1;
-                    }
-                    PacketType::Metadata => {
-                        info!("Got metadata packet during main loop");
-                        index += 11;
-                    }
-                    PacketType::Invalid(b) => {
-                        warn!("Got invalid packet type during mainloop: {}", b);
-                        index = usize::MAX;
-                    }
+            match PacketType::from(buffer[0]) {
+                PacketType::Data => {
+                    let payload_size =
+                        u16::from_be_bytes(buffer[1..3].try_into().expect("Should always work"));
+                    self.handle_data(&buffer[(3)..(13usize + payload_size as usize)]);
+                }
+                PacketType::End => {
+                    self.close_connection(&mut connection);
+                    break 'record_loop;
+                }
+                PacketType::UserJoin => {
+                    self.user_join(&buffer[1..9]);
+                }
+                PacketType::Checkup => {
+                    self.check_up(&mut connection);
+                }
+                PacketType::Metadata => {
+                    // This really shouldn't happen.
+                    info!("Got metadata packet during main loop");
+                }
+                PacketType::Invalid(b) => {
+                    // Can't do anything with this packet so just dump it.
+                    warn!("Got invalid packet type during mainloop: {}", b);
                 }
             }
         }
@@ -219,155 +210,128 @@ impl WAVReceiver {
     // Takes an rtp packet and adds it to the appropriate audio channel
     // Packet should be formatted as:
     //
-    // [ 0x00,
-    //          --- RTP Header (12 bytes) ---
-    //          ---  Opus Data (n bytes)  ---
+    // [  0x00, size0, size1,
+    //    uid0,  uid1,  uid2,  uid3,
+    //    uid4,  uid5,  uid6,  uid7,
+    //    seq0,  seq1,
+    //              --- payload bytes ---
     // ]
     //
-    // where the method recieves everything after the 0x00.
+    // where the method recieves everything after the size1.
     fn handle_data(&mut self, packet_bytes: &[u8]) {
-        // Parse the rtp packet from the bytes and return if it's invalid
-        let packet = match RtpReader::new(packet_bytes) {
-            Ok(p) => p,
-            Err(_) => {
-                warn!("Got invalid rtp packet of correct payload type.");
-                return;
-            }
-        };
+        let uid = u64::from_be_bytes(packet_bytes[0..8].try_into().expect("Should always work."));
+        let seq = u16::from_be_bytes(packet_bytes[8..10].try_into().expect("Should always work."));
 
-        // Can't do anything without a valid ssrc <-> uid mapping so
-        // return if one is not found.
-        let ssrc = packet.ssrc();
-        let uid = match self.ssrc_to_user.get_by_left(&ssrc) {
-            Some(u) => u,
-            None => {
-                info!("Got packet from ssrc not in map");
-                return;
-            }
-        };
-
-        // All of the decoded PCM data should be 3840 bytes as that is 20 ms of
-        // 16 bit audio sampled at 48,000 Hz. So we need 1920 i16s as a buffer
-        // to store the relevant pcm data. The FEC option is hardcoded to be
-        // false as we are not able to make use of it. We would need to use a
-        // separate decoder per channel and maintain sequence order for that
-        // to work which adds lots of complexity and memory overhead that is
-        // unnecessary for a microservice that can't really guarantee that
-        // that additional overhead will actually improve service much.
-        // The decode function can only ever return an Ok so using unwrap
-        // should be fine.
-        let mut pcm: [i16; 1920] = [0; 1920];
-        let num_bytes = self
-            .decoder
-            .decode(packet.payload(), &mut pcm, false)
-            .unwrap();
-
-        // Find which channel the uid belongs to. This should never go down the
-        // error branch.
-        let channel_index = match self.get_channel(*uid) {
+        // Find which channel the uid belongs to. This should only ever match
+        // to None when the uid is in the disallowed list.
+        let channel_index = match self.get_channel(uid) {
             Some(i) => i,
             None => {
-                warn!("User in map but not user_list.");
+                return;
+            }
+        };
+
+        // Drop packet if future packets have already been processed.
+        if self.last_sequence[channel_index] < seq
+            || (seq < 10 && self.last_sequence[channel_index] > 65530)
+        {
+            self.last_sequence[channel_index] = seq;
+        } else {
+            return;
+        }
+
+        // Find out how many channels there are and get relevant decoder.
+        let channels = match packet::nb_channels(&packet_bytes[10..]) {
+            Ok(nc) => nc,
+            Err(_) => {
+                warn!("Bad number of channels in packet");
+                return;
+            }
+        };
+
+        let decoder = self
+            .decoders
+            .entry((uid, channels))
+            .or_insert_with(|| Decoder::new(SAMPLE_RATE, channels).unwrap());
+
+        // The opus payload should never be larger than 3840 bytes so
+        // this array should be fine for loading the data.
+        let mut pcm: [i16; 3840] = [0; 3840];
+        let num_bytes = decoder.decode(Some(&packet_bytes[10..]), &mut pcm[..], false);
+        let num_bytes = match num_bytes {
+            Ok(n) => n,
+            Err(e) => {
+                warn!("Bad packet: {:?}", e);
                 return;
             }
         };
 
         // Add pcm data to vector.
+        let offset: usize;
+        if channels == Channels::Mono {
+            offset = 1;
+        } else {
+            offset = 2;
+        }
         let mut i = 0;
         while i < num_bytes {
             self.audio_channels[channel_index].push(pcm[i]);
-            i += 2;
+            i += offset;
         }
 
         self.packet_count += 1;
+
+        if self.packet_count > 25 {
+            self.balance(false);
+            self.packet_count = 0;
+        }
     }
 
     // Returns which channel a uid gets mapped to.
-    // Returns an error if the uid is not mapped to a channel
-    fn get_channel(&self, uid: u64) -> Option<usize> {
+    // If user is disallowed, return None.
+    // If user not indexed already, give them an index.
+    fn get_channel(&mut self, uid: u64) -> Option<usize> {
+        if self.disallowed(uid) {
+            return None;
+        }
+
         for (i, e) in self.user_list.iter().enumerate() {
             if *e == uid {
                 return Some(i);
             }
         }
 
-        None
+        let index = self.user_list.len();
+        self.user_list.push(uid);
+        self.audio_channels.push(Vec::new());
+        self.last_sequence.push(0);
+        return Some(index);
     }
 
-    // Stops recording bytes and does some close up stuff.
-    // Packet format:
-    //
-    // 0x04
-    //
-    // This method does not require any data from the packet.
-    fn close_connection(&mut self, connection: &mut TcpStream) {
-        let words: usize = self.audio_channels.iter().map(|c| c.len()).sum::<usize>() * 2;
-        info!("Ending connection with {} bytes", words);
-        'stats_loop: loop {
-            match connection.write(&words.to_be_bytes()) {
-                Ok(_) => break,
-                Err(e) => {
-                    if e.kind() == ErrorKind::Interrupted || e.kind() == ErrorKind::TimedOut {
-                        continue;
-                    } else {
-                        warn!("Connection failed trying to send stats.");
-                        break 'stats_loop;
-                    }
-                }
-            }
-        }
-    }
-
-    // Adds a user to the ssrc <-> uid mapping. Packet should be formed as:
+    // Adds a user to the index of uids if they havne't already been added
+    // and they are not in the disallowed id list.
     //
     // [  0x01,
-    //   ssrc1, ssrc2, ssrc3, ssrc4,
-    //    uid1,  uid2,  uid3,  uid4,
-    //    uid5,  uid6,  uid7,  uid8 ]
+    //    uid0,  uid1,  uid2,  uid3,
+    //    uid4,  uid5,  uid6,  uid7 ]
     //
-    //   Where the method is passed everything after the 0x01.
+    // Where the method is passed everything after the 0x01.
     fn user_join(&mut self, data: &[u8]) {
-        let ssrc = u32::from_be_bytes(data[0..4].try_into().expect("Should always work"));
-        let uid = u64::from_be_bytes(data[4..12].try_into().expect("Should always work"));
+        let uid = u64::from_be_bytes(data[0..8].try_into().expect("Should always work"));
 
-        debug!("Adding {} <-> {}", ssrc, uid);
-
-        // Add to ssrc map.
-        self.ssrc_to_user.insert(ssrc, uid);
-
-        // See if uid needs to be added to the user list
-        match self.get_channel(uid) {
-            Some(_) => {}
-            None => {
-                self.user_list.push(uid);
-                self.audio_channels.push(Vec::new());
-                self.num_channels += 1;
-            }
-        }
-    }
-
-    // Removes an ssrc from the ssrc <-> uid mapping. Packet should be formed as:
-    //
-    // [  0x02,
-    //   ssrc1, ssrc2, ssrc3, ssrc4 ]
-    //
-    // And this method gets everything after the 0x02.
-    fn user_leave(&mut self, data: &[u8]) {
-        let ssrc = u32::from_be_bytes(data[0..4].try_into().expect("Should always work"));
-
-        match self.ssrc_to_user.remove_by_left(&ssrc) {
-            None => warn!("Tried to remove non-existant mapping"),
-            _ => {}
-        }
+        // `get_channel` will automatically allocate if not disallowed so we can just
+        // dispatch to it after parsing the uid.
+        self.get_channel(uid);
     }
 
     // Lets the bot know how many bytes have been recorded so far.
     //
-    // Called by a packet of [5]
+    // Called by a packet of [0x05]
     fn check_up(&mut self, connection: &mut TcpStream) {
-        let words: usize = self.audio_channels.iter().map(|c| c.len()).sum::<usize>() * 2;
+        debug!("In check up function");
+        let bytes = self.recording_size();
         loop {
-            match connection.write(&words.to_be_bytes()) {
+            match connection.write(&bytes.to_be_bytes()) {
                 Ok(_) => break,
                 Err(e) => {
                     if e.kind() == ErrorKind::Interrupted || e.kind() == ErrorKind::TimedOut {
@@ -382,19 +346,77 @@ impl WAVReceiver {
     }
 
     // Checks whether an id is disallowed.
-    fn _disallowed(&self, id: u64) -> bool {
+    fn disallowed(&self, id: u64) -> bool {
         for u in self.disallowed_ids.iter() {
             if *u == id {
                 return true;
             }
         }
 
-        false
+        if id == self.bot_id {
+            true
+        } else {
+            false
+        }
     }
-}
 
-fn _split(word: i16) -> (u8, u8) {
-    let high: u8 = (word.swap_bytes() & 0x00FF) as u8;
-    let low: u8 = (word & 0x00FF) as u8;
-    (high, low)
+    // Close connection by sending how many bytes were read
+    fn close_connection(mut self, connection: &mut TcpStream) {
+        let bytes = self.recording_size();
+        debug!("Recorded: {}", bytes);
+        self.balance(true);
+        let dir = match tempdir() {
+            Ok(d) => d,
+            Err(_) => match connection.write(&[ResponseCode::DirectoryFailure.byte()]) {
+                Ok(_) => return,
+                Err(_) => {
+                    warn!("Tcp failed sending error");
+                    return;
+                }
+            },
+        };
+
+        let (url, pw) = match zip(self.audio_channels, dir) {
+            Ok(s) => s,
+            Err(e) => match connection.write(&[e.byte()]) {
+                Ok(_) => return,
+                Err(_) => {
+                    warn!("Tcp failed sending error");
+                    return;
+                }
+            },
+        };
+    }
+
+    // Returns total number of bytes recorded.
+    fn recording_size(&self) -> u64 {
+        let words: u64 = self
+            .audio_channels
+            .iter()
+            .map(|c| c.len() as u64)
+            .sum::<u64>();
+        words * 2
+    }
+
+    // Balances out all of the audio channels to the same length as a basic
+    // synchronization strategy.
+    // Equalize tells the balance function wether each channel should be
+    // comletely synchronized or just get them roughly equal if a channel
+    // is falling behind.
+    fn balance(&mut self, equalize: bool) {
+        let largest: usize = self
+            .audio_channels
+            .iter()
+            .fold(0, |acc, c| max(acc, c.len()));
+
+        // 23,000 is roughly a quarter second of audio data.
+        let max_diff: usize = if equalize { 0 } else { 23_000 };
+        for c in self.audio_channels.iter_mut() {
+            if largest - c.len() > max_diff {
+                for _ in 0..(largest - c.len()) {
+                    c.push(0x0000);
+                }
+            }
+        }
+    }
 }

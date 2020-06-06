@@ -13,6 +13,7 @@ import asyncio
 import src.generate.wordcount as wordcount_gen
 from src.generate import corona
 from lib.config import DISCORD_EPOCH, logger
+from lib.ipc import manager_pb2 as message
 
 
 class MessageData:
@@ -158,10 +159,11 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
         with ThreadPoolExecutor() as pool:
             img = await self.bot.loop.run_in_executor(pool, wordcount_gen.generate, message_counts, word_counts, victim)
-        data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
+        data = await self.bot.manager_client.publish_file(
+            message.File(file=img))
 
         em = discord.Embed(title="Top 5 Message Senders", description=ctx.guild.name)
-        em.set_image(url=data['url'])
+        em.set_image(url=data.url)
         em.color = 0x7b8fb7
         if victim:
             if victim.id in self.bot.settings[ctx.guild].stats_exclude:
@@ -187,11 +189,12 @@ class CoronaStats(commands.Cog, name="Coronavirus Data"):
 
                 img = corona.generate(parsed, deaths_only)
 
-                data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
+                data = await self.bot.manager_client.publish_file(
+                    message.File(file=img))
 
                 em = discord.Embed(title="Coronavirus in the US", description="More Information",
                                    url="https://www.cdc.gov/coronavirus/2019-ncov/index.html")
-                em.set_image(url=data['url'])
+                em.set_image(url=data.url)
                 em.color = 0x7b8fb7
                 em.set_footer(text="data collected from state websites by http://coronavirusapi.com")
 

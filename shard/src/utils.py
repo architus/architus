@@ -9,6 +9,7 @@ from threading import Lock
 import discord
 
 from lib.config import logger
+from lib.ipc import manager_pb2 as message
 
 class TCPLock:
     """
@@ -73,6 +74,28 @@ def guild_to_dict(guild: discord.Guild) -> dict:
     data = {p: getattr(guild, p) for p in params}
     data['id'] = str(data['id'])
     return data
+
+
+def guild_to_message(guild: discord.Guild):
+    return message.Guild(
+        id=guild.id,
+        name=guild.name,
+        icon=guild.icon,
+        splash=guild.splash,
+        owner_id=guild.owner_id,
+        region=repr(guild.region),
+        afk_timeout=guild.afk_timeout,
+        unavailable=guild.unavailable,
+        max_members=guild.max_members,
+        banner=guild.banner,
+        description=guild.description,
+        mfa_level=guild.mfa_level,
+        features=guild.features,
+        premium_tier=guild.premium_tier,
+        premium_subscription_count=guild.premium_subscription_count,
+        preferred_locale=guild.preferred_locale,
+        member_count=guild.member_count
+    )
 
 
 def user_to_dict(user: discord.User) -> dict:

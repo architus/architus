@@ -9,6 +9,10 @@ services:
       - architus.env
     environment:
       NUM_SHARDS: "${NUM_SHARDS:-1}"
+      http_proxy: ""
+      https_proxy: ""
+      GRPC_TRACE: "channel,tcp"
+      GRPC_VERBOSITY: "DEBUG"
     deploy:
       replicas: "${NUM_SHARDS:-1}"
       restart_policy:
@@ -83,11 +87,16 @@ services:
       - architus.env
     environment:
       NUM_SHARDS: "${NUM_SHARDS:-1}"
+      GRPC_VERBOSITY: "debug"
+      GRPC_TRACE: "channel,tcp"
+      http_proxy: ""
+      https_proxy: ""
     deploy:
       restart_policy:
         condition: on-failure
     ports:
       - "5300:5300"
+      - "50051:50051"
     volumes:
       - "./www:/var/www"
     deploy:

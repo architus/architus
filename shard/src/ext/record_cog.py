@@ -32,44 +32,50 @@ class Recording:
         self.sink = None
         self.tcp = None
 
+        self.checkup = bytearray(4096)
+        self.checkup[0] = 5
+
     async def send_file(self):
-        """
-        try:
-            self.ctx.voice_client.stop_listening()
-        except Exception:
-            await self.ctx.send("Something went wrong")
-            await self.cleanup()
-            return
+        msg = self.tcp.recv(1024)
+        if msg[0] != 0x00:
+            if msg[0] == 0x01:
+                self.ctx.send("Failed to make temporary directory")
+            if msg[0] == 0x02:
+                self.ctx.send("Failed to write data to WAV file")
+            if msg[0] == 0x03:
+                self.ctx.send("Failed to zip WAV file")
+            if msg[0] == 0x04:
+                self.ctx.send("Recording was too large for WAV file")
+            if msg[0] == 0x05:
+                self.ctx.send("Too many users in recording")
+            if msg[0] == 0x06:
+                self.ctx.send("Byte rate of recording was too large")
+            if msg[0] == 0x07:
+                self.ctx.send("Failed to upload file to CDN")
+            return 0
 
-        loop = asyncio.get_running_loop()
-        url, _ = await self.bot.manager_client.publish_file(
-            data=base64.b64encode(zip_file.getvalue()).decode('ascii'),
-            filetype='zip',
-            location='recordings')
+        url_len = msg[1]
+        url = decode(msg[2:2 + url_len], 'ascii')
+        pw = decode(msg[2 + url_len:len(msg) - 2])
+        channels = struct.unpack("<H", msg[-2:])
 
-        embed = discord.Embed(title=f"Recording of {self.vc.name}", url=url['url'])
-        embed.add_field(name="URL", value=url['url'], inline=False)
+        embed = discord.Embed(title="Voice Recording")
+        embed.add_field(name="URL", value=url)
         embed.add_field(name="Password", value=pw)
-        if self.sink.num_channels > 3:
-            embed.add_field(name="Channels", value=str(self.sink.num_channels))
-        embed.set_footer(text="File will not work well in normal audio players."
-                              "Try using audacity to listen to the file.")
-        await self.ctx.send(embed=embed)
-        """
-
-        msg = self.tcp.recv(8)
-        size = "I" if len(msg) == 4 else "Q"
-        num_bytes = struct.unpack(size, msg)[0]
-        await self.ctx.send(f"Recorded {num_bytes} bytes")
+        if channels > 3:
+            embed.add_field(name="# of Channels", value=repr(channels))
+            ebmed.set_footer(text="Note: Audio will not play correctly in most programs. "
+                                  "Try using audacity to listen to the file.")
         return num_bytes
 
     def send_disallowed_ids(self, ids):
         buf = bytearray(4096)
         sent = 0
         to_send = len(ids)
+        print(f"Sending: {ids}")
         while to_send > 0:
             sending = min(to_send, 64)
-            struct.pack_into(f">{sending}Q", buf, 0, *members[sent:sent + sending])
+            struct.pack_into(f">{sending}Q", buf, 0, *ids[sent:sent + sending])
             self.tcp.send(buf)
             to_send -= sending
 
@@ -79,19 +85,18 @@ class Recording:
         """
         try:
             await self.ensure_voice()
-        except commands.CommandError:
+        except Exception:
             return 1
 
-        members = [m.id for m in self.ctx.author.voice.channel.members
-                   if not m.bot and m not in excludes]
-
         self.tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp.setblocking(0)
         self.tcp.connect(("record-service", 7777))
-        to_send = len(members)
-        buf = bytearray(11)
+        to_send = len(excludes)
+        buf = bytearray(4096)
         struct.pack_into(">BQH", buf, 0, 0x03, self.bot_id, to_send)
         self.tcp.send(buf)
         print(f"Sending {to_send} user_ids")
+        self.send_disallowed_ids(excludes)
 
         self.tcp = TCPLock(self.tcp)
         self.sink = TCPSink(self.tcp)
@@ -112,9 +117,8 @@ class Recording:
 
         self.recording = False
         self.ctx.voice_client.stop_listening()
-        print("Sending kill signal")
         self.tcp.send(b"\x04")
-        print("kill sent")
+        await asyncio.sleep(3)
 
         async with self.ctx.typing():
             num_bytes = await self.send_file()
@@ -122,32 +126,46 @@ class Recording:
         await self.cleanup()
         return num_bytes
 
-    def get_curr_recording_length(self):
-        self.tcp.write(b"\x05")
+    async def get_curr_recording_length(self):
+        """
+        Sends the checkup code to the microservice and then reads
+        back how many bytes have been recorded so far.
+        """
+        self.tcp.write(self.checkup)
+        await asyncio.sleep(1)
         msg = self.tcp.recv(8)
-        size = "I" if len(msg) == 4 else "Q"
-        num_bytes = struct.unpack(size, msg)
+
+        # if didn't receive anything, return 0 and try again later
+        if len(msg) < 8:
+            return 0
+        num_bytes = struct.unpack(">Q", msg)
         return num_bytes[0]
 
     async def timer(self):
         """
         Ensures that the recording does not go over a certain size.
         """
+        await asyncio.sleep(15)
         loop = asyncio.get_running_loop()
         while self.recording:
-            """
-            with ThreadPoolExecutor() as pool:
-                num_bytes = await loop.run_in_executor(
-                    pool, self.get_curr_recording_length)
-            """
-            num_bytes = self.get_curr_recording_length()
-            if (num_bytes > self.budget):
+            try:
+                num_bytes = await self.get_curr_recording_length()
+            except:
+                await self.ctx.send("Lost TCP connection to recording microservice")
+                return 0
+            if (num_bytes > self.budget or num_bytes > 4000000000):
                 self.recording = False
                 self.ctx.voice_client.stop_listening()
-                self.tcp.send(b"\x05")
+                try:
+                    self.tcp.send(b"\x04")
+                except:
+                    await self.ctx.send("Lost TCP connection to recording microservice")
+                    return 0
+                await asyncio.sleep(3)
 
                 num_bytes = 0
                 async with self.ctx.typing():
+                    await self.ctx.send("Used up all of alloted memory. Sending current recording.")
                     num_bytes = await self.send_file()
 
                 await self.cleanup()
@@ -202,8 +220,7 @@ class RecordCog(commands.Cog, name="Voice Recording"):
             self.budgets[guild_id] = 5000000000
             self.last_recording[guild_id] = time.time()
 
-        excludes = [ctx.guild.get_member(uid)
-                    for uid in self.bot.settings[ctx.guild].voice_exclude]
+        excludes = self.bot.settings[ctx.guild].voice_exclude
         recording = Recording(self.bot.user.id, ctx, self.budgets[guild_id])
         err = await recording.start_recording(excludes)
 
@@ -227,12 +244,11 @@ class RecordCog(commands.Cog, name="Voice Recording"):
         num_bytes = await self.recordings[guild_id].stop_recording()
         self.budgets[guild_id] -= num_bytes
 
+    """ Need to temporarily disable this
     @commands.command(aliases=['delete'])
     async def delete_file(self, ctx, filename):
-        """
-        Delete specified voice recording from the cdn. Pass just the specific file name without
-        directories.
-        """
+        # Delete specified voice recording from the cdn. Pass just the specific file name without
+        # directories.
         result = await self.bot.manager_client.delete_file(filename)
         if result == 0:
             await ctx.send("File successfully deleted.")
@@ -240,6 +256,7 @@ class RecordCog(commands.Cog, name="Voice Recording"):
             await ctx.send("Tried to delete from invalid directory. How did you even do that?")
         elif result == 2:
             await ctx.send(f"{filename} does not exist.")
+    """
 
     @commands.command(aliases=['unmute_me'])
     async def mute_me(self, ctx):
