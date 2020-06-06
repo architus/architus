@@ -4,7 +4,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime, timezone
 from contextlib import suppress
-import re
 import logging
 
 with suppress(ImportError):
