@@ -118,7 +118,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         em = discord.Embed(title="Server Growth", description=ctx.guild.name)
         em.set_image(url=data['url'])
         em.color = 0x35a125
-        em.set_footer(text=f"total of {ctx.guild.member_count} members")
+        em.set_footer(text=f"{ctx.guild.name} has a total of {ctx.guild.member_count} members")
         await ctx.channel.send(embed=em)
 
     @commands.command()
