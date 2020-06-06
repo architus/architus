@@ -1,6 +1,8 @@
 import jwt as pyjwt
 from flask import request
+from datetime import datetime, timedelta
 from lib.status_codes import StatusCodes
+from lib.config import jwt_secret
 
 from functools import wraps
 
@@ -17,9 +19,10 @@ def flask_authenticated(member=False):
         def wrapper(self, *args, **kwargs):
             try:
                 jwt = JWT(token=request.cookies.get('token'))
-                # TODO check token expiration
             except pyjwt.exceptions.InvalidTokenError:
                 return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
+            if expired(jwt):
+                return ({'message': "Expired"}, StatusCodes.UNAUTHORIZED_401)
             if member:
                 data, sc = self.shard.is_member(jwt.id, kwargs['guild_id'], routing_guild=kwargs['guild_id'])
                 if sc != 200 or not data['member']:
@@ -88,7 +91,13 @@ class JWT:
             raise AttributeError(f"no such attribute {name}") from None
 
     def _decode(self, token):
-        return pyjwt.decode(token, 'secret', alorgithms='HS256')
+        return pyjwt.decode(token, jwt_secret, alorgithms='HS256')
 
     def _encode(self, payload):
-        return pyjwt.encode(payload, 'secret', algorithm='HS256')
+        return pyjwt.encode(payload, jwt_secret, algorithm='HS256')
+
+
+def expired(jwt: JWT):
+    issued_at = datetime.strptime(jwt.issued_at, "%Y-%m-%dT%H:%M:%S.%f")
+    expires_in = timedelta(seconds=jwt.expires_in)
+    return datetime.now() > issued_at + expires_in

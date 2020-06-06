@@ -222,7 +222,7 @@ class AutoResponse:
         return {
             'trigger': self.trigger,
             'response': self.response,
-            'authorId': str(self.author_id),
+            'authorId': str(self.author_id) if self.author_id else None,
             'guildId': str(self.guild_id),
             'id': str(self.id),
             'triggerRegex': self.trigger_regex,
@@ -258,7 +258,7 @@ class GuildAutoResponses:
             self.bot,
             r.trigger,
             r.response,
-            r.author_id,
+            r.author_id if r.author_id != 0 else None,
             r.guild_id,
             r.id,
             r.trigger_regex,
