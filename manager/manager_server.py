@@ -106,7 +106,6 @@ def serve(manager):
     server = grpc.server(ThreadPoolExecutor(max_workers=20), options=grpc_options)
     manager_grpc.add_ManagerServicer_to_server(manager, server)
     server.add_insecure_port("0.0.0.0:50051")
-    server.add_insecure_port("manager:50051")
     server.start()
     logger.debug("gRPC server started")
     server.wait_for_termination()

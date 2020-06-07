@@ -7,6 +7,7 @@ from lib.config import logger
 import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 grpc_options = (
     ('grpc.keepalive_time_ms', 10000),
@@ -29,23 +30,8 @@ class SyncRPCClient():
             except _InactiveRpcError:
                 continue
 
-    def register(self, v):
-        return self.rpc(self.stub.register, v)
-
-    def guild_count(self, v):
-        return self.rpc(self.stub.guild_count, v)
-
-    def checkin(self, i):
-        return self.rpc(self.stub.checkin, i)
-
-    def publish_file(self, f):
-        return self.rpc(self.stub.publish_file, f)
-
-    def all_guilds(self, v):
-        return self.rpc(self.stub.all_guilds, v)
-
-    def guild_update(self, g):
-        return self.rpc(self.stub.guild_update, g)
+    def __getattr__(self, name):
+        return partial(self.rpc, getattr(self.stub, name))
 
 
 def get_blocking_client():
@@ -77,23 +63,26 @@ class AsyncRPCClient():
             except _MultiThreadedRendezvous:
                 continue
 
-    async def register(self, v):
-        return await self.rpc(self.stub.register, v)
+    def __getattr__(self, name):
+        return partial(self.rpc, getattr(self.stub, name))
 
-    async def guild_count(self, v):
-        return await self.rpc(self.stub.guild_count, v)
+    # async def register(self, v):
+    #     return await self.rpc(self.stub.register, v)
 
-    async def checkin(self, i):
-        return await self.rpc(self.stub.checkin, i)
+    # async def guild_count(self, v):
+    #     return await self.rpc(self.stub.guild_count, v)
 
-    async def publish_file(self, f):
-        return await self.rpc(self.stub.publish_file, f)
+    # async def checkin(self, i):
+    #     return await self.rpc(self.stub.checkin, i)
 
-    async def all_guilds(self, v):
-        return await self.rpc(self.stub.all_guilds, v)
+    # async def publish_file(self, f):
+    #     return await self.rpc(self.stub.publish_file, f)
 
-    async def guild_update(self, g):
-        return await self.rpc(self.stub.guild_update, g)
+    # async def all_guilds(self, v):
+    #     return await self.rpc(self.stub.all_guilds, v)
+
+    # async def guild_update(self, g):
+    #     return await self.rpc(self.stub.guild_update, g)
 
 
 def get_async_client():

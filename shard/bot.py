@@ -67,11 +67,11 @@ class Architus(Bot):
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
             name=f"the tragedy of darth plagueis the wise {self.shard_id}", type=2))
-        await self.manager_client.guild_update(iter(self.guilds_as_message))
+        await self.manager_client.guild_update(self.guilds_as_message)
 
     async def on_guild_join(self, guild):
         logger.info(f" -- JOINED NEW GUILD: {guild.name} -- ")
-        await self.manager_client.guild_update(iter(self.guilds_as_message))
+        await self.manager_client.guild_update(self.guilds_as_message)
 
     @property
     def settings(self):
@@ -79,13 +79,11 @@ class Architus(Bot):
 
     @property
     def guilds_as_message(self):
-        guilds = []
         for guild in self.guilds:
             guild_message = guild_to_message(guild)
             guild_message.shard_id = self.shard_id
             guild_message.admin_ids.extend(self.settings[guild].admins_ids)
-            guilds.append(guild_message)
-        return guilds
+            yield guild_message
 
     @property
     def guilds_as_dicts(self):

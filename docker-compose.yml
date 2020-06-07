@@ -9,8 +9,6 @@ services:
       - architus.env
     environment:
       NUM_SHARDS: "${NUM_SHARDS:-1}"
-      http_proxy: ""
-      https_proxy: ""
     deploy:
       replicas: "${NUM_SHARDS:-1}"
       restart_policy:
@@ -85,14 +83,11 @@ services:
       - architus.env
     environment:
       NUM_SHARDS: "${NUM_SHARDS:-1}"
-      http_proxy: ""
-      https_proxy: ""
     deploy:
       restart_policy:
         condition: on-failure
     ports:
       - "5300:5300"
-      - "50051:50051"
     volumes:
       - "./www:/var/www"
     deploy:
