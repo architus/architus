@@ -5,7 +5,6 @@ from PIL import Image
 import re
 from typing import Optional, List
 from io import BytesIO
-import base64
 
 from src.utils import send_message_webhook
 from src.architus_emoji import ArchitusEmoji

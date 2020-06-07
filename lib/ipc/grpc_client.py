@@ -17,6 +17,7 @@ grpc_options = (
     ('grpc.http2.min_ping_interval_without_data_ms', 5000)
 )
 
+
 class SyncRPCClient():
     def __init__(self, stub):
         self.stub = stub
@@ -59,6 +60,7 @@ def get_blocking_client():
 # TODO: gRPC will hopefully be releasing actual support for python async soon.
 #       Will need to update to actually take advantage of that when it comes out.
 
+
 class AsyncRPCClient():
     def __init__(self, stub):
         self.stub = stub
@@ -69,9 +71,9 @@ class AsyncRPCClient():
         while True:
             try:
                 return await self.loop.run_in_executor(self.pool, f, a)
-            except _InactiveRpcError as e:
+            except _InactiveRpcError:
                 continue
-            except _MultiThreadedRendezvous as m:
+            except _MultiThreadedRendezvous:
                 continue
 
     async def register(self, v):
@@ -102,7 +104,7 @@ def get_async_client():
             stub = manager_pb2_grpc.ManagerStub(channel)
             logger.debug("Connected to gRPC")
             break
-        except:
+        except Exception:
             logger.debug("Waiting to connect to gRPC")
             time.sleep(3)
 

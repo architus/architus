@@ -4,7 +4,7 @@ import base64
 
 from src.utils import timezone_aware_format
 from lib.config import logger
-from lib.ipc import manager_pb2 as message
+from lib.ipc import manager_pb2 as message_type
 
 
 class StarboardCog(commands.Cog):
@@ -33,7 +33,7 @@ class StarboardCog(commands.Cog):
             title=timezone_aware_format(message.created_at), description=message.content, colour=0x42f468)
         img = await message.author.avatar_url.read()
         data = await self.bot.manager_client.publish_file(
-            message.File(location='avatars',
+            message_type.File(location='avatars',
                          name=message.author.id,
                          file=img))
 

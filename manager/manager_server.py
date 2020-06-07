@@ -1,7 +1,6 @@
 import os
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
-import time
 import asyncio
 
 from lib.config import logger, domain_name
@@ -12,9 +11,6 @@ import lib.ipc.manager_pb2_grpc as manager_grpc
 import lib.ipc.manager_pb2 as message
 from lib.ipc.grpc_client import grpc_options
 
-# TODO: Add some thread safety locks here and there
-# TODO: Maybe increase sleep on health_check to decrease races for lock
-#       that I have to add.
 
 class Manager(manager_grpc.ManagerServicer):
     """
@@ -63,16 +59,17 @@ class Manager(manager_grpc.ManagerServicer):
 
     def checkin(self, request, context):
         self.last_checkin[request.shard_id] = datetime.now()
-        self.registered[shard_id] = True
+        self.registered[request.shard_id] = True
         return message.CheckInResponse()
 
-    def publish_file(self, request, context):
+    def publish_file(self, request_iterator, context):
         """Missing associated documentation comment in .proto file"""
-        assert (len(data) > 0)
-        filetype = "png" if request.filetype == "" else request.filetype
-        if request.name == "":
+        first = next(request_iterator)
+        filetype = "png" if first.filetype == "" else first.filetype
+        name = first.name
+        if name == "":
             name = str(self.hoarfrost_gen.generate())
-        location = request.location
+        location = first.location
         if location == "":
             location = "assets"
         directory = f"/var/www/{location}"
@@ -80,8 +77,10 @@ class Manager(manager_grpc.ManagerServicer):
         if not os.path.exists(directory):
             os.makedirs(directory)
         with open(f"{directory}/{name}.{filetype}", "wb") as f:
-            logger.info(f"Writing {directory}/{filename}.{filetype}")
-            f.write(requests.file)
+            logger.info(f"Writing {directory}/{name}.{filetype}")
+            f.write(first.file)
+            for datum in request_iterator:
+                f.write(datum.file)
 
         return message.Url(Url=f"https://cdn.{domain_name}/{location}/{name}.{filetype}")
 
@@ -102,6 +101,7 @@ class Manager(manager_grpc.ManagerServicer):
         self.store[guilds[0].shard_id] = guilds
         return message.UpdateResponse()
 
+
 def serve(manager):
     server = grpc.server(ThreadPoolExecutor(max_workers=20), options=grpc_options)
     manager_grpc.add_ManagerServicer_to_server(manager, server)
@@ -110,6 +110,7 @@ def serve(manager):
     server.start()
     logger.debug("gRPC server started")
     server.wait_for_termination()
+
 
 if __name__ == "__main__":
     manager = Manager(int(os.environ["NUM_SHARDS"]))
