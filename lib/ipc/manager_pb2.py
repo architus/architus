@@ -18,26 +18,19 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='Manager',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=b'\n\rmanager.proto\x12\x07Manager\"\x13\n\x04Void\x12\x0b\n\x03val\x18\x01 \x01(\x08\"2\n\tShardInfo\x12\x10\n\x08shard_id\x18\x01 \x01(\r\x12\x13\n\x0bshard_count\x18\x02 \x01(\r\"4\n\tGuildInfo\x12\x13\n\x0bguild_count\x18\x01 \x01(\r\x12\x12\n\nuser_count\x18\x02 \x01(\r\"\x1b\n\x07ShardID\x12\x10\n\x08shard_id\x18\x01 \x01(\r\"F\n\x04\x46ile\x12\x10\n\x08location\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x10\n\x08\x66iletype\x18\x03 \x01(\t\x12\x0c\n\x04\x66ile\x18\x04 \x01(\x0c\"\x12\n\x03Url\x12\x0b\n\x03Url\x18\x01 \x01(\t\"\xf9\x02\n\x05Guild\x12\x10\n\x08shard_id\x18\x01 \x01(\r\x12\n\n\x02id\x18\x02 \x01(\x06\x12\x0c\n\x04name\x18\x03 \x01(\t\x12\x0c\n\x04icon\x18\x04 \x01(\t\x12\x0e\n\x06splash\x18\x05 \x01(\t\x12\x10\n\x08owner_id\x18\x06 \x01(\x06\x12\x0e\n\x06region\x18\x07 \x01(\t\x12\x13\n\x0b\x61\x66k_timeout\x18\x08 \x01(\r\x12\x13\n\x0bunavailable\x18\t \x01(\x08\x12\x13\n\x0bmax_members\x18\n \x01(\x05\x12\x0e\n\x06\x62\x61nner\x18\x0b \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x0c \x01(\t\x12\x11\n\tmfa_level\x18\r \x01(\x05\x12\x14\n\x0cpremium_tier\x18\x0e \x01(\r\x12\"\n\x1apremium_subscription_count\x18\x0f \x01(\x05\x12\x18\n\x10preferred_locale\x18\x10 \x01(\t\x12\x14\n\x0cmember_count\x18\x11 \x01(\x05\x12\x11\n\tadmin_ids\x18\x12 \x03(\x06\x12\x10\n\x08\x66\x65\x61tures\x18\x13 \x03(\t2\xaf\x02\n\x07Manager\x12/\n\x08register\x12\r.Manager.Void\x1a\x12.Manager.ShardInfo\"\x00\x12\x32\n\x0bguild_count\x12\r.Manager.Void\x1a\x12.Manager.GuildInfo\"\x00\x12,\n\x07\x63heckin\x12\x10.Manager.ShardID\x1a\r.Manager.Void\"\x00\x12-\n\x0cpublish_file\x12\r.Manager.File\x1a\x0c.Manager.Url\"\x00\x12/\n\nall_guilds\x12\r.Manager.Void\x1a\x0e.Manager.Guild\"\x00\x30\x01\x12\x31\n\x0cguild_update\x12\x0e.Manager.Guild\x1a\r.Manager.Void\"\x00(\x01\x62\x06proto3'
+  serialized_pb=b'\n\rmanager.proto\x12\x07Manager\"\x11\n\x0fRegisterRequest\"\x13\n\x11GuildCountRequest\"\x11\n\x0f\x43heckInResponse\"\x12\n\x10\x41llGuildsRequest\"\x10\n\x0eUpdateResponse\"2\n\tShardInfo\x12\x10\n\x08shard_id\x18\x01 \x01(\r\x12\x13\n\x0bshard_count\x18\x02 \x01(\r\"4\n\tGuildInfo\x12\x13\n\x0bguild_count\x18\x01 \x01(\r\x12\x12\n\nuser_count\x18\x02 \x01(\r\"\x1b\n\x07ShardID\x12\x10\n\x08shard_id\x18\x01 \x01(\r\"F\n\x04\x46ile\x12\x10\n\x08location\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x10\n\x08\x66iletype\x18\x03 \x01(\t\x12\x0c\n\x04\x66ile\x18\x04 \x01(\x0c\"\x12\n\x03Url\x12\x0b\n\x03Url\x18\x01 \x01(\t\"\xf9\x02\n\x05Guild\x12\x10\n\x08shard_id\x18\x01 \x01(\r\x12\n\n\x02id\x18\x02 \x01(\x06\x12\x0c\n\x04name\x18\x03 \x01(\t\x12\x0c\n\x04icon\x18\x04 \x01(\t\x12\x0e\n\x06splash\x18\x05 \x01(\t\x12\x10\n\x08owner_id\x18\x06 \x01(\x06\x12\x0e\n\x06region\x18\x07 \x01(\t\x12\x13\n\x0b\x61\x66k_timeout\x18\x08 \x01(\r\x12\x13\n\x0bunavailable\x18\t \x01(\x08\x12\x13\n\x0bmax_members\x18\n \x01(\x05\x12\x0e\n\x06\x62\x61nner\x18\x0b \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x0c \x01(\t\x12\x11\n\tmfa_level\x18\r \x01(\x05\x12\x14\n\x0cpremium_tier\x18\x0e \x01(\r\x12\"\n\x1apremium_subscription_count\x18\x0f \x01(\x05\x12\x18\n\x10preferred_locale\x18\x10 \x01(\t\x12\x14\n\x0cmember_count\x18\x11 \x01(\x05\x12\x11\n\tadmin_ids\x18\x12 \x03(\x06\x12\x10\n\x08\x66\x65\x61tures\x18\x13 \x03(\t2\xea\x02\n\x07Manager\x12:\n\x08register\x12\x18.Manager.RegisterRequest\x1a\x12.Manager.ShardInfo\"\x00\x12?\n\x0bguild_count\x12\x1a.Manager.GuildCountRequest\x1a\x12.Manager.GuildInfo\"\x00\x12\x37\n\x07\x63heckin\x12\x10.Manager.ShardID\x1a\x18.Manager.CheckInResponse\"\x00\x12/\n\x0cpublish_file\x12\r.Manager.File\x1a\x0c.Manager.Url\"\x00(\x01\x12;\n\nall_guilds\x12\x19.Manager.AllGuildsRequest\x1a\x0e.Manager.Guild\"\x00\x30\x01\x12;\n\x0cguild_update\x12\x0e.Manager.Guild\x1a\x17.Manager.UpdateResponse\"\x00(\x01\x62\x06proto3'
 )
 
 
 
 
-_VOID = _descriptor.Descriptor(
-  name='Void',
-  full_name='Manager.Void',
+_REGISTERREQUEST = _descriptor.Descriptor(
+  name='RegisterRequest',
+  full_name='Manager.RegisterRequest',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
-    _descriptor.FieldDescriptor(
-      name='val', full_name='Manager.Void.val', index=0,
-      number=1, type=8, cpp_type=7, label=1,
-      has_default_value=False, default_value=False,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -51,7 +44,103 @@ _VOID = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=26,
-  serialized_end=45,
+  serialized_end=43,
+)
+
+
+_GUILDCOUNTREQUEST = _descriptor.Descriptor(
+  name='GuildCountRequest',
+  full_name='Manager.GuildCountRequest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=45,
+  serialized_end=64,
+)
+
+
+_CHECKINRESPONSE = _descriptor.Descriptor(
+  name='CheckInResponse',
+  full_name='Manager.CheckInResponse',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=66,
+  serialized_end=83,
+)
+
+
+_ALLGUILDSREQUEST = _descriptor.Descriptor(
+  name='AllGuildsRequest',
+  full_name='Manager.AllGuildsRequest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=85,
+  serialized_end=103,
+)
+
+
+_UPDATERESPONSE = _descriptor.Descriptor(
+  name='UpdateResponse',
+  full_name='Manager.UpdateResponse',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=105,
+  serialized_end=121,
 )
 
 
@@ -88,8 +177,8 @@ _SHARDINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=47,
-  serialized_end=97,
+  serialized_start=123,
+  serialized_end=173,
 )
 
 
@@ -126,8 +215,8 @@ _GUILDINFO = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=99,
-  serialized_end=151,
+  serialized_start=175,
+  serialized_end=227,
 )
 
 
@@ -157,8 +246,8 @@ _SHARDID = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=153,
-  serialized_end=180,
+  serialized_start=229,
+  serialized_end=256,
 )
 
 
@@ -209,8 +298,8 @@ _FILE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=182,
-  serialized_end=252,
+  serialized_start=258,
+  serialized_end=328,
 )
 
 
@@ -240,8 +329,8 @@ _URL = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=254,
-  serialized_end=272,
+  serialized_start=330,
+  serialized_end=348,
 )
 
 
@@ -397,11 +486,15 @@ _GUILD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=275,
-  serialized_end=652,
+  serialized_start=351,
+  serialized_end=728,
 )
 
-DESCRIPTOR.message_types_by_name['Void'] = _VOID
+DESCRIPTOR.message_types_by_name['RegisterRequest'] = _REGISTERREQUEST
+DESCRIPTOR.message_types_by_name['GuildCountRequest'] = _GUILDCOUNTREQUEST
+DESCRIPTOR.message_types_by_name['CheckInResponse'] = _CHECKINRESPONSE
+DESCRIPTOR.message_types_by_name['AllGuildsRequest'] = _ALLGUILDSREQUEST
+DESCRIPTOR.message_types_by_name['UpdateResponse'] = _UPDATERESPONSE
 DESCRIPTOR.message_types_by_name['ShardInfo'] = _SHARDINFO
 DESCRIPTOR.message_types_by_name['GuildInfo'] = _GUILDINFO
 DESCRIPTOR.message_types_by_name['ShardID'] = _SHARDID
@@ -410,12 +503,40 @@ DESCRIPTOR.message_types_by_name['Url'] = _URL
 DESCRIPTOR.message_types_by_name['Guild'] = _GUILD
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
-Void = _reflection.GeneratedProtocolMessageType('Void', (_message.Message,), {
-  'DESCRIPTOR' : _VOID,
+RegisterRequest = _reflection.GeneratedProtocolMessageType('RegisterRequest', (_message.Message,), {
+  'DESCRIPTOR' : _REGISTERREQUEST,
   '__module__' : 'manager_pb2'
-  # @@protoc_insertion_point(class_scope:Manager.Void)
+  # @@protoc_insertion_point(class_scope:Manager.RegisterRequest)
   })
-_sym_db.RegisterMessage(Void)
+_sym_db.RegisterMessage(RegisterRequest)
+
+GuildCountRequest = _reflection.GeneratedProtocolMessageType('GuildCountRequest', (_message.Message,), {
+  'DESCRIPTOR' : _GUILDCOUNTREQUEST,
+  '__module__' : 'manager_pb2'
+  # @@protoc_insertion_point(class_scope:Manager.GuildCountRequest)
+  })
+_sym_db.RegisterMessage(GuildCountRequest)
+
+CheckInResponse = _reflection.GeneratedProtocolMessageType('CheckInResponse', (_message.Message,), {
+  'DESCRIPTOR' : _CHECKINRESPONSE,
+  '__module__' : 'manager_pb2'
+  # @@protoc_insertion_point(class_scope:Manager.CheckInResponse)
+  })
+_sym_db.RegisterMessage(CheckInResponse)
+
+AllGuildsRequest = _reflection.GeneratedProtocolMessageType('AllGuildsRequest', (_message.Message,), {
+  'DESCRIPTOR' : _ALLGUILDSREQUEST,
+  '__module__' : 'manager_pb2'
+  # @@protoc_insertion_point(class_scope:Manager.AllGuildsRequest)
+  })
+_sym_db.RegisterMessage(AllGuildsRequest)
+
+UpdateResponse = _reflection.GeneratedProtocolMessageType('UpdateResponse', (_message.Message,), {
+  'DESCRIPTOR' : _UPDATERESPONSE,
+  '__module__' : 'manager_pb2'
+  # @@protoc_insertion_point(class_scope:Manager.UpdateResponse)
+  })
+_sym_db.RegisterMessage(UpdateResponse)
 
 ShardInfo = _reflection.GeneratedProtocolMessageType('ShardInfo', (_message.Message,), {
   'DESCRIPTOR' : _SHARDINFO,
@@ -467,15 +588,15 @@ _MANAGER = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=655,
-  serialized_end=958,
+  serialized_start=731,
+  serialized_end=1093,
   methods=[
   _descriptor.MethodDescriptor(
     name='register',
     full_name='Manager.Manager.register',
     index=0,
     containing_service=None,
-    input_type=_VOID,
+    input_type=_REGISTERREQUEST,
     output_type=_SHARDINFO,
     serialized_options=None,
   ),
@@ -484,7 +605,7 @@ _MANAGER = _descriptor.ServiceDescriptor(
     full_name='Manager.Manager.guild_count',
     index=1,
     containing_service=None,
-    input_type=_VOID,
+    input_type=_GUILDCOUNTREQUEST,
     output_type=_GUILDINFO,
     serialized_options=None,
   ),
@@ -494,7 +615,7 @@ _MANAGER = _descriptor.ServiceDescriptor(
     index=2,
     containing_service=None,
     input_type=_SHARDID,
-    output_type=_VOID,
+    output_type=_CHECKINRESPONSE,
     serialized_options=None,
   ),
   _descriptor.MethodDescriptor(
@@ -511,7 +632,7 @@ _MANAGER = _descriptor.ServiceDescriptor(
     full_name='Manager.Manager.all_guilds',
     index=4,
     containing_service=None,
-    input_type=_VOID,
+    input_type=_ALLGUILDSREQUEST,
     output_type=_GUILD,
     serialized_options=None,
   ),
@@ -521,7 +642,7 @@ _MANAGER = _descriptor.ServiceDescriptor(
     index=5,
     containing_service=None,
     input_type=_GUILD,
-    output_type=_VOID,
+    output_type=_UPDATERESPONSE,
     serialized_options=None,
   ),
 ])

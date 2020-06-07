@@ -25,7 +25,7 @@ class Architus(Bot):
 
         logger.debug("registering with manager...")
         manager_client = grpc_client.get_blocking_client()
-        shard_info = manager_client.register(message.Void(val=True))
+        shard_info = manager_client.register(message.RegisterRequest())
         self.shard_id = shard_info.shard_id
         shard_dict = { 'shard_id': shard_info.shard_id, 'shard_count': shard_info.shard_count }
         logger.info(f"Got shard_id {self.shard_id}")
@@ -46,6 +46,7 @@ class Architus(Bot):
         )
 
         self.manager_client = grpc_client.get_async_client()
+        print("Got manager: {}", self.manager_client)
 
         self.loop.create_task(self.emitter.connect())
 
@@ -131,5 +132,4 @@ architus.load_extension('src.api.api')
 architus.load_extension('src.guild_settings')
 
 if __name__ == '__main__':
-    sleep(5)
     architus.run(secret_token)

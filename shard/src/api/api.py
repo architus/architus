@@ -46,7 +46,7 @@ class Api(Cog):
         return {'message': 'pong'}, sc.OK_200
 
     async def guild_count(self):
-        return await self.bot.manager_client.guild_count(message.Void(val=True))
+        return await self.bot.manager_client.guild_count(message.GuildCountRequest())
 
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
@@ -142,7 +142,7 @@ class Api(Cog):
         return {'value': "unknown setting"}, sc.NOT_FOUND_404
 
     async def tag_autbot_guilds(self, guild_list, user_id: int):
-        all_guilds = [guild for guild in await self.bot.manager_client.all_guilds(message.Void(val=True))]
+        all_guilds = [guild for guild in await self.bot.manager_client.all_guilds(message.AllGuildsRequest())]
         for guild_dict in guild_list:
             for guild in all_guilds:
                 if guild.id == int(guild_dict['id']):

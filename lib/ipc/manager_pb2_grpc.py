@@ -15,33 +15,33 @@ class ManagerStub(object):
         """
         self.register = channel.unary_unary(
                 '/Manager.Manager/register',
-                request_serializer=manager__pb2.Void.SerializeToString,
+                request_serializer=manager__pb2.RegisterRequest.SerializeToString,
                 response_deserializer=manager__pb2.ShardInfo.FromString,
                 )
         self.guild_count = channel.unary_unary(
                 '/Manager.Manager/guild_count',
-                request_serializer=manager__pb2.Void.SerializeToString,
+                request_serializer=manager__pb2.GuildCountRequest.SerializeToString,
                 response_deserializer=manager__pb2.GuildInfo.FromString,
                 )
         self.checkin = channel.unary_unary(
                 '/Manager.Manager/checkin',
                 request_serializer=manager__pb2.ShardID.SerializeToString,
-                response_deserializer=manager__pb2.Void.FromString,
+                response_deserializer=manager__pb2.CheckInResponse.FromString,
                 )
-        self.publish_file = channel.unary_unary(
+        self.publish_file = channel.stream_unary(
                 '/Manager.Manager/publish_file',
                 request_serializer=manager__pb2.File.SerializeToString,
                 response_deserializer=manager__pb2.Url.FromString,
                 )
         self.all_guilds = channel.unary_stream(
                 '/Manager.Manager/all_guilds',
-                request_serializer=manager__pb2.Void.SerializeToString,
+                request_serializer=manager__pb2.AllGuildsRequest.SerializeToString,
                 response_deserializer=manager__pb2.Guild.FromString,
                 )
         self.guild_update = channel.stream_unary(
                 '/Manager.Manager/guild_update',
                 request_serializer=manager__pb2.Guild.SerializeToString,
-                response_deserializer=manager__pb2.Void.FromString,
+                response_deserializer=manager__pb2.UpdateResponse.FromString,
                 )
 
 
@@ -66,7 +66,7 @@ class ManagerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def publish_file(self, request, context):
+    def publish_file(self, request_iterator, context):
         """Missing associated documentation comment in .proto file"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -89,33 +89,33 @@ def add_ManagerServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'register': grpc.unary_unary_rpc_method_handler(
                     servicer.register,
-                    request_deserializer=manager__pb2.Void.FromString,
+                    request_deserializer=manager__pb2.RegisterRequest.FromString,
                     response_serializer=manager__pb2.ShardInfo.SerializeToString,
             ),
             'guild_count': grpc.unary_unary_rpc_method_handler(
                     servicer.guild_count,
-                    request_deserializer=manager__pb2.Void.FromString,
+                    request_deserializer=manager__pb2.GuildCountRequest.FromString,
                     response_serializer=manager__pb2.GuildInfo.SerializeToString,
             ),
             'checkin': grpc.unary_unary_rpc_method_handler(
                     servicer.checkin,
                     request_deserializer=manager__pb2.ShardID.FromString,
-                    response_serializer=manager__pb2.Void.SerializeToString,
+                    response_serializer=manager__pb2.CheckInResponse.SerializeToString,
             ),
-            'publish_file': grpc.unary_unary_rpc_method_handler(
+            'publish_file': grpc.stream_unary_rpc_method_handler(
                     servicer.publish_file,
                     request_deserializer=manager__pb2.File.FromString,
                     response_serializer=manager__pb2.Url.SerializeToString,
             ),
             'all_guilds': grpc.unary_stream_rpc_method_handler(
                     servicer.all_guilds,
-                    request_deserializer=manager__pb2.Void.FromString,
+                    request_deserializer=manager__pb2.AllGuildsRequest.FromString,
                     response_serializer=manager__pb2.Guild.SerializeToString,
             ),
             'guild_update': grpc.stream_unary_rpc_method_handler(
                     servicer.guild_update,
                     request_deserializer=manager__pb2.Guild.FromString,
-                    response_serializer=manager__pb2.Void.SerializeToString,
+                    response_serializer=manager__pb2.UpdateResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -138,7 +138,7 @@ class Manager(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/Manager.Manager/register',
-            manager__pb2.Void.SerializeToString,
+            manager__pb2.RegisterRequest.SerializeToString,
             manager__pb2.ShardInfo.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -154,7 +154,7 @@ class Manager(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/Manager.Manager/guild_count',
-            manager__pb2.Void.SerializeToString,
+            manager__pb2.GuildCountRequest.SerializeToString,
             manager__pb2.GuildInfo.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -171,12 +171,12 @@ class Manager(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/Manager.Manager/checkin',
             manager__pb2.ShardID.SerializeToString,
-            manager__pb2.Void.FromString,
+            manager__pb2.CheckInResponse.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def publish_file(request,
+    def publish_file(request_iterator,
             target,
             options=(),
             channel_credentials=None,
@@ -185,7 +185,7 @@ class Manager(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/Manager.Manager/publish_file',
+        return grpc.experimental.stream_unary(request_iterator, target, '/Manager.Manager/publish_file',
             manager__pb2.File.SerializeToString,
             manager__pb2.Url.FromString,
             options, channel_credentials,
@@ -202,7 +202,7 @@ class Manager(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_stream(request, target, '/Manager.Manager/all_guilds',
-            manager__pb2.Void.SerializeToString,
+            manager__pb2.AllGuildsRequest.SerializeToString,
             manager__pb2.Guild.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -219,6 +219,6 @@ class Manager(object):
             metadata=None):
         return grpc.experimental.stream_unary(request_iterator, target, '/Manager.Manager/guild_update',
             manager__pb2.Guild.SerializeToString,
-            manager__pb2.Void.FromString,
+            manager__pb2.UpdateResponse.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)

@@ -2,16 +2,27 @@ syntax = "proto3";
 package Manager;
 
 service Manager {
-    rpc register(Void) returns (ShardInfo) {}
-    rpc guild_count(Void) returns (GuildInfo) {}
-    rpc checkin(ShardID) returns (Void) {}
-    rpc publish_file(File) returns (Url) {}
-    rpc all_guilds(Void) returns (stream Guild) {}
-    rpc guild_update(stream Guild) returns (Void) {}
+    rpc register(RegisterRequest) returns (ShardInfo) {}
+    rpc guild_count(GuildCountRequest) returns (GuildInfo) {}
+    rpc checkin(ShardID) returns (CheckInResponse) {}
+    rpc publish_file(stream File) returns (Url) {}
+    rpc all_guilds(AllGuildsRequest) returns (stream Guild) {}
+    rpc guild_update(stream Guild) returns (UpdateResponse) {}
 }
 
-message Void {
-    bool val = 1;
+message RegisterRequest {
+}
+
+message GuildCountRequest {
+}
+
+message CheckInResponse {
+}
+
+message AllGuildsRequest {
+}
+
+message UpdateResponse {
 }
 
 message ShardInfo {

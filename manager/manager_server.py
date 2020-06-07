@@ -8,8 +8,9 @@ from lib.config import logger, domain_name
 from lib.hoar_frost import HoarFrostGenerator
 
 import grpc
-import manager_pb2_grpc as manager_grpc
-import manager_pb2 as message
+import lib.ipc.manager_pb2_grpc as manager_grpc
+import lib.ipc.manager_pb2 as message
+from lib.ipc.grpc_client import grpc_options
 
 # TODO: Add some thread safety locks here and there
 # TODO: Maybe increase sleep on health_check to decrease races for lock
@@ -34,7 +35,7 @@ class Manager(manager_grpc.ManagerServicer):
 
     async def health_check(self):
         while True:
-            time.sleep(5)
+            await asyncio.sleep(5)
             for shard, last_checkin in self.last_checkin.items():
                 if last_checkin is not None and last_checkin < datetime.now() - timedelta(seconds=5):
                     logger.error(f"--- SHARD {shard} MISSED ITS HEARTBEAT, DEREGISTERING... ---")
@@ -63,7 +64,7 @@ class Manager(manager_grpc.ManagerServicer):
     def checkin(self, request, context):
         self.last_checkin[request.shard_id] = datetime.now()
         self.registered[shard_id] = True
-        return message.Void(val=True)
+        return message.CheckInResponse()
 
     def publish_file(self, request, context):
         """Missing associated documentation comment in .proto file"""
@@ -81,7 +82,7 @@ class Manager(manager_grpc.ManagerServicer):
         with open(f"{directory}/{name}.{filetype}", "wb") as f:
             logger.info(f"Writing {directory}/{filename}.{filetype}")
             f.write(requests.file)
-        
+
         return message.Url(Url=f"https://cdn.{domain_name}/{location}/{name}.{filetype}")
 
     def all_guilds(self, request, context):
@@ -96,20 +97,22 @@ class Manager(manager_grpc.ManagerServicer):
         for guild in request_iterator:
             guilds.append(guild)
         if len(guilds) == 0:
-            return message.Void(val=False)
-        logger.debug(f"Received guild list from shard {guilds[0].shard_id} of {len(guilds)} guilds")
+            return message.UpdateResponse()
+        logger.debug(f"Received guild list from shard {guilds[0].shard_id + 1} of {len(guilds)} guilds")
         self.store[guilds[0].shard_id] = guilds
-        return message.Void(val=True)
+        return message.UpdateResponse()
 
 def serve(manager):
-    server = grpc.server(ThreadPoolExecutor(max_workers=20))
+    server = grpc.server(ThreadPoolExecutor(max_workers=20), options=grpc_options)
     manager_grpc.add_ManagerServicer_to_server(manager, server)
     server.add_insecure_port("0.0.0.0:50051")
     server.add_insecure_port("manager:50051")
     server.start()
     logger.debug("gRPC server started")
+    server.wait_for_termination()
 
 if __name__ == "__main__":
     manager = Manager(int(os.environ["NUM_SHARDS"]))
+    loop = asyncio.get_event_loop()
+    loop.create_task(manager.health_check())
     serve(manager)
-    asyncio.run(manager.health_check())

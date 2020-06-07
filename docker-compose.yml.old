@@ -121,5 +121,20 @@ services:
       - "8090:15672"
     networks:
       - webnet
+  record-service:
+    image: johnyburd/recording:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./record-service/Dockerfile
+    hostname: "record-service"
+    ports:
+      - "7777:7777"
+    networks:
+      - webnet
+    deploy:
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - shard
 networks:
   webnet:
