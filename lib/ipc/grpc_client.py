@@ -26,7 +26,7 @@ class SyncRPCClient():
         while True:
             try:
                 return f(a)
-            except _InactiveRpcError as e:
+            except _InactiveRpcError:
                 continue
 
     def register(self, v):
@@ -46,6 +46,7 @@ class SyncRPCClient():
 
     def guild_update(self, g):
         return self.rpc(self.stub.guild_update, g)
+
 
 def get_blocking_client():
     while True:
