@@ -1,6 +1,5 @@
 from discord.ext import commands
 import discord
-import base64
 
 from src.utils import timezone_aware_format
 from lib.config import logger
@@ -34,8 +33,8 @@ class StarboardCog(commands.Cog):
         img = await message.author.avatar_url.read()
         data = await self.bot.manager_client.publish_file(
             message_type.File(location='avatars',
-                         name=message.author.id,
-                         file=img))
+                              name=message.author.id,
+                              file=img))
 
         em.set_author(name=message.author.display_name, icon_url=data.url)
         if message.embeds:
