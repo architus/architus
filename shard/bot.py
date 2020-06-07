@@ -4,10 +4,10 @@ import os
 from discord.ext.commands import Bot
 import discord
 
-from src.utils import guild_to_message
+from src.utils import guild_to_message, guild_to_dict
 from lib.config import get_session, secret_token, logger, AsyncConnWrapper
 # TODO: Get rid of this stuff
-from lib.ipc import async_rpc_server, async_rpc_client, blocking_rpc_client
+from lib.ipc import async_rpc_server
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
 from lib.ipc import grpc_client, manager_pb2 as message
@@ -27,7 +27,7 @@ class Architus(Bot):
         manager_client = grpc_client.get_blocking_client()
         shard_info = manager_client.register(message.RegisterRequest())
         self.shard_id = shard_info.shard_id
-        shard_dict = { 'shard_id': shard_info.shard_id, 'shard_count': shard_info.shard_count }
+        shard_dict = {'shard_id': shard_info.shard_id, 'shard_count': shard_info.shard_count}
         logger.info(f"Got shard_id {self.shard_id}")
 
         kwargs.update(shard_dict)

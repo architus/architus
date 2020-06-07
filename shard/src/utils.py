@@ -2,7 +2,6 @@ from datetime import datetime
 from pytz import timezone
 from aiohttp import ClientSession
 import io
-import asyncio
 import functools
 from threading import Lock
 
@@ -10,6 +9,7 @@ import discord
 
 from lib.config import logger
 from lib.ipc import manager_pb2 as message
+
 
 class TCPLock:
     """
@@ -32,6 +32,7 @@ class TCPLock:
         msg = self.connection.recv(num_bytes)
         self.lock.release()
         return msg
+
 
 async def download_emoji(emoji: discord.Emoji) -> io.BytesIO:
     async with ClientSession() as session:
