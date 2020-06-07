@@ -11,7 +11,7 @@ import aiohttp
 import asyncio
 
 import src.generate.wordcount as wordcount_gen
-from src.generate import corona
+from src.generate import corona, member_growth
 from lib.config import DISCORD_EPOCH, logger
 from lib.ipc import manager_pb2 as message_type
 
@@ -111,6 +111,16 @@ class MessageStats(commands.Cog, name="Server Statistics"):
             excludes.append(author.id)
             await ctx.send(f"{author.display_name}'s message data is now hidden")
         settings.stats_exclude = excludes
+
+    @commands.command(aliases=['growth'])
+    async def joins(self, ctx):
+        img = member_growth.generate(ctx.guild.members)
+        data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
+        em = discord.Embed(title="Server Growth", description=ctx.guild.name)
+        em.set_image(url=data['url'])
+        em.color = 0x35a125
+        em.set_footer(text=f"{ctx.guild.name} has a total of {ctx.guild.member_count} members")
+        await ctx.channel.send(embed=em)
 
     @commands.command()
     async def spellcheck(self, ctx, victim: discord.Member):

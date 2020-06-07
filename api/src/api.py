@@ -18,7 +18,7 @@ from src.session import Identify, Login, RefreshToken, TokenExchange, End
 app = Flask(__name__)
 cors = CORS(
     app,
-    resources={'/*': {'origins': [f"https://{DOMAIN}/", f"https://api.{DOMAIN}/"] if is_prod else "*"}},
+    origins=[f"https://{DOMAIN}", f"https://api.{DOMAIN}"] if is_prod else "*",
     supports_credentials=True
 )
 
