@@ -22,6 +22,7 @@ services:
       - postgres
     networks:
       - webnet
+
   api:
     image: johnyburd/api:${TAG:-latest}
     build:
@@ -45,6 +46,7 @@ services:
       - rabbit
     networks:
       - webnet
+
   gateway:
     image: johnyburd/gateway:${TAG:-latest}
     build:
@@ -58,6 +60,7 @@ services:
       - "6000:6000"
     networks:
       - webnet
+
   postgres:
     image: johnyburd/db:${TAG:-latest}
     build:
@@ -74,6 +77,7 @@ services:
         constraints: [node.role == manager]
     networks:
       - webnet
+
   manager:
     image: johnyburd/manager:${TAG:-latest}
     build:
@@ -95,6 +99,7 @@ services:
         constraints: [node.role == manager]
     networks:
       - webnet
+
   visualizer:
     image: dockersamples/visualizer:stable
     ports:
@@ -106,6 +111,7 @@ services:
         constraints: [node.role == manager]
     networks:
       - webnet
+
   rabbit:
     image: johnyburd/rabbit:${TAG:-latest}
     build:
@@ -116,5 +122,6 @@ services:
       - "8090:15672"
     networks:
       - webnet
+
 networks:
   webnet:
