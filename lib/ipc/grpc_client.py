@@ -23,15 +23,8 @@ class SyncRPCClient():
     def __init__(self, stub):
         self.stub = stub
 
-    def rpc(self, f, a):
-        while True:
-            try:
-                return f(a)
-            except _InactiveRpcError:
-                continue
-
     def __getattr__(self, name):
-        return partial(self.rpc, getattr(self.stub, name))
+        return getattr(self.stub, name)
 
 
 def get_blocking_client():
@@ -44,10 +37,9 @@ def get_blocking_client():
             logger.debug(f"Waiting to connect to gRPC {e}")
             time.sleep(3)
 
+
 # TODO: gRPC will hopefully be releasing actual support for python async soon.
 #       Will need to update to actually take advantage of that when it comes out.
-
-
 class AsyncRPCClient():
     def __init__(self, stub):
         self.stub = stub
@@ -55,34 +47,11 @@ class AsyncRPCClient():
         self.pool = ThreadPoolExecutor(max_workers=8)
 
     async def rpc(self, f, a):
-        while True:
-            try:
-                return await self.loop.run_in_executor(self.pool, f, a)
-            except _InactiveRpcError:
-                continue
-            except _MultiThreadedRendezvous:
-                continue
+        return await self.loop.run_in_executor(self.pool, f, a)
+
 
     def __getattr__(self, name):
         return partial(self.rpc, getattr(self.stub, name))
-
-    # async def register(self, v):
-    #     return await self.rpc(self.stub.register, v)
-
-    # async def guild_count(self, v):
-    #     return await self.rpc(self.stub.guild_count, v)
-
-    # async def checkin(self, i):
-    #     return await self.rpc(self.stub.checkin, i)
-
-    # async def publish_file(self, f):
-    #     return await self.rpc(self.stub.publish_file, f)
-
-    # async def all_guilds(self, v):
-    #     return await self.rpc(self.stub.all_guilds, v)
-
-    # async def guild_update(self, g):
-    #     return await self.rpc(self.stub.guild_update, g)
 
 
 def get_async_client():
