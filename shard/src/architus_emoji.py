@@ -63,8 +63,8 @@ class ArchitusEmoji:
                             location="emojis",
                             name=f"{self.id}",
                             file=binary))
-                except:
-                    log.info(f"Shard {self.bot.shard_id} failed to upload emoji")
+                except Exception:
+                    logger.info(f"Shard {self.bot.shard_id} failed to upload emoji")
                     return None
                 self.str_url = data.url
         return self.str_url

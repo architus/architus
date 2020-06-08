@@ -415,8 +415,8 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
                 try:
                     data = await self.bot.manager_client.publish_file(
                         message_type.File(file=file.getvalue()))
-                except:
-                    log.info(f"Shard {self.bot.shard_id} failed to upload emoji")
+                except Exception:
+                    logger.info(f"Shard {self.bot.shard_id} failed to upload emoji")
                     await ctx.send("Failed to upload emoji file")
                     return
                 em = discord.Embed(title="Cached Emojis", description=ctx.guild.name)

@@ -1,6 +1,4 @@
 import grpc
-from grpc._channel import _InactiveRpcError
-from grpc._channel import _MultiThreadedRendezvous
 from lib.ipc import manager_pb2_grpc
 
 from lib.config import logger
@@ -48,7 +46,6 @@ class AsyncRPCClient():
 
     async def rpc(self, f, a):
         return await self.loop.run_in_executor(self.pool, f, a)
-
 
     def __getattr__(self, name):
         return partial(self.rpc, getattr(self.stub, name))

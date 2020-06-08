@@ -27,8 +27,8 @@ class Architus(Bot):
             try:
                 shard_info = manager_client.register(message.RegisterRequest())
                 break
-            except:
-                log.info("Trying to get shard id from manager")
+            except Exception:
+                logger.info("Trying to get shard id from manager")
         self.shard_id = shard_info.shard_id
         shard_dict = {'shard_id': shard_info.shard_id, 'shard_count': shard_info.shard_count}
         logger.info(f"Got shard_id {self.shard_id}")
@@ -72,15 +72,15 @@ class Architus(Bot):
             name=f"the tragedy of darth plagueis the wise {self.shard_id}", type=2))
         try:
             await self.manager_client.guild_update(self.guilds_as_message)
-        except:
-            log.info(f"Shard {self.shard_id} failed to send manager its guild list")
+        except Exception:
+            logger.info(f"Shard {self.shard_id} failed to send manager its guild list")
 
     async def on_guild_join(self, guild):
         logger.info(f" -- JOINED NEW GUILD: {guild.name} -- ")
         try:
             await self.manager_client.guild_update(self.guilds_as_message)
-        except:
-            log.info(f"Shard {self.shard_id} failed to send manager its guild list")
+        except Exception:
+            logger.info(f"Shard {self.shard_id} failed to send manager its guild list")
 
     @property
     def settings(self):
@@ -109,8 +109,8 @@ class Architus(Bot):
             await asyncio.sleep(0.5)
             try:
                 await self.manager_client.checkin(message.ShardID(shard_id=self.shard_id))
-            except:
-                log.info(f"Shard {self.shard_id} failed to checkin with manager")
+            except Exception:
+                logger.info(f"Shard {self.shard_id} failed to checkin with manager")
 
     async def list_guilds(self):
         """Update the manager with the guilds that we know about"""
