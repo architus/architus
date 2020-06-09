@@ -55,6 +55,7 @@ class Manager(manager_grpc.ManagerServicer):
             gc += len(guilds)
             for guild in guilds:
                 uc += guild.member_count
+
         return message.GuildInfo(guild_count=gc, user_count=uc)
 
     def checkin(self, request, context):
