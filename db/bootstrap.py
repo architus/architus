@@ -75,7 +75,7 @@ def get_new_migrations(current):
     migrations = get_all_files(MIGRATIONS_DIR, suffix=".sql")
     migrations.sort()
 
-    if current == None:
+    if current is None:
         return migrations
 
     try:
@@ -106,7 +106,7 @@ def get_all_files(dirname, suffix=None):
     """
 
     return [file for file in os.listdir(dirname)
-            if suffix == None or file.endswith(suffix)]
+            if suffix is None or file.endswith(suffix)]
 
 
 def inject(lines):
@@ -137,7 +137,8 @@ def inject(lines):
     # If the injection point was never found, migrations won't ever be run
     # In that case, it's better to fail-fast
     if not ever_found:
-        raise Exception(f"Injection point {injection_point} not found in postgres bash script. This may require an update to the injection search fragment.")
+        raise Exception(f"Injection point {injection_point} not found in postgres bash script."
+                        + "This may require an update to the injection search fragment.")
 
     return final_lines
 
@@ -164,11 +165,11 @@ def bootstrap():
             script_contents = "\n".join(new_lines)
         with open(INJECTED_ENTRYPOINT, "w") as file:
             file.write(script_contents)
-            
+
         subprocess.run(["chmod", "+x", INJECTED_ENTRYPOINT])
         subprocess.run(["/usr/bin/env", "bash", INJECTED_ENTRYPOINT, "postgres"],
-                            stdout=sys.stdout,
-                            stderr=sys.stderr)
+                       stdout=sys.stdout,
+                       stderr=sys.stderr)
 
 
 if __name__ == "__main__":
