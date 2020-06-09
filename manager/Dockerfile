@@ -5,8 +5,10 @@ WORKDIR /app
 COPY ./manager/requirements.txt /app
 
 # Copy the current directory contents into the container at /app
-RUN apk update && apk add build-base python3 python3-dev
+RUN apk update && apk add build-base python3 python3-dev curl
 
+# Install pip
+RUN curl https://bootstrap.pypa.io/get-pip.py | python3
 
 # Install any needed packages specified in requirements.txt
 RUN python3 -m pip install --trusted-host pypi.python.org -r requirements.txt
