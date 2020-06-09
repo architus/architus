@@ -1,0 +1,8 @@
+[package]
+name = "logs_lib"
+version = "0.1.0"
+authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1.0.111", features = ["derive"] }
