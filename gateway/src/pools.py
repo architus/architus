@@ -10,17 +10,17 @@ guild_attrs = [
     'preferred_locale', 'member_count'
 ]
 
-guild_attrs_list = ['admin_ids', 'features']
-
 def guilds_to_dicts(guilds):
     for g in guilds:
         guild_dict = dict()
         for attr in guild_attrs:
             guild_dict[attr] = getattr(g, attr)
-        for attr in guild_attrs_list:
-            guild_dict[attr] = list()
-            for v in getattr(g, attr):
-                guild_dict[attr].append(v)
+        guild_dict['features'] = list()
+        for feat in g.features:
+            guild_dict['features'].append(str(feat))
+        # javascript requires numbers to be strings for some odd reason
+        guild_dict['id'] = str(guild_dict['id'])
+        guild_dict['admin_ids'] = map(lambda id: str(id), g.admin_ids)
         yield guild_dict
 
 class GuildPool:
