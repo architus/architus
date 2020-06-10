@@ -4,8 +4,8 @@ from lib.config import logger, which_shard
 import lib.ipc.manager_pb2 as message
 
 guild_attrs = [
-    'shard_id', 'id', 'name', 'icon', 'splash', 'owner_id', 'region',
-    'afk_timeout', 'unavailable', 'max_members', 'banner', 'description',
+    'id', 'name', 'icon', 'splash', 'owner_id', 'region', 'description',
+    'afk_timeout', 'unavailable', 'max_members', 'banner',
     'mfa_level', 'premium_tier', 'premium_subscription_count',
     'preferred_locale', 'member_count'
 ]
@@ -14,13 +14,18 @@ def guilds_to_dicts(guilds):
     for g in guilds:
         guild_dict = dict()
         for attr in guild_attrs:
-            guild_dict[attr] = getattr(g, attr)
+            value = getattr(g, attr)
+            if type(value) == int and value == 0:
+                value = None
+            if type(value) == str and value == '':
+                value = None
+            guild_dict[attr] = value
         guild_dict['features'] = list()
         for feat in g.features:
             guild_dict['features'].append(str(feat))
         # javascript requires numbers to be strings for some odd reason
         guild_dict['id'] = str(guild_dict['id'])
-        guild_dict['admin_ids'] = map(lambda id: str(id), g.admin_ids)
+        guild_dict['admin_ids'] = list(map(str, g.admin_ids))
         yield guild_dict
 
 class GuildPool:
