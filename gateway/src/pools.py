@@ -26,6 +26,8 @@ def guilds_to_dicts(guilds):
         # javascript requires numbers to be strings for some odd reason
         guild_dict['id'] = str(guild_dict['id'])
         guild_dict['admin_ids'] = list(map(str, g.admin_ids))
+        # TODO Remove this when joey fixes the frontend
+        guild_dict['region'] = [guild_dict['region']]
         yield guild_dict
 
 class GuildPool:
