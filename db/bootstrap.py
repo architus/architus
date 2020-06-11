@@ -26,7 +26,7 @@ def main():
     current_migration = get_current_migration()
     to_run = get_new_migrations(current_migration)
     if to_run:
-        print(f"Running migrations: [{', '.join(to_run)}]")
+        print(f"Running migrations: {to_run}")
         run_migrations(to_run)
     else:
         print("No migrations to run")

@@ -1,5 +1,5 @@
 # Debian variant
-FROM postgres
+FROM postgres:13
 ENV POSTGRES_USER=autbot
 ENV POSTGRES_PASSWORD=autism
 ENV POSTGRES_DB=autbot
