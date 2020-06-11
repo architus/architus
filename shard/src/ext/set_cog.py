@@ -45,7 +45,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
                 author = msg.channel.guild.get_member(resp.author_id)
                 react_msg = await msg.channel.send(
                     f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, "
-                    "created by {author}\n:x: to remove")
+                    f"created by {author}\n:x: to remove")
                 await react_msg.add_reaction("❌")
                 self.react_msgs[react_msg.id] = self.response_msgs[msg.id]
                 del self.response_msgs[msg.id]
