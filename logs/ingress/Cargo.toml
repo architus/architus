@@ -12,6 +12,9 @@ log = { version = "0.4.8", features = ["release_max_level_info"] }
 env_logger = "0.7.1"
 tokio = { version = "0.2.20", features = ["macros"] }
 futures = "0.3.4"
+logs_lib = { path = "../lib" }
+serde = { version = "1.0.111", features = ["derive"] }
+serde_json = "1.0.55"
 
 [dependencies.serenity]
 version = "0.8.6"

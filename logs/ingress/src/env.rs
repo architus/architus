@@ -1,4 +1,4 @@
-use log::{debug};
+use log::debug;
 use std::env;
 
 /// Configuration object loaded from the environment upon startup
