@@ -5,4 +5,8 @@ authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
 
 [dependencies]
-serde = { version = "1.0.111", features = ["derive"] }
+mac_address = "1.0.3"
+
+# Unix-specific dependencies
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.68"
