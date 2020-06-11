@@ -25,8 +25,8 @@ impl Default for IdProvisioner {
     fn default() -> Self {
         let mac_addr_significant = get_mac_address().map(|bytes| bytes[0] as u64).unwrap_or(0);
         return Self {
-            shifted_worker_id: (process::id() as u64 & 0b11111) << 12,
-            shifted_process_id: (mac_addr_significant & 0b11111) << 17,
+            shifted_worker_id: (mac_addr_significant & 0b11111) << 17,
+            shifted_process_id: (process::id() as u64 & 0b11111) << 12,
             internal_counter: AtomicU64::new(0),
         };
     }
