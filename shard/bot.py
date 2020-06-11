@@ -1,5 +1,6 @@
 import asyncio
 import os
+import time
 
 from discord.ext.commands import Bot
 import discord
@@ -29,6 +30,7 @@ class Architus(Bot):
                 break
             except Exception:
                 logger.info("Trying to get shard id from manager")
+                time.sleep(3)
         self.shard_id = shard_info.shard_id
         shard_dict = {'shard_id': shard_info.shard_id, 'shard_count': shard_info.shard_count}
         logger.info(f"Got shard_id {self.shard_id}")

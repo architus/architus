@@ -170,7 +170,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         with ThreadPoolExecutor() as pool:
             img = await self.bot.loop.run_in_executor(pool, wordcount_gen.generate, message_counts, word_counts, victim)
         data = await self.bot.manager_client.publish_file(
-            iter([message_type.File(file=img)])
+            iter([message_type.File(file=img)]))
 
         em = discord.Embed(title="Top 5 Message Senders", description=ctx.guild.name)
         em.set_image(url=data.url)
