@@ -1,7 +1,8 @@
 import os
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
-import asyncio
+import threading
+import time
 
 from lib.config import logger, domain_name
 from lib.hoar_frost import HoarFrostGenerator
@@ -29,9 +30,9 @@ class Manager(manager_grpc.ManagerServicer):
         self.last_checkin = dict()
         self.store = dict()
 
-    async def health_check(self):
+    def health_check(self):
         while True:
-            await asyncio.sleep(5)
+            time.sleep(5)
             for shard, last_checkin in self.last_checkin.items():
                 if last_checkin is not None and last_checkin < datetime.now() - timedelta(seconds=5):
                     logger.error(f"--- SHARD {shard} MISSED ITS HEARTBEAT, DEREGISTERING... ---")
@@ -83,7 +84,7 @@ class Manager(manager_grpc.ManagerServicer):
             for datum in request_iterator:
                 f.write(datum.file)
 
-        return message.Url(Url=f"https://cdn.{domain_name}/{location}/{name}.{filetype}")
+        return message.Url(url=f"https://cdn.{domain_name}/{location}/{name}.{filetype}")
 
     def all_guilds(self, request, context):
         """Return information about all guilds that the bot is in, including their admins"""
@@ -114,6 +115,6 @@ def serve(manager):
 
 if __name__ == "__main__":
     manager = Manager(int(os.environ["NUM_SHARDS"]))
-    loop = asyncio.get_event_loop()
-    loop.create_task(manager.health_check())
+    health = threading.Thread(target=manager.health_check, daemon=True)
+    health.start()
     serve(manager)

@@ -28,7 +28,7 @@ sio.attach(app)
 loop = asyncio.get_event_loop()
 shard_client = shardRPC(loop)
 event_subscriber = Subscriber(loop)
-manager_client = get_async_client()
+manager_client = get_async_client('manager:50051')
 
 auth_nonces = {}
 
