@@ -414,7 +414,7 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
                 # msg = await ctx.send(message, file=discord.File(file, "cool.png"))
                 try:
                     data = await self.bot.manager_client.publish_file(
-                        message_type.File(file=file.getvalue()))
+                        iter([message_type.File(file=file.getvalue())]))
                 except Exception:
                     logger.info(f"Shard {self.bot.shard_id} failed to upload emoji")
                     await ctx.send("Failed to generate cached emoji preview")

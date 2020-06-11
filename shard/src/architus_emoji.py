@@ -59,10 +59,11 @@ class ArchitusEmoji:
                 binary = buf.getvalue()
                 try:
                     data = await self.bot.manager_client.publish_file(
-                        message.File(
-                            location="emojis",
-                            name=f"{self.id}",
-                            file=binary))
+                        iter([
+                            message.File(
+                                location="emojis",
+                                name=f"{self.id}",
+                                file=binary)]))
                 except Exception:
                     logger.info(f"Shard {self.bot.shard_id} failed to upload emoji")
                     return None
