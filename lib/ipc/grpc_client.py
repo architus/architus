@@ -25,10 +25,10 @@ class SyncRPCClient():
         return getattr(self.stub, name)
 
 
-def get_blocking_client():
+def get_blocking_client(server):
     while True:
         try:
-            channel = grpc.insecure_channel('manager:50051', options=grpc_options)
+            channel = grpc.insecure_channel(server, options=grpc_options)
             stub = manager_pb2_grpc.ManagerStub(channel)
             return SyncRPCClient(stub)
         except Exception as e:
@@ -51,12 +51,11 @@ class AsyncRPCClient():
         return partial(self.rpc, getattr(self.stub, name))
 
 
-def get_async_client():
-    print("called get async client")
+def get_async_client(server):
     stub = None
     while True:
         try:
-            channel = grpc.insecure_channel('manager:50051', options=grpc_options)
+            channel = grpc.insecure_channel(server, options=grpc_options)
             stub = manager_pb2_grpc.ManagerStub(channel)
             logger.debug("Connected to gRPC")
             break
