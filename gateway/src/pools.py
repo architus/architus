@@ -10,6 +10,7 @@ guild_attrs = [
     'preferred_locale', 'member_count'
 ]
 
+
 def guilds_to_dicts(guilds):
     for g in guilds:
         guild_dict = dict()
@@ -28,6 +29,7 @@ def guilds_to_dicts(guilds):
         # TODO Remove this when joey fixes the frontend
         guild_dict['region'] = [guild_dict['region']]
         yield guild_dict
+
 
 class GuildPool:
     def __init__(self, manager_client, shard_client, jwt):
