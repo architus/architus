@@ -1,0 +1,21 @@
+[package]
+name = "mic"
+version = "0.1.0"
+authors = ["James Johnson <jjohnson474@gatech.edu>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+audiopus = "0.2"
+log = "0.4"
+simple_logger = "1.6.0"
+tempfile = "3.1"
+rand = "0.7"
+tonic = "0.2"
+prost = "0.6"
+tokio = { version = "0.2", features = ["macros"] }
+futures = "0.3"
+
+[build-dependencies]
+tonic-build = "0.2"
