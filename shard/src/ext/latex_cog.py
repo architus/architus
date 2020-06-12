@@ -40,6 +40,8 @@ class Latexify(commands.Cog, name="Latex Compiler"):
     @cooldown(2, 15, BucketType.user)
     async def latex(self, ctx, *latex):
         """
+        Compiles latex and returns a rendered image.
+
         Usage: !latex [valid latex code]
         Parameters do not need to be passed inside of quotes. They will
         be automatically joined together with a space in between them.
