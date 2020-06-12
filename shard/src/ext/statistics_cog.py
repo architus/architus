@@ -1,7 +1,6 @@
 from collections import defaultdict
 from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
-import base64
 
 from discord.ext import commands
 from discord import Forbidden, HTTPException
