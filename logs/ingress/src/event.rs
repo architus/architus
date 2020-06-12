@@ -1,5 +1,4 @@
-use backoff;
-use backoff_futures::BackoffExt;
+use crate::audit_log;
 use lazy_static::lazy_static;
 use log::{debug, trace, warn};
 use logs_lib::id::{self, HoarFrost, IdProvisioner};
@@ -14,7 +13,6 @@ use serenity::model::event::Event;
 use serenity::model::guild::AuditLogEntry;
 use serenity::model::id::{AuditLogEntryId, GuildId, UserId};
 use serenity::prelude::*;
-use std::sync::Arc;
 
 lazy_static! {
     /// Includes all guild-related events to signal to Discord that we intend to
@@ -110,68 +108,21 @@ impl Handler {
                 guild_id = Some(guild.id);
 
                 // try to access the audit log entry corresponding to this
-                let http = Arc::clone(&context.http);
-                type BackoffError = backoff::Error<serenity::Error>;
-                let get_log_entry = || async {
-                    let entry_type = AuditLogEntryType::ChannelCreate as u8;
-                    // limit is a tradeoff of time in situations
-                    // where a single channel is made in a small interval
-                    // to situations where many channels are made in a small interval
-                    let limit = 5;
-                    // determines the max number of seconds to search back in the
-                    // audit log for an entry since the creation of the channel
-                    let time_threshold = 60_000;
-                    let mut before: Option<AuditLogEntryId> = None;
-                    // traverse the audit log history
-                    loop {
-                        let entries = guild
-                            .audit_logs(
-                                Arc::clone(&http),
-                                Some(entry_type),
-                                None,
-                                before,
-                                Some(limit),
-                            )
-                            .await?
-                            .entries;
-                        if entries.len() > 0 {
-                            // attempt to find the entry corresponding to the channel
-                            let mut oldest: Option<AuditLogEntryId> = None;
-                            for (key, value) in entries {
-                                // try to match the current entry
-                                if value.target_id == Some(channel_id.0) {
-                                    return Ok::<AuditLogEntry, BackoffError>(value);
-                                }
-                                // update oldest entry
-                                if oldest.map(|id| id > key).unwrap_or(true) {
-                                    oldest = Some(key);
-                                }
-                            }
-
-                            // determine whether to continue
-                            let creation_timestamp = id::extract_timestamp(channel_id.0);
-                            let oldest_timestamp = oldest.map(|i| id::extract_timestamp(i.0)).unwrap_or(0);
-                            if (creation_timestamp - oldest_timestamp) > time_threshold {
-                                break;
-                            }
-
-                            before = oldest;
-                        } else {
-                            break;
-                        }
-                    }
-
-                    // Search was either exhausted or stopped early due to passing the threshold;
-                    // mark as transient error and backoff
-                    Err::<AuditLogEntry, BackoffError>(backoff::Error::Transient(
-                        serenity::Error::Other("exhausted audit log search"),
-                    ))
-                };
-
-                let mut backoff = backoff::ExponentialBackoff::default();
-                if let Ok(log_entry) = get_log_entry.with_backoff(&mut backoff).await {
-                    agent_id = Some(log_entry.user_id);
-                    audit_log_entry = Some(log_entry);
+                let entry_future = audit_log::get_entry(
+                    context.http,
+                    guild,
+                    AuditLogEntryType::ChannelCreate,
+                    Some(id::extract_timestamp(channel_id.0)),
+                    |entry| {
+                        entry
+                            .target_id
+                            .map(|id| id == channel_id.0)
+                            .unwrap_or(false)
+                    },
+                );
+                if let Ok(entry) = entry_future.await {
+                    agent_id = Some(entry.user_id);
+                    audit_log_entry = Some(entry);
                 }
             }
         }
