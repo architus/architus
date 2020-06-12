@@ -1,0 +1,20 @@
+[package]
+name = "feature-gate"
+version = "0.1.0"
+authors = ["James Johnson <jjohnson474@gatech.edu>"]
+edition = "2018"
+
+[[bin]]
+name = "feature-gate"
+path = "src/bin/feature-gate.rs"
+
+[lib]
+name = "db"
+
+[dependencies]
+dotenv = "0.15"
+thiserror = "1.0"
+
+[dependencies.diesel]
+version = "1.4"
+features = ["postgres"]

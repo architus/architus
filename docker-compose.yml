@@ -116,5 +116,12 @@ services:
       - "8090:15672"
     networks:
       - webnet
+  feature-gate:
+    image: johnyburd/feature-gate:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./feature-gate/Dockerfile
+    networks:
+      - webnet
 networks:
   webnet:
