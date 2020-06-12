@@ -1,6 +1,64 @@
 pub mod id;
 pub mod time;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ActionOrigin {
+    // Action originated from the gateway and was caught as it originated
+    Gateway = 1,
+    // Action originated from the audit log
+    AuditLog = 2,
+    // Gateway events that also incorporate a corresponding audit log entry
+    Hybrid = 3,
+    // Action originated from a scheduled recovery job where the bot knew it had
+    // ingestion downtime and ran a recovery job to collect all relevant origin/update events
+    ScheduledRecovery = 4,
+    // Action originated from an unscheduled recovery job where the bot was
+    // scanning history and verifying that the logs have the up-to-date state
+    UnscheduledRecovery = 5,
+    Logs = 6,
+    Internal = 7,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AuditLogEntryType {
+    GuildUpdate = 1,
+    ChannelCreate = 10,
+    ChannelUpdate = 11,
+    ChannelDelete = 12,
+    ChannelOverwriteCreate = 13,
+    ChannelOverwriteUpdate = 14,
+    ChannelOverwriteDelete = 15,
+    MemberKick = 20,
+    MemberPrune = 21,
+    MemberBanAdd = 22,
+    MemberBanRemove = 23,
+    MemberUpdate = 24,
+    MemberRoleUpdate = 25,
+    MemberMove = 26,
+    MemberDisconnect = 27,
+    BotAdd = 28,
+    RoleCreate = 30,
+    RoleUpdate = 31,
+    RoleDelete = 32,
+    InviteCreate = 40,
+    InviteUpdate = 41,
+    InviteDelete = 42,
+    WebhookCreate = 50,
+    WebhookUpdate = 51,
+    WebhookDelete = 52,
+    EmojiCreate = 60,
+    EmojiUpdate = 61,
+    EmojiDelete = 62,
+    MessageDelete = 72,
+    MessageBulkDelete = 73,
+    MessagePin = 74,
+    MessageUnpin = 75,
+    IntegrationCreate = 80,
+    IntegrationUpdate = 81,
+    IntegrationDelete = 82,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ActionType {
     // Discord audit log events
     GuildUpdate = 1,
@@ -16,6 +74,9 @@ pub enum ActionType {
     MemberBanRemove = 23,
     MemberUpdate = 24,
     MemberRoleUpdate = 25,
+    MemberMove = 26,
+    MemberDisconnect = 27,
+    BotAdd = 28,
     RoleCreate = 30,
     RoleUpdate = 31,
     RoleDelete = 32,
@@ -29,20 +90,23 @@ pub enum ActionType {
     EmojiUpdate = 61,
     EmojiDelete = 62,
     MessageDelete = 72,
+    MessageBulkDelete = 73,
+    MessagePin = 74,
+    MessageUnpin = 75,
+    IntegrationCreate = 80,
+    IntegrationUpdate = 81,
+    IntegrationDelete = 82,
     // Discord-related custom events
     MessageSend = 3001,
     MessageEdit = 3002,
-    MessageBulkDelete = 3003,
-    ReactionAdd = 3004,
-    ReactionRemove = 3005,
-    ReactionRemoveAll = 3006,
-    ChannelPinsUpdate = 3007,
-    IntegrationsUpdate = 3008,
-    MemberJoin = 3009,
-    MemberLeave = 3010,
-    GuildUnavailable = 3011,
-    VoiceStateUpdate = 3012,
-    VoiceServerUpdate = 3013,
+    ReactionAdd = 3003,
+    ReactionRemove = 3004,
+    ReactionRemoveAll = 3005,
+    MemberJoin = 3006,
+    MemberLeave = 3007,
+    GuildUnavailable = 3008,
+    VoiceStateUpdate = 3009,
+    VoiceServerUpdate = 3010,
     // Auto response events
     AutoResponseCreate = 3100,
     AutoResponseUpdate = 3101,
