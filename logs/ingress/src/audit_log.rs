@@ -26,11 +26,12 @@ where
     let target_timestamp = target_timestamp.unwrap_or_else(|| time::millisecond_ts());
     type BackoffError = backoff::Error<serenity::Error>;
     let get_log_entry = || async {
-        // limit is a tradeoff of time in situations where a single channel is made in a small interval
-        // to situations where many channels are made in a small interval
+        // limit is a tradeoff of time in situations where a single event of the target type
+        // occurs in a small interval to situations where many events of the target type
+        // occur in a small interval
         let limit = 5;
         // determines the max number of seconds to search back in the
-        // audit log for an entry since the creation of the channel
+        // audit log for an entry since the target timestamp
         let time_threshold = 60_000;
         let mut before: Option<AuditLogEntryId> = None;
         // traverse the audit log history
@@ -49,14 +50,13 @@ where
                 break;
             }
 
-            // attempt to find the entry corresponding to the channel
+            // attempt to find the desired matching entry
             let mut oldest: Option<AuditLogEntryId> = None;
             for (key, value) in entries {
-                // try to match the current entry
                 if matches(&value) {
                     return Ok::<AuditLogEntry, BackoffError>(value);
                 }
-                // update oldest entry
+                // update oldest entry if older then oldest
                 if oldest.map(|id| id > key).unwrap_or(true) {
                     oldest = Some(key);
                 }
