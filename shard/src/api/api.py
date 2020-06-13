@@ -12,6 +12,7 @@ from src.auto_response import GuildAutoResponses
 from src.api.util import fetch_guild
 from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
+from lib.ipc import manager_pb2 as message
 
 
 class Api(Cog):
@@ -45,7 +46,12 @@ class Api(Cog):
         return {'message': 'pong'}, sc.OK_200
 
     async def guild_count(self):
-        return await self.bot.manager_client.guild_count()
+        try:
+            resp = await self.bot.manager_client.guild_count(message.GuildCountRequest())
+            return {'guild_count': resp.guild_count, 'user_count': resp.user_count}, sc.OK_200
+        except Exception:
+            logger.info(f"Shard {self.bot.shard_id} failed to get guild count from manager")
+            return {'guild_count': -1, 'user_count': -1}, sc.INTERNAL_SERVER_ERROR_500
 
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
@@ -141,12 +147,16 @@ class Api(Cog):
         return {'value': "unknown setting"}, sc.NOT_FOUND_404
 
     async def tag_autbot_guilds(self, guild_list, user_id: int):
-        all_guilds, _ = await self.bot.manager_client.all_guilds()
+        try:
+            all_guilds = [guild for guild in await self.bot.manager_client.all_guilds(message.AllGuildsRequest())]
+        except Exception:
+            logger.info(f"Shard {self.bot.shard_id} failed to get guild list from manager")
+            return {'guilds': []}, sc.INTERNAL_SERVER_ERROR_500
         for guild_dict in guild_list:
             for guild in all_guilds:
-                if int(guild['id']) == int(guild_dict['id']):
+                if guild.id == int(guild_dict['id']):
                     guild_dict['has_architus'] = True
-                    guild_dict['architus_admin'] = user_id in guild['admin_ids']
+                    guild_dict['architus_admin'] = user_id in guild.admin_ids
                     break
             else:
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
