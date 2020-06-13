@@ -1,5 +1,5 @@
 mod env;
-mod event;
+mod gateway;
 mod audit_log;
 
 use env::Environment;
@@ -18,9 +18,9 @@ async fn main() {
     let framework = StandardFramework::new();
     let mut client = Client::new(&env.token)
         .event_handler(StatusHandler)
-        .raw_event_handler(event::Handler::new())
+        .raw_event_handler(gateway::Handler::new())
+        .intents(*gateway::INTENTS)
         .framework(framework)
-        .intents(*event::INTENTS)
         .await
         .expect("error creating client");
 

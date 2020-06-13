@@ -1,19 +1,18 @@
-use crate::audit_log;
+mod channel;
+
 use lazy_static::lazy_static;
 use log::{debug, trace, warn};
-use logs_lib::id::{self, HoarFrost, IdProvisioner};
-use logs_lib::{time, ActionOrigin, ActionType, AuditLogEntryType};
+use logs_lib::id::{HoarFrost, IdProvisioner};
+use logs_lib::{time, ActionOrigin, ActionType};
 use serde::ser;
+use serde::Serialize;
 use serde_json;
 use serenity;
 use serenity::async_trait;
 use serenity::client::bridge::gateway::GatewayIntents;
-use serenity::model::event::{ChannelCreateEvent, ChannelDeleteEvent};
 use serenity::model::event::Event;
-use serenity::model::guild::AuditLogEntry;
 use serenity::model::id::{AuditLogEntryId, GuildId, UserId};
 use serenity::prelude::*;
-use serde::Serialize;
 
 lazy_static! {
     /// Includes all guild-related events to signal to Discord that we intend to
@@ -35,6 +34,7 @@ lazy_static! {
 #[derive(Clone, PartialEq, Debug, Serialize)]
 pub struct NormalizedEvent {
     pub id: HoarFrost,
+    // Unix timestamp
     pub timestamp: u64,
     pub source: Source,
     pub origin: ActionOrigin,
@@ -60,7 +60,10 @@ impl Source {
         }
     }
 
-    fn hybrid<T: ser::Serialize, V: ser::Serialize>(gateway_event: &T, audit_log_entry: &V) -> Self {
+    fn hybrid<T: ser::Serialize, V: ser::Serialize>(
+        gateway_event: &T,
+        audit_log_entry: &V,
+    ) -> Self {
         Self {
             gateway: try_serialize(gateway_event),
             audit_log: try_serialize(audit_log_entry),
@@ -68,14 +71,9 @@ impl Source {
     }
 }
 
-fn try_serialize<T: ser::Serialize>(source: &T) -> Option<serde_json::Value> {
-    let result = serde_json::to_value(source);
-    if let Err(e) = result {
-        debug!("an error occurred while serializing event data: {:?}", e);
-        None
-    } else {
-        result.ok()
-    }
+pub struct GatewayContext<'a> {
+    discord: Context,
+    id_provisioner: &'a IdProvisioner,
 }
 
 /// Bot event handler (used to dispatch events to the main service)
@@ -96,135 +94,16 @@ impl Handler {
         Default::default()
     }
 
-    async fn channel_create(
-        &self,
-        event: ChannelCreateEvent,
-        context: Context,
-    ) -> Option<NormalizedEvent> {
-        let channel_id = event.channel.id();
-        let mut agent_id: Option<UserId> = None;
-        let mut guild_id: Option<GuildId> = None;
-        let mut audit_log_entry: Option<AuditLogEntry> = None;
-
-        if let Some(guild_channel) = event.channel.clone().guild() {
-            if let Some(guild) = guild_channel.guild(context.cache).await {
-                guild_id = Some(guild.id);
-
-                // try to access the audit log entry corresponding to this
-                let entry_future = audit_log::get_entry(
-                    context.http,
-                    guild,
-                    AuditLogEntryType::ChannelCreate,
-                    Some(id::extract_timestamp(channel_id.0)),
-                    |entry| {
-                        entry
-                            .target_id
-                            .map(|id| id == channel_id.0)
-                            .unwrap_or(false)
-                    },
-                );
-                if let Ok(entry) = entry_future.await {
-                    agent_id = Some(entry.user_id);
-                    audit_log_entry = Some(entry);
-                }
-            }
-        }
-
-        match audit_log_entry {
-            // if there was a corresponding audit log entry, then the event is hybrid
-            Some(audit_log) => Some(NormalizedEvent {
-                action_type: ActionType::ChannelCreate,
-                id: self.id_provisioner.provision(),
-                origin: ActionOrigin::Hybrid,
-                source: Source::hybrid(&event, &audit_log),
-                timestamp: id::extract_timestamp(channel_id.0),
-                subject_id: Some(channel_id.0),
-                guild_id,
-                agent_id,
-                audit_log_id: Some(audit_log.id),
-            }),
-            // otherwise it's a normal gateway event
-            None => Some(NormalizedEvent {
-                action_type: ActionType::ChannelCreate,
-                id: self.id_provisioner.provision(),
-                origin: ActionOrigin::Gateway,
-                source: Source::gateway(&event),
-                timestamp: id::extract_timestamp(channel_id.0),
-                subject_id: Some(channel_id.0),
-                guild_id,
-                agent_id: None,
-                audit_log_id: None,
-            }),
-        }
-    }
-
-    async fn channel_delete(
-        &self,
-        event: ChannelDeleteEvent,
-        context: Context,
-    ) -> Option<NormalizedEvent> {
-        let channel_id = event.channel.id();
-        let mut agent_id: Option<UserId> = None;
-        let mut guild_id: Option<GuildId> = None;
-        let mut audit_log_entry: Option<AuditLogEntry> = None;
-
-        if let Some(guild_channel) = event.channel.clone().guild() {
-            if let Some(guild) = guild_channel.guild(context.cache).await {
-                guild_id = Some(guild.id);
-
-                // try to access the audit log entry corresponding to this
-                let entry_future = audit_log::get_entry(
-                    context.http,
-                    guild,
-                    AuditLogEntryType::ChannelDelete,
-                    Some(id::extract_timestamp(channel_id.0)),
-                    |entry| {
-                        entry
-                            .target_id
-                            .map(|id| id == channel_id.0)
-                            .unwrap_or(false)
-                    },
-                );
-                if let Ok(entry) = entry_future.await {
-                    agent_id = Some(entry.user_id);
-                    audit_log_entry = Some(entry);
-                }
-            }
-        }
-
-        match audit_log_entry {
-            // if there was a corresponding audit log entry, then the event is hybrid
-            Some(audit_log) => Some(NormalizedEvent {
-                action_type: ActionType::ChannelDelete,
-                id: self.id_provisioner.provision(),
-                origin: ActionOrigin::Hybrid,
-                source: Source::hybrid(&event, &audit_log),
-                timestamp: id::extract_timestamp(channel_id.0),
-                subject_id: Some(channel_id.0),
-                guild_id,
-                agent_id,
-                audit_log_id: Some(audit_log.id),
-            }),
-            // otherwise it's a normal gateway event
-            None => Some(NormalizedEvent {
-                action_type: ActionType::ChannelDelete,
-                id: self.id_provisioner.provision(),
-                origin: ActionOrigin::Gateway,
-                source: Source::gateway(&event),
-                timestamp: id::extract_timestamp(channel_id.0),
-                subject_id: Some(channel_id.0),
-                guild_id,
-                agent_id: None,
-                audit_log_id: None,
-            }),
-        }
-    }
-
     async fn normalize(&self, raw_event: Event, context: Context) -> Option<NormalizedEvent> {
+        // Create a grouped context object
+        let ctx = GatewayContext {
+            discord: context,
+            id_provisioner: &self.id_provisioner,
+        };
+
         match raw_event {
             // handle all log ingestion events
-            Event::ChannelCreate(event) => self.channel_create(event, context).await,
-            Event::ChannelDelete(event) => self.channel_delete(event, context).await,
+            Event::ChannelCreate(_) | Event::ChannelDelete(_) | Event::ChannelUpdate(_) => channel::handle(raw_event, ctx).await,
             Event::Unknown(event) => {
                 warn!("Received Event::Unknown: {:?}", event);
                 Some(NormalizedEvent {
@@ -241,7 +120,6 @@ impl Handler {
             },
             _ => None
             // Event::ChannelPinsUpdate(_) => Self::handle(raw_event, EventType::ChannelPinsUpdate).await
-            // Event::ChannelUpdate(_) => Self::handle(raw_event, EventType::ChannelUpdate).await,
             // Event::GuildBanAdd(_) => Self::handle(raw_event, EventType::GuildBanAdd).await,
             // Event::GuildBanRemove(_) => Self::handle(raw_event, EventType::GuildBanRemove).await,
             // Event::GuildEmojisUpdate(_) => Self::handle(raw_event, EventType::GuildEmojisUpdate).await
@@ -282,5 +160,15 @@ impl RawEventHandler for Handler {
                 }
             }
         }
+    }
+}
+
+fn try_serialize<T: ser::Serialize>(source: &T) -> Option<serde_json::Value> {
+    let result = serde_json::to_value(source);
+    if let Err(e) = result {
+        debug!("an error occurred while serializing event data: {:?}", e);
+        None
+    } else {
+        result.ok()
     }
 }
