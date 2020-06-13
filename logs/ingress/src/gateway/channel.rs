@@ -36,11 +36,11 @@ impl ChannelEvent {
     }
 
     // Extracts the underlying Channel
-    fn channel(&self) -> Channel {
+    fn channel(&self) -> &Channel {
         match &self.0 {
-            Event::ChannelCreate(event) => event.channel.clone(),
-            Event::ChannelDelete(event) => event.channel.clone(),
-            Event::ChannelUpdate(event) => event.channel.clone(),
+            Event::ChannelCreate(event) => &event.channel,
+            Event::ChannelDelete(event) => &event.channel,
+            Event::ChannelUpdate(event) => &event.channel,
             _ => panic!("invalid channel event type"),
         }
     }
