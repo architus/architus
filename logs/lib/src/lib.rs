@@ -1,7 +1,10 @@
 pub mod id;
 pub mod time;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+use serde_repr::{Deserialize_repr, Serialize_repr};
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
 pub enum ActionOrigin {
     // Action originated from the gateway and was caught as it originated
     Gateway = 1,
@@ -15,11 +18,14 @@ pub enum ActionOrigin {
     // Action originated from an unscheduled recovery job where the bot was
     // scanning history and verifying that the logs have the up-to-date state
     UnscheduledRecovery = 5,
+    // Action comes from the internal logs endpoint
     Logs = 6,
+    // Action comes from some other internal process
     Internal = 7,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
 pub enum AuditLogEntryType {
     GuildUpdate = 1,
     ChannelCreate = 10,
@@ -58,7 +64,8 @@ pub enum AuditLogEntryType {
     IntegrationDelete = 82,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u16)]
 pub enum ActionType {
     // Discord audit log events
     GuildUpdate = 1,
