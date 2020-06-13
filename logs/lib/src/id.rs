@@ -1,5 +1,6 @@
 use crate::time;
 use mac_address;
+use serde::{Deserialize, Serialize};
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -16,6 +17,7 @@ pub struct IdProvisioner {
 }
 
 // Architus-style ID
+#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct HoarFrost(pub u64);
 
 impl HoarFrost {
