@@ -114,7 +114,7 @@ class ArchitusEmoji:
             'id': str(self.id),
             'name': self.name,
             'authorId': str(self.author_id),
-            'discordId': str(self.discord_id),
+            'discordId': str(self.discord_id) if self.discord_id else None,
             'numUses': self.num_uses,
             'priority': self.priority,
         }
@@ -124,7 +124,7 @@ class ArchitusEmoji:
             'id': str(self.id),
             'name': self.name,
             'authorId': str(self.author_id),
-            'discordId': str(self.discord_id),
+            'discordId': str(self.discord_id) if self.discord_id else None,
             'numUses': self.num_uses,
             'priority': self.priority,
             'url': await self.url(),

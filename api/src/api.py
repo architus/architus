@@ -175,11 +175,11 @@ class Emojis(CustomResource):
 
     @authenticated(member=True)
     def patch(self, guild_id: int, emoji_id: int, jwt: JWT):
-        return self.shard.load_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+        return self.shard.cache_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
 
     @authenticated(member=True)
     def delete(self, guild_id: int, emoji_id: int, jwt: JWT):
-        return self.shard.load_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+        return self.shard.delete_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
 
 
 class ListGuilds(CustomResource):
