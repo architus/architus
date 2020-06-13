@@ -165,8 +165,21 @@ class Stats(CustomResource):
 
 class Emojis(CustomResource):
 
-    def get(self, guild_id: int):
-        return self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
+    @authenticated(member=True)
+    def get(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return {'message': 'not implemented'}, StatusCodes.NOT_IMPLEMENTED_501
+
+    @authenticated(member=True)
+    def post(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.load_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+
+    @authenticated(member=True)
+    def patch(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.load_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+
+    @authenticated(member=True)
+    def delete(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.load_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
 
 
 class ListGuilds(CustomResource):
@@ -196,7 +209,7 @@ def app_factory():
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Stats, "/stats/<int:guild_id>")
-    api.add_resource(Emojis, "/emojis/<int:guild_id>")
+    api.add_resource(Emojis, "/emojis/<int:guild_id>/<int:emoji_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")

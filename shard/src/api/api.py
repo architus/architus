@@ -140,6 +140,36 @@ class Api(Cog):
         }, sc.OK_200
 
     @fetch_guild
+    async def load_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if emoji is None:
+            return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
+        emoji_manager.load_emoji(emoji)
+        return {'message': "successfully loaded"}, sc.OK_200
+
+    @fetch_guild
+    async def cache_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if emoji is None:
+            return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
+        emoji_manager.cache_emoji(emoji)
+        return {'message': "successfully cached"}, sc.OK_200
+
+    @fetch_guild
+    async def delete_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
+        member = guild.get_member(member_id)
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if emoji is None:
+            return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
+        if emoji.author_id != member.id and member.id not in self.bot.settings[guild].admin_ids:
+            return {'message': "you must own this emoji or have admin permissions"}, sc.UNAUTHORIZED_401
+        emoji_manager.delete_emoji(emoji)
+        return {'message': "successfully deleted"}, sc.OK_200
+
+    @fetch_guild
     async def settings_access(self, guild, setting=None, value=None):
         settings = self.bot.settings[guild]
         if hasattr(settings, setting):
