@@ -12,7 +12,6 @@ path = "src/bin/feature-gate.rs"
 name = "db"
 
 [dependencies]
-dotenv = "0.15"
 thiserror = "1.0"
 
 [dependencies.diesel]

@@ -21,3 +21,9 @@ table! {
         feature_id -> Integer,
     }
 }
+
+// Tells diesel how a join of the two tables would work.
+// Allows for easy inner join to get all of a guilds features
+// in the database library.
+joinable!(tb_guild_features -> tb_feature_flags (feature_id));
+allow_tables_to_appear_in_same_query!(tb_feature_flags, tb_guild_features);

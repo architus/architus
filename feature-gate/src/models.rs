@@ -1,3 +1,6 @@
+//! Variety of structs used for receiving and sending data to and from
+//! the sql database.
+
 use crate::schema::{tb_feature_flags, tb_guild_features};
 
 /// Represents a feature that the architus bot offers to
