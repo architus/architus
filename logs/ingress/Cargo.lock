@@ -82,16 +82,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "backoff-futures"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439ed9b108d66050250531aae23a9a35b1079ee60d4ed900bc4408ecbd542eca"
-dependencies = [
- "backoff",
- "tokio",
-]
-
-[[package]]
 name = "base64"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -562,12 +552,12 @@ name = "ingress"
 version = "0.1.0"
 dependencies = [
  "backoff",
- "backoff-futures",
  "env_logger",
  "futures",
  "lazy_static",
  "log",
  "logs_lib",
+ "reqwest",
  "serde",
  "serde_json",
  "serenity",

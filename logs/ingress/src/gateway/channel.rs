@@ -1,6 +1,5 @@
 use crate::audit_log;
 use crate::gateway::{GatewayContext, NormalizedEvent, Source};
-use log::debug;
 use logs_lib::id;
 use logs_lib::{ActionOrigin, ActionType, AuditLogEntryType};
 use serde_json;
@@ -9,6 +8,8 @@ use serenity::model::channel::Channel;
 use serenity::model::event::Event;
 use serenity::model::guild::AuditLogEntry;
 use serenity::model::id::{ChannelId, GuildId, UserId};
+use serenity::model::permissions::Permissions;
+use std::sync::Arc;
 
 // Channel event wrapper
 #[derive(Clone, Debug)]
@@ -60,7 +61,7 @@ impl ChannelEvent {
 /// and attaching it to the built action as a hybrid action.
 ///
 /// Only supports `ChannelCreate`, `ChannelDelete`, and `ChannelUpdate` events
-pub async fn handle<'a>(event: Event, context: GatewayContext<'a>) -> Option<NormalizedEvent> {
+pub async fn handle(event: Event, context: GatewayContext) -> Option<NormalizedEvent> {
     let event = ChannelEvent(event);
     let action_type = event.action_type();
     let audit_log_entry_type = event.audit_log_entry_type();
@@ -71,36 +72,36 @@ pub async fn handle<'a>(event: Event, context: GatewayContext<'a>) -> Option<Nor
     let mut audit_log_entry: Option<AuditLogEntry> = None;
     match event.channel() {
         Channel::Guild(guild_channel) => {
-            if let Some(guild) = guild_channel.guild(context.discord.cache).await {
+            let cache = Arc::clone(&context.discord.cache);
+            if let Some(guild) = guild_channel.guild(cache).await {
                 guild_id = Some(guild.id);
-                // try to access the audit log entry corresponding to this
-                let entry_result = audit_log::get_entry(
-                    context.discord.http,
-                    guild,
-                    audit_log_entry_type,
-                    Some(id::extract_timestamp(channel_id.0)),
-                    |entry| {
-                        entry
-                            .target_id
-                            .map(|id| id == channel_id.0)
-                            .unwrap_or(false)
-                    },
-                )
-                .await;
+                // Make sure the bot has permissions first
+                if context.has_perms(&guild, Permissions::VIEW_AUDIT_LOG).await {
+                    // try to access the audit log entry corresponding to this
+                    let entry_result = audit_log::get_entry(
+                        context.discord.http,
+                        guild,
+                        audit_log_entry_type,
+                        Some(id::extract_timestamp(channel_id.0)),
+                        |entry| {
+                            entry
+                                .target_id
+                                .map(|id| id == channel_id.0)
+                                .unwrap_or(false)
+                        },
+                    )
+                    .await;
 
-                match entry_result {
-                    Ok(entry) => {
+                    if let Ok(entry) = entry_result {
                         agent_id = Some(entry.user_id);
                         audit_log_entry = Some(entry);
-                    }
-                    Err(err) => {
-                        debug!("Couldn't get audit log entry for channel event: {:#?}", err)
                     }
                 }
             }
         }
         _ => {}
     }
+
     let event_json: serde_json::Value = event.serialize().unwrap_or_else(|err| {
         serde_json::to_value(format!(
             "Serialization failed for channel event (channel id {:?}): {}",
