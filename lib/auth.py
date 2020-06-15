@@ -17,10 +17,17 @@ def flask_authenticated(member=False):
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            try:
-                jwt = JWT(token=request.cookies.get('token'))
-            except pyjwt.exceptions.InvalidTokenError:
-                return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
+            jwt = None
+            msg = "Missing Token"
+            for token in request.cookies.getlist('token'):
+                try:
+                    jwt = JWT(token=token)
+                    break
+                except pyjwt.exceptions.InvalidTokenError as e:
+                    msg = f"Invalid Token: {e}"
+
+            if jwt is None:
+                return {'message': msg}, StatusCodes.UNAUTHORIZED_401
             if expired(jwt):
                 return ({'message': "Expired"}, StatusCodes.UNAUTHORIZED_401)
             if member:
