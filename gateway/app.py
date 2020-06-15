@@ -85,17 +85,16 @@ class CustomNamespace(socketio.AsyncNamespace):
     async def on_connect(self, sid: str, environ: dict):
         logger.debug(f"{environ['REMOTE_ADDR']} has connected with sid: {sid}")
         request = environ['aiohttp.request']
-        for token in request.cookies.getall('token'):
-            try:
-                jwt = JWT(token=token)
-            except (InvalidTokenError, KeyError):
-                logger.info("Invalid token...")
-            else:
-                logger.info("Found valid token, logging into elevated gateway...")
-                sio.enter_room(sid, f"{sid}_auth")
-                async with sio.session(sid) as session:
-                    session['jwt'] = jwt
-                return
+        try:
+            jwt = JWT(token=request.cookies['token'])
+        except (InvalidTokenError, KeyError):
+            logger.info("Invalid token...")
+        else:
+            logger.info("Found valid token, logging into elevated gateway...")
+            sio.enter_room(sid, f"{sid}_auth")
+            async with sio.session(sid) as session:
+                session['jwt'] = jwt
+            return
 
     @authenticated(shard_client)
     async def on_pool_request(self, sid: str, data, jwt):

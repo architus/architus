@@ -1,4 +1,5 @@
 from discord import Guild
+from discord.errors import NotFound
 
 from src.utils import channel_to_dict, member_to_dict, role_to_dict, user_to_dict
 
@@ -38,13 +39,15 @@ class Pools:
     async def get_member(self, guild: Guild, member_id, fetch=False):
         member = guild.get_member(int(member_id))
         if member is None and fetch:
-            member = await guild.fetch_member(int(member_id))
+            with suppress(NotFound):
+                member = await guild.fetch_member(int(member_id))
         return member_to_dict(member) if member else {}
 
     async def get_user(self, user_id, fetch=False):
         user = self.bot.get_user(int(user_id))
         if user is None and fetch:
-            user = await self.bot.fetch_user(int(user_id))
+            with suppress(NotFound):
+                user = await self.bot.fetch_user(int(user_id))
         return user_to_dict(user) if user else {}
 
     def get_all_responses(self, guild: Guild):
