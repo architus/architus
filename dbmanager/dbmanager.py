@@ -8,7 +8,6 @@ __version__ = "0.1.0"
 
 import os
 import sys
-import shlex
 import subprocess
 import time
 
@@ -56,9 +55,9 @@ def execute_sql_script(file):
     Runes a sql script on the postgres container
     """
     process = subprocess.run(["psql", "-h", "postgres", "-U", "autbot", "-a", "-v", "ON_ERROR_STOP=1", "-f", file],
-                          stdout=sys.stdout,
-                          stderr=sys.stderr)
-    return process.returncode;
+                             stdout=sys.stdout,
+                             stderr=sys.stderr)
+    return process.returncode
 
 
 def get_new_migrations(current):
