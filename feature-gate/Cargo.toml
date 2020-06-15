@@ -13,7 +13,13 @@ name = "db"
 
 [dependencies]
 thiserror = "1.0"
+tonic = "0.2"
+prost = "0.6"
+tokio = { version = "0.2", features = ["macros"] }
 
 [dependencies.diesel]
 version = "1.4"
 features = ["postgres"]
+
+[build-dependencies]
+tonic-build = "0.2"

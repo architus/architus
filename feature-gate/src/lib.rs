@@ -32,13 +32,7 @@ pub enum DatabaseError {
 
 type DbResult<T> = Result<T, DatabaseError>;
 
-/// Returns a connection to the postresql database.
-pub fn establish_connection(database_url: &str) -> PgConnection {
-    PgConnection::establish(database_url).expect("Could not connect to database.")
-}
-
-/// Inserts a new feature into the database. Will return a result that's either an
-/// insertion error or the id that was assigned to the new feature.
+/// Inserts a new feature into the database.
 #[must_use]
 pub fn insert_feature(conn: &PgConnection, name: &str, open: bool) -> DbResult<i32> {
     let new_feature = models::NewFeature { name, open };
@@ -59,57 +53,18 @@ pub fn get_all_features(conn: &PgConnection) -> DbResult<Vec<models::Feature>> {
     features.map_err(|_| DatabaseError::Query)
 }
 
-/// Queries the database to find a feature with the matching id.
-pub fn get_feature_by_id(
-    conn: &PgConnection,
-    feature_id: i32,
-) -> DbResult<Option<models::Feature>> {
-    let result = schema::tb_feature_flags::table
-        .filter(schema::tb_feature_flags::id.eq(feature_id))
-        .limit(1)
-        .load::<models::Feature>(conn);
-
-    match result {
-        Ok(mut res) => {
-            if res.len() > 0 {
-                Ok(Some(res.remove(0)))
-            } else {
-                Ok(None)
-            }
-        }
-        Err(_) => Err(DatabaseError::Query),
-    }
-}
-
-/// Queries the database to find a feature with the matching name.
-pub fn get_feature_by_name(
-    conn: &PgConnection,
-    feature_name: &str,
-) -> DbResult<Option<models::Feature>> {
-    let result = schema::tb_feature_flags::table
-        .filter(schema::tb_feature_flags::name.eq(feature_name))
-        .limit(1)
-        .load::<models::Feature>(conn);
-
-    match result {
-        Ok(mut res) => {
-            if res.len() > 0 {
-                Ok(Some(res.remove(0)))
-            } else {
-                Ok(None)
-            }
-        }
-        Err(_) => Err(DatabaseError::Query),
-    }
-}
-
 /// Inserts a new guild <-> feature relation into the database.
 ///
-/// This function will not check that the guild_id and feature_id are valid ids.
-/// Only pass feature_ids that are known to be in the database. These can be found
-/// by using the `get_feature_by_name` function to get the feature's id.
+/// Will return an `UnknownFeature` error if a feature that has not been previously
+/// added is passed as an argument.
 #[must_use]
-pub fn insert_guild_feature(conn: &PgConnection, guild_id: i64, feature_id: i32) -> DbResult<()> {
+pub fn insert_guild_feature(
+    conn: &PgConnection,
+    guild_id: i64,
+    feature_name: &str,
+) -> DbResult<()> {
+    let feature_id = get_feature_id(conn, feature_name)?;
+
     let relation = models::Guild {
         guild_id,
         feature_id,
@@ -197,6 +152,29 @@ pub fn set_feature_openness(conn: &PgConnection, feature: &str, openness: bool) 
     match result {
         Ok(_) => Ok(()),
         Err(_) => Err(DatabaseError::Update),
+    }
+}
+
+/// Check to see if a feature is open or closed.
+///
+/// If the feature does not exist in the database, an unknown feature errror will
+/// be returned. Any other error should be interpreted as the database having failed
+/// in some way.
+pub fn get_feature_openness(conn: &PgConnection, feature: &str) -> DbResult<bool> {
+    let feature_id = get_feature_id(conn, feature)?;
+
+    let result = schema::tb_feature_flags::table
+        .filter(schema::tb_feature_flags::id.eq(feature_id))
+        .limit(1)
+        .select(schema::tb_feature_flags::open)
+        .load::<bool>(conn);
+
+    match result {
+        // Can just blindly remove the first element because we know that it will
+        // be there if no error occurrs. The id fetch returned true so the feature
+        // is there. Therefore it must have an open value that can be returned.
+        Ok(mut v) => Ok(v.remove(0)),
+        Err(_) => Err(DatabaseError::Query),
     }
 }
 

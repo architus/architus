@@ -4,6 +4,8 @@ WORKDIR /app
 COPY ./feature-gate/ /app
 RUN apt update -y
 RUN apt install -y musl-dev libpq-dev
+RUN rustup update
+RUN rustup component add rustfmt
 
 ENV DATABASE_URL=postgresql://autbot:autism@postgres:5432/autbot
 RUN cargo build
