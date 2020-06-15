@@ -74,6 +74,17 @@ services:
         constraints: [node.role == manager]
     networks:
       - webnet
+  dbmanager:
+    image: johnyburd/dbmanager:${TAG:-latest}
+    build: ./dbmanager
+    environment:
+      PGUSER: autbot
+      PGPASSWORD: autism
+      PGDATABASE: autbot
+    depends_on:
+      - postgres
+    networks:
+      - webnet
   manager:
     image: johnyburd/manager:${TAG:-latest}
     build:
