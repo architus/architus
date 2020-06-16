@@ -7,12 +7,13 @@
 //! The specifics of what the error message are can be found
 //! in the specific documentation for each function.
 
+#![deny(clippy::all)]
+
 use db::*;
 use diesel::connection::Connection;
 use diesel::PgConnection;
+use log::{info, warn};
 use std::env;
-use std::thread::sleep;
-use std::time::Duration;
 use tokio::sync::mpsc;
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -25,6 +26,9 @@ pub mod feature_gate {
     include!("../../grpc/featuregate.rs");
 }
 
+/// Structure for handling all of the gRPC requests. Just holds
+/// the address of the postgres database so that it can be used
+/// to connect to the database for each RPC request.
 #[derive(Debug)]
 pub struct Gate {
     pub db_addr: String,
@@ -56,7 +60,14 @@ impl FeatureGate for Gate {
         let result = insert_feature(&conn, &feature.name, feature.open);
 
         match result {
-            Ok(_) => success,
+            Ok(_) => {
+                info!(
+                    "Added feature {} which is {}",
+                    feature.name,
+                    if feature.open { "open" } else { "closed" }
+                );
+                success
+            }
             Err(_) => failure,
         }
     }
@@ -97,7 +108,13 @@ impl FeatureGate for Gate {
 
         let result = insert_guild_feature(&conn, addition.guild_id, &addition.feature_name);
         match result {
-            Ok(()) => success,
+            Ok(()) => {
+                info!(
+                    "Added feature {} to guild {}",
+                    addition.feature_name, addition.guild_id
+                );
+                success
+            }
             Err(_) => failure,
         }
     }
@@ -119,7 +136,13 @@ impl FeatureGate for Gate {
         let removal = request.into_inner();
         let result = remove_guild_feature(&conn, removal.guild_id, &removal.feature_name);
         match result {
-            Ok(()) => success,
+            Ok(()) => {
+                info!(
+                    "Removed feature {} from guild {}",
+                    removal.feature_name, removal.guild_id
+                );
+                success
+            }
             Err(_) => failure,
         }
     }
@@ -128,7 +151,7 @@ impl FeatureGate for Gate {
     ///
     /// Will return a true/false value on successfully querying the database.
     /// If the feature asked about does not exist, then it will return a
-    /// default value of true.
+    /// default value of false.
     /// If the database is not able to be contacted, then it will return an
     /// internal server error status code.
     async fn check_guild_feature(
@@ -140,12 +163,12 @@ impl FeatureGate for Gate {
             None => return Err(Status::internal("Database connection failed")),
         };
 
-        let removal = request.into_inner();
-        let result = remove_guild_feature(&conn, removal.guild_id, &removal.feature_name);
+        let check = request.into_inner();
+        let result = check_guild_feature(&conn, check.guild_id, &check.feature_name);
         match result {
-            Ok(()) => Ok(Response::new(FeatureResult { success: true })),
+            Ok(b) => Ok(Response::new(FeatureResult { has_feature: b })),
             Err(DatabaseError::UnknownFeature) => {
-                Ok(Response::new(FeatureResult { success: true }))
+                Ok(Response::new(FeatureResult { has_feature: false }))
             }
             Err(_) => Err(Status::internal("Database connection failed")),
         }
@@ -155,6 +178,11 @@ impl FeatureGate for Gate {
     type GetFeaturesStream = mpsc::Receiver<Result<Feature, Status>>;
 
     /// Returns a stream of all of the features on the database.
+    ///
+    /// Returns a stream of each feature. The client will then receive an iterator
+    /// of features that will go through everything that this function returns.
+    /// Should return all features but may stop early if the client drops
+    /// the iterator before all features have been read.
     async fn get_features(&self, _: Request<FeatureList>) -> RpcResponse<Self::GetFeaturesStream> {
         let conn = match self.get_connection() {
             Some(c) => c,
@@ -163,7 +191,7 @@ impl FeatureGate for Gate {
 
         let features = match get_all_features(&conn) {
             Ok(v) => v,
-            Err(_) => return Err(Status::internal("Database failure")),
+            Err(_) => return Err(Status::internal("Database connection failed")),
         };
 
         let (mut tx, rx) = mpsc::channel(8);
@@ -184,15 +212,60 @@ impl FeatureGate for Gate {
 
         Ok(Response::new(rx))
     }
+
+    // Stream type for returning a feature stream. Basically the same thing as for
+    // the `get_features` stream.
+    type GetGuildFeaturesStream = mpsc::Receiver<Result<Feature, Status>>;
+
+    /// Sends all of the features associated with a guild.
+    ///
+    /// See `get_features` documentation for exactly how a stream works.
+    /// If the guild id is not in the database, an empty stream will be
+    /// sent to the client.
+    async fn get_guild_features(
+        &self,
+        request: Request<Guild>,
+    ) -> RpcResponse<Self::GetGuildFeaturesStream> {
+        let conn = match self.get_connection() {
+            Some(c) => c,
+            None => return Err(Status::internal("Database connection failed")),
+        };
+
+        let guild_id = request.into_inner().guild_id;
+        let features = match get_guild_features(&conn, guild_id) {
+            Ok(v) => v,
+            Err(_) => return Err(Status::internal("Database connection failed")),
+        };
+
+        let (mut tx, rx) = mpsc::channel(8);
+        tokio::spawn(async move {
+            for feat in features {
+                match tx
+                    .send(Ok(Feature {
+                        name: feat.0,
+                        open: feat.1,
+                    }))
+                    .await
+                {
+                    Ok(_) => {}
+                    Err(_) => break,
+                }
+            }
+        });
+
+        Ok(Response::new(rx))
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    sleep(Duration::from_secs(20));
+    // Need to limit to Level or above to prevent tonic from bombarding the logs with
+    // hundreds of lines of debug output.
+    simple_logger::init_with_level(log::Level::Info).unwrap();
     let database_url =
         env::var("DATABASE_URL").expect("Database url environment variable not set.");
 
-    let addr = "[::1]:50051".parse()?;
+    let addr = "0.0.0.0:50555".parse()?;
     let gate = Gate {
         db_addr: database_url,
     };
@@ -202,6 +275,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .serve(addr)
         .await?;
 
-    println!("Server ended main loop");
+    warn!("Server exited mainloop");
     Ok(())
 }

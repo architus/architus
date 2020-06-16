@@ -8,6 +8,7 @@ service FeatureGate {
     rpc RemoveGuildFeature(FeatureRemoval) returns (RemoveResult);
     rpc CheckGuildFeature(GuildFeature) returns (FeatureResult);
     rpc GetFeatures(FeatureList) returns (stream Feature);
+    rpc GetGuildFeatures(Guild) returns (stream Feature);
 }
 
 message Feature {
@@ -32,6 +33,10 @@ message FeatureRemoval {
 message GuildFeature {
     string feature_name = 1;
     sfixed64 guild_id = 2;
+}
+
+message Guild {
+    sfixed64 guild_id = 1;
 }
 
 message FeatureList {
