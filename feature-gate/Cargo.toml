@@ -16,6 +16,8 @@ thiserror = "1.0"
 tonic = "0.2"
 prost = "0.6"
 tokio = { version = "0.2", features = ["macros"] }
+log = "0.4"
+simple_logger = "1.6"
 
 [dependencies.diesel]
 version = "1.4"

@@ -4,6 +4,8 @@
 //! so that the feature server only has to deal with guild ids and
 //! feature names.
 
+#![deny(clippy::all, clippy::pedantic, clippy::nursery)]
+
 pub mod models;
 pub mod schema;
 
@@ -33,7 +35,14 @@ pub enum DatabaseError {
 type DbResult<T> = Result<T, DatabaseError>;
 
 /// Inserts a new feature into the database.
-#[must_use]
+///
+/// # Arguments
+/// * `conn` - Database connection
+/// * `name` - Name of feature to insert
+/// * `open` - Whether or not the feature is open or closed
+///
+/// # Errors
+/// * `DatabaseError::Insertion` - Failed to insert new feature into database
 pub fn insert_feature(conn: &PgConnection, name: &str, open: bool) -> DbResult<i32> {
     let new_feature = models::NewFeature { name, open };
 
@@ -48,6 +57,12 @@ pub fn insert_feature(conn: &PgConnection, name: &str, open: bool) -> DbResult<i
 }
 
 /// Queries the database for all features.
+///
+/// # Arguments
+/// * `conn` - Database connection
+///
+/// # Errors
+/// * `DatabaseError::Query` - Failed to query the database
 pub fn get_all_features(conn: &PgConnection) -> DbResult<Vec<models::Feature>> {
     let features = schema::tb_feature_flags::table.load::<models::Feature>(conn);
     features.map_err(|_| DatabaseError::Query)
@@ -57,7 +72,15 @@ pub fn get_all_features(conn: &PgConnection) -> DbResult<Vec<models::Feature>> {
 ///
 /// Will return an `UnknownFeature` error if a feature that has not been previously
 /// added is passed as an argument.
-#[must_use]
+///
+/// # Arguments
+/// * `conn` - Connection to the database
+/// * `guild_id` - ID of the guild to add the feature to
+/// * `feature_name` - Name of the feature being added to the guild
+///
+/// # Errors
+/// * `DatabaseError::UnknownFeature` - The feature passed in is not in the database
+/// * `DatabaseError::Insertion` - Association could not be inserted into the database
 pub fn insert_guild_feature(
     conn: &PgConnection,
     guild_id: i64,
@@ -81,6 +104,13 @@ pub fn insert_guild_feature(
 }
 
 /// Gets all of the features associated with a guild id.
+///
+/// # Arguments
+/// * `conn` - Connection to the database
+/// * `guild_id` - Which guild to get the features of
+///
+/// # Errors
+/// * `DatabaseError::Query` - The database query failed
 pub fn get_guild_features(conn: &PgConnection, guild_id: i64) -> DbResult<Vec<(String, bool)>> {
     let join = schema::tb_guild_features::table
         .inner_join(schema::tb_feature_flags::table)
@@ -98,6 +128,15 @@ pub fn get_guild_features(conn: &PgConnection, guild_id: i64) -> DbResult<Vec<(S
 ///
 /// First gets the feature id and then checks to see if the guild id and feature id
 /// pair can be found in the guild feature database.
+///
+/// # Arguments
+/// * `conn` - Database connection
+/// * `guild_id` - ID of guild that is being checked
+/// * `feature` - Name of feature to check on guild
+///
+/// # Errors
+/// * `DatabaseError::UnknownFeature` - Feature is not found in the database
+/// * `DatabaseError::Query` - The query to the database failed
 pub fn check_guild_feature(conn: &PgConnection, guild_id: i64, feature: &str) -> DbResult<bool> {
     let feature_id = get_feature_id(conn, feature)?;
 
@@ -109,10 +148,10 @@ pub fn check_guild_feature(conn: &PgConnection, guild_id: i64, feature: &str) ->
 
     match result {
         Ok(v) => {
-            if v.len() > 0 {
-                Ok(true)
-            } else {
+            if v.is_empty() {
                 Ok(false)
+            } else {
+                Ok(true)
             }
         }
         Err(_) => Err(DatabaseError::Query),
@@ -120,7 +159,15 @@ pub fn check_guild_feature(conn: &PgConnection, guild_id: i64, feature: &str) ->
 }
 
 /// Removes a guild <-> feature association from the database.
-#[must_use]
+///
+/// # Arguments
+/// * `conn` - Database connection
+/// * `guild_id` - ID of guild that the feature is being removed from
+/// * `feature` - Name of feature being removed from guild
+///
+/// # Errors
+/// * `DatabaseError::UnknownFeature` - Feature name has no associated feature in database
+/// * `DatabaseError::Delete` - Failed to delete association from the database
 pub fn remove_guild_feature(conn: &PgConnection, guild_id: i64, feature: &str) -> DbResult<()> {
     let feature_id = get_feature_id(conn, feature)?;
 
@@ -140,7 +187,15 @@ pub fn remove_guild_feature(conn: &PgConnection, guild_id: i64, feature: &str) -
 /// Will check to make sure that the feature has already been added to the database.
 /// If called with a feature id that is not in the db it will just return an
 /// unknown feature error.
-#[must_use]
+///
+/// # Arguments
+/// * `conn` - Database connection
+/// * `feature` - Name of feature to update
+/// * `openness` - Value to update feature to
+///
+/// # Errors
+/// * `DatabaseError::UnknownFeature` - Feature name not found in database
+/// * `DatabaseError::Update` - Failed to update the feature in the database
 pub fn set_feature_openness(conn: &PgConnection, feature: &str, openness: bool) -> DbResult<()> {
     let feature_id = get_feature_id(conn, feature)?;
 
@@ -160,6 +215,14 @@ pub fn set_feature_openness(conn: &PgConnection, feature: &str, openness: bool) 
 /// If the feature does not exist in the database, an unknown feature errror will
 /// be returned. Any other error should be interpreted as the database having failed
 /// in some way.
+///
+/// # Arguments
+/// * `conn` - Database connection
+/// * `feature` - Name of feature to check if it's open or not
+///
+/// # Errors
+/// * `DatabaseError::UnknownFeature` - Feature name not found in database
+/// * `DatabaseError::Queyr` - Database qeury failed
 pub fn get_feature_openness(conn: &PgConnection, feature: &str) -> DbResult<bool> {
     let feature_id = get_feature_id(conn, feature)?;
 
@@ -188,10 +251,10 @@ fn get_feature_id(conn: &PgConnection, feature: &str) -> DbResult<i32> {
 
     match result {
         Ok(mut v) => {
-            if v.len() > 0 {
-                Ok(v.remove(0))
-            } else {
+            if v.is_empty() {
                 Err(DatabaseError::UnknownFeature)
+            } else {
+                Ok(v.remove(0))
             }
         }
         Err(_) => Err(DatabaseError::Query),

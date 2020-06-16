@@ -54,5 +54,5 @@ message RemoveResult {
 }
 
 message FeatureResult {
-    bool success = 1;
+    bool has_feature = 1;
 }

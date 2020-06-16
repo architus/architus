@@ -8,5 +8,6 @@ RUN rustup update
 RUN rustup component add rustfmt
 
 ENV DATABASE_URL=postgresql://autbot:autism@postgres:5432/autbot
-RUN cargo build
-CMD /app/target/debug/feature-gate
+ENV RUST_LOG=Info
+RUN cargo build --release
+CMD /app/target/release/feature-gate
