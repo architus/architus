@@ -412,8 +412,13 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
                 logger.debug("file is good")
                 message = "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
                 # msg = await ctx.send(message, file=discord.File(file, "cool.png"))
-                data = await self.bot.manager_client.publish_file(
-                    message_type.File(file=file.getvalue()))
+                try:
+                    data = await self.bot.manager_client.publish_file(
+                        iter([message_type.File(file=file.getvalue())]))
+                except Exception:
+                    logger.info(f"Shard {self.bot.shard_id} failed to upload emoji")
+                    await ctx.send("Failed to generate cached emoji preview")
+                    return
                 em = discord.Embed(title="Cached Emojis", description=ctx.guild.name)
                 # em.set_image(url=msg.attachments[0].url)
                 em.set_image(url=data.url)

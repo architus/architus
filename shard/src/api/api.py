@@ -46,7 +46,12 @@ class Api(Cog):
         return {'message': 'pong'}, sc.OK_200
 
     async def guild_count(self):
-        return await self.bot.manager_client.guild_count(message.GuildCountRequest())
+        try:
+            resp = await self.bot.manager_client.guild_count(message.GuildCountRequest())
+            return {'guild_count': resp.guild_count, 'user_count': resp.user_count}, sc.OK_200
+        except Exception:
+            logger.info(f"Shard {self.bot.shard_id} failed to get guild count from manager")
+            return {'guild_count': -1, 'user_count': -1}, sc.INTERNAL_SERVER_ERROR_500
 
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
@@ -142,7 +147,11 @@ class Api(Cog):
         return {'value': "unknown setting"}, sc.NOT_FOUND_404
 
     async def tag_autbot_guilds(self, guild_list, user_id: int):
-        all_guilds = [guild for guild in await self.bot.manager_client.all_guilds(message.AllGuildsRequest())]
+        try:
+            all_guilds = [guild for guild in await self.bot.manager_client.all_guilds(message.AllGuildsRequest())]
+        except Exception:
+            logger.info(f"Shard {self.bot.shard_id} failed to get guild list from manager")
+            return {'guilds': []}, sc.INTERNAL_SERVER_ERROR_500
         for guild_dict in guild_list:
             for guild in all_guilds:
                 if guild.id == int(guild_dict['id']):

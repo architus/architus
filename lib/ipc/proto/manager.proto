@@ -47,7 +47,7 @@ message File {
 }
 
 message Url {
-    string Url = 1;
+    string url = 1;
 }
 
 message Guild {

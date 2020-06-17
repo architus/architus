@@ -1,7 +1,6 @@
 from collections import defaultdict
 from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
-import base64
 
 from discord.ext import commands
 from discord import Forbidden, HTTPException
@@ -115,9 +114,9 @@ class MessageStats(commands.Cog, name="Server Statistics"):
     @commands.command(aliases=['growth'])
     async def joins(self, ctx):
         img = member_growth.generate(ctx.guild.members)
-        data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
+        data = await self.bot.manager_client.publish_file(iter([message_type.File(file=img)]))
         em = discord.Embed(title="Server Growth", description=ctx.guild.name)
-        em.set_image(url=data['url'])
+        em.set_image(url=data.url)
         em.color = 0x35a125
         em.set_footer(text=f"{ctx.guild.name} has a total of {ctx.guild.member_count} members")
         await ctx.channel.send(embed=em)
@@ -170,7 +169,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         with ThreadPoolExecutor() as pool:
             img = await self.bot.loop.run_in_executor(pool, wordcount_gen.generate, message_counts, word_counts, victim)
         data = await self.bot.manager_client.publish_file(
-            message_type.File(file=img))
+            iter([message_type.File(file=img)]))
 
         em = discord.Embed(title="Top 5 Message Senders", description=ctx.guild.name)
         em.set_image(url=data.url)
@@ -200,7 +199,7 @@ class CoronaStats(commands.Cog, name="Coronavirus Data"):
                 img = corona.generate(parsed, deaths_only)
 
                 data = await self.bot.manager_client.publish_file(
-                    message_type.File(file=img))
+                    iter([message_type.File(file=img)]))
 
                 em = discord.Embed(title="Coronavirus in the US", description="More Information",
                                    url="https://www.cdc.gov/coronavirus/2019-ncov/index.html")

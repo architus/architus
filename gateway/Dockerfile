@@ -5,7 +5,7 @@ WORKDIR /app
 COPY ./gateway/requirements.txt /app
 
 # Copy the current directory contents into the container at /app
-RUN apk update && apk add python3 linux-headers pcre-dev uwsgi-python3
+RUN apk update && apk add python3 linux-headers pcre-dev uwsgi-python3 build-base
 # RUN apk add build-base libzmq musl-dev python3 zeromq-dev
 RUN apk add --virtual build-deps gcc python3-dev musl-dev postgresql-dev
 

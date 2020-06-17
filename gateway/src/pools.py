@@ -1,10 +1,37 @@
 from lib.discord_requests import async_list_guilds_request
 from lib.status_codes import StatusCodes as s
 from lib.config import logger, which_shard
+import lib.ipc.manager_pb2 as message
+
+guild_attrs = [
+    'id', 'name', 'icon', 'splash', 'owner_id', 'region', 'description',
+    'afk_timeout', 'unavailable', 'max_members', 'banner',
+    'mfa_level', 'premium_tier', 'premium_subscription_count',
+    'preferred_locale', 'member_count'
+]
+
+
+def guilds_to_dicts(guilds):
+    for g in guilds:
+        guild_dict = dict()
+        for attr in guild_attrs:
+            value = getattr(g, attr)
+            if type(value) == int and value == 0:
+                value = None
+            if type(value) == str and value == '':
+                value = None
+            guild_dict[attr] = value
+        guild_dict['features'] = list()
+        for feat in g.features:
+            guild_dict['features'].append(str(feat))
+        # javascript requires numbers to be strings for some odd reason
+        guild_dict['admin_ids'] = list(map(str, g.admin_ids))
+        # TODO Remove this when joey fixes the frontend
+        guild_dict['region'] = [guild_dict['region']]
+        yield guild_dict
 
 
 class GuildPool:
-
     def __init__(self, manager_client, shard_client, jwt):
         self.manager_client = manager_client
         self.shard_client = shard_client
@@ -12,10 +39,9 @@ class GuildPool:
         self.return_guilds = []
 
     async def fetch_architus_guilds(self):
-
-        all_guilds, _ = await self.manager_client.all_guilds()
+        all_guilds_message = await self.manager_client.all_guilds(message.AllGuildsRequest())
+        all_guilds = guilds_to_dicts(all_guilds_message)
         for guild in all_guilds:
-
             resp, _ = await self.shard_client.is_member(
                 self.jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
             if resp['member']:
