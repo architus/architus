@@ -5,13 +5,13 @@ from PIL import Image
 import re
 from typing import Optional, List
 from io import BytesIO
-import base64
 
 from src.utils import send_message_webhook
 from src.architus_emoji import ArchitusEmoji
 from src.generate.emoji_list import generate
 from lib.config import logger
 from lib.models import Emoji as EmojiModel
+from lib.ipc import manager_pb2 as message_type
 
 EMOJI_DIR = 'emojis'
 
@@ -412,11 +412,16 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
                 logger.debug("file is good")
                 message = "Enclose the name (case sensitive) of cached emoji in `:`s to auto-load it into a message"
                 # msg = await ctx.send(message, file=discord.File(file, "cool.png"))
-                data, _ = await self.bot.manager_client.publish_file(
-                    data=base64.b64encode(file.getvalue()).decode('ascii'))
+                try:
+                    data = await self.bot.manager_client.publish_file(
+                        iter([message_type.File(file=file.getvalue())]))
+                except Exception:
+                    logger.info(f"Shard {self.bot.shard_id} failed to upload emoji")
+                    await ctx.send("Failed to generate cached emoji preview")
+                    return
                 em = discord.Embed(title="Cached Emojis", description=ctx.guild.name)
                 # em.set_image(url=msg.attachments[0].url)
-                em.set_image(url=data['url'])
+                em.set_image(url=data.url)
                 em.color = 0x7b8fb7
                 em.set_footer(text=message)
                 await ctx.send(embed=em)
