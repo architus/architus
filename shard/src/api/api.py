@@ -152,6 +152,8 @@ class Api(Cog):
     async def cache_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
         emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
         emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if member_id not in self.bot.settings[guild].admin_ids:
+            return {'message': "only admins may manually cache emoji"}, sc.UNAUTHORIZED_401
         if emoji is None:
             return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
         await emoji_manager.cache_emoji(emoji)
