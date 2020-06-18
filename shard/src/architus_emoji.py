@@ -57,11 +57,16 @@ class ArchitusEmoji:
             with BytesIO() as buf:
                 self.im.save(buf, format="PNG")
                 binary = buf.getvalue()
-                data = await self.bot.manager_client.publish_file(
-                    message.File(
-                        location="emojis",
-                        name=f"{self.id}",
-                        file=binary))
+                try:
+                    data = await self.bot.manager_client.publish_file(
+                        iter([
+                            message.File(
+                                location="emojis",
+                                name=f"{self.id}",
+                                file=binary)]))
+                except Exception:
+                    logger.info(f"Shard {self.bot.shard_id} failed to upload emoji")
+                    return None
                 self.str_url = data.url
         return self.str_url
 

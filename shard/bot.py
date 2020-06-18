@@ -1,12 +1,12 @@
 import asyncio
 import os
+import time
 
 from discord.ext.commands import Bot
 import discord
 
 from src.utils import guild_to_message, guild_to_dict
 from lib.config import get_session, secret_token, logger, AsyncConnWrapper
-# TODO: Get rid of this stuff
 from lib.ipc import async_rpc_server
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
@@ -23,8 +23,14 @@ class Architus(Bot):
         self.hoarfrost_gen = HoarFrostGenerator()
 
         logger.debug("registering with manager...")
-        manager_client = grpc_client.get_blocking_client()
-        shard_info = manager_client.register(message.RegisterRequest())
+        manager_client = grpc_client.get_blocking_client('manager:50051')
+        while True:
+            try:
+                shard_info = manager_client.register(message.RegisterRequest())
+                break
+            except Exception:
+                logger.info("Trying to get shard id from manager")
+                time.sleep(3)
         self.shard_id = shard_info.shard_id
         shard_dict = {'shard_id': shard_info.shard_id, 'shard_count': shard_info.shard_count}
         logger.info(f"Got shard_id {self.shard_id}")
@@ -44,8 +50,7 @@ class Architus(Bot):
             )
         )
 
-        self.manager_client = grpc_client.get_async_client()
-        print("Got manager: {}", self.manager_client)
+        self.manager_client = grpc_client.get_async_client('manager:50051')
 
         self.loop.create_task(self.emitter.connect())
 
@@ -67,11 +72,17 @@ class Architus(Bot):
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
             name=f"the tragedy of darth plagueis the wise {self.shard_id}", type=2))
-        await self.manager_client.guild_update(iter(self.guilds_as_message))
+        try:
+            await self.manager_client.guild_update(self.guilds_as_message)
+        except Exception:
+            logger.info(f"Shard {self.shard_id} failed to send manager its guild list")
 
     async def on_guild_join(self, guild):
         logger.info(f" -- JOINED NEW GUILD: {guild.name} -- ")
-        await self.manager_client.guild_update(iter(self.guilds_as_message))
+        try:
+            await self.manager_client.guild_update(self.guilds_as_message)
+        except Exception:
+            logger.info(f"Shard {self.shard_id} failed to send manager its guild list")
 
     @property
     def settings(self):
@@ -79,13 +90,11 @@ class Architus(Bot):
 
     @property
     def guilds_as_message(self):
-        guilds = []
         for guild in self.guilds:
             guild_message = guild_to_message(guild)
             guild_message.shard_id = self.shard_id
             guild_message.admin_ids.extend(self.settings[guild].admins_ids)
-            guilds.append(guild_message)
-        return guilds
+            yield guild_message
 
     @property
     def guilds_as_dicts(self):
@@ -100,7 +109,10 @@ class Architus(Bot):
         await self.wait_until_ready()
         while not self.is_closed():
             await asyncio.sleep(0.5)
-            await self.manager_client.checkin(message.ShardID(shard_id=self.shard_id))
+            try:
+                await self.manager_client.checkin(message.ShardID(shard_id=self.shard_id))
+            except Exception:
+                logger.info(f"Shard {self.shard_id} failed to checkin with manager")
 
     async def list_guilds(self):
         """Update the manager with the guilds that we know about"""

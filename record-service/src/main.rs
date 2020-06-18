@@ -18,7 +18,7 @@ fn main() {
     let port = port.parse::<u16>().expect("Didn't pass a valid number");
     assert!(port < 65535);
 
-    let server = TcpListener::bind(format!("record-service:{}", port)).expect("Failed to bind");
+    let server = TcpListener::bind(format!("record:{}", port)).expect("Failed to bind");
     info!("Listening on port {}", port);
 
     for stream in server.incoming() {

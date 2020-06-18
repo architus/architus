@@ -101,7 +101,7 @@ class Recording:
             return 1
 
         self.tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp.connect(("record-service", 7777))
+        self.tcp.connect(("record", 7777))
         to_send = len(excludes)
         buf = bytearray(4096)
         struct.pack_into(">BQH", buf, 0, 0x03, self.bot_id, to_send)
