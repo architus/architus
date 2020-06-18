@@ -116,5 +116,12 @@ services:
       - "8090:15672"
     networks:
       - webnet
+  record:
+    image: johnyburd/record:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./record-service/Dockerfile
+    networks:
+      - webnet
 networks:
   webnet:
