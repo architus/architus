@@ -229,7 +229,7 @@ impl WAVReceiver {
         };
 
         // Drop packet if future packets have already been processed.
-        if self.last_sequence[channel_index] < seq
+        if (self.last_sequence[channel_index] < seq)
             || (seq < 10 && self.last_sequence[channel_index] > 65530)
         {
             self.last_sequence[channel_index] = seq;
