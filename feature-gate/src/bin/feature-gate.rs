@@ -106,7 +106,7 @@ impl FeatureGate for Gate {
             None => return failure,
         };
 
-        let result = insert_guild_feature(&conn, addition.guild_id, &addition.feature_name);
+        let result = insert_guild_feature(&conn, addition.guild_id as i64, &addition.feature_name);
         match result {
             Ok(()) => {
                 info!(
@@ -134,7 +134,7 @@ impl FeatureGate for Gate {
         };
 
         let removal = request.into_inner();
-        let result = remove_guild_feature(&conn, removal.guild_id, &removal.feature_name);
+        let result = remove_guild_feature(&conn, removal.guild_id as i64, &removal.feature_name);
         match result {
             Ok(()) => {
                 info!(
@@ -164,7 +164,7 @@ impl FeatureGate for Gate {
         };
 
         let check = request.into_inner();
-        let result = check_guild_feature(&conn, check.guild_id, &check.feature_name);
+        let result = check_guild_feature(&conn, check.guild_id as i64, &check.feature_name);
         match result {
             Ok(b) => Ok(Response::new(FeatureResult { has_feature: b })),
             Err(DatabaseError::UnknownFeature) => {
@@ -232,7 +232,7 @@ impl FeatureGate for Gate {
         };
 
         let guild_id = request.into_inner().guild_id;
-        let features = match get_guild_features(&conn, guild_id) {
+        let features = match get_guild_features(&conn, guild_id as i64) {
             Ok(v) => v,
             Err(_) => return Err(Status::internal("Database connection failed")),
         };
@@ -262,8 +262,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Need to limit to Level or above to prevent tonic from bombarding the logs with
     // hundreds of lines of debug output.
     simple_logger::init_with_level(log::Level::Info).unwrap();
-    let database_url =
-        env::var("DATABASE_URL").expect("Database url environment variable not set.");
+    let db_usr = env::var("db_user").expect("Need to have an architus.env file");
+    let db_pass = env::var("db_pass").expect("Need to have an architus.env file");
+    let database_url = format!("postgresql://{}{}@postgres:5432/autbot", db_usr, db_pass);
 
     let addr = "0.0.0.0:50555".parse()?;
     let gate = Gate {

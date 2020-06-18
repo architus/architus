@@ -150,7 +150,7 @@ CREATE TABLE public.tb_users (
 ALTER TABLE public.tb_users OWNER TO autbot;
 
 --
--- Name: tb_features; Type: TABLE; Schema: public; Owner: autbot
+-- Name: tb_feature_flags; Type: TABLE; Schema: public; Owner: autbot
 --
 
 CREATE TABLE public.tb_feature_flags (
