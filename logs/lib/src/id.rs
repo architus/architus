@@ -64,6 +64,14 @@ impl IdProvisioner {
         let timestamp = (time::millisecond_ts() - DISCORD_EPOCH_OFFSET) << 22;
         HoarFrost(increment | timestamp | self.combined_process_id)
     }
+
+    /// Atomically provisions a new Id using the given timestamp
+    #[must_use]
+    pub fn with_ts(&self, timestamp: u64) -> HoarFrost {
+        let increment = self.internal_counter.fetch_add(1, Ordering::Relaxed) & 0b111111111111;
+        let shifted_timestamp = (timestamp - DISCORD_EPOCH_OFFSET) << 22;
+        HoarFrost(increment | shifted_timestamp | self.combined_process_id)
+    }
 }
 
 /// Extracts the creation timestamp of the given snowflake-format Id
