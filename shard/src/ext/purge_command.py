@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-from contextlib import suppress
 
 import re
 from datetime import datetime, timedelta
@@ -106,7 +105,7 @@ async def id(ctx, mid, inclusive=False):
             ids = list(map(lambda m: m.id, messages_to_delete))
             async with ctx.channel.typing():
                 deleted = await ctx.channel.purge(limit=len(messages_to_delete), check=lambda m: m.id in ids,
-                                        bulk=False)
+                                                  bulk=False)
                 await ctx.send(f"Deleted {len(deleted)} message(s)")
     except discord.Forbidden:
         await ctx.send("Architus does not have permission to remove messages in this server")
@@ -176,7 +175,7 @@ async def time(ctx, time_window):
             ids = list(map(lambda m: m.id, messages_to_delete))
             async with ctx.channel.typing():
                 deleted = await ctx.channel.purge(limit=len(messages_to_delete), check=lambda m: m.id in ids,
-                                        bulk=False)
+                                                  bulk=False)
                 await ctx.send(f"Deleted {len(deleted)} message(s)")
     except discord.Forbidden:
         await ctx.send("Architus does not have permission to remove messages "
