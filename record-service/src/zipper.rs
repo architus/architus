@@ -1,4 +1,4 @@
-use log::trace;
+use log::info;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -23,6 +23,7 @@ const PW_ALPHABET: [char; 62] = [
     '5', '6', '7', '8', '9',
 ];
 
+#[derive(Debug)]
 pub enum PublishError {
     Writing,
     Zipping,
@@ -65,7 +66,6 @@ pub fn zip(pcm: Vec<Vec<i16>>) -> Result<(String, String), PublishError> {
         Err(_) => return Err(PublishError::Writing),
     };
     write_wav(&pcm, &mut file)?;
-    trace!("Wrote zip");
     drop(pcm);
 
     // Zip the Wav file and get the password used to zip the file.
@@ -171,12 +171,13 @@ fn zip_file(dir: &TempDir) -> Result<String, PublishError> {
         let i: usize = rng.gen::<usize>() % 62;
         pw.push(PW_ALPHABET[i]);
     }
-    trace!("Passowrd: {}", pw);
+    info!("Passowrd: {}", pw);
 
     let status = Command::new("zip")
-        .arg(format!("-P {}", pw))
-        .arg(dir.path().join("rec.zip"))
-        .arg(dir.path().join("recording.wav"))
+        .current_dir(dir.path())
+        .arg(format!("-P{}", pw))
+        .arg("rec.zip")
+        .arg("recording.wav")
         .status()
         .map_err(|_| PublishError::Zipping);
 
