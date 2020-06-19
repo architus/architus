@@ -40,7 +40,7 @@ async def purge(ctx):
 @purge.command()
 async def id(ctx, mid, inclusive=False):
     """
-    Purge a channel of a user's messages
+    Purge a channel of messages until a specific message is reached
 
     Usage: {prefix}purge id {message id} [true]
     Purges all messages sent after the message corresponding to the
@@ -116,7 +116,7 @@ async def id(ctx, mid, inclusive=False):
 @purge.command()
 async def time(ctx, time_window):
     """
-    Purge a channel of a user's messages
+    Purge a channel of messages sent in the past X amount of time
 
     Usage: {prefix}purge time {XXm|XXs}
 
