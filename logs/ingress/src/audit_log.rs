@@ -151,11 +151,10 @@ where
     P: Fn(&AuditLogEntry) -> bool,
 {
     let mut backoff = search.make_backoff();
+    let start = time::millisecond_ts();
     let timing = SearchTiming {
-        start: time::millisecond_ts(),
-        target: search
-            .target_timestamp
-            .unwrap_or_else(|| time::millisecond_ts()),
+        start,
+        target: search.target_timestamp.unwrap_or(start),
     };
 
     loop {
