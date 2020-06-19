@@ -1,6 +1,7 @@
-mod env;
-mod gateway;
 mod audit_log;
+mod env;
+mod event;
+mod gateway;
 
 use env::Environment;
 use log::{error, info};

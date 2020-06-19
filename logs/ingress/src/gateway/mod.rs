@@ -1,18 +1,16 @@
 mod channel;
 
+use crate::event::{NormalizedEvent, Source};
 use lazy_static::lazy_static;
 use log::{debug, warn};
-use logs_lib::id::{HoarFrost, IdProvisioner};
+use logs_lib::id::IdProvisioner;
 use logs_lib::{time, ActionOrigin, ActionType};
-use serde::ser;
-use serde::Serialize;
 use serde_json;
 use serenity;
 use serenity::async_trait;
 use serenity::client::bridge::gateway::GatewayIntents;
 use serenity::model::event::Event;
 use serenity::model::guild::Guild;
-use serenity::model::id::{AuditLogEntryId, GuildId, UserId};
 use serenity::model::permissions::Permissions;
 use serenity::prelude::*;
 use std::sync::Arc;
@@ -33,59 +31,41 @@ lazy_static! {
         | GatewayIntents::GUILD_MESSAGE_REACTIONS;
 }
 
-/// Normalized log event to send to log ingestion
-#[derive(Clone, PartialEq, Debug, Serialize)]
-pub struct NormalizedEvent {
-    pub id: HoarFrost,
-    // Unix timestamp
-    pub timestamp: u64,
-    pub source: Source,
-    pub origin: ActionOrigin,
-    pub action_type: ActionType,
-    pub guild_id: Option<GuildId>,
-    pub agent_id: Option<UserId>,
-    // Subject Id can be any id
-    pub subject_id: Option<u64>,
-    pub audit_log_id: Option<AuditLogEntryId>,
-}
-
-#[derive(Clone, PartialEq, Debug, Serialize)]
-pub struct Source {
-    pub gateway: Option<serde_json::Value>,
-    pub audit_log: Option<serde_json::Value>,
-}
-
-impl Source {
-    fn gateway<T: ser::Serialize>(gateway_event: &T) -> Self {
-        Self {
-            gateway: try_serialize(gateway_event),
-            audit_log: None,
-        }
-    }
-
-    fn hybrid<T: ser::Serialize, V: ser::Serialize>(
-        gateway_event: &T,
-        audit_log_entry: &V,
-    ) -> Self {
-        Self {
-            gateway: try_serialize(gateway_event),
-            audit_log: try_serialize(audit_log_entry),
-        }
-    }
-}
-
 pub struct GatewayContext {
     discord: Context,
     id_provisioner: Arc<IdProvisioner>,
+    timestamp: u64,
 }
 
 impl GatewayContext {
-    pub async fn has_perms(&self, guild: &Guild, target: Permissions) -> bool {
+    /// Utility to get live permissions for the bot user for the given guild
+    #[must_use]
+    async fn has_perms(&self, guild: &Guild, target: Permissions) -> bool {
         let user_id = self.discord.cache.current_user().await.id;
         let bot_perms = guild.member_permissions(user_id).await;
         let mut base_perms = target;
         base_perms.remove(bot_perms);
         base_perms.is_empty()
+    }
+
+    /// Constructs a normalized event using default empty values for most fields.
+    /// Uses the internal timestamp as the Id timestamp and the fallback
+    /// for the underlying timestamp if None is supplied
+    #[must_use]
+    fn event(&self, underlying_ts: Option<u64>) -> NormalizedEvent {
+        let timestamp: u64 = underlying_ts.unwrap_or(self.timestamp);
+        NormalizedEvent {
+            id: self.id_provisioner.with_ts(self.timestamp),
+            timestamp,
+            source: Source::empty(),
+            origin: ActionOrigin::Internal,
+            action_type: ActionType::Unknown,
+            reason: None,
+            guild_id: None,
+            agent_id: None,
+            subject_id: None,
+            audit_log_id: None,
+        }
     }
 }
 
@@ -103,6 +83,7 @@ impl Default for Handler {
 }
 
 impl Handler {
+    #[must_use]
     pub fn new() -> Self {
         Default::default()
     }
@@ -115,6 +96,7 @@ impl RawEventHandler for Handler {
         // Wraps the context in a single object
         let context = GatewayContext {
             discord: base_context,
+            timestamp: time::millisecond_ts(),
             id_provisioner: Arc::clone(&self.id_provisioner),
         };
 
@@ -132,58 +114,21 @@ impl RawEventHandler for Handler {
     }
 }
 
+/// Attempts to normalize a gateway event into a normalized event struct,
+/// including the corresponding audit log entry (if it exists)
 async fn normalize(raw_event: Event, context: GatewayContext) -> Option<NormalizedEvent> {
     match raw_event {
-        // handle all log ingestion events
-        Event::ChannelCreate(_) | Event::ChannelDelete(_) | Event::ChannelUpdate(_) => channel::handle(raw_event, context).await,
-        // Event::ChannelPinsUpdate(_) => Self::handle(raw_event, EventType::ChannelPinsUpdate).await
-        // Event::GuildBanAdd(_) => Self::handle(raw_event, EventType::GuildBanAdd).await,
-        // Event::GuildBanRemove(_) => Self::handle(raw_event, EventType::GuildBanRemove).await,
-        // Event::GuildEmojisUpdate(_) => Self::handle(raw_event, EventType::GuildEmojisUpdate).await
-        // Event::GuildIntegrationsUpdate(_) => Self::handle(raw_event, EventType::GuildIntegrationsUpdate).await
-        // Event::GuildMemberAdd(_) => Self::handle(raw_event, EventType::GuildMemberAdd).await,
-        // Event::GuildMemberRemove(_) => Self::handle(raw_event, EventType::GuildMemberRemove).await
-        // Event::GuildMemberUpdate(_) => Self::handle(raw_event, EventType::GuildMemberUpdate).await
-        // Event::GuildMembersChunk(_) => Self::handle(raw_event, EventType::GuildMembersChunk).await
-        // Event::GuildRoleCreate(_) => Self::handle(raw_event, EventType::GuildRoleCreate).await,
-        // Event::GuildRoleDelete(_) => Self::handle(raw_event, EventType::GuildRoleDelete).await,
-        // Event::GuildRoleUpdate(_) => Self::handle(raw_event, EventType::GuildRoleUpdate).await,
-        // Event::GuildUnavailable(_) => Self::handle(raw_event, EventType::GuildUnavailable).await
-        // Event::GuildUpdate(_) => Self::handle(raw_event, EventType::GuildUpdate).await,
-        // Event::MessageCreate(_) => Self::handle(raw_event, EventType::MessageCreate).await,
-        // Event::MessageDelete(_) => Self::handle(raw_event, EventType::MessageDelete).await,
-        // Event::MessageDeleteBulk(_) => Self::handle(raw_event, EventType::MessageDeleteBulk).await
-        // Event::MessageUpdate(_) => Self::handle(raw_event, EventType::MessageUpdate).await,
-        // Event::ReactionAdd(_) => Self::handle(raw_event, EventType::ReactionAdd).await,
-        // Event::ReactionRemove(_) => Self::handle(raw_event, EventType::ReactionRemove).await,
-        // Event::ReactionRemoveAll(_) => Self::handle(raw_event, EventType::ReactionRemoveAll).await
-        // Event::VoiceStateUpdate(_) => Self::handle(raw_event, EventType::VoiceStateUpdate).await
-        // Event::VoiceServerUpdate(_) => Self::handle(raw_event, EventType::VoiceServerUpdate).await
-        // Event::WebhookUpdate(_) => Self::handle(raw_event, EventType::WebhookUpdate).await,
-        Event::Unknown(event) => {
-            warn!("Received Event::Unknown: {:?}", event);
+        Event::ChannelCreate(_) | Event::ChannelDelete(_) | Event::ChannelUpdate(_) => {
+            channel::handle(raw_event, context).await
+        }
+        Event::Unknown(_) | _ => {
+            warn!("Received unhandled event: {:?}", raw_event);
             Some(NormalizedEvent {
                 action_type: ActionType::Unknown,
-                id: context.id_provisioner.provision(),
-                source: Source::gateway(&event),
+                source: Source::gateway(&raw_event),
                 origin: ActionOrigin::Gateway,
-                timestamp: time::millisecond_ts(),
-                subject_id: None,
-                guild_id: None,
-                agent_id: None,
-                audit_log_id: None,
+                ..context.event(None)
             })
-        },
-        _ => None
-    }
-}
-
-fn try_serialize<T: ser::Serialize>(source: &T) -> Option<serde_json::Value> {
-    let result = serde_json::to_value(source);
-    if let Err(e) = result {
-        debug!("an error occurred while serializing event data: {:?}", e);
-        None
-    } else {
-        result.ok()
+        }
     }
 }
