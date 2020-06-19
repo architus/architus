@@ -34,11 +34,6 @@ async def purge(ctx):
     from the target message's author in the channel will be deleted depending on the
     timing of when the original message was deleted.
     '''
-    settings = ctx.bot.settings[ctx.guild]
-    if ctx.author.id not in settings.admins_ids:
-        await ctx.send("You do not have permissions to purge messaages")
-        return
-
     if ctx.invoked_subcommand is None:
         await ctx.send("Need to use command with id or time parameter")
         return
@@ -73,6 +68,11 @@ async def id(ctx, mid, inclusive=False):
         message_id = int(mid)
     except ValueError:
         await ctx.send("Message ID has an invalid format")
+        return
+
+    settings = ctx.bot.settings[ctx.guild]
+    if ctx.author.id not in settings.admins_ids:
+        await ctx.send("You do not have permissions to purge messaages")
         return
 
     try:
@@ -141,6 +141,11 @@ async def time(ctx, time_window):
         await ctx.send("Time value formatted improperly")
         return
 
+    settings = ctx.bot.settings[ctx.guild]
+    if ctx.author.id not in settings.admins_ids:
+        await ctx.send("You do not have permissions to purge messaages")
+        return
+
     if time_param[2] == 'm':
         mins = int(time_param[1])
         diff = timedelta(minutes=mins)
@@ -164,7 +169,7 @@ async def time(ctx, time_window):
 
     try:
         async with ctx.channel.typing():
-            for i in rane(0, len(messages_to_delete), 100):
+            for i in range(0, len(messages_to_delete), 100):
                 await ctx.channel.delete_messages(messages_to_delete[i:i + 100])
             await ctx.send(f"Deleted {len(messages_to_delete)} message(s)")
     except discord.Forbidden:
