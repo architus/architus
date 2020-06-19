@@ -1,6 +1,8 @@
 from discord import Guild
 from discord.errors import NotFound
 
+from contextlib import suppress
+
 from src.utils import channel_to_dict, member_to_dict, role_to_dict, user_to_dict
 
 
