@@ -24,6 +24,6 @@ fn load_string(key: &str, description: &str) -> String {
             debug!("Loaded {} from ${}", description, key);
             value
         }
-        Err(_) => panic!(format!("requires {} token in ${}", description, key)),
+        Err(_) => panic!(format!("requires {} in $${}", description, key)),
     }
 }
