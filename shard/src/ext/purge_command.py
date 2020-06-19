@@ -2,7 +2,10 @@ import discord
 from discord.ext import commands
 from contextlib import suppress
 
+import re
 from datetime import datetime, timedelta
+
+TIME_REGEX = re.compile(r"(\d+)([m|s])")
 
 
 @commands.group()
@@ -102,9 +105,9 @@ async def id(ctx, mid, inclusive=False):
         else:
             ids = list(map(lambda m: m.id, messages_to_delete))
             async with ctx.channel.typing():
-                await ctx.channel.purge(limit=len(messages_to_delete), check=lambda m: m.id in ids,
+                deleted = await ctx.channel.purge(limit=len(messages_to_delete), check=lambda m: m.id in ids,
                                         bulk=False)
-                await ctx.send(f"Deleted {len(messages_to_delete)} message(s)")
+                await ctx.send(f"Deleted {len(deleted)} message(s)")
     except discord.Forbidden:
         await ctx.send("Architus does not have permission to remove messages in this server")
     except discord.HTTPException:
@@ -133,16 +136,17 @@ async def time(ctx, time_window):
     # what utcnow gives us so that's what we'll use.
     # See: https://discordpy.readthedocs.io/en/latest/api.html?highlight=channel#discord.TextChannel.history
     now = datetime.utcnow()
-    try:
-        if time_window[2] == 'm':
-            mins = int(time_window[0:2])
-            diff = timedelta(minutes=mins)
-        elif time_window[2] == 's':
-            secs = int(time_window[0:2])
-            diff = timedelta(seconds=secs)
-    except ValueError:
+    time_param = TIME_REGEX.match(time_window.strip())
+    if time_param is None:
         await ctx.send("Time value formatted improperly")
         return
+
+    if time_param[2] == 'm':
+        mins = int(time_param[1])
+        diff = timedelta(minutes=mins)
+    elif time_param[2] == 's':
+        secs = int(time_param[1])
+        diff = timedelta(seconds=secs)
 
     earliest = now - diff
 
@@ -171,9 +175,9 @@ async def time(ctx, time_window):
         else:
             ids = list(map(lambda m: m.id, messages_to_delete))
             async with ctx.channel.typing():
-                await ctx.channel.purge(limit=len(messages_to_delete), check=lambda m: m.id in ids,
+                deleted = await ctx.channel.purge(limit=len(messages_to_delete), check=lambda m: m.id in ids,
                                         bulk=False)
-                await ctx.send(f"Deleted {len(messages_to_delete)} message(s)")
+                await ctx.send(f"Deleted {len(deleted)} message(s)")
     except discord.Forbidden:
         await ctx.send("Architus does not have permission to remove messages "
                        "in this server.")
