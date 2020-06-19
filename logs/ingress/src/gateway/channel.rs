@@ -66,10 +66,7 @@ impl<'a> ChannelEvent<'a> {
                     let mut search = audit_log::SearchQuery {
                         entry_type: Some(self.audit_log_entry_type()),
                         ..audit_log::SearchQuery::new(guild.id, |entry: &AuditLogEntry| {
-                            entry
-                                .target_id
-                                .map(|id| id == channel_id.0)
-                                .unwrap_or(false)
+                            entry.target_id == Some(channel_id.0)
                         })
                     };
 

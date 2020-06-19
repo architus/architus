@@ -110,10 +110,10 @@ impl Strategy {
                 // Construct the interval based on how much time has elapsed
                 // since the start
                 let ratio: f64 = max.as_secs_f64() / search.max_duration().as_secs_f64();
-                let ms_passed = timestamp - timing.start;
+                let ms_passed = timestamp.saturating_sub(timing.start);
                 let interval_width = ((ms_passed as f64) * ratio) as u64;
-                let lower = timing.target - interval_width;
-                let upper = timing.target + interval_width;
+                let lower = timing.target.saturating_sub(interval_width);
+                let upper = timing.target.saturating_add(interval_width);
 
                 // Only match if the entry's timestamp is inside the interval
                 let entry_ts = id::extract_timestamp(entry.id.0);
@@ -126,16 +126,11 @@ impl Strategy {
 /// Determines if the given serenity error is an HTTP unauthorized
 fn unauthorized_response(err: &serenity::Error) -> Option<ErrorResponse> {
     if let serenity::Error::Http(boxed_err) = err {
-        return match &**boxed_err {
-            serenity::http::HttpError::UnsuccessfulRequest(response) => {
-                if response.status_code == StatusCode::UNAUTHORIZED {
-                    return Some(response.clone());
-                } else {
-                    return None;
-                }
+        if let serenity::http::HttpError::UnsuccessfulRequest(response) = &**boxed_err {
+            if response.status_code == StatusCode::UNAUTHORIZED {
+                return Some(response.clone());
             }
-            _ => None,
-        };
+        }
     };
 
     None
