@@ -1,4 +1,4 @@
-use log::{debug, info, trace, warn};
+use log::{debug, info, warn};
 use std::cmp::max;
 use std::collections::HashMap;
 use std::convert::TryInto;

@@ -11,7 +11,7 @@ use std::time::Duration;
 
 fn main() {
     sleep(Duration::from_secs(10));
-    simple_logger::init().unwrap();
+    simple_logger::init_with_level(log::Level::Info).unwrap();
     info!("Starting recording microservice");
 
     let port = args().nth(1).expect("No port given");
