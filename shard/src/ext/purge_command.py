@@ -22,8 +22,8 @@ async def purge(ctx):
     message id of the user who sent that message. If true is passed, then all messages
     from now until that message will be deleted.
 
-    Only searches the past 500 messages sent in a channel for which to delete.
-    If more than 500 messages have been sent between the given message's id and
+    Only searches the past 10000 messages sent in a channel for which to delete.
+    If more than 1000 messages have been sent between the given message's id and
     when this command is run, then all of that user's messages may not get
     deleted.
 
@@ -52,8 +52,8 @@ async def id(ctx, mid, inclusive=False):
     time period. Any non "true" or "True" value passed in at the end will
     default to False.
 
-    Only searches the past 500 messages sent in a channel for which to delete.
-    If more than 500 messages have been sent between the given message's id and
+    Only searches the past 10000 messages sent in a channel for which to delete.
+    If more than 10000 messages have been sent between the given message's id and
     when this command is run, then all of that user's messages may not get
     deleted.
 
@@ -97,11 +97,22 @@ async def id(ctx, mid, inclusive=False):
     args = dict()
     if original_message is None:
         args['after'] = sent_time
-    async for m in ctx.channel.history(limit=MESSAGE_LIMIT, **args):
-        if inclusive or m.author == original_message.author:
-            messages_to_delete.append(m)
-        if original_message is not None and m.id == original_message.id:
-            break
+
+    try:
+        async for m in ctx.channel.history(limit=MESSAGE_LIMIT, **args):
+            if inclusive or m.author == original_message.author:
+                messages_to_delete.append(m)
+            if original_message is not None and m.id == original_message.id:
+                break
+    except discord.Forbidden:
+        await ctx.send("Architus does not have permission to view message history")
+        return
+    except discord.HTTPException:
+        await ctx.send("Architus was unable to reach discord servers")
+        return
+    except Exception:
+        await ctx.send("Something went wrong. :(")
+        return
 
     try:
         async with ctx.channel.typing():
@@ -117,14 +128,15 @@ async def id(ctx, mid, inclusive=False):
 
 
 @purge.command()
-async def time(ctx, time_window):
+async def time(ctx, time_window: str, user: discord.Member = None):
     """
     Purge a channel of messages sent in the past X amount of time
 
-    Usage: {prefix}purge time {XXm|XXs}
+    Usage: {prefix}purge time {XXm|XXs} [user]
 
-    Deletes all messages in the channel in the past number of
-    minutes or seconds.
+    Deletes all messages in the channel in the past number of minutes or seconds. If
+    a user is passed, such as by @ing them, then Architus will only delete messages
+    by that user.
 
     NOTE: If the original message is deleted before the bot deletes it, all messages
     from the target message's author in the channel will be deleted depending on the
@@ -156,7 +168,13 @@ async def time(ctx, time_window):
     earliest = now - diff
 
     try:
-        messages_to_delete = await ctx.channel.history(limit=MESSAGE_LIMIT, after=earliest).flatten()
+        if user == None:
+            messages_to_delete = await ctx.channel.history(limit=MESSAGE_LIMIT, after=earliest).flatten()
+        else:
+            messages_to_delete = list()
+            async for m in ctx.channel.history(limit=MESSAGE_LIMIT, after=earliest):
+                if m.author == user:
+                    messages_to_delete.append(m)
     except discord.Forbidden:
         await ctx.send("Architus does not have permission to read message history")
         return
