@@ -124,7 +124,7 @@ class Api(Cog):
     @fetch_guild
     async def bin_messages(self, guild):
         stats_cog = self.bot.cogs["Server Statistics"]
-        members, channels, times = stats_cog.bin_messages(guild, timedelta(minutes=5))
+        members, channels, times = stats_cog.bin_messages(guild, timedelta(days=1))
         return {
             'total': len(stats_cog.cache[guild.id]),
             'members': members,
@@ -150,7 +150,7 @@ class Api(Cog):
         try:
             all_guilds = [guild for guild in await self.bot.manager_client.all_guilds(message.AllGuildsRequest())]
         except Exception:
-            logger.info(f"Shard {self.bot.shard_id} failed to get guild list from manager")
+            logger.exception(f"Shard {self.bot.shard_id} failed to get guild list from manager")
             return {'guilds': []}, sc.INTERNAL_SERVER_ERROR_500
         for guild_dict in guild_list:
             for guild in all_guilds:
