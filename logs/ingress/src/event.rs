@@ -2,6 +2,7 @@ use logs_lib::id::HoarFrost;
 use logs_lib::{ActionOrigin, ActionType, to_json};
 use serde::ser;
 use serde::Serialize;
+use serenity::model::guild::AuditLogEntry;
 use serenity::model::id::{AuditLogEntryId, GuildId, UserId};
 
 /// Normalized log event to send to log ingestion
@@ -30,6 +31,19 @@ pub struct NormalizedEvent {
     /// Id of the corresponding audit log entry this event corresponds to, if any
     /// (included for indexing purposes)
     pub audit_log_id: Option<AuditLogEntryId>,
+}
+
+impl NormalizedEvent {
+    /// Upgrades a normalized event struct with an audit log entry
+    pub fn upgrade(&mut self, entry: &AuditLogEntry) {
+        self.agent_id = Some(entry.user_id);
+        self.audit_log_id = Some(entry.id);
+        self.origin = self.origin.upgrade();
+        self.source.audit_log = to_json(&entry);
+        if self.reason == None {
+            self.reason = entry.reason.clone();
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug, Serialize)]
