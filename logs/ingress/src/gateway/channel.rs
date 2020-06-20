@@ -1,7 +1,7 @@
 use crate::audit_log;
 use crate::gateway::{GatewayContext, NormalizedEvent, Source};
 use logs_lib::id;
-use logs_lib::{to_json, ActionOrigin, ActionType, AuditLogEntryType};
+use logs_lib::{ActionOrigin, ActionType, AuditLogEntryType};
 use serenity;
 use serenity::model::channel::Channel;
 use serenity::model::event::Event;
@@ -120,10 +120,7 @@ pub async fn handle(raw_event: Event, context: GatewayContext) -> Option<Normali
 
         // Try to access the audit log entry corresponding to this gateway event
         if let Some(entry) = event.audit_log(&context).await {
-            normalized.agent_id = Some(entry.user_id);
-            normalized.audit_log_id = Some(entry.id);
-            normalized.origin = ActionOrigin::Hybrid;
-            normalized.source.audit_log = to_json(&entry);
+            normalized.upgrade(&entry);
         }
     }
 

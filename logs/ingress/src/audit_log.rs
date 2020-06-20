@@ -110,6 +110,7 @@ impl Strategy {
                 // Construct the interval based on how much time has elapsed
                 // since the start
                 let ratio: f64 = max.as_secs_f64() / search.max_duration().as_secs_f64();
+                // use saturating overflows to prevent overflows
                 let ms_passed = timestamp.saturating_sub(timing.start);
                 let interval_width = ((ms_passed as f64) * ratio) as u64;
                 let lower = timing.target.saturating_sub(interval_width);

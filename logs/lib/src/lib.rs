@@ -26,6 +26,17 @@ pub enum ActionOrigin {
     Internal = 7,
 }
 
+impl ActionOrigin {
+    /// Upgrades an action origin to include an audit log entry
+    pub fn upgrade(&self) -> ActionOrigin {
+        match self {
+            Self::Gateway | Self::Hybrid => Self::Hybrid,
+            Self::AuditLog => Self::AuditLog,
+            _ => *self
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum AuditLogEntryType {
