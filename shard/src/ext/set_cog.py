@@ -17,6 +17,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         self.bot = bot
         self.responses = {}
         self.response_msgs = {}
+        self.react_msgs = {}
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -42,9 +43,27 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             with suppress(KeyError):
                 resp = self.response_msgs[msg.id]
                 author = msg.channel.guild.get_member(resp.author_id)
-                await msg.channel.send(
-                    f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, created by {author}")
+                react_msg = await msg.channel.send(
+                    f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, "
+                    f"created by {author}\n:x: to remove")
+                await react_msg.add_reaction("❌")
+                self.react_msgs[react_msg.id] = self.response_msgs[msg.id]
                 del self.response_msgs[msg.id]
+        elif not user.bot and str(react.emoji) == "❌":
+            with suppress(KeyError):
+                resp = self.react_msgs[msg.id]
+                try:
+                    self.responses[resp.guild_id].remove(resp.trigger, user)
+                except PermissionException as e:
+                    member = msg.guild.get_member(e.author_id)
+                    whom = f"{member.display_name} or an admin" if member else "an admin"
+                    await msg.channel.send(f"❌ please ask {whom} to remove this response")
+                    return
+                except UnknownResponseException:
+                    await msg.channel.send("❌ This autoresponse has already been removed")
+                else:
+                    del self.react_msgs[msg.id]
+                    await msg.channel.send(f"✅ `{resp}` _successfully removed_")
 
     @commands.command()
     @bot_commands_only
@@ -53,7 +72,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)
 
-        match = re.match(f'{prefix}remove (.+)', ctx.message.content, re.IGNORECASE)
+        match = re.match(f'^{prefix}remove (.+?)(::.+)?$', ctx.message.content.strip(), re.IGNORECASE)
         if match:
             try:
                 resp = self.responses[ctx.guild.id].remove(match[1], ctx.author)
