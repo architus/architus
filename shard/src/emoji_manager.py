@@ -43,6 +43,7 @@ class EmojiManager:
                 e.num_uses,
                 e.priority)
             for e in emojis]
+        self.session.commit()
 
     async def _insert_into_db(self, emoji: ArchitusEmoji) -> None:
         """stores an emoji in the database"""
@@ -309,7 +310,7 @@ class EmojiManager:
         # check if new emoji is a duplicate
         if a_emoji in self.emojis:
             logger.debug(f"duplicate emoji added!: {emoji}")
-            if self.settins.manage_emojis:
+            if self.settings.manage_emojis:
                 await emoji.delete(reason="duplicate")
                 await self.notify_deletion(emoji)
         else:
