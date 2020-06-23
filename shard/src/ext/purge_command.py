@@ -168,7 +168,7 @@ async def time(ctx, time_window: str, user: discord.Member = None):
     earliest = now - diff
 
     try:
-        if user == None:
+        if user is None:
             messages_to_delete = await ctx.channel.history(limit=MESSAGE_LIMIT, after=earliest).flatten()
         else:
             messages_to_delete = list()
