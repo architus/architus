@@ -77,10 +77,8 @@ services:
   dbmanager:
     image: johnyburd/dbmanager:${TAG:-latest}
     build: ./dbmanager
-    environment:
-      PGUSER: autbot
-      PGPASSWORD: autism
-      PGDATABASE: autbot
+    env_file:
+      - architus.env
     depends_on:
       - postgres
     networks:

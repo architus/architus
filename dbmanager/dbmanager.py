@@ -15,9 +15,11 @@ BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 MIGRATIONS_DIR = os.path.join(BASE_DIR, "migrations")
 CURRENT_MIGRATIONS_DIR = os.path.join(BASE_DIR, "current_migration")
 CURRENT_MIGRATION_FILE = "current.out"
+PSQL_USER = os.getenv('db_user')
 
 
 def main():
+    configure_psql_env_vars()
     print("Running db migration manager")
     current_migration = get_current_migration()
     to_run = get_new_migrations(current_migration)
@@ -54,7 +56,7 @@ def execute_sql_script(file):
     """
     Runes a sql script on the postgres container
     """
-    process = subprocess.run(["psql", "-h", "postgres", "-U", "autbot", "-a", "-v", "ON_ERROR_STOP=1", "-f", file],
+    process = subprocess.run(["psql", "-h", "postgres", "-U", PSQL_USER, "-a", "-v", "ON_ERROR_STOP=1", "-f", file],
                              stdout=sys.stdout,
                              stderr=sys.stderr)
     return process.returncode
@@ -99,6 +101,13 @@ def get_all_files(dirname, suffix=None):
 
     return [file for file in os.listdir(dirname)
             if suffix is None or file.endswith(suffix)]
+
+
+def configure_psql_env_vars():
+    """
+    Maps necessary postgres credential enviromental variables to allow for scripting.
+    """
+    os.environ['PGPASSWORD'] = os.getenv('db_pass')
 
 
 if __name__ == "__main__":
