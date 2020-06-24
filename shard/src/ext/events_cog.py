@@ -8,6 +8,12 @@ from discord.ext import commands
 
 from lib.config import logger
 
+from enum import Enum
+import datetime
+import json
+
+from lib.aiomodels import TbReactEvents
+
 
 class ScheduleEvent(object):
     def __init__(self, msg, title, time_str):
@@ -26,6 +32,11 @@ class PollEvent(object):
         self.options = options
         self.votes = votes
         self.exclusive = exclusive
+
+
+class ReactionEventType(Enum):
+    poll = 0,
+    schedule = 1
 
 
 class EventCog(Cog, name="Events"):
@@ -166,6 +177,19 @@ class EventCog(Cog, name="Events"):
         await msg.add_reaction(self.NO_EMOJI)
         await msg.add_reaction(self.MAYBE_EMOJI)
         self.schedule_messages[msg.id] = ScheduleEvent(msg, title_str, parsed_time)
+
+    @commands.command()
+    async def poll_v2(self, ctx, title, *choices):
+        '''
+        Starts a poll with some pretty formatting
+        Allows more than one response per user
+        Surround title in quotes to include spaces
+        Supports up to 10 options
+        '''
+        self.register_poll_v2(ctx, title, choices, False)
+
+    async def register_poll_v2(self, ctx, title, choices, exclusive):
+
 
     @commands.command()
     async def poll(self, ctx, *args):
