@@ -65,6 +65,7 @@ class EventCog(Cog, name="Events"):
         self.bot = bot
         self.schedule_messages = {}
         self.poll_messages = {}
+        self.tb_react_events = TbReactEvents(self.bot.asyncpg_wrapper)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, react, user):
@@ -179,17 +180,30 @@ class EventCog(Cog, name="Events"):
         self.schedule_messages[msg.id] = ScheduleEvent(msg, title_str, parsed_time)
 
     @commands.command()
-    async def poll_v2(self, ctx, title, *choices):
+    async def poll_v2(self, ctx, title, *options):
         '''
         Starts a poll with some pretty formatting
         Allows more than one response per user
         Surround title in quotes to include spaces
         Supports up to 10 options
         '''
-        self.register_poll_v2(ctx, title, choices, False)
+        await self.register_poll_v2(ctx, title, options, False)
 
-    async def register_poll_v2(self, ctx, title, choices, exclusive):
+    async def register_poll_v2(self, ctx, title, options, exclusive: bool):
+        votes = [[] for x in range(10)]
+        text = self.render_poll_text(title, options, votes)
+        msg = await ctx.send(text)
+        for i in range(len(options)):
+            await msg.add_reaction(self.ANSWERS[i])
 
+        event_id = ReactionEvent.poll
+        expires = datetime.datetime.now() + datetime.timedelta(days=1)
+        payload = {
+            'exclusive': exclusive,
+            'title': title,
+            'options': options 
+        }
+        await self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload), expires)
 
     @commands.command()
     async def poll(self, ctx, *args):
