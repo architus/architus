@@ -1,4 +1,3 @@
-import base64
 from typing import Optional
 from io import BytesIO
 
@@ -8,6 +7,7 @@ from discord import Emoji
 from lib.hoar_frost import HoarFrostGenerator
 from src.utils import download_emoji
 from lib.config import logger
+from lib.ipc import manager_pb2 as message
 
 
 hoarfrost_gen = HoarFrostGenerator()
@@ -57,11 +57,17 @@ class ArchitusEmoji:
             with BytesIO() as buf:
                 self.im.save(buf, format="PNG")
                 binary = buf.getvalue()
-                data, _ = await self.bot.manager_client.publish_file(
-                    location="emojis",
-                    name=f"{self.id}",
-                    data=base64.b64encode(binary).decode('ascii'))
-                self.str_url = data['url']
+                try:
+                    data = await self.bot.manager_client.publish_file(
+                        iter([
+                            message.File(
+                                location="emojis",
+                                name=f"{self.id}",
+                                file=binary)]))
+                except Exception:
+                    logger.info(f"Shard {self.bot.shard_id} failed to upload emoji")
+                    return None
+                self.str_url = data.url
         return self.str_url
 
     def cache(self) -> None:

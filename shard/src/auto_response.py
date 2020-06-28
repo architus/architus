@@ -254,6 +254,7 @@ class GuildAutoResponses:
         if self.no_db:
             return
         responses = self.session.query(AutoResponseModel).filter_by(guild_id=self.guild.id).all()
+        self.session.commit()
         self.auto_responses = [AutoResponse(
             self.bot,
             r.trigger,
@@ -354,7 +355,7 @@ class GuildAutoResponses:
             raise DisabledException("regex responses")
 
         if self.settings.responses_limit is not None and not admin:
-            author_count = len([r for r in self.auto_responses if r.author_id == self.author_id])
+            author_count = len([r for r in self.auto_responses if r.author_id == response.author_id])
             if author_count >= self.settings.responses_limit:
                 raise UserLimitException
 

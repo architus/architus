@@ -1,7 +1,6 @@
 from collections import defaultdict
 from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
-import base64
 
 from discord.ext import commands
 from discord import Forbidden, HTTPException
@@ -11,8 +10,9 @@ import aiohttp
 import asyncio
 
 import src.generate.wordcount as wordcount_gen
-from src.generate import corona
+from src.generate import corona, member_growth
 from lib.config import DISCORD_EPOCH, logger
+from lib.ipc import manager_pb2 as message_type
 
 
 class MessageData:
@@ -111,6 +111,16 @@ class MessageStats(commands.Cog, name="Server Statistics"):
             await ctx.send(f"{author.display_name}'s message data is now hidden")
         settings.stats_exclude = excludes
 
+    @commands.command(aliases=['growth'])
+    async def joins(self, ctx):
+        img = member_growth.generate(ctx.guild.members)
+        data = await self.bot.manager_client.publish_file(iter([message_type.File(file=img)]))
+        em = discord.Embed(title="Server Growth", description=ctx.guild.name)
+        em.set_image(url=data.url)
+        em.color = 0x35a125
+        em.set_footer(text=f"{ctx.guild.name} has a total of {ctx.guild.member_count} members")
+        await ctx.channel.send(embed=em)
+
     @commands.command()
     async def spellcheck(self, ctx, victim: discord.Member):
         '''Checks the spelling of a user'''
@@ -158,10 +168,11 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
         with ThreadPoolExecutor() as pool:
             img = await self.bot.loop.run_in_executor(pool, wordcount_gen.generate, message_counts, word_counts, victim)
-        data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
+        data = await self.bot.manager_client.publish_file(
+            iter([message_type.File(file=img)]))
 
         em = discord.Embed(title="Top 5 Message Senders", description=ctx.guild.name)
-        em.set_image(url=data['url'])
+        em.set_image(url=data.url)
         em.color = 0x7b8fb7
         if victim:
             if victim.id in self.bot.settings[ctx.guild].stats_exclude:
@@ -187,11 +198,12 @@ class CoronaStats(commands.Cog, name="Coronavirus Data"):
 
                 img = corona.generate(parsed, deaths_only)
 
-                data, _ = await self.bot.manager_client.publish_file(data=base64.b64encode(img).decode('ascii'))
+                data = await self.bot.manager_client.publish_file(
+                    iter([message_type.File(file=img)]))
 
                 em = discord.Embed(title="Coronavirus in the US", description="More Information",
                                    url="https://www.cdc.gov/coronavirus/2019-ncov/index.html")
-                em.set_image(url=data['url'])
+                em.set_image(url=data.url)
                 em.color = 0x7b8fb7
                 em.set_footer(text="data collected from state websites by http://coronavirusapi.com")
 
