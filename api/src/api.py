@@ -82,6 +82,7 @@ class Logs(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int):
         rows = self.session.query(Log).filter(Log.guild_id == guild_id).order_by(Log.timestamp.desc()).limit(400).all()
+        self.session.commit()
         logs = []
         for log in rows:
             logs.append({

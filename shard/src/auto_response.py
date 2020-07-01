@@ -254,6 +254,7 @@ class GuildAutoResponses:
         if self.no_db:
             return
         responses = self.session.query(AutoResponseModel).filter_by(guild_id=self.guild.id).all()
+        self.session.commit()
         self.auto_responses = [AutoResponse(
             self.bot,
             r.trigger,
