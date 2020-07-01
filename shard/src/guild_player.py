@@ -8,10 +8,59 @@ import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
 from src.list_embed import ListEmbed as list_embed
+from lib import config
 from lib.config import logger
 
+from os import mkfifo, unlink
+from threading import Thread
+import types
+import pafy
 import subprocess
 # spotify_tools = None
+
+
+class Ydl:
+    def urlopen(self, url):
+        return pafy.g.opener.open(url)
+
+    def to_screen(self, *args, **kwargs):
+        pass
+
+    def to_console_title(self, *args, **kwargs):
+        pass
+
+    def trouble(self, *args, **kwargs):
+        pass
+
+    def report_warning(self, *args, **kwargs):
+        pass
+
+    def report_error(self, *args, **kwargs):
+        pass
+
+
+def callback(s):
+    if s['status'] != 'downloading':
+        return
+    total = s['total_bytes']
+    curr = s['downloaded_bytes']
+    print("{downloaded_bytes:10} / {total_bytes:10}")
+
+
+def download(self, filepath=""):
+    downloader = youtube_dl.downloader.http.HttpFD(Ydl(),
+                                                   {'nopart': True,
+                                                    'noprogress': False,
+                                                    'quiet': False,
+                                                    'http_chunk_size': 1048576})
+    infodict = {'url': self.url}
+    downloader._progress_hooks = [callback]
+    downloader.download(filepath, infodict)
+
+
+def callback(*args):
+    for a in args:
+        print(a)
 
 
 class GuildPlayer:
@@ -23,6 +72,9 @@ class GuildPlayer:
         self.name = ''
 
         self.playing_file = False
+
+        pafy.set_api_key(config.youtube_client_key)
+        self.pipe = None
 
     async def play_file(self, filepath):
         self.playing_file = True
@@ -42,8 +94,14 @@ class GuildPlayer:
 
     async def play(self):
         if (self.voice is None or len(self.q) == 0):
+            if self.pipe is not None:
+                unlink(self.pipe)
+                self.pipe = None
             return ''
         if (self.voice and self.voice.is_playing()):
+            if self.pipe is not None:
+                unlink(self.pipe)
+                self.pipe = None
             return await self.skip()
         self.stop()
         song = self.q.pop()
@@ -55,36 +113,32 @@ class GuildPlayer:
             self.name = url['name']
             url = url['url']
 
-        opts = {
-            'prefer_ffmpeg': True,
-            'format': 'bestaudio/best',
-            'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
-            'restrictfilenames': True,
-            'noplaylist': True,
-            'nocheckcertificate': True,
-            'ignoreerrors': False,
-            'logtostderr': False,
-            'quiet': True,
-            'no_warnings': True,
-            'default_search': 'auto',
-            'source_address': '0.0.0.0'  # bind to ipv4 since ipv6 addresses cause issues sometimes
-        }
         ffmpeg_options = {
-            'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
-
+            'options': '-vn',
         }
-        ydl = youtube_dl.YoutubeDL(opts)
-        func = functools.partial(ydl.extract_info, url, download=True)
-        info = await self.bot.loop.run_in_executor(None, func)
-        if "entries" in info:
-            info = info['entries'][0]
 
-        # download_url = info['url']
-        download_url = ydl.prepare_filename(info)
-        logger.debug(f"downloading url {download_url}")
-        self.voice.play(discord.FFmpegPCMAudio(download_url, **ffmpeg_options), after=self.agane)
-        # await asyncio.sleep(2)
-        # os.remove(download_url)
+        audio = pafy.new(url)
+        stream = None
+        for s in audio.audiostreams:
+            if s.bitrate == "128k":
+                stream = s
+                break
+
+        if stream is None:
+            stream = audio.getbestaudiostream()
+
+        thing = types.MethodType(download, stream)
+        self.pipe = "/tmp/" + audio.title + "." + stream.extension
+        mkfifo(self.pipe)
+        Thread(target=thing, kwargs={"filepath": self.pipe}).start()
+
+        logger.debug(f"Named pipe: {self.pipe}")
+        logger.debug(f"downloading song {stream.url}")
+        logger.debug(f"Rate: {stream.bitrate}")
+        # p = open(self.pipe, "rb")
+        self.voice.play(discord.FFmpegPCMAudio(self.pipe, **ffmpeg_options), after=self.agane)
+
+        logger.debug("Song playing has started")
         return self.name
 
     async def add_spotify_playlist(self, url):
@@ -147,6 +201,9 @@ class GuildPlayer:
         if self.voice is None:
             return
         self.voice.stop()
+        if self.pipe is not None:
+            unlink(self.pipe)
+            self.pipe = None
 
     def pause(self):
         if self.voice is None:
@@ -191,6 +248,9 @@ class GuildPlayer:
             return
 
         if len(self.q) == 0:
+            if self.pipe is not None:
+                unlink(self.pipe)
+                self.pipe = None
             coro = self.voice.disconnect()
         else:
             coro = self.play()

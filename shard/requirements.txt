@@ -27,7 +27,7 @@ mccabe
 multidict
 mutagen
 numpy
-pafy
+pafy==0.5.1
 pathlib
 Pillow
 psycopg2-binary

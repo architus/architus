@@ -31,7 +31,11 @@ class Play(commands.Cog, name="Music Player"):
             if not discord.opus.is_loaded():
                 discord.opus.load_opus('res/libopus.so')
             if not (player.is_connected()):
-                voice = await ctx.author.voice.channel.connect()
+                try:
+                    voice = await ctx.author.voice.channel.connect()
+                except AttributeError:
+                    await ctx.send("Need to be connected to a voice channel to start palying")
+                    return
                 player.voice = voice
             else:
                 await player.voice.move_to(ctx.author.voice.channel)
