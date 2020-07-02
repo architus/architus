@@ -31,6 +31,7 @@ class EmojiManager:
         """queries the db for this guild's emojis and populates the list"""
 
         emojis = self.session.query(EmojiModel).filter_by(guild_id=self.guild.id).order_by(EmojiModel.priority).all()
+        self.session.commit()
         self.emojis = [
             ArchitusEmoji(
                 self.bot,
@@ -309,7 +310,7 @@ class EmojiManager:
         # check if new emoji is a duplicate
         if a_emoji in self.emojis:
             logger.debug(f"duplicate emoji added!: {emoji}")
-            if self.settins.manage_emojis:
+            if self.settings.manage_emojis:
                 await emoji.delete(reason="duplicate")
                 await self.notify_deletion(emoji)
         else:
