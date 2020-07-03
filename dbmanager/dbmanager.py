@@ -46,14 +46,15 @@ def run_scripts(file_paths):
         if exitcode != 0:
             raise Exception(f"oh no, {file_name} failed to execute")
 
-def run_migration_scripts(sql_names):
+def run_migration_scripts(migration_files):
     """
     Runs all migration SQL files in the order given
     """
-    run_scripts(sql_names)
+    print('ok')
+    run_scripts(migration_files)
 
     current_path = os.path.join(CURRENT_MIGRATIONS_DIR, CURRENT_MIGRATION_FILE)
-    last_migration = os.path.basename(sql_names[-1])
+    last_migration = os.path.basename(migration_files[-1])
     with open(current_path, "w") as file:
         print(f"Saving last-run migration '{last_migration}' to disk at {current_path}")
         file.write(last_migration)
@@ -76,20 +77,20 @@ def get_new_migrations(current):
     """
     Gets all new migration scripts to run from the given one
     """
-    migrations = get_all_files(MIGRATIONS_DIR, suffix=".sql")
-    migrations.sort()
-    migrations = [os.path.join(MIGRATIONS_DIR, f) for f in migrations]
+    base_migrations = get_all_files(MIGRATIONS_DIR, suffix=".sql")
+    base_migrations.sort()
+    full_path_migrations = [os.path.join(MIGRATIONS_DIR, f) for f in base_migrations]
 
     if current is None:
-        return migrations
+        return full_path_migrations
 
     try:
-        idx = migrations.index(current) + 1
-        return migrations[idx:]
+        idx = base_migrations.index(current) + 1
+        return full_path_migrations[idx:]
     except ValueError:
         # If the current migration was not in the list, run every migration again
         print("An error occurred while detecting the last-run migration. Running all migrations again")
-        return migrations
+        return full_path_migrations
 
 
 def get_current_migration():
