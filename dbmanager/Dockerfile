@@ -11,5 +11,6 @@ VOLUME /app/current_migration
 WORKDIR /app
 COPY ./dbmanager.py .
 COPY ./migrations ./migrations
+COPY ./cleanup ./cleanup
 
 ENTRYPOINT ["python3", "-u", "dbmanager.py"]
