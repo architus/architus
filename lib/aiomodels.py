@@ -1,6 +1,3 @@
-import datetime
-
-
 class Base:
 
     def __init__(self, conn_wrapper):
@@ -48,11 +45,10 @@ class TbReactEvents(Base):
 
         await super().insert(cols)
 
-    async def get_by_id(self, message_id:int, guild_id: int):
+    async def get_by_id(self, message_id: int, guild_id: int):
         return await self.conn.fetchrow(
             f'''SELECT *
             FROM {self.__class__.__tablename__}
             WHERE (guild_id, message_id) = ($1, $2)
             ''', guild_id, message_id
         )
-

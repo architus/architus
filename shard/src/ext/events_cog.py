@@ -68,7 +68,7 @@ class EventCog(Cog, name="Events"):
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload):
         await self.on_reaction_update(payload, True)
-        
+
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload):
         await self.on_reaction_update(payload, False)
@@ -82,7 +82,7 @@ class EventCog(Cog, name="Events"):
         message = await channel.fetch_message(payload.message_id)
         user = payload.member
         emoji = payload.emoji
-        if user is not None: 
+        if user is not None:
             if user.bot:
                 return
 
@@ -260,7 +260,7 @@ class EventCog(Cog, name="Events"):
         payload = {
             'exclusive': exclusive,
             'title': title,
-            'options': options 
+            'options': options
         }
         await self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload), expires)
 
