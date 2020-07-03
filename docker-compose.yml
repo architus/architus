@@ -125,5 +125,16 @@ services:
       - "8090:15672"
     networks:
       - webnet
+  feature-gate:
+    image: johnyburd/feature-gate:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./feature-gate/Dockerfile
+    ports:
+      - "50555:50555"
+    networks:
+      - webnet
+    env_file:
+      - architus.env
 networks:
   webnet:
