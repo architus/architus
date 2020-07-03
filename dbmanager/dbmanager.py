@@ -34,6 +34,7 @@ def main():
     print(f"Running Cleanup Scripts: {list(map(os.path.basename, cleanup_scripts))}")
     run_scripts(cleanup_scripts)
 
+
 def run_scripts(file_paths):
     for file_name in file_paths:
         exitcode = execute_sql_script(file_name)
@@ -45,6 +46,7 @@ def run_scripts(file_paths):
 
         if exitcode != 0:
             raise Exception(f"oh no, {file_name} failed to execute")
+
 
 def run_migration_scripts(migration_files):
     """
@@ -69,9 +71,11 @@ def execute_sql_script(file):
                              stderr=sys.stderr)
     return process.returncode
 
+
 def get_cleanup_scripts():
     cleanup_scripts = get_all_files(CLEANUP_DIR, suffix=".sql")
     return [os.path.join(CLEANUP_DIR, f) for f in cleanup_scripts]
+
 
 def get_new_migrations(current):
     """
