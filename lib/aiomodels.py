@@ -1,3 +1,4 @@
+import datetime
 
 
 class Base:
@@ -13,7 +14,7 @@ class Base:
         columns, values = zip(*cols.items())
         await self.conn.execute(
             f'''INSERT INTO {self.__class__.__tablename__}({','.join(columns)})
-            VALUES ({','.join(f'${num}' for num in range(len(values)))})
+            VALUES ({','.join(f'${num}' for num in range(1, len(values) + 1))})
             ''', *values
         )
 
@@ -35,7 +36,7 @@ class TbReactEvents(Base):
     __tablename__ = 'tb_react_events'
 
     async def insert(self, message_id: int, guild_id: int, channel_id: int,
-                     event_type: int, payload: str, expires_on: datetime.datetime):
+                     event_type: int, payload: str, expires_on: int):
         cols = {
             'message_id': message_id,
             'guild_id': guild_id,

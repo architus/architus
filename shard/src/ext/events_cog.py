@@ -1,17 +1,15 @@
+import datetime
 import pytz
 import dateutil.parser
 import re
+import json
+from enum import IntEnum
 from unidecode import unidecode
 from contextlib import suppress
 from discord.ext.commands import Cog
 from discord.ext import commands
 
 from lib.config import logger
-
-from enum import Enum
-import datetime
-import json
-
 from lib.aiomodels import TbReactEvents
 
 
@@ -34,7 +32,7 @@ class PollEvent(object):
         self.exclusive = exclusive
 
 
-class ReactionEventType(Enum):
+class ReactionEventType(IntEnum):
     poll = 0,
     schedule = 1
 
@@ -68,7 +66,58 @@ class EventCog(Cog, name="Events"):
         self.tb_react_events = TbReactEvents(self.bot.asyncpg_wrapper)
 
     @commands.Cog.listener()
+    async def on_raw_reaction_add(self, payload):
+        await self.on_reaction_update(payload, True)
+        
+    @commands.Cog.listener()
+    async def on_raw_reaction_remove(self, payload):
+        await self.on_reaction_update(payload, False)
+
+    async def on_reaction_update(self, payload, add):
+        '''
+        Lumps together on_reaction_add and on_reaction_remove into one thing.
+        add: True means its reaction_add, False, means reaction_remove
+        '''
+        channel = await self.bot.fetch_channel(payload.channel_id)
+        message = await channel.fetch_message(payload.message_id)
+        user = payload.member
+        emoji = payload.emoji
+        if user is not None: 
+            if user.bot:
+                return
+
+        react_event = await self.tb_react_events.get_by_id(message.id, message.guild.id)
+        if react_event is None:
+            return
+
+        react_event_payload = json.loads(react_event['payload'])
+        react_event_type = react_event['event_type']
+        if react_event_type == ReactionEventType.schedule:
+            return
+        elif react_event_type == ReactionEventType.poll:
+            await self.poll_react_update(emoji, user, message, react_event_payload, add)
+            return
+
+    async def poll_react_update(self, emoji, user, message, react_event_payload, add):
+        options = react_event_payload['options']
+        exclusive = react_event_payload['exclusive']
+
+        if add and exclusive:
+            for r in message.reactions:
+                if not str(r.emoji) == str(emoji) and user in await r.users().flatten():
+                    await message.remove_reaction(r, user)
+
+        votes = [[] for x in range(len(options))]
+        for i in range(len(options)):
+            reaction = next(r for r in message.reactions if r.emoji == self.ANSWERS[i])
+            votes[i] = [u for u in await reaction.users().flatten() if not u.bot]
+
+        text = self.render_poll_text(react_event_payload['title'], options, votes)
+        await message.edit(content=text)
+
+    @commands.Cog.listener()
     async def on_reaction_add(self, react, user):
+        # polls_v1 logic
         if not user.bot and react.message.id in self.schedule_messages:
             event = self.schedule_messages[react.message.id]
             with suppress(KeyError):
@@ -189,6 +238,16 @@ class EventCog(Cog, name="Events"):
         '''
         await self.register_poll_v2(ctx, title, options, False)
 
+    @commands.command()
+    async def xpoll_v2(self, ctx, title, *options):
+        '''
+        Starts an exclusive poll with some pretty formatting
+        Allows more than one response per user
+        Surround title in quotes to include spaces
+        Supports up to 10 options
+        '''
+        await self.register_poll_v2(ctx, title, options, True)
+
     async def register_poll_v2(self, ctx, title, options, exclusive: bool):
         votes = [[] for x in range(10)]
         text = self.render_poll_text(title, options, votes)
@@ -196,7 +255,7 @@ class EventCog(Cog, name="Events"):
         for i in range(len(options)):
             await msg.add_reaction(self.ANSWERS[i])
 
-        event_id = ReactionEvent.poll
+        event_id = int(ReactionEventType.poll)
         expires = datetime.datetime.now() + datetime.timedelta(days=1)
         payload = {
             'exclusive': exclusive,
