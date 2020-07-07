@@ -109,7 +109,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
                 await ctx.send(msg)
             except LongResponseException:
                 await ctx.send(f"❌ that response is too long :confused: max length is "
-                               f"{settings.responses_trigger_length} characters")
+                               f"{settings.responses_response_length} characters")
             except ShortTriggerException:
                 await ctx.send(
                     f"❌ please make your trigger longer than {settings.responses_trigger_length} characters")
