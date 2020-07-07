@@ -74,6 +74,15 @@ services:
         constraints: [node.role == manager]
     networks:
       - webnet
+  dbmanager:
+    image: johnyburd/dbmanager:${TAG:-latest}
+    build: ./dbmanager
+    env_file:
+      - architus.env
+    depends_on:
+      - postgres
+    networks:
+      - webnet
   manager:
     image: johnyburd/manager:${TAG:-latest}
     build:
@@ -116,5 +125,16 @@ services:
       - "8090:15672"
     networks:
       - webnet
+  feature-gate:
+    image: johnyburd/feature-gate:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./feature-gate/Dockerfile
+    ports:
+      - "50555:50555"
+    networks:
+      - webnet
+    env_file:
+      - architus.env
 networks:
   webnet:
