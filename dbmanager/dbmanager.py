@@ -31,11 +31,14 @@ def main():
         print("No migrations to run")
 
     cleanup_scripts = get_cleanup_scripts()
-    print(f"Running Cleanup Scripts: {list(map(os.path.basename, cleanup_scripts))}")
+    print(f"Running Cleanup Scripts: {[os.path.basename(script) for script in cleanup_scripts]}")
     run_scripts(cleanup_scripts)
 
 
 def run_scripts(file_paths):
+    """
+    Runs all of the SQL scripts given their file paths
+    """
     for file_name in file_paths:
         exitcode = execute_sql_script(file_name)
         if exitcode == 2:
@@ -52,7 +55,6 @@ def run_migration_scripts(migration_files):
     """
     Runs all migration SQL files in the order given
     """
-    print('ok')
     run_scripts(migration_files)
 
     current_path = os.path.join(CURRENT_MIGRATIONS_DIR, CURRENT_MIGRATION_FILE)
@@ -73,6 +75,9 @@ def execute_sql_script(file):
 
 
 def get_cleanup_scripts():
+    """
+    Gets all of the cleanup scripts to run.
+    """
     cleanup_scripts = get_all_files(CLEANUP_DIR, suffix=".sql")
     return [os.path.join(CLEANUP_DIR, f) for f in cleanup_scripts]
 
