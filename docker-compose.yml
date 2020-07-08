@@ -132,15 +132,15 @@ services:
       dockerfile: ./record-service/Dockerfile
     networks:
       - webnet
-  feature-gate:
-    image: johnyburd/feature-gate:${TAG:-latest}
+  feature:
+    image: johnyburd/feature:${TAG:-latest}
     build:
       context: ./
       dockerfile: ./feature-gate/Dockerfile
-    ports:
-      - "50555:50555"
     networks:
       - webnet
+    ports:
+      - "50555:50555"
     env_file:
       - architus.env
 networks:

@@ -1,5 +1,6 @@
 import grpc
 from lib.ipc import manager_pb2_grpc
+from lib.ipc import feature_gate_pb2_grpc
 
 from lib.config import logger
 import asyncio
@@ -25,16 +26,25 @@ class SyncRPCClient():
         return getattr(self.stub, name)
 
 
-def get_blocking_client(server):
+def get_manager_blocking_client(server):
     while True:
         try:
             channel = grpc.insecure_channel(server, options=grpc_options)
             stub = manager_pb2_grpc.ManagerStub(channel)
             return SyncRPCClient(stub)
         except Exception as e:
-            logger.debug(f"Waiting to connect to gRPC {e}")
+            logger.debug(f"Waiting to connect to manager: {e}")
             time.sleep(3)
 
+def get_feature_blocking_client(server):
+    while True:
+        try:
+            channel = grpc.insecure_channel(server)
+            stub = feature_gate_pb2_grpc.FeatureGateStub(channel)
+            return SyncRPCClient(stub)
+        except Exception as e:
+            logger.debug(f"Wating to connect to feature server: {e}")
+            time.sleep(3)
 
 # TODO: gRPC will hopefully be releasing actual support for python async soon.
 #       Will need to update to actually take advantage of that when it comes out.
@@ -51,16 +61,30 @@ class AsyncRPCClient():
         return partial(self.rpc, getattr(self.stub, name))
 
 
-def get_async_client(server):
+def get_manager_async_client(server):
     stub = None
     while True:
         try:
             channel = grpc.insecure_channel(server, options=grpc_options)
             stub = manager_pb2_grpc.ManagerStub(channel)
-            logger.debug("Connected to gRPC")
+            logger.debug("Connected to manager")
             break
         except Exception:
-            logger.debug("Waiting to connect to gRPC")
+            logger.debug("Waiting to connect to manager")
+            time.sleep(3)
+
+    return AsyncRPCClient(stub)
+
+def get_feature_async_client(server):
+    stub = None
+    while True:
+        try:
+            channel = grpc.insecure_channel(server)
+            stub = feature_gate_pb2_grpc.FeatureGateStub(channel)
+            logger.debug("Connected to feature server")
+            break
+        except Exception:
+            logger.debug("Trying to connect to feature server")
             time.sleep(3)
 
     return AsyncRPCClient(stub)

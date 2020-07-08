@@ -7,9 +7,10 @@ import time
 from functools import partial
 import socket
 import struct
-from concurrent.futures import ThreadPoolExecutor
 
 from src.utils import TCPLock
+from lib.ipc import grpc_client
+from lib.ipc import feature_gate_pb2 as message
 
 import discord
 from discord import TCPSink
@@ -63,7 +64,7 @@ class Recording:
         url_len = struct.unpack(">Q", msg[1:9])[0]
         url = msg[9:9 + url_len].decode('ascii')
         curr = 9 + url_len
-        pw_len = struct.unpack(">Q", msg[curr:curr+8])[0]
+        pw_len = struct.unpack(">Q", msg[curr:curr + 8])[0]
         curr += 8
         pw = msg[curr:curr + pw_len].decode('ascii')
         print(f"Password: {pw}")
@@ -76,7 +77,7 @@ class Recording:
         embed.add_field(name="Password", value=pw)
         if channels > 3:
             embed.add_field(name="# of Channels", value=str(channels))
-            ebmed.set_footer(text="Note: Audio will not play correctly in most programs. "
+            embed.set_footer(text="Note: Audio will not play correctly in most programs. "
                                   "Try using audacity to listen to the file.")
         await self.ctx.send(embed=embed)
         return num_bytes
@@ -157,11 +158,10 @@ class Recording:
         Ensures that the recording does not go over a certain size.
         """
         await asyncio.sleep(15)
-        loop = asyncio.get_running_loop()
         while self.recording:
             try:
                 num_bytes = await self.get_curr_recording_length()
-            except:
+            except Exception:
                 await self.ctx.send("Lost TCP connection to recording microservice")
                 return 0
             if (num_bytes > self.budget or num_bytes > 4000000000):
@@ -169,7 +169,7 @@ class Recording:
                 self.ctx.voice_client.stop_listening()
                 try:
                     self.tcp.send(b"\x04")
-                except:
+                except Exception:
                     await self.ctx.send("Lost TCP connection to recording microservice")
                     return 0
                 await asyncio.sleep(3)
@@ -216,12 +216,25 @@ class RecordCog(commands.Cog, name="Voice Recording"):
         self.recordings = defaultdict(lambda: None)
         self.last_recording = defaultdict(time.time)
 
+    async def feature_check(self, guildID):
+        """
+        Check with the feature server to determine whether or not the 'Voice'
+        feature is activated for this guild.
+        """
+        m = message.GuildFeature(guild_id=guildID, feature_name="Voice")
+        feat = await self.bot.feature_client.CheckGuildFeature(m)
+        return feat.has_feature
+
     @commands.command(aliases=['record'])
     async def start_recording(self, ctx):
         """
         Records the voice channel that the commanding user is currently in.
         """
         guild_id = ctx.guild.id
+        if not await self.feature_check(guild_id):
+            await ctx.send("The voice recording feature has not been activated for this server.")
+            return
+
         if self.recordings[guild_id] is not None:
             await ctx.send("I'm already recording. "
                            "Stop the current recording then start a new one.")

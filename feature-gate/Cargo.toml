@@ -13,7 +13,7 @@ name = "db"
 
 [dependencies]
 thiserror = "1.0"
-tonic = "0.2"
+tonic = { version = "0.2", features = ["transport"] }
 prost = "0.6"
 tokio = { version = "0.2", features = ["macros"] }
 log = "0.4"
