@@ -124,7 +124,7 @@ class Api(Cog):
     @fetch_guild
     async def bin_messages(self, guild):
         stats_cog = self.bot.cogs["Server Statistics"]
-        members, channels, times = stats_cog.bin_messages(guild, timedelta(minutes=5))
+        members, channels, times = await stats_cog.bin_messages(guild, timedelta(minutes=5))
         return {
             'total': len(stats_cog.cache[guild.id]),
             'members': members,

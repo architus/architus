@@ -15,6 +15,13 @@ from lib.config import DISCORD_EPOCH, logger
 from lib.ipc import manager_pb2 as message_type
 
 
+async def gen(items):
+    for i in range(0, len(items), 250):
+        for e in items[i:i + 100]:
+            yield e
+        await asyncio.sleep(0.001)
+
+
 class MessageData:
 
     def __init__(self, message_id, author, channel_id, total_words, correct_words):
@@ -24,13 +31,10 @@ class MessageData:
         self.total_words = total_words
         self.correct_words = correct_words
         self.cache_up_to_date = {}
+        created_at = DISCORD_EPOCH + timedelta(milliseconds=(self.message_id >> 22))
 
     def __hash__(self):
         return hash(self.message_id)
-
-    @property
-    def created_at(self):
-        return DISCORD_EPOCH + timedelta(milliseconds=self.message_id >> 22)
 
 
 class MessageStats(commands.Cog, name="Server Statistics"):
@@ -97,7 +101,8 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     @commands.command(aliases=['exclude'])
     async def optout(self, ctx):
-        """Prevents Architus from displaying statistics about you
+        """
+        Prevents Architus from displaying statistics about you
         run again to reallow collection
         """
         settings = self.bot.settings[ctx.guild]
@@ -130,7 +135,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         words = 1
         correct_words = 0
         async with ctx.channel.typing():
-            for msgdata in self.cache[ctx.guild.id]:
+            async for msgdata in gen(self.cache[ctx.guild.id]):
                 if msgdata.author.id == victim.id:
                     words += msgdata.total_words
                     correct_words += msgdata.correct_words
@@ -141,7 +146,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         '''Count the total messages a user has sent in the server'''
         word_counts = {}
         message_counts = {}
-        for msgdata in self.cache[guild.id]:
+        async for msgdata in gen(self.cache[guild.id]):
             if msgdata.author.id in self.bot.settings[guild].stats_exclude:
                 continue
             message_counts[msgdata.author] = message_counts.get(msgdata.author, 0) + 1
@@ -149,11 +154,11 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
         return message_counts, word_counts
 
-    def bin_messages(self, guild, time_granularity: timedelta):
+    async def bin_messages(self, guild, time_granularity: timedelta):
         time_bins = defaultdict(int)
         member_bins = defaultdict(int)
         channel_bins = defaultdict(int)
-        for msgdata in self.cache[guild.id]:
+        async for msgdata in gen(self.cache[guild.id]):
             date = msgdata.created_at - ((msgdata.created_at - DISCORD_EPOCH) % time_granularity)
             time_bins[date.isoformat()] += 1
             if msgdata.author.id not in self.bot.settings[guild].stats_exclude:
