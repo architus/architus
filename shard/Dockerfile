@@ -66,6 +66,7 @@ ENV PYTHONIOENCODING UTF-8
 # Copy the current directory contents into the container at /app
 COPY  ./shard/ /app/
 COPY ./lib /app/lib
+COPY ./shard/events.py /usr/lib/python3.8/asyncio
 
 # Run app.py when the container launches
 ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
