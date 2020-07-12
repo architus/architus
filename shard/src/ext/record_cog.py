@@ -37,7 +37,15 @@ class Recording:
         self.checkup[0] = 5
 
     async def send_file(self):
-        msg = self.tcp.recv(1024)
+        while True:
+            try:
+                msg = self.tcp.recv(1024)
+                break
+            except BlockingIOError:
+                await asyncio.sleep(1)
+            except Exception:
+                await self.ctx.send("Connection to recording service failed")
+                return 0
         if msg[0] != 0x00:
             if msg[0] == 0x01:
                 await self.ctx.send("Nothing was recorded")
