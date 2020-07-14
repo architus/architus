@@ -3,10 +3,7 @@ import functools
 import discord
 from collections import deque
 import src.spotify_tools as spotify_tools
-import urllib
 import asyncio
-import aiohttp
-from bs4 import BeautifulSoup
 from src.list_embed import ListEmbed as list_embed
 from lib.config import logger
 
@@ -138,7 +135,7 @@ class GuildPlayer:
             'default_search': 'auto',
             'noplaylist': True
         }
-        
+
         ydl = youtube_dl.YoutubeDL(opts)
         f = functools.partial(ydl.extract_info, search, download=False)
         data = await self.bot.loop.run_in_executor(None, f)
