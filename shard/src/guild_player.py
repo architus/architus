@@ -71,7 +71,6 @@ class GuildPlayer:
         }
         ffmpeg_options = {
             'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
-
         }
         ydl = youtube_dl.YoutubeDL(opts)
         func = functools.partial(ydl.extract_info, url, download=True)
@@ -130,18 +129,22 @@ class GuildPlayer:
 
     async def get_youtube_url(self, search):
         '''scrape video url from search paramaters'''
-        async with aiohttp.ClientSession() as session:
-            query = urllib.parse.quote(search)
-            url = "https://www.youtube.com/results?search_query=" + query
-            async with session.get(url) as resp:
-                html = await resp.read()
-
-                soup = BeautifulSoup(html.decode('utf-8'), 'lxml')
-                for video in soup.findAll(attrs={'class': 'yt-uix-tile-link'}):
-                    if ('googleadservices' not in video['href']):
-                        return 'https://www.youtube.com' + video['href']
-
-        return ''
+        opts = {
+            'format': 'bestaudio/best',
+            'ignoreerrors': False,
+            'logtostderr': False,
+            'quiet': True,
+            'no_warnings': True,
+            'default_search': 'auto',
+            'noplaylist': True
+        }
+        
+        ydl = youtube_dl.YoutubeDL(opts)
+        f = functools.partial(ydl.extract_info, search, download=False)
+        data = await self.bot.loop.run_in_executor(None, f)
+        if 'entries' in data:
+            data = data['entries'][0]
+        return data['webpage_url']
 
     def stop(self):
         if self.voice is None:
