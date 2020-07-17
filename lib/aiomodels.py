@@ -60,4 +60,3 @@ class TbReactEvents(Base):
             'guild_id': guild_id
         }
         return await super().select_by_id(cols)
-
