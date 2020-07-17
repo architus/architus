@@ -1,4 +1,5 @@
 import datetime
+import discord
 import pytz
 import dateutil.parser
 import re
@@ -78,15 +79,21 @@ class EventCog(Cog, name="Events"):
         Lumps together on_reaction_add and on_reaction_remove into one thing.
         add: True means its reaction_add, False, means reaction_remove
         '''
-        channel = await self.bot.fetch_channel(payload.channel_id)
-        message = await channel.fetch_message(payload.message_id)
+        channel = self.bot.get_channel(payload.channel_id)
+        if channel is None:
+            channel = await self.bot.fetch_channel(payload.channel_id)
+
+        message = discord.utils.find(lambda m: m.id == payload.message_id, self.bot.cached_messages)
+        if message is None:
+            message = await channel.fetch_message(payload.message_id)
+
         user = payload.member
         emoji = payload.emoji
         if user is not None:
             if user.bot:
                 return
 
-        react_event = await self.tb_react_events.get_by_id(message.id, message.guild.id)
+        react_event = await self.tb_react_events.select_by_id(message.id, message.guild.id)
         if react_event is None:
             return
 

@@ -24,6 +24,15 @@ class Base:
             ''', id, *cols.values()
         )
 
+    async def select_by_id(self, cols):
+        columns, values = zip(*cols.items())
+        return await self.conn.fetchrow(
+            f'''SELECT *
+            FROM {self.__class__.__tablename__}
+            WHERE ({','.join(columns)}) = ({','.join(f'${num}' for num in range(1, len(values) + 1))})
+            ''', *cols.values()
+        )
+
 
 class TbAutoResponses(Base):
     __tablename__ = 'tb_auto_responses'
@@ -45,10 +54,10 @@ class TbReactEvents(Base):
 
         await super().insert(cols)
 
-    async def get_by_id(self, message_id: int, guild_id: int):
-        return await self.conn.fetchrow(
-            f'''SELECT *
-            FROM {self.__class__.__tablename__}
-            WHERE (guild_id, message_id) = ($1, $2)
-            ''', guild_id, message_id
-        )
+    async def select_by_id(self, message_id: int, guild_id: int):
+        cols = {
+            'message_id': message_id,
+            'guild_id': guild_id
+        }
+        return await super().select_by_id(cols)
+
