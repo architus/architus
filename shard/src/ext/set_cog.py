@@ -7,7 +7,7 @@ from src.utils import bot_commands_only
 from lib.config import logger
 
 from contextlib import suppress
-
+from concurrent.futures import ThreadPoolExecutor
 import re
 
 
@@ -18,10 +18,11 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         self.responses = {}
         self.response_msgs = {}
         self.react_msgs = {}
+        self.executor = ThreadPoolExecutor(max_workers=10)
 
     @commands.Cog.listener()
     async def on_ready(self):
-        self.responses = {g.id: await GuildAutoResponses.new(self.bot, g) for g in self.bot.guilds}
+        self.responses = {g.id: await GuildAutoResponses.new(self.bot, g, self.executor) for g in self.bot.guilds}
 
     @commands.Cog.listener()
     async def on_message(self, msg):

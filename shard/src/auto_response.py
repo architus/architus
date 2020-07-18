@@ -10,7 +10,6 @@ from src.emoji_manager import EmojiManager
 from lib.reggy.reggy import Reggy
 from lib.response_grammar.response import parse as parse_response, NodeType
 from lib.config import logger
-from lib.models import AutoResponse as AutoResponseModel
 from lib.aiomodels import TbAutoResponses
 
 
@@ -235,16 +234,16 @@ class AutoResponse:
 
 class GuildAutoResponses:
 
-    def __init__(self, bot, guild, no_db=False):
+    def __init__(self, bot, guild, executor, no_db=False):
         self.guild = guild
         self.bot = bot
-        self.session = bot.session
+        self.executor = executor
         self.tb_auto_responses = TbAutoResponses(self.bot.asyncpg_wrapper)
         self.settings = self.bot.settings[guild]
         self.auto_responses = []
         self.word_gen = WordGen()
         self.no_db = no_db
-    
+
     @classmethod
     async def new(cls, *args, **kwargs):
         guild_auto_responses = cls(*args, **kwargs)
@@ -259,20 +258,23 @@ class GuildAutoResponses:
         if self.no_db:
             return
 
-        self.auto_responses = [AutoResponse(
-            self.bot,
-            r['trigger'],
-            r['response'],
-            r['author_id'] if r['author_id'] != 0 else None,
-            r['guild_id'],
-            r['id'],
-            r['trigger_regex'],
-            r['trigger_punctuation'],
-            "",
-            r['mode'],
-            r['count'],
-            self.word_gen,
-            None)  # TODO
+        self.auto_responses = [
+            await self.bot.loop.run_in_executor(
+                self.executor,
+                AutoResponse,
+                self.bot,
+                r['trigger'],
+                r['response'],
+                r['author_id'] if r['author_id'] != 0 else None,
+                r['guild_id'],
+                r['id'],
+                r['trigger_regex'],
+                r['trigger_punctuation'],
+                "",
+                r['mode'],
+                r['count'],
+                self.word_gen,
+                None)  # TODO
             for r in await self.tb_auto_responses.select_all()]
 
     async def _insert_into_db(self, resp: AutoResponse) -> None:
@@ -318,14 +320,21 @@ class GuildAutoResponses:
         else:
             manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
 
-        r = AutoResponse(
+        r = await self.bot.loop.run_in_executor(
+            self.executor, AutoResponse,
             self.bot,
             trigger.strip(),
             response.strip(),
             author.id,
             guild.id,
-            word_gen=self.word_gen,
-            emoji_manager=manager)
+            None,
+            "",
+            (),
+            "",
+            None,
+            0,
+            self.word_gen,
+            manager)
 
         self.validate(r)
         self.auto_responses.append(r)
