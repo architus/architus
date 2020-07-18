@@ -1,7 +1,6 @@
 from asyncio import sleep
 
 
-
 class Base:
 
     def __init__(self, conn_wrapper):
