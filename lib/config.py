@@ -65,10 +65,10 @@ def get_session():
 
 class AsyncConnWrapper:
     def __init__(self):
-        self.conn = None
+        self.pool = None
 
     async def connect(self):
-        self.conn = await asyncpg.connect(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
+        self.pool = await asyncpg.create_pool(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
 
 
 def which_shard(guild_id=None):
