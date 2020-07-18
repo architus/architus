@@ -1,0 +1,27 @@
+[package]
+name = "feature-gate"
+version = "0.1.0"
+authors = ["James Johnson <jjohnson474@gatech.edu>"]
+edition = "2018"
+
+[[bin]]
+name = "feature-gate"
+path = "src/bin/feature-gate.rs"
+
+[lib]
+name = "db"
+
+[dependencies]
+thiserror = "1.0"
+tonic = "0.2"
+prost = "0.6"
+tokio = { version = "0.2", features = ["macros"] }
+log = "0.4"
+simple_logger = "1.6"
+
+[dependencies.diesel]
+version = "1.4"
+features = ["postgres"]
+
+[build-dependencies]
+tonic-build = "0.2"
