@@ -94,7 +94,8 @@ class Latexify(commands.Cog, name="Latex Compiler"):
                 await ctx.send(embed=embed)
                 return
 
-            convert = await create_subprocess_exec('dvipng', '-T', 'tight', '-D', '300', 'out.dvi',
+            convert = await create_subprocess_exec('dvipng', '-T', 'tight', '-Q', '16', '-D', '900',
+                                                   '-bg', 'transparent', 'out.dvi',
                                                    cwd=work_dir,
                                                    stdout=DEVNULL,
                                                    stderr=DEVNULL,
