@@ -31,7 +31,7 @@ class MessageData:
         self.total_words = total_words
         self.correct_words = correct_words
         self.cache_up_to_date = {}
-        created_at = DISCORD_EPOCH + timedelta(milliseconds=(self.message_id >> 22))
+        self.created_at = DISCORD_EPOCH + timedelta(milliseconds=(self.message_id >> 22))
 
     def __hash__(self):
         return hash(self.message_id)
