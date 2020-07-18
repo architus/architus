@@ -101,8 +101,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     @commands.command(aliases=['exclude'])
     async def optout(self, ctx):
-        """
-        Prevents Architus from displaying statistics about you
+        """Prevents Architus from displaying statistics about you
         run again to reallow collection
         """
         settings = self.bot.settings[ctx.guild]
