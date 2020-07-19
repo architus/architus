@@ -38,7 +38,27 @@ class GuildPool:
         self.jwt = jwt
         self.return_guilds = []
 
+    async def fetch_guilds(self):
+        resp, sc = await async_list_guilds_request(self.jwt)
+        if sc != s.OK_200:
+            logger.debug(resp)
+            return []
+
+        guilds = []
+
+        for guild in resp:
+            mem_resp, _ = await self.shard_client.is_member(
+                self.jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
+            guild.update({
+                'has_architus': mem_resp['member'],
+                'architus_admin': mem_resp['admin'],
+            })
+            guilds.append(guild)
+        
+        return guilds
+
     async def fetch_architus_guilds(self):
+        """deprecated"""
         all_guilds_message = await self.manager_client.all_guilds(message.AllGuildsRequest())
         all_guilds = guilds_to_dicts(all_guilds_message)
         for guild in all_guilds:
@@ -59,6 +79,7 @@ class GuildPool:
         return self.return_guilds
 
     async def fetch_remaining_guilds(self):
+        """deprecated"""
         resp, sc = await async_list_guilds_request(self.jwt)
         if sc != s.OK_200:
             logger.debug(resp)

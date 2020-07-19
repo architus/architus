@@ -41,7 +41,7 @@ class EmojiManager:
                 e['url'],
                 e['num_uses'],
                 e['priority'])
-            for e in await self.tb_emojis.select_all()]
+            for e in await self.tb_emojis.select_by_guild(self.guild.id)]
 
     async def _insert_into_db(self, emoji: ArchitusEmoji) -> None:
         """stores an emoji in the database"""

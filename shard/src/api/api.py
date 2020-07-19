@@ -256,7 +256,8 @@ class Api(Cog):
 
                 responses = self.bot.get_cog("Auto Responses").responses
                 responses.setdefault(
-                    guild_id, GuildAutoResponses(self.bot, MockGuild(guild_id), no_db=int(guild_id) < FAKE_GUILD_IDS))
+                    guild_id, GuildAutoResponses(
+                        self.bot, MockGuild(guild_id), None, no_db=int(guild_id) < FAKE_GUILD_IDS))
                 if triggered_command:
                     # found builtin command, creating fake context
                     ctx = Context(**{

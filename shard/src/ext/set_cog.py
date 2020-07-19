@@ -18,19 +18,21 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         self.responses = {}
         self.response_msgs = {}
         self.react_msgs = {}
-        self.executor = ThreadPoolExecutor(max_workers=10)
+        self.executor = ThreadPoolExecutor(max_workers=5)
 
     @commands.Cog.listener()
     async def on_ready(self):
         self.responses = {g.id: await GuildAutoResponses.new(self.bot, g, self.executor) for g in self.bot.guilds}
+        logger.debug("auto responses initialized")
 
     @commands.Cog.listener()
     async def on_message(self, msg):
         if not self.bot.settings[msg.channel.guild].responses_enabled:
             return
-        resp_msg, response = await self.responses[msg.guild.id].execute(msg)
-        if resp_msg is not None:
-            self.response_msgs[resp_msg.id] = response
+        with suppress(KeyError):
+            resp_msg, response = await self.responses[msg.guild.id].execute(msg)
+            if resp_msg is not None:
+                self.response_msgs[resp_msg.id] = response
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):

@@ -156,19 +156,9 @@ class CustomNamespace(socketio.AsyncNamespace):
                 'pool_response',
                 {
                     '_id': _id,
-                    'finished': False,
-                    'nonexistant': [],
-                    'data': await pool.fetch_architus_guilds(),
-                },
-                room=f"{sid}_auth"
-            )
-            await sio.emit(
-                'pool_response',
-                {
-                    '_id': _id,
                     'finished': True,
                     'nonexistant': [],
-                    'data': await pool.fetch_remaining_guilds(),
+                    'data': await pool.fetch_guilds(),
                 },
                 room=f"{sid}_auth"
             )
