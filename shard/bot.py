@@ -135,6 +135,9 @@ def command_prefix(bot: Architus, msg: discord.Message):
 
 architus = Architus(command_prefix=command_prefix, max_messages=10000)
 
+# Remove default help command so it doesn't conflict with ours
+architus.help_command = None
+
 for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
     architus.load_extension(f"src.ext.{ext[:-3]}")
 

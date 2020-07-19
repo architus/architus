@@ -5,6 +5,7 @@ from unidecode import unidecode
 from contextlib import suppress
 from discord.ext.commands import Cog
 from discord.ext import commands
+from src.utils import doc_url
 
 from lib.config import logger
 
@@ -121,10 +122,11 @@ class EventCog(Cog, name="Events"):
         return title_msg.clean_content or None
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/events/#schedule")
     async def schedule(self, ctx, *argst):
-        '''
+        '''schedule <title> <event>
         Start an event poll.
-        Timezone is based on your servers voice zone.
+        Timezone is based on your server's voice zone.
         '''
         args = list(argst)
         logger.debug(args)
@@ -168,24 +170,26 @@ class EventCog(Cog, name="Events"):
         self.schedule_messages[msg.id] = ScheduleEvent(msg, title_str, parsed_time)
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/events/#poll")
     async def poll(self, ctx, *args):
-        '''
-        Starts a poll with some pretty formatting
-        Allows more than one response per user
-        Surround title in quotes to include spaces
-        Supports up to 10 options
+        '''poll <"title"> <option 1>, [option 2], ..., [option 10]
+        Starts a poll with some pretty formatting.
+        Allows more than one response per user.
+        Surround title in quotes to include spaces.
+        Supports up to 10 options.
         '''
         pattern = re.compile(r'.poll (?P<title>(?:(?:".*")|(?:.*?)+)) (?P<options>.*$)')
         match = pattern.search(unidecode(ctx.message.content))
         await self.register_poll(ctx, match, False)
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/events/#xpoll")
     async def xpoll(self, ctx, *args):
-        '''
-        Starts a exclusive poll with some pretty formatting
-        Limited to one response per user
-        Surround title in quotes to include spaces
-        Supports up to 10 options
+        '''xpoll <"title"> <option 1>, [option 2], ..., [option 10]
+        Starts a exclusive poll with some pretty formatting.
+        Limited to one response per user.
+        Surround title in quotes to include spaces.
+        Supports up to 10 options.
         '''
         pattern = re.compile(r'.poll (?P<title>(?:(?:".*")|(?:.*?)+)) (?P<options>.*$)')
         match = pattern.search(unidecode(ctx.message.content))

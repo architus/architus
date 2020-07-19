@@ -97,8 +97,9 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     @commands.command(aliases=['exclude'])
     async def optout(self, ctx):
-        """Prevents Architus from displaying statistics about you
-        run again to reallow collection
+        """optout
+        Prevents Architus from displaying statistics about you.
+        Run again to reallow collection.
         """
         settings = self.bot.settings[ctx.guild]
         excludes = settings.stats_exclude
@@ -113,6 +114,9 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     @commands.command(aliases=['growth'])
     async def joins(self, ctx):
+        """growth
+        View a pretty chart of member growth on the server.
+        """
         img = member_growth.generate(ctx.guild.members)
         data = await self.bot.manager_client.publish_file(iter([message_type.File(file=img)]))
         em = discord.Embed(title="Server Growth", description=ctx.guild.name)
@@ -123,7 +127,8 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     @commands.command()
     async def spellcheck(self, ctx, victim: discord.Member):
-        '''Checks the spelling of a user'''
+        '''spellcheck <member>
+        Checks the spelling of a member.'''
         if ctx.author.id in self.bot.settings[ctx.guild].stats_exclude:
             await ctx.send(f"Sorry, {victim.display_name} has requested that their stats not be recorded :confused:")
             return
@@ -163,6 +168,10 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
     @commands.command()
     async def messagecount(self, ctx, victim: discord.Member = None):
+        """messagecount [member]
+        See top message senders in the server and how many messages a
+        specific member has sent.
+        """
         async with ctx.channel.typing():
             message_counts, word_counts = await self.count_messages(ctx.guild)
 
@@ -190,6 +199,9 @@ class CoronaStats(commands.Cog, name="Coronavirus Data"):
 
     @commands.command(aliases=['covid', 'covid-19', 'covid19', 'coronavirus'])
     async def corona(self, ctx, deaths_only: bool = False):
+        """corona
+        Sends a graph of current coronavirus statistics.
+        """
         async with aiohttp.ClientSession() as session:
             url = 'http://coronavirusapi.com/time_series.csv'
             async with session.get(url) as resp:

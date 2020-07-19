@@ -14,7 +14,8 @@ api = twitter.Api(consumer_key=twitter_consumer_key,
 
 @commands.command(aliases=['ajax', 'masters', 'beat'])
 async def ajax_masters(ctx):
-    '''Tells you if Ajax is in masters or not'''
+    '''ajax
+    DEPRECATED: Tells you if Ajax is in masters or not.'''
     id = '1143094150717304832'
     statuses = api.GetUserTimeline(user_id=id, count=1, exclude_replies=True, include_rts=False)
     msg = 'https://twitter.com/Ajaxbeat/status/' + statuses[0].id_str

@@ -473,7 +473,8 @@ class Settings(Cog):
 
     @commands.command(hidden=True)
     async def roleids(self, ctx):
-        '''Shows the discord id for every role in your server'''
+        '''roleids
+        Shows the discord id for every role in your server.'''
         lem = ListEmbed(ctx.guild.name, '')
         lem.name = "Role IDs"
         for role in ctx.guild.roles:
@@ -482,12 +483,14 @@ class Settings(Cog):
 
     @commands.command(aliases=['listsettingstags', 'settingstags', 'stags'])
     async def list_settings_tags(self, ctx):
-        '''Get the list of tags for the settings command'''
+        '''listsettingstags
+        Get the list of tags for the settings command.'''
         await ctx.channel.send(f"Tags for settings are: {self.list_tags()}")
 
     @commands.command()
     async def settings(self, ctx, tag="general"):
-        '''Open an interactive settings dialog'''
+        '''settings
+        Open an interactive settings dialog.'''
         settings = self.bot.settings[ctx.guild]
         if ctx.author.id not in settings.admins_ids:
             await ctx.channel.send('nope, sorry, you must be an admin')

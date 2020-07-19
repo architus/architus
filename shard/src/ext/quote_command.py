@@ -7,7 +7,8 @@ from lib.config import logger
 
 @commands.command()
 async def quote(ctx, message: discord.Message):
-    '''Quotes a previous message in a pretty format. Use url or id.'''
+    '''quote <message url|message id>
+    Quotes a previous message in a pretty format. Use url or id.'''
 
     utc = message.created_at.replace(tzinfo=timezone('UTC'))
     est = utc.astimezone(timezone('US/Eastern'))

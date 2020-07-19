@@ -126,6 +126,13 @@ def role_to_dict(role: discord.Role) -> dict:
     return data
 
 
+def doc_url(url: str):
+    def wrap(func):
+        func.__doc_url__ = url
+        return func
+    return wrap
+
+
 def bot_commands_only(cmd):
     """Adds the restriction that a command must be run in a bot commands channel if the guild has one set
     Does nothing if not in a guild

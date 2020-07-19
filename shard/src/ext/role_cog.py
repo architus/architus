@@ -22,7 +22,8 @@ class Roles(commands.Cog):
 
     @commands.command(aliases=['rank', 'join', 'roles'])
     async def role(self, ctx, *arg):
-        '''Assign yourself a role `!roles` to see joinable roles'''
+        '''role [role to join]
+        List available roles to join or join a role.'''
         settings = self.bot.settings[ctx.guild]
         roles_dict = settings.roles_dict
         member = ctx.author

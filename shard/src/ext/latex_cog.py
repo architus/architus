@@ -3,6 +3,7 @@
 # Inspired by: https://github.com/chuanshi/slacklatex
 from discord.ext import commands
 from discord.ext.commands import cooldown, BucketType
+from src.utils import doc_url
 
 from discord import File, Embed
 
@@ -38,16 +39,10 @@ class Latexify(commands.Cog, name="Latex Compiler"):
 
     @commands.command(aliases=['tex'])
     @cooldown(2, 15, BucketType.user)
+    @doc_url("https://docs.archit.us/commands/latex/")
     async def latex(self, ctx, *latex):
-        """
-        Compiles latex and returns a rendered image.
-
-        Usage: !latex [valid latex code]
-        Parameters do not need to be passed inside of quotes. They will
-        be automatically joined together with a space in between them.
-        Latex code is just inside of a plain document environment so add
-        dollar signs if you need them. The packages mathrsfs and amsmath
-        are included by default.
+        """latex <latex code>
+        Compiles latex to a png.
         """
         for l in latex:
             for c in self.illegal_commands:
@@ -94,8 +89,8 @@ class Latexify(commands.Cog, name="Latex Compiler"):
                 await ctx.send(embed=embed)
                 return
 
-            convert = await create_subprocess_exec('dvipng', '-T', 'tight', '-Q', '16', '-D', '900',
-                                                   '-bg', 'transparent', 'out.dvi',
+            convert = await create_subprocess_exec('dvipng', '-T', 'tight', '-Q', '32', '-D', '1500', '-fg', 'rgb 1.0 1.0 1.0',
+                                                   '-bg', 'transparent', '--gamma', '100', 'out.dvi',
                                                    cwd=work_dir,
                                                    stdout=DEVNULL,
                                                    stderr=DEVNULL,
