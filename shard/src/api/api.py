@@ -13,6 +13,7 @@ from src.api.util import fetch_guild
 from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 from lib.ipc import manager_pb2 as message
+from src.utils import guild_to_dict
 
 
 class Api(Cog):
@@ -55,6 +56,22 @@ class Api(Cog):
 
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
+
+    async def users_guilds(self, user_id):
+        users_guilds = []
+        for guild in self.bot.guilds:
+            member = guild.get_member(int(user_id))
+            if member is not None:
+                settings = self.bot.settings[guild]
+
+                g = guild_to_dict(guild)
+                g.update({
+                    "has_architus": True,
+                    "architus_admin": int(user_id) in settings.admins_ids,
+                    'permissions': member.guild_permissions.value,
+                })
+                users_guilds.append(g)
+        return users_guilds, sc.OK_200
 
     async def is_member(self, user_id, guild_id):
         '''check if user is a member or admin of the given guild'''

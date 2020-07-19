@@ -1,7 +1,7 @@
 from lib.discord_requests import async_list_guilds_request
 from lib.status_codes import StatusCodes as s
-from lib.config import logger, which_shard
-import lib.ipc.manager_pb2 as message
+from lib.config import logger, which_shard, NUM_SHARDS
+from asyncio import create_task
 
 guild_attrs = [
     'id', 'name', 'icon', 'splash', 'owner_id', 'region', 'description',
@@ -54,28 +54,14 @@ class GuildPool:
                 'architus_admin': mem_resp['admin'],
             })
             guilds.append(guild)
-        
+
         return guilds
 
     async def fetch_architus_guilds(self):
-        """deprecated"""
-        all_guilds_message = await self.manager_client.all_guilds(message.AllGuildsRequest())
-        all_guilds = guilds_to_dicts(all_guilds_message)
-        for guild in all_guilds:
-            resp, _ = await self.shard_client.is_member(
-                self.jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
-            if resp['member']:
-                guild.update({
-                    'id': str(guild['id']),
-                    'has_architus': True,
-                    'architus_admin': resp['admin'],
-                    'owner': guild['owner_id'] == self.jwt.id,
-                    'permissions': resp['permissions']
-                })
-                del guild['owner_id']
-                del guild['admin_ids']
-                self.return_guilds.append(guild)
-
+        tasks = (create_task(
+            self.manager_client.users_guilds(self.jwt.id, routing_key=f"shard_rpc_{i}"))
+            for i in range(NUM_SHARDS))
+        self.return_guilds = [g for guilds in await tasks for g in guilds]
         return self.return_guilds
 
     async def fetch_remaining_guilds(self):
