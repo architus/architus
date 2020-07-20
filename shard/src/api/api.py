@@ -58,13 +58,13 @@ class Api(Cog):
         all_guilds = []
         for g in await self.bot.manager_client.all_guilds(message.AllGuildsRequest()):
             all_guilds.append({
-                g['id'],
-                g['name'],
-                g['icon'],
-                g['region'],
-                g['description'],
-                g['preffered_locale'],
-                g['member_count'],
+                'id': g.id,
+                'name': g.name,
+                'icon': g.icon,
+                'region': g.region,
+                'description': g.description,
+                'preferred_locale': g.preferred_locale,
+                'member_count': g.member_count,
             })
         return {'guilds': all_guilds}, sc.OK_200
 

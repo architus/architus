@@ -37,6 +37,7 @@ class GuildPool:
         self.shard_client = shard_client
         self.jwt = jwt
         self.return_guilds = []
+        self.list_task = None
 
     async def fetch_guilds(self):
         resp, sc = await async_list_guilds_request(self.jwt)
@@ -58,6 +59,9 @@ class GuildPool:
         return guilds
 
     async def fetch_architus_guilds(self):
+        # get discord request started
+        self.list_task = create_task(async_list_guilds_request(self.jwt))
+
         tasks = (create_task(
             self.shard_client.users_guilds(self.jwt.id, routing_key=f"shard_rpc_{i}"))
             for i in range(NUM_SHARDS))
@@ -68,8 +72,7 @@ class GuildPool:
         return self.return_guilds
 
     async def fetch_remaining_guilds(self):
-        """deprecated"""
-        resp, sc = await async_list_guilds_request(self.jwt)
+        resp, sc = await self.list_task
         if sc != s.OK_200:
             logger.debug(resp)
             return []
