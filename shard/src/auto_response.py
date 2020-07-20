@@ -258,24 +258,27 @@ class GuildAutoResponses:
         if self.no_db:
             return
 
-        self.auto_responses = [
-            await self.bot.loop.run_in_executor(
-                self.executor,
-                AutoResponse,
-                self.bot,
-                r['trigger'],
-                r['response'],
-                r['author_id'] if r['author_id'] != 0 else None,
-                r['guild_id'],
-                r['id'],
-                r['trigger_regex'],
-                r['trigger_punctuation'],
-                "",
-                r['mode'],
-                r['count'],
-                self.word_gen,
-                None)  # TODO
-            for r in await self.tb_auto_responses.select_all()]
+        for r in await self.tb_auto_responses.select_by_guild(self.guild.id):
+            try:
+                args = (
+                    self.bot,
+                    r['trigger'],
+                    r['response'],
+                    r['author_id'] if r['author_id'] != 0 else None,
+                    r['guild_id'],
+                    r['id'],
+                    r['trigger_regex'],
+                    r['trigger_punctuation'],
+                    "",
+                    r['mode'],
+                    r['count'],
+                    self.word_gen,
+                    None)  # TODO
+                resp = await self.bot.loop.run_in_executor(self.executor, AutoResponse, *args)
+            except Exception:
+                logger.exception("")
+            else:
+                self.auto_responses.append(resp)
 
     async def _insert_into_db(self, resp: AutoResponse) -> None:
         if self.no_db:
@@ -319,7 +322,6 @@ class GuildAutoResponses:
             manager = None
         else:
             manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
-
         r = await self.bot.loop.run_in_executor(
             self.executor, AutoResponse,
             self.bot,
@@ -386,7 +388,6 @@ class GuildAutoResponses:
         for r in self.auto_responses:
             if not r.trigger_reggy.isdisjoint(response.trigger_reggy):
                 conflicts.append(r)
-                logger.debug(f"{response} collides with {r}")
         return conflicts
 
 

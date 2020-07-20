@@ -195,7 +195,6 @@ class EventCog(Cog, name="Events"):
         Timezone is based on your servers voice zone.
         '''
         args = list(argst)
-        logger.debug(args)
         # event bot's id
         if ctx.guild.get_member(476042677440479252):
             logger.warning("not scheduling cause event bot exists")
