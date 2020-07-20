@@ -10,7 +10,7 @@ from src.utils import send_message_webhook
 from src.architus_emoji import ArchitusEmoji
 from src.generate.emoji_list import generate
 from lib.config import logger
-from lib.models import Emoji as EmojiModel
+from lib.aiomodels import TbEmojis
 from lib.ipc import manager_pb2 as message_type
 
 EMOJI_DIR = 'emojis'
@@ -20,30 +20,28 @@ class EmojiManager:
 
     def __init__(self, bot, guild: discord.guild) -> None:
         self.bot = bot
-        self.session = bot.session
+        self.tb_emojis = TbEmojis(self.bot.asyncpg_wrapper)
         self.settings = self.bot.settings[guild]
         self.guild = guild
         self.emojis = []
         self.ignore_add = []
         self.emoji_pattern = re.compile(r'(?:<:(?P<name>\w+):(?P<id>\d+)>)|(?::(?P<nameonly>\w+):)')
 
-    def _populate_from_db(self) -> None:
+    async def _populate_from_db(self) -> None:
         """queries the db for this guild's emojis and populates the list"""
 
-        emojis = self.session.query(EmojiModel).filter_by(guild_id=self.guild.id).order_by(EmojiModel.priority).all()
-        self.session.commit()
         self.emojis = [
             ArchitusEmoji(
                 self.bot,
-                Image.open(BytesIO(e.img)),
-                e.name,
-                e.id,
-                e.discord_id,
-                e.author_id,
-                e.url,
-                e.num_uses,
-                e.priority)
-            for e in emojis]
+                Image.open(BytesIO(e['img'])),
+                e['name'],
+                e['id'],
+                e['discord_id'],
+                e['author_id'],
+                e['url'],
+                e['num_uses'],
+                e['priority'])
+            for e in await self.tb_emojis.select_by_guild(self.guild.id)]
 
     async def _insert_into_db(self, emoji: ArchitusEmoji) -> None:
         """stores an emoji in the database"""
@@ -52,50 +50,30 @@ class EmojiManager:
             emoji.im.save(buf, format="PNG")
             binary = buf.getvalue()
 
-        row = EmojiModel(
+        await self.tb_emojis.insert_one((
             emoji.id,
             emoji.discord_id,
             emoji.author_id,
             self.guild.id,
             emoji.name,
-            await emoji.url(),
             emoji.num_uses,
             emoji.priority,
-            binary)
+            binary,
+            await emoji.url()
+        ))
 
-        try:
-            self.session.add(row)
-        except Exception:
-            self.session.rollback()
-            raise
-        else:
-            self.session.commit()
+    async def _update_emojis_db(self, emojis_list: List[ArchitusEmoji]) -> None:
 
-    def _update_emojis_db(self, emojis_list: List[ArchitusEmoji]) -> None:
-        emojis = [{
-            'id': e.id,
-            'discord_id': e.discord_id,
-            'author_id': e.author_id,
-            'guild_id': self.guild.id,
-            'name': e.name,
-            'num_uses': e.num_uses,
-            'priority': e.priority,
-            # EmojiModel.id: e.id,
-            # EmojiModel.discord_id: e.discord_id,
-            # EmojiModel.author_id: e.author_id,
-            # EmojiModel.guild_id: self.guild.id,
-            # EmojiModel.name: e.name,
-            # EmojiModel.num_uses: e.num_uses,
-            # EmojiModel.priority: e.priority,
-        } for e in emojis_list]
-
-        try:
-            self.session.bulk_update_mappings(EmojiModel, emojis)
-        except Exception:
-            self.session.rollback()
-            raise
-        else:
-            self.session.commit()
+        # TODO implement proper bulk update
+        for e in emojis_list:
+            await self.tb_emojis.update_by_id({
+                'discord_id': e.discord_id,
+                'author_id': e.author_id,
+                'guild_id': self.guild.id,
+                'name': e.name,
+                'num_uses': e.num_uses,
+                'priority': e.priority,
+            }, e.id)
 
     @property
     def guild_emojis(self) -> List[discord.Emoji]:
@@ -133,7 +111,7 @@ class EmojiManager:
 
     async def initialize(self) -> None:
         # populate emojis from db here
-        self._populate_from_db()
+        await self._populate_from_db()
         dupes = await self.synchronize()
         if self.settings.manage_emojis:
             for e in dupes:
@@ -263,7 +241,7 @@ class EmojiManager:
             logger.warning(f"someone renamed an emoji that I don't know about! {after.name}:{after.id}")
         else:
             e.update_from_discord(after)
-            self._update_emojis_db((e,))
+            await self._update_emojis_db((e,))
 
     async def add_emoji(self, emoji: ArchitusEmoji) -> None:
         """Inserts an emoji into the guild, making space if necessary
@@ -284,7 +262,7 @@ class EmojiManager:
         emoji = self.find_emoji(d_id=emoji.id, name=emoji.name)
         if emoji:
             emoji.cache()
-            self._update_emojis_db((emoji,))
+            await self._update_emojis_db((emoji,))
 
     async def on_react(self, react: discord.Reaction) -> None:
         if type(react.emoji) == str:
@@ -352,7 +330,7 @@ class EmojiManager:
                     await self.bump_emoji(emoji)
                     content = content.replace(f"<:{emoji.name}:{match['id']}>", emoji.to_discord_str())
         if did_match:
-            self._update_emojis_db(self.emojis)
+            await self._update_emojis_db(self.emojis)
         if replace and self.settings.manage_emojis:
             try:
                 await send_message_webhook(
