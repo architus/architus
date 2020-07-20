@@ -118,14 +118,12 @@ class Architus(Bot):
         """Update the manager with the guilds that we know about"""
         await self.wait_until_ready()
         while not self.is_closed():
-            logger.info("Current guilds:")
             for guild in self.guilds:
                 if guild.me.display_name == 'archit.us':
                     try:
                         await guild.me.edit(nick='architus')
                     except discord.Forbidden:
                         logger.warning(f"couldn't change nickname in {guild.name}")
-                logger.info("{} - {} ({})".format(guild.name, guild.id, guild.member_count))
             await asyncio.sleep(600)
 
 

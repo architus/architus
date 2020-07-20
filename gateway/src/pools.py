@@ -61,7 +61,10 @@ class GuildPool:
         tasks = (create_task(
             self.shard_client.users_guilds(self.jwt.id, routing_key=f"shard_rpc_{i}"))
             for i in range(NUM_SHARDS))
-        self.return_guilds = [g[0] for guilds in tasks for g in await guilds]
+
+        self.return_guilds = [guild for t in tasks for guild in (await t)[0]]
+        for g in self.return_guilds:
+            g.update({'owner': g['owner_id'] == self.jwt.id})
         return self.return_guilds
 
     async def fetch_remaining_guilds(self):

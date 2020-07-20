@@ -388,7 +388,6 @@ class GuildAutoResponses:
         for r in self.auto_responses:
             if not r.trigger_reggy.isdisjoint(response.trigger_reggy):
                 conflicts.append(r)
-                logger.debug(f"{response} collides with {r}")
         return conflicts
 
 

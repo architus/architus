@@ -77,6 +77,13 @@ class GuildCounter(CustomResource):
         camelcase_keys(guild_count)
         return guild_count, sc
 
+class AllGuilds(CustomResource):
+    @authenticated()
+    def get(self, jwt: JWT):
+        if jwt.id != 214037134477230080:  # johnyburd
+            return {"message": "unauthorized"}, StatusCodes.UNAUTHORIZED_401
+        return self.shard.all_guilds()
+
 
 class Logs(CustomResource):
     @authenticated(member=True)
@@ -193,6 +200,7 @@ def app_factory():
     api.add_resource(End, "/session/end")
     api.add_resource(TokenExchange, "/session/token-exchange")
 
+    api.add_resource(AllGuilds, "/admin/guilds")
     api.add_resource(User, "/user/<string:name>")
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")

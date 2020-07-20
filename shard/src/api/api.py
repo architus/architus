@@ -54,6 +54,20 @@ class Api(Cog):
             logger.info(f"Shard {self.bot.shard_id} failed to get guild count from manager")
             return {'guild_count': -1, 'user_count': -1}, sc.INTERNAL_SERVER_ERROR_500
 
+    async def all_guilds(self):
+        all_guilds = []
+        for g in await self.bot.manager_client.all_guilds(message.AllGuildsRequest()):
+            all_guilds.append({
+                g['id'],
+                g['name'],
+                g['icon'],
+                g['region'],
+                g['description'],
+                g['preffered_locale'],
+                g['member_count'],
+            })
+        return {'guilds': all_guilds}, sc.OK_200
+
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
 
