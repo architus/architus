@@ -13,6 +13,7 @@ from src.api.util import fetch_guild
 from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 from lib.ipc import manager_pb2 as message
+from src.utils import guild_to_dict
 
 
 class Api(Cog):
@@ -53,8 +54,38 @@ class Api(Cog):
             logger.info(f"Shard {self.bot.shard_id} failed to get guild count from manager")
             return {'guild_count': -1, 'user_count': -1}, sc.INTERNAL_SERVER_ERROR_500
 
+    async def all_guilds(self):
+        all_guilds = []
+        for g in await self.bot.manager_client.all_guilds(message.AllGuildsRequest()):
+            all_guilds.append({
+                'id': g.id,
+                'name': g.name,
+                'icon': g.icon,
+                'region': g.region,
+                'description': g.description,
+                'preferred_locale': g.preferred_locale,
+                'member_count': g.member_count,
+            })
+        return {'guilds': all_guilds}, sc.OK_200
+
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
+
+    async def users_guilds(self, user_id):
+        users_guilds = []
+        for guild in self.bot.guilds:
+            member = guild.get_member(int(user_id))
+            if member is not None:
+                settings = self.bot.settings[guild]
+
+                g = guild_to_dict(guild)
+                g.update({
+                    "has_architus": True,
+                    "architus_admin": int(user_id) in settings.admins_ids,
+                    'permissions': member.guild_permissions.value,
+                })
+                users_guilds.append(g)
+        return users_guilds, sc.OK_200
 
     async def is_member(self, user_id, guild_id):
         '''check if user is a member or admin of the given guild'''
@@ -124,7 +155,7 @@ class Api(Cog):
     @fetch_guild
     async def bin_messages(self, guild):
         stats_cog = self.bot.cogs["Server Statistics"]
-        members, channels, times = stats_cog.bin_messages(guild, timedelta(minutes=5))
+        members, channels, times = await stats_cog.bin_messages(guild, timedelta(minutes=5))
         return {
             'total': len(stats_cog.cache[guild.id]),
             'members': members,
@@ -256,7 +287,8 @@ class Api(Cog):
 
                 responses = self.bot.get_cog("Auto Responses").responses
                 responses.setdefault(
-                    guild_id, GuildAutoResponses(self.bot, MockGuild(guild_id), no_db=int(guild_id) < FAKE_GUILD_IDS))
+                    guild_id, GuildAutoResponses(
+                        self.bot, MockGuild(guild_id), None, no_db=int(guild_id) < FAKE_GUILD_IDS))
                 if triggered_command:
                     # found builtin command, creating fake context
                     ctx = Context(**{

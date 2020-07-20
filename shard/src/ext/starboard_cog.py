@@ -33,7 +33,7 @@ class StarboardCog(commands.Cog):
         img = await message.author.avatar_url.read()
         data = await self.bot.manager_client.publish_file(
             message_type.File(location='avatars',
-                              name=message.author.id,
+                              name=str(message.author.id),
                               file=img))
 
         em.set_author(name=message.author.display_name, icon_url=data.url)
