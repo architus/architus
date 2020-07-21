@@ -84,7 +84,6 @@ class AllGuilds(CustomResource):
             return {"message": "unauthorized"}, StatusCodes.UNAUTHORIZED_401
         return self.shard.all_guilds()
 
-
 class Logs(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int):
