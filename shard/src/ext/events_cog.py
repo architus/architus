@@ -234,7 +234,7 @@ class EventCog(Cog, name="Events"):
         await msg.add_reaction(self.MAYBE_EMOJI)
         self.schedule_messages[msg.id] = ScheduleEvent(msg, title_str, parsed_time)
 
-    @commands.command()
+    @commands.command(hidden=True)
     async def poll_v2(self, ctx, title, *options):
         '''
         Starts a poll with some pretty formatting
@@ -244,7 +244,7 @@ class EventCog(Cog, name="Events"):
         '''
         await self.register_poll_v2(ctx, title, options, False)
 
-    @commands.command()
+    @commands.command(hidden=True)
     async def xpoll_v2(self, ctx, title, *options):
         '''
         Starts an exclusive poll with some pretty formatting
