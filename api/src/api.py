@@ -77,6 +77,7 @@ class GuildCounter(CustomResource):
         camelcase_keys(guild_count)
         return guild_count, sc
 
+
 class AllGuilds(CustomResource):
     @authenticated()
     def get(self, jwt: JWT):
