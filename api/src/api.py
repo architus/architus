@@ -77,12 +77,14 @@ class GuildCounter(CustomResource):
         camelcase_keys(guild_count)
         return guild_count, sc
 
+
 class AllGuilds(CustomResource):
     @authenticated()
     def get(self, jwt: JWT):
         if jwt.id != 214037134477230080:  # johnyburd
             return {"message": "unauthorized"}, StatusCodes.UNAUTHORIZED_401
         return self.shard.all_guilds()
+
 
 class Logs(CustomResource):
     @authenticated(member=True)
