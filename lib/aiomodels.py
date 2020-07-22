@@ -30,11 +30,13 @@ class Base:
 
     async def insert(self, cols):
         columns, values = zip(*cols.items())
-        await self.conn.execute(
-            f'''INSERT INTO {self.__class__.__tablename__}({','.join(columns)})
-            VALUES ({','.join(f'${num}' for num in range(1, len(values) + 1))})
-            ''', *values
-        )
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    f'''INSERT INTO {self.__class__.__tablename__}({','.join(columns)})
+                    VALUES ({','.join(f'${num}' for num in range(1, len(values) + 1))})
+                    ''', *values
+                )
 
     async def update_by_id(self, cols, id):
         assigns = (f"{c} = ${n + 2}" for n, c in enumerate(cols.keys()))
@@ -54,12 +56,14 @@ class Base:
 
     async def select_by_id(self, cols):
         columns, values = zip(*cols.items())
-        return await self.conn.fetchrow(
-            f'''SELECT *
-            FROM {self.__class__.__tablename__}
-            WHERE ({','.join(columns)}) = ({','.join(f'${num}' for num in range(1, len(values) + 1))})
-            ''', *cols.values()
-        )
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                return await conn.fetchrow(
+                    f'''SELECT *
+                    FROM {self.__class__.__tablename__}
+                    WHERE ({','.join(columns)}) = ({','.join(f'${num}' for num in range(1, len(values) + 1))})
+                    ''', *cols.values()
+                )
 
 
 class TbAutoResponses(Base):
