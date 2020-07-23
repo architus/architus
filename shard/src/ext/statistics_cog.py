@@ -1,5 +1,6 @@
-from collections import defaultdict
+from functools import partial
 from datetime import timedelta
+from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
 from discord.ext import commands
@@ -35,6 +36,33 @@ class MessageData:
 
     def __hash__(self):
         return hash(self.message_id)
+
+
+class GuildData:
+
+    def __init__(self, time_granularity=timedelta(days=1)):
+        self.message_count = 0
+        self.word_count = 0
+        self.words = Counter()
+        self.mentions = Counter()
+        self.members = Counter()
+        self.time_granularity = time_granularity
+        times_box = partial(defaultdict, int)
+        self.times = defaultdict(times_box)
+
+    async def process_message(self, msg):
+        self.message_count += 1
+
+        words = msg.content.split()
+        self.word_count += len(words)
+        self.words.update(words)
+
+        date = msg.created_at - ((msg.created_at - DISCORD_EPOCH) % self.time_granularity)
+        self.times[date][msg.author.id] += 1
+
+        self.mentions.update(msg.mentions)
+
+        self.members.update((msg.author.id,))
 
 
 class MessageStats(commands.Cog, name="Server Statistics"):
