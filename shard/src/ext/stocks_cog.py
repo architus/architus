@@ -13,7 +13,7 @@ class Stocks(commands.Cog, name="Stock Prices"):
 
     @commands.command()
     async def price(self, ctx, symbol: str):
-        '''price [ticker]
+        '''price <ticker>
         Give some daily stats about a company.'''
         async with aiohttp.ClientSession() as session:
             url = 'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&'
