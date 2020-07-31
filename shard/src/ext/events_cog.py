@@ -262,13 +262,12 @@ class EventCog(Cog, name="Events"):
             await msg.add_reaction(self.ANSWERS[i])
 
         event_id = int(ReactionEventType.poll)
-        expires = datetime.datetime.now() + datetime.timedelta(days=1)
         payload = {
             'exclusive': exclusive,
             'title': title,
             'options': options
         }
-        await self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload), expires)
+        await self.tb_react_events.insert(msg.id, msg.guild.id, msg.channel.id, event_id, json.dumps(payload))
 
     @commands.command()
     async def poll(self, ctx, *args):
