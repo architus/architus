@@ -8,3 +8,5 @@ pyyaml
 psycopg2
 pika
 pyjwt
+grpcio
+protobuf

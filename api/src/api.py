@@ -10,6 +10,8 @@ from lib.models import Log
 from lib.auth import JWT, flask_authenticated as authenticated
 from lib.discord_requests import list_guilds_request
 from lib.pool_types import PoolType
+from lib.ipc import grpc_client
+from lib.ipc import feature_gate_pb2 as message_type
 
 from src.util import CustomResource, reqparams, camelcase_keys
 from src.session import Identify, Login, RefreshToken, TokenExchange, End
@@ -188,6 +190,119 @@ class ListGuilds(CustomResource):
         return resp, status_code
 
 
+class Feature(Resource):
+
+    def __init__(self):
+        self.feature_server = grpc_client.get_feature_blocking_client("feature:50555")
+
+    def get(self, name: str = ""):
+        if name == "":
+            # TODO return all features
+            pass
+        else:
+            # TODO return the feature they asked for
+            pass
+        return StatusCodes.NO_CONTENT_204
+
+    @reqparams(name=str, openness=bool)
+    @authenticated()
+    def post(self, name: str, openness: bool, jwt: JWT):
+        if jwt.id != 214037134477230080:
+            return StatusCode.UNAUTHORIZED_401
+        #new_feature = message_type.Feature(name=feature_name, open=openness)
+        #result = self.feature_server.CreateFeature(new_feature)
+        #if result.success:
+            #return StatusCodes.OK_200
+        #else:
+            #return StatusCodes.INTERNAL_SERVER_ERROR_500
+
+        # TODO create a new feature with name and openness
+
+    @reqparams(openness=bool)
+    @authenticated()
+    def patch(self, name: str, openness: bool, jwt: JWT):
+        if jwt.id != 214037134477230080:
+            return StatusCode.UNAUTHORIZED_401
+        
+        # TODO set the feature to openness
+
+
+class Guild(Resource):
+
+    @authenticated()
+    def get(self, guild_id: int, jwt: JWT):
+        if jwt.id != 214037134477230080:
+            return StatusCode.UNAUTHORIZED_401
+
+        # TODO return list of features the guild is allowed to use
+
+    @reqparams(name=str, enabled=bool)
+    @authenticated()
+    def patch(self, guild_id: int, name: str, enabled: bool, jwt: JWT):
+        if jwt.id != 214037134477230080:
+            return StatusCode.UNAUTHORIZED_401
+
+        # TODO set feature {name} to be {enabled} on {guild_id}
+
+
+"""
+
+class ServerFeature(CustomResource):
+
+    def __init__(self):
+        self.feature_server = grpc_client.get_feature_blocking_client()
+        super().__init__()
+
+    @authenticated()
+    def get(self, guild: int, feature: str, jwt: JWT):
+        msg = message_type.GuildFeature(feature_name=feature,
+                                        guild_id=guild)
+        enabled = self.feature_server.CheckGuildFeature(msg)
+        return StatusCodes.OK_200, {"enabled", enabled.has_feature}
+
+    @authenticated()
+    def post(self, guild: int, feature: str, jwt: JWT):
+        admin = False
+        johny = False
+        if jwt.id in self.shard.settings['admins_id']:
+            admin = True
+        if jwt.id == 214037134477230080:
+            johny = True
+
+        if (not self.check_open(feature)) and not johny:
+            return StatusCodes.UNAUTHORIZED_401
+        elif not admin:
+            return StatusCodes.UNAUTHORIZED_401
+        msg = message_type.FeatureAddition(feature_name=feature,
+                                           guild_id=guild)
+        result = self.feature_server.grpc_client.AddGuildFeature(msg)
+        if result.success:
+            return StatusCodes.OK_200
+        else:
+            return StatusCodes.INTERNAL_SERVER_ERROR_500
+
+    @authenticated()
+    def delete(self, guild: int, feature: str, jwt: JWT):
+        if jwt.id in self.shard.settings['admins_id']:
+            admin = True
+        if jwt.id == 214037134477230080:
+            johny = True
+        if not (johny or admin):
+            return StatusCodes.UNAUTHORIZED_401
+        msg = message_type.FeatureRemoval(feature_name=feature,
+                                          guild_id=guild)
+        result = self.feature_server.RemoveGuildFeature(msg)
+        if result.success:
+            return StatusCodes.OK_200
+        else:
+            return StatusCodes.INTERNAL_SERVER_ERROR_500
+
+    def check_open(self, feature: str):
+        msg = message_type.FeatureName(name=feature)
+        return self.feature_server.CheckOpenness(msg).open
+"""
+
+
 @app.route('/status')
 def status():
     return "all systems operational", StatusCodes.NO_CONTENT_204
@@ -213,4 +328,9 @@ def app_factory():
     api.add_resource(GuildCounter, "/guild-count")
     api.add_resource(Invite, "/invite/<int:guild_id>")
     api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
+    api.add_resource(Feature, "/feature", "/feature/<string:name>")
+    api.add_resource(Guild, "/guild/<int:guild_id>")
+    #api.add_resource(ServerFeature, "/serverfeature/<int:guild>/<string:feature",
+                     #"/serverfeature/<int:guild>/<string:feature>",
+                     #"/serverfeature/<int:guild>/<string:feature>")
     return app

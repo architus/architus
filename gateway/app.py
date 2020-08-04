@@ -8,7 +8,7 @@ from jwt.exceptions import InvalidTokenError
 
 from lib.config import which_shard, logger, is_prod, domain_name
 from lib.auth import JWT, gateway_authenticated as authenticated
-from lib.ipc.grpc_client import get_async_client
+from lib.ipc.grpc_client import get_manager_async_client
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
 from lib.ipc.async_rpc_server import start_server
@@ -28,7 +28,7 @@ sio.attach(app)
 loop = asyncio.get_event_loop()
 shard_client = shardRPC(loop)
 event_subscriber = Subscriber(loop)
-manager_client = get_async_client('manager:50051')
+manager_client = get_manager_async_client('manager:50051')
 
 auth_nonces = {}
 

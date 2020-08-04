@@ -14,6 +14,7 @@ use diesel::connection::Connection;
 use diesel::PgConnection;
 use log::{info, warn};
 use std::env;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tonic::{transport::Server, Request, Response, Status};
 
@@ -264,14 +265,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     simple_logger::init_with_level(log::Level::Info).unwrap();
     let db_usr = env::var("db_user").expect("Need to have an architus.env file");
     let db_pass = env::var("db_pass").expect("Need to have an architus.env file");
-    let database_url = format!("postgresql://{}{}@postgres:5432/autbot", db_usr, db_pass);
+    let database_url = format!("postgresql://{}:{}@postgres:5432/autbot", db_usr, db_pass);
 
     let addr = "0.0.0.0:50555".parse()?;
     let gate = Gate {
         db_addr: database_url,
     };
 
+    info!("Feature server starting");
     Server::builder()
+        .tcp_keepalive(Some(Duration::from_millis(10_000)))
+        .timeout(Duration::from_millis(5_000))
         .add_service(FeatureGateServer::new(gate))
         .serve(addr)
         .await?;

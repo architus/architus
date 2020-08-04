@@ -23,7 +23,7 @@ class Architus(Bot):
         self.hoarfrost_gen = HoarFrostGenerator()
 
         logger.debug("registering with manager...")
-        manager_client = grpc_client.get_blocking_client('manager:50051')
+        manager_client = grpc_client.get_manager_blocking_client('manager:50051')
         while True:
             try:
                 shard_info = manager_client.register(message.RegisterRequest())
@@ -50,7 +50,8 @@ class Architus(Bot):
             )
         )
 
-        self.manager_client = grpc_client.get_async_client('manager:50051')
+        self.manager_client = grpc_client.get_manager_async_client('manager:50051')
+        self.feature_client = grpc_client.get_feature_async_client('feature:50555')
 
         self.loop.create_task(self.emitter.connect())
 
