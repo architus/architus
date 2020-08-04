@@ -187,25 +187,57 @@ class Feature(Resource):
     def __init__(self):
         self.feature_server = grpc_client.get_feature_blocking_client("feature:50555")
 
-    def get(self):
-        msg = message_type.FeatureList()
-        feats = self.feature_server.GetFeatures(msg)
-        features = []
-        for f in feats:
-            features.append([f.name, f.open])
-        return {"features": features}, StatusCodes.OK_200
+    def get(self, name: str = ""):
+        if name == "":
+            # TODO return all features
+            pass
+        else:
+            # TODO return the feature they asked for
+            pass
+        return StatusCodes.NO_CONTENT_204
 
+    @reqparams(name=str, openness=bool)
     @authenticated()
-    def post(self, feature_name: str, openness: bool, jwt: JWT):
+    def post(self, name: str, openness: bool, jwt: JWT):
         if jwt.id != 214037134477230080:
             return StatusCode.UNAUTHORIZED_401
-        new_feature = message_type.Feature(name=feature_name, open=openness)
-        result = self.feature_server.CreateFeature(new_feature)
-        if result.success:
-            return StatusCodes.OK_200
-        else:
-            return StatusCodes.INTERNAL_SERVER_ERROR_500
+        #new_feature = message_type.Feature(name=feature_name, open=openness)
+        #result = self.feature_server.CreateFeature(new_feature)
+        #if result.success:
+            #return StatusCodes.OK_200
+        #else:
+            #return StatusCodes.INTERNAL_SERVER_ERROR_500
 
+        # TODO create a new feature with name and openness
+
+    @reqparams(openness=bool)
+    @authenticated()
+    def patch(self, name: str, openness: bool, jwt: JWT):
+        if jwt.id != 214037134477230080:
+            return StatusCode.UNAUTHORIZED_401
+        
+        # TODO set the feature to openness
+
+
+class Guild(Resource):
+
+    @authenticated()
+    def get(self, guild_id: int, jwt: JWT):
+        if jwt.id != 214037134477230080:
+            return StatusCode.UNAUTHORIZED_401
+
+        # TODO return list of features the guild is allowed to use
+
+    @reqparams(name=str, enabled=bool)
+    @authenticated()
+    def patch(self, guild_id: int, name: str, enabled: bool, jwt: JWT):
+        if jwt.id != 214037134477230080:
+            return StatusCode.UNAUTHORIZED_401
+
+        # TODO set feature {name} to be {enabled} on {guild_id}
+
+
+"""
 
 class ServerFeature(CustomResource):
 
@@ -260,6 +292,7 @@ class ServerFeature(CustomResource):
     def check_open(self, feature: str):
         msg = message_type.FeatureName(name=feature)
         return self.feature_server.CheckOpenness(msg).open
+"""
 
 
 @app.route('/status')
@@ -286,8 +319,9 @@ def app_factory():
     api.add_resource(GuildCounter, "/guild-count")
     api.add_resource(Invite, "/invite/<int:guild_id>")
     api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
-    api.add_resource(Feature, "/feature", "/feature/<string:feature_name>/<bool:openness>")
-    api.add_resource(ServerFeature, "/serverfeature/<int:guild>/<string:feature",
-                     "/serverfeature/<int:guild>/<string:feature>",
-                     "/serverfeature/<int:guild>/<string:feature>")
+    api.add_resource(Feature, "/feature", "/feature/<string:name>")
+    api.add_resource(Guild, "/guild/<int:guild_id>")
+    #api.add_resource(ServerFeature, "/serverfeature/<int:guild>/<string:feature",
+                     #"/serverfeature/<int:guild>/<string:feature>",
+                     #"/serverfeature/<int:guild>/<string:feature>")
     return app
