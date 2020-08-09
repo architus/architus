@@ -1,4 +1,4 @@
-# [![architus](https://i.imgur.com/qfPmMBW.png)](https://archit.us)
+<h1><a href="https://archit.us/"><img alt="Architus" width="340" src="https://raw.githubusercontent.com/architus/architus/develop/readme/logo.svg" /></a></h1>
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Farchitus%2Farchitus.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Farchitus%2Farchitus?ref=badge_shield) [![API Uptime](https://img.shields.io/uptimerobot/ratio/7/m782992399-3443671051db8aeaecfe7434.svg?label=API%20uptime)](https://status.archit.us/)
 [![Style](https://github.com/architus/architus/workflows/Style/badge.svg?branch=develop)](https://github.com/architus/architus/actions)
