@@ -40,9 +40,15 @@ class MessageData:
 
 class GuildData:
 
-    def __init__(self, time_granularity=timedelta(days=1)):
+    def __init__(self, guild, dictionary, time_granularity=timedelta(days=1)):
+        self.guild = guild
+        self.dictionary = dictionary
+
+        self._join_dates = []
+
         self.message_count = 0
         self.word_count = 0
+        self.correct_word_count = 0
         self.words = Counter()
         self.mentions = Counter()
         self.members = Counter()
@@ -50,11 +56,22 @@ class GuildData:
         times_box = partial(defaultdict, int)
         self.times = defaultdict(times_box)
 
+    def count_correct(self, string):
+        '''returns the number of correctly spelled words in a string'''
+        return len([w for w in string.split() if w in self.dictionary or w.upper() in ('A', 'I')])
+
+    @property
+    def join_dates(self):
+        if self._join_dates is None:
+            self._join_dates = tuple(m.created_at for m in guild.members)
+        return self._join_dates
+
     async def process_message(self, msg):
         self.message_count += 1
 
         words = msg.content.split()
         self.word_count += len(words)
+        self.correct_word_count += self.count_correct(msg.content)
         self.words.update(words)
 
         date = msg.created_at - ((msg.created_at - DISCORD_EPOCH) % self.time_granularity)
@@ -72,10 +89,6 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         self.cache = defaultdict(list)
         with open('res/words/words.json') as f:
             self.dictionary = json.loads(f.read())
-
-    def count_correct(self, string):
-        '''returns the number of correctly spelled words in a string'''
-        return len([w for w in string.split() if w in self.dictionary or w.upper() in ('A', 'I')])
 
     async def cache_channel(self, channel):
         async for message in channel.history(limit=None, oldest_first=True):
