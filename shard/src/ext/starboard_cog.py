@@ -31,10 +31,10 @@ class StarboardCog(commands.Cog):
         em = discord.Embed(
             title=timezone_aware_format(message.created_at), description=message.content, colour=0x42f468)
         img = await message.author.avatar_url.read()
-        data = await self.bot.manager_client.publish_file(
+        data = await self.bot.manager_client.publish_file(iter([
             message_type.File(location='avatars',
                               name=str(message.author.id),
-                              file=img))
+                              file=img)]))
 
         em.set_author(name=message.author.display_name, icon_url=data.url)
         if message.embeds:
