@@ -50,8 +50,11 @@ class GuildData:
         self.word_count = 0
         self.correct_word_count = 0
         self.words = Counter()
+        self.correct_words = Counter()
+        self.member_words = Counter()
         self.mentions = Counter()
         self.members = Counter()
+        self.channels = Counter()
         self.time_granularity = time_granularity
         times_box = partial(defaultdict, int)
         self.times = defaultdict(times_box)
@@ -73,32 +76,58 @@ class GuildData:
         self.word_count += len(words)
         self.correct_word_count += self.count_correct(msg.content)
         self.words.update(words)
+        self.correct_words[msg.author.id] += self.count_correct(msg.content)
 
         date = msg.created_at - ((msg.created_at - DISCORD_EPOCH) % self.time_granularity)
         self.times[date][msg.author.id] += 1
 
         self.mentions.update(msg.mentions)
 
-        self.members.update((msg.author.id,))
+        self.members[msg.author.id] += 1
+
+        self.channels[msg.channel.id] += 1
+
+    @property
+    def channel_counts(self):
+        return dict(self.channels)
+
+    @property
+    def member_counts(self):
+        return dict(self.members)
+
+    @property
+    def mention_counts(self):
+        return dict(self.mentions)
+
+    @property
+    def mention_count(self):
+        return sum(self.mentions.values())
+    
+    @property
+    def word_count(self):
+        return sum(self.words.values())
+
+    @property
+    def word_counts(self):
+        return dict(self.member_words)
+
+    @property
+    def common_words(self):
+        return self.words.most_common(100)
+
+    @property
 
 
 class MessageStats(commands.Cog, name="Server Statistics"):
 
     def __init__(self, bot):
         self.bot = bot
-        self.cache = defaultdict(list)
         with open('res/words/words.json') as f:
             self.dictionary = json.loads(f.read())
 
     async def cache_channel(self, channel):
-        async for message in channel.history(limit=None, oldest_first=True):
-            self.cache[channel.guild.id].append(MessageData(
-                message.id,
-                message.author,
-                channel.id,
-                len(message.clean_content.split()),
-                self.count_correct(message.clean_content)
-            ))
+        async for msg in channel.history(limit=None, oldest_first=True):
+            self.cache[channel.guild.id].process_message(msg)
 
     async def cache_guild(self, guild):
         '''cache interesting information about all the messages in a guild'''
@@ -128,13 +157,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
     async def on_message(self, msg):
         if not msg.channel.guild:
             return
-        self.cache[msg.channel.guild.id].append(MessageData(
-            msg.id,
-            msg.author,
-            msg.channel.id,
-            len(msg.clean_content.split()),
-            self.count_correct(msg.clean_content)
-        ))
+        self.cache[msg.channel.guild.id].process_message(msg)
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
