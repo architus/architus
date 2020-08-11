@@ -31,6 +31,43 @@ def guilds_to_dicts(guilds):
         yield guild_dict
 
 
+async def guild_pool_response(shard_client, partial_event, payload, jwt):
+    returned_guilds = []
+
+    async def cached_response(shard_id, returned_guilds):
+        resp, sc = await shard_client.users_guilds(jwt.id, routing_key=f"shard_rpc_{shard_id}")
+        if sc != 200:
+            logger.error(f"got bad response from `users_guilds` from shard: {shard_id}")
+            return
+        for g in resp:
+            g.update({'owner': g['owner_id'] == jwt.id})
+        if not payload['finished']:
+            payload.update({'data': resp})
+            returned_guilds += resp
+            await partial_event(payload)
+
+    for i in range(NUM_SHARDS):
+        create_task(cached_response(i, returned_guilds))
+
+    resp, sc = await async_list_guilds_request(jwt)
+    if sc != s.OK_200:
+        logger.error(f"discord returned error from guild_list: {resp}")
+        return
+    remaining = []
+    ids = [g['id'] for g in returned_guilds]
+    for guild in resp:
+        if str(guild['id']) not in ids:
+            mem_resp, _ = await shard_client.is_member(
+                jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
+            guild.update({
+                'has_architus': mem_resp['member'],
+                'architus_admin': mem_resp['admin'],
+            })
+            remaining.append(guild)
+    payload.update({'data': remaining, 'finished': True})
+    await partial_event(payload)
+
+
 class GuildPool:
     def __init__(self, manager_client, shard_client, jwt):
         self.manager_client = manager_client
