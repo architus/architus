@@ -67,11 +67,11 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
     ids = [g['id'] for g in returned_guilds]
     for guild in resp:
         if str(guild['id']) not in ids:
-            mem_resp, _ = await shard_client.is_member(
+            mem_resp, sc = await shard_client.is_member(
                 jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
             guild.update({
-                'has_architus': mem_resp['member'],
-                'architus_admin': mem_resp['admin'],
+                'has_architus': mem_resp['member'] if sc == 200 else False,
+                'architus_admin': mem_resp['admin'] if sc == 200 else False,
             })
             remaining.append(guild)
     payload.update({'data': remaining, 'finished': True})
