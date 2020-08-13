@@ -153,7 +153,9 @@ class CustomNamespace(socketio.AsyncNamespace):
         if type == PoolType.GUILD:
             logger.debug(f"all guilds requested for {jwt.id}")
             payload = {'_id': _id, 'nonexistant': [], 'finished': False}
-            await guild_pool_response(shard_client, partial(sio.emit, 'pool_response', room=f'{sid}_auth'), payload, jwt)
+            error = partial(self.error, _id=_id, room=sid)
+            response = partial(sio.emit, 'pool_response', room=f'{sid}_auth')
+            await guild_pool_response(shard_client, response, error, payload, jwt)
             return
 
         else:

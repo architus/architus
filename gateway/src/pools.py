@@ -31,13 +31,18 @@ def guilds_to_dicts(guilds):
         yield guild_dict
 
 
-async def guild_pool_response(shard_client, partial_event, payload, jwt):
+async def guild_pool_response(shard_client, partial_event, partial_error, payload, jwt):
     returned_guilds = []
 
     async def cached_response(shard_id, returned_guilds):
         resp, sc = await shard_client.users_guilds(jwt.id, routing_key=f"shard_rpc_{shard_id}")
         if sc != 200:
             logger.error(f"got bad response from `users_guilds` from shard: {shard_id}")
+            await partial_error(
+                message=f"shard {shard_id} returned error fetching guilds",
+                human="An error occured. Some servers may be temporarily unavailable.",
+                context=[resp],
+                code=sc)
             return
         for g in resp:
             g.update({'owner': g['owner_id'] == jwt.id})
@@ -52,6 +57,11 @@ async def guild_pool_response(shard_client, partial_event, payload, jwt):
     resp, sc = await async_list_guilds_request(jwt)
     if sc != s.OK_200:
         logger.error(f"discord returned error from guild_list: {resp}")
+        await partial_error(
+            message=f"discord returned error fetching guilds",
+            human="There was a problem connecting to discord. Some servers may be unavailable.",
+            context=[resp],
+            code=sc)
         return
     remaining = []
     ids = [g['id'] for g in returned_guilds]
