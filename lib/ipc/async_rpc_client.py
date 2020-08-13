@@ -1,9 +1,11 @@
 import uuid
 import json
+import asyncio
 from functools import partial
 from aio_pika import IncomingMessage, Message
 
 from lib.ipc.util import poll_for_async_connection
+from lib.config import logger
 
 
 class shardRPC:
