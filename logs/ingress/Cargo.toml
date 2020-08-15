@@ -24,3 +24,7 @@ git = "https://github.com/Lakelezz/serenity"
 branch = "await"
 default-features = false
 features = ["client", "model", "gateway", "native_tls_backend", "cache", "utils", "framework", "standard_framework"]
+
+[dependencies.jmespath]
+git = "https://github.com/jmespath/jmespath.rs"
+features = ["sync"]
