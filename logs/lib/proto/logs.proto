@@ -1,0 +1,152 @@
+syntax = "proto3";
+package Logs;
+
+service LogStore {
+    rpc submit(SubmitRequest) returns (Empty) {}
+    rpc submit_spread(SubmitSpreadRequest) returns (Empty) {}
+}
+
+message SubmitRequest {
+    Event event = 1;
+}
+
+message SubmitSpreadRequest {
+    Event event = 1;
+    repeated fixed64 guild_ids = 2;
+}
+
+message Empty {}
+
+message EventSource {
+    // Source gateway event inner object (optional)
+    string gateway = 1;
+    // Source audit log entry entity object (optional)
+    string audit_log = 2;
+}
+
+enum EventOrigin {
+    Unknown = 0;
+    // Action originated from the gateway and was caught as it originated
+    Gateway = 1;
+    // Action originated from the audit log
+    AuditLog = 2;
+    // Gateway events that also incorporate a corresponding audit log entry
+    Hybrid = 3;
+    // Action originated from a scheduled recovery job where the bot knew it had
+    // ingestion downtime and ran a recovery job to collect all relevant origin/update events
+    ScheduledRecovery = 4;
+    // Action originated from an unscheduled recovery job where the bot was
+    // scanning history and verifying that the logs have the up-to-date state
+    UnscheduledRecovery = 5;
+    // Action comes from the internal logs endpoint
+    Logs = 6;
+    // Action comes from some other internal process
+    Internal = 7;
+}
+
+enum EventType {
+    UnknownType = 0;
+
+    GuildUpdate = 1;
+    ChannelCreate = 10;
+    ChannelUpdate = 11;
+    ChannelDelete = 12;
+    ChannelOverwriteCreate = 13;
+    ChannelOverwriteUpdate = 14;
+    ChannelOverwriteDelete = 15;
+    MemberKick = 20;
+    MemberPrune = 21;
+    MemberBanAdd = 22;
+    MemberBanRemove = 23;
+    MemberUpdate = 24;
+    MemberRoleUpdate = 25;
+    MemberMove = 26;
+    MemberDisconnect = 27;
+    BotAdd = 28;
+    RoleCreate = 30;
+    RoleUpdate = 31;
+    RoleDelete = 32;
+    InviteCreate = 40;
+    InviteUpdate = 41;
+    InviteDelete = 42;
+    WebhookCreate = 50;
+    WebhookUpdate = 51;
+    WebhookDelete = 52;
+    EmojiCreate = 60;
+    EmojiUpdate = 61;
+    EmojiDelete = 62;
+    MessageDelete = 72;
+    MessageBulkDelete = 73;
+    MessagePin = 74;
+    MessageUnpin = 75;
+    IntegrationCreate = 80;
+    IntegrationUpdate = 81;
+    IntegrationDelete = 82;
+
+    MessageSend = 3001;
+    MessageEdit = 3002;
+    ReactionAdd = 3003;
+    ReactionRemove = 3004;
+    ReactionRemoveAll = 3005;
+    MemberJoin = 3006;
+    MemberLeave = 3007;
+    GuildUnavailable = 3008;
+    VoiceStateUpdate = 3009;
+    VoiceServerUpdate = 3010;
+
+    AutoResponseCreate = 3100;
+    AutoResponseUpdate = 3101;
+    AutoResponseDelete = 3102;
+    AutoResponseTrigger = 3103;
+    
+    LogRevert = 3200;
+    LogRollback = 3201;
+    LogRecoveryRun = 3202;
+
+    CustomEmojiCreate = 3300;
+    CustomEmojiUpdate = 3301;
+    CustomEmojiDelete = 3302;
+    CustomEmojiUse = 3303;
+    CustomEmojiCache = 3304;
+    CustomEmojiLoad = 3305;
+
+    SettingsUpdate = 3400;
+
+    ArchitusJoin = 4000;
+    ArchitusLeave = 4001;
+    UserPrivacyUpdate = 4002;
+
+    LogDebug = 9000;
+    LogInfo = 9001;
+    LogWarn = 9002;
+    LogError = 9003;
+    LogCritical = 9004;
+}
+
+message Event {
+    // Id using snowflake format;
+    // using the *time that the event was received by wherever it's ingested*
+    // (effectively required)
+    fixed64 id = 1;
+    // Unix timestamp of the *time of the underlying event* (if available),
+    // else some meaningful timestamp describing when the event was ingested
+    // (effectively required)
+    uint64 timestamp = 2;
+    // The source data; including the original gateway/audit log entries
+    EventSource source = 3;
+    // The origin type of the event
+    EventOrigin origin = 4;
+    // The type of action the event is
+    EventType type = 5;
+    // Related guild the event ocurred in
+    fixed64 guild_id = 6;
+    // Id of the entity that caused the event to occur
+    fixed64 agent_id = 7;
+    // Id of the entity that the event is about/affects
+    // (can be any Id type)
+    fixed64 subject_id = 8;
+    // Id of the corresponding audit log entry this event corresponds to; if any
+    // (included for indexing purposes)
+    fixed64 audit_log_id  = 9;
+}
+

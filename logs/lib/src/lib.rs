@@ -37,7 +37,7 @@ impl ActionOrigin {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize_repr, Deserialize_repr)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum AuditLogEntryType {
     GuildUpdate = 1,
