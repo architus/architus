@@ -26,7 +26,8 @@ async def connect():
     #print(f"requesting spectate guild {guild_id}")
     #await sio.emit('spectate', guild_id)
 
-    #await sio.emit('pool_all_request', {'type': 'guild', 'guildId': guild_id, '_id': 1})
+    for i in range(10):
+        await sio.emit('pool_all_request', {'type': 'guild', 'guildId': guild_id, '_id': 1})
    # await sio.emit('pool_all_request', {'type': 'member', 'guildId': guild_id, '_id': 2})
     #await sio.emit('pool_all_request', {'type': 'role', 'guildId': guild_id, '_id': 3})
     #await sio.emit('pool_all_request', {'type': 'autoResponse', 'guildId': guild_id, '_id': 5})
@@ -63,8 +64,8 @@ async def mock_bot_event(*data):
 
 async def start_server():
     print('hello I\'m a UI :)')
-    #await sio.connect('https://gateway.develop.archit.us')
-    await sio.connect('http://gateway.local.archit.us:6000')
+    await sio.connect('https://gateway.develop.archit.us')
+    #await sio.connect('http://gateway.local.archit.us:6000')
     await sio.wait()
 
 
