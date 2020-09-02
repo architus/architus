@@ -177,7 +177,8 @@ class AutoResponse:
             content.append(msg.author.display_name)
         elif (node.type == NodeType.Capture):
             with suppress(IndexError):
-                content.append(match.groups()[node.capture_group])
+                string = match.groups()[node.capture_group]
+                content.append(string if string is not None else "")
 
         elif (node.type == NodeType.Url):
             content.append(node.text)
