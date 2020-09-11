@@ -72,10 +72,15 @@ class Architus(Bot):
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
             name=f"the tragedy of darth plagueis the wise {self.shard_id}", type=2))
-        try:
-            await self.manager_client.guild_update(self.guilds_as_message)
-        except Exception:
-            logger.info(f"Shard {self.shard_id} failed to send manager its guild list")
+        while True:
+            try:
+                await self.manager_client.guild_update(self.guilds_as_message)
+            except Exception:
+                logger.exception(
+                    f"Shard {self.shard_id} failed to send manager its guild list... trying again in a bit")
+                await asyncio.sleep(10)
+            else:
+                return
 
     async def on_guild_join(self, guild):
         logger.info(f" -- JOINED NEW GUILD: {guild.name} -- ")

@@ -56,10 +56,10 @@ class EmojiManager:
             emoji.author_id,
             self.guild.id,
             emoji.name,
+            await emoji.url(),
             emoji.num_uses,
             emoji.priority,
-            binary,
-            await emoji.url()
+            binary
         ))
 
     async def _update_emojis_db(self, emojis_list: List[ArchitusEmoji]) -> None:
@@ -180,6 +180,9 @@ class EmojiManager:
 
     async def cache_emoji(self, emoji: ArchitusEmoji) -> None:
         """remove an emoji from the guild"""
+        if not self.settings.manage_emojis:
+            logger.warning(f"looks like someone tried to cache an emoji ({emoji} from {self.guild.name}) when they shouldn't have :/")
+            return
         discord_emoji = self.bot.get_emoji(emoji.discord_id)
         if discord_emoji is None:
             return

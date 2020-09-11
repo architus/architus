@@ -13,6 +13,7 @@ import time
 
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 MIGRATIONS_DIR = os.path.join(BASE_DIR, "migrations")
+CLEANUP_DIR = os.path.join(BASE_DIR, "cleanup")
 CURRENT_MIGRATIONS_DIR = os.path.join(BASE_DIR, "current_migration")
 CURRENT_MIGRATION_FILE = "current.out"
 PSQL_USER = os.getenv('db_user')
@@ -22,20 +23,24 @@ def main():
     configure_psql_env_vars()
     print("Running db migration manager")
     current_migration = get_current_migration()
-    to_run = get_new_migrations(current_migration)
-    if to_run:
-        print(f"Running migrations: {to_run}")
-        run_migrations(to_run)
+    new_migrations = get_new_migrations(current_migration)
+    if new_migrations:
+        print(f"Running migrations: {list(map(os.path.basename, new_migrations))}")
+        run_migration_scripts(new_migrations)
     else:
         print("No migrations to run")
 
+    cleanup_scripts = get_cleanup_scripts()
+    print(f"Running Cleanup Scripts: {[os.path.basename(script) for script in cleanup_scripts]}")
+    run_scripts(cleanup_scripts)
 
-def run_migrations(sql_names):
+
+def run_scripts(file_paths):
     """
-    Runs all migration SQL files in the order given
+    Runs all of the SQL scripts given their file paths
     """
-    for file_name in sql_names:
-        exitcode = execute_sql_script(os.path.join(MIGRATIONS_DIR, file_name))
+    for file_name in file_paths:
+        exitcode = execute_sql_script(file_name)
         if exitcode == 2:
             # retry once if connection to server fails
             print("failed to connect to postgres server. Retrying in 20 Seconds...")
@@ -45,8 +50,15 @@ def run_migrations(sql_names):
         if exitcode != 0:
             raise Exception(f"oh no, {file_name} failed to execute")
 
+
+def run_migration_scripts(migration_files):
+    """
+    Runs all migration SQL files in the order given
+    """
+    run_scripts(migration_files)
+
     current_path = os.path.join(CURRENT_MIGRATIONS_DIR, CURRENT_MIGRATION_FILE)
-    last_migration = sql_names[-1]
+    last_migration = os.path.basename(migration_files[-1])
     with open(current_path, "w") as file:
         print(f"Saving last-run migration '{last_migration}' to disk at {current_path}")
         file.write(last_migration)
@@ -62,23 +74,32 @@ def execute_sql_script(file):
     return process.returncode
 
 
+def get_cleanup_scripts():
+    """
+    Gets all of the cleanup scripts to run.
+    """
+    cleanup_scripts = get_all_files(CLEANUP_DIR, suffix=".sql")
+    return [os.path.join(CLEANUP_DIR, f) for f in cleanup_scripts]
+
+
 def get_new_migrations(current):
     """
     Gets all new migration scripts to run from the given one
     """
-    migrations = get_all_files(MIGRATIONS_DIR, suffix=".sql")
-    migrations.sort()
+    base_migrations = get_all_files(MIGRATIONS_DIR, suffix=".sql")
+    base_migrations.sort()
+    full_path_migrations = [os.path.join(MIGRATIONS_DIR, f) for f in base_migrations]
 
     if current is None:
-        return migrations
+        return full_path_migrations
 
     try:
-        idx = migrations.index(current) + 1
-        return migrations[idx:]
+        idx = base_migrations.index(current) + 1
+        return full_path_migrations[idx:]
     except ValueError:
         # If the current migration was not in the list, run every migration again
         print("An error occurred while detecting the last-run migration. Running all migrations again")
-        return migrations
+        return full_path_migrations
 
 
 def get_current_migration():

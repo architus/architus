@@ -49,7 +49,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
                 react_msg = await msg.channel.send(
                     f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, "
                     f"created by {author}\n:x: to remove this auto response")
-                await react_msg.add_reaction("❌")
+                # await react_msg.add_reaction("❌")
                 self.react_msgs[react_msg.id] = self.response_msgs[msg.id]
                 del self.response_msgs[msg.id]
         elif not user.bot and str(react.emoji) == "❌":

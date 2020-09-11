@@ -1,5 +1,6 @@
 import json
 import asyncio
+from functools import partial
 
 from aiohttp import web
 import socketio
@@ -15,7 +16,7 @@ from lib.ipc.async_rpc_server import start_server
 from lib.status_codes import StatusCodes as s
 from lib.pool_types import PoolType
 
-from src.pools import GuildPool
+from src.pools import guild_pool_response
 
 
 sio = socketio.AsyncServer(
@@ -150,28 +151,11 @@ class CustomNamespace(socketio.AsyncNamespace):
         guild_id = data.get('guildId', None)
         type = data['type']
         if type == PoolType.GUILD:
-            pool = GuildPool(manager_client, shard_client, jwt)
-
-            await sio.emit(
-                'pool_response',
-                {
-                    '_id': _id,
-                    'finished': False,
-                    'nonexistant': [],
-                    'data': await pool.fetch_architus_guilds(),
-                },
-                room=f"{sid}_auth"
-            )
-            await sio.emit(
-                'pool_response',
-                {
-                    '_id': _id,
-                    'finished': True,
-                    'nonexistant': [],
-                    'data': await pool.fetch_remaining_guilds(),
-                },
-                room=f"{sid}_auth"
-            )
+            logger.debug(f"all guilds requested for {jwt.id}")
+            payload = {'_id': _id, 'nonexistant': [], 'finished': False}
+            error = partial(self.error, _id=_id, room=sid)
+            response = partial(sio.emit, 'pool_response', room=f'{sid}_auth')
+            await guild_pool_response(shard_client, response, error, payload, jwt)
             return
 
         else:
