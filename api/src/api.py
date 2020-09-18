@@ -154,22 +154,12 @@ class Coggers(CustomResource):
 
 
 class Stats(CustomResource):
-    @authenticated(member=True)
-    def get(self, guild_id: int, jwt: JWT):
+    #@authenticated(member=True)
+    def get(self, guild_id: int):#, jwt: JWT):
         '''Request message count statistics from shard and return'''
-        msg_data, _ = self.shard.bin_messages(guild_id, routing_guild=guild_id)
-        guild_data, _ = self.shard.get_guild_data(guild_id, routing_guild=guild_id)
-        return {
-            'members': {
-                'count': guild_data['member_count'],
-            },
-            'messages': {
-                'count': msg_data['total'],
-                'channels': msg_data['channels'],
-                'members': msg_data['members'],
-                'times': msg_data['times'],
-            }
-        }, StatusCodes.OK_200
+        data, sc = self.shard.bin_messages(guild_id, routing_guild=guild_id)
+        camelcase_keys(data)
+        return data, sc
 
 
 class Emojis(CustomResource):

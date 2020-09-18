@@ -152,15 +152,21 @@ class Api(Cog):
             return {"message": f"Extension Not Loaded: {e}"}, sc.SERVICE_UNAVAILABLE_503
         return {"message": "Reload signal sent"}, sc.OK_200
 
-    @fetch_guild
-    async def bin_messages(self, guild):
+    async def bin_messages(self, guild_id):
         stats_cog = self.bot.cogs["Server Statistics"]
-        members, channels, times = await stats_cog.bin_messages(guild, timedelta(days=1))
+        data = stats_cog.cache.get(guild_id, None)
+        if data is None:
+            return {}, sc.NOT_FOUND_404
         return {
-            'total': len(stats_cog.cache[guild.id]),
-            'members': members,
-            'channels': channels,
-            'times': times,
+            'member_count': data.member_count,
+            'architus_count': data.architus_count,
+            'message_count': data.message_count,
+            'common_words': data.common_words,
+            'mention_counts': data.mention_counts,
+            'member_counts': data.member_counts,
+            'channel_counts': data.channel_counts,
+            'time_member_counts': data.times_as_strings,
+            'up_to_date': data.up_to_date,
         }, sc.OK_200
 
     @fetch_guild

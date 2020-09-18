@@ -1,5 +1,5 @@
 from functools import partial
-from datetime import timedelta
+from datetime import timedelta, datetime
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
@@ -8,7 +8,8 @@ from discord import Forbidden, HTTPException
 import discord
 import json
 import aiohttp
-import asyncio
+import pytz
+from typing import Dict
 
 import src.generate.wordcount as wordcount_gen
 from src.generate import corona, member_growth
@@ -16,38 +17,18 @@ from lib.config import DISCORD_EPOCH, logger
 from lib.ipc import manager_pb2 as message_type
 
 
-async def gen(items):
-    for i in range(0, len(items), 250):
-        for e in items[i:i + 100]:
-            yield e
-        await asyncio.sleep(0.001)
-
-
-class MessageData:
-
-    def __init__(self, message_id, author, channel_id, total_words, correct_words):
-        self.message_id = message_id
-        self.author = author
-        self.channel_id = channel_id
-        self.total_words = total_words
-        self.correct_words = correct_words
-        self.cache_up_to_date = {}
-        self.created_at = DISCORD_EPOCH + timedelta(milliseconds=(self.message_id >> 22))
-
-    def __hash__(self):
-        return hash(self.message_id)
-
-
 class GuildData:
 
-    def __init__(self, guild, dictionary, time_granularity=timedelta(days=1)):
+    def __init__(self, bot, guild, dictionary, time_granularity=timedelta(days=1)):
+        self.bot = bot
+        self._up_to_date_after = pytz.utc.localize(datetime.now())
         self.guild = guild
         self.dictionary = dictionary
+        self.forbidden = False
 
         self._join_dates = []
 
         self.message_count = 0
-        self.word_count = 0
         self.correct_word_count = 0
         self.words = Counter()
         self.correct_words = Counter()
@@ -64,28 +45,54 @@ class GuildData:
         return len([w for w in string.split() if w in self.dictionary or w.upper() in ('A', 'I')])
 
     @property
+    def up_to_date(self):
+        return self._up_to_date_after == DISCORD_EPOCH
+
+    @property
+    def up_to_date_after(self):
+        return self._up_to_date_after
+
+    @up_to_date_after.setter
+    def up_to_date_after(self, after: datetime):
+        if after.tzinfo is None:
+            after = pytz.utc.localize(after)
+        self._up_to_date_after = max(DISCORD_EPOCH, after)
+
+    @property
     def join_dates(self):
         if self._join_dates is None:
-            self._join_dates = tuple(m.created_at for m in guild.members)
+            self._join_dates = tuple(m.created_at for m in self.guild.members)
         return self._join_dates
 
     async def process_message(self, msg):
         self.message_count += 1
 
-        words = msg.content.split()
-        self.word_count += len(words)
+        words = [w.lower() for w in msg.content.split()]
         self.correct_word_count += self.count_correct(msg.content)
         self.words.update(words)
         self.correct_words[msg.author.id] += self.count_correct(msg.content)
+        self.member_words[msg.author.id] += len(words)
 
-        date = msg.created_at - ((msg.created_at - DISCORD_EPOCH) % self.time_granularity)
+        date = msg.created_at - ((pytz.utc.localize(msg.created_at) - DISCORD_EPOCH) % self.time_granularity)
         self.times[date][msg.author.id] += 1
 
-        self.mentions.update(msg.mentions)
+        self.mentions.update([m.id for m in msg.mentions])
 
         self.members[msg.author.id] += 1
 
         self.channels[msg.channel.id] += 1
+
+    @property
+    def architus_count(self):
+        return self.members.get(self.bot.user.id, 0)
+
+    @property
+    def member_count(self):
+        return self.guild.member_count
+
+    @property
+    def times_as_strings(self):
+        return {k.isoformat(): v for k, v in self.times.items()}
 
     @property
     def channel_counts(self):
@@ -102,7 +109,7 @@ class GuildData:
     @property
     def mention_count(self):
         return sum(self.mentions.values())
-    
+
     @property
     def word_count(self):
         return sum(self.words.values())
@@ -115,53 +122,61 @@ class GuildData:
     def common_words(self):
         return self.words.most_common(100)
 
-    @property
-
 
 class MessageStats(commands.Cog, name="Server Statistics"):
 
     def __init__(self, bot):
         self.bot = bot
+        self.cache = {}  # type: Dict[int, GuildData]
         with open('res/words/words.json') as f:
             self.dictionary = json.loads(f.read())
 
-    async def cache_channel(self, channel):
-        async for msg in channel.history(limit=None, oldest_first=True):
-            self.cache[channel.guild.id].process_message(msg)
+    async def cache_guilds_history(self):
+        while not all(d.up_to_date for d in self.cache.values()):
+            for guild_d in self.cache.values():
+                if guild_d.up_to_date:
+                    continue
+                before = guild_d.up_to_date_after
+                after = max(before - timedelta(days=30), DISCORD_EPOCH)
+                msgs = []
+                for ch in guild_d.guild.text_channels:
+                    try:
+                        async for msg in ch.history(
+                                before=before.replace(tzinfo=None), after=after.replace(tzinfo=None)):
+                            msgs.append(msg)
+                    except Forbidden:
+                        guild_d.forbidden = True
+                    except HTTPException:
+                        logger.exception("error while downloading '{guild.name}.{channel.name}'")
+                        break
+                else:
+                    for msg in msgs:
+                        await guild_d.process_message(msg)
+                    guild_d.up_to_date_after = after
 
-    async def cache_guild(self, guild):
-        '''cache interesting information about all the messages in a guild'''
-        logger.debug(f"Downloading messages in {len(guild.channels)} channels for '{guild.name}'...")
-        for channel in guild.text_channels:
-            try:
-                await self.cache_channel(channel)
-            except Forbidden:
-                logger.warning(f"Insuffcient permissions to download messages from '{guild.name}.{channel.name}'")
-            except HTTPException as e:
-                logger.error(f"Caught {e} when downloading '{guild.name}.{channel.name}'")
-                logger.error("trying again in 10 seconds...")
-                await asyncio.sleep(10)
-                try:
-                    await self.cache_channel(channel)
-                except Exception:
-                    logger.exception("failed to download channel a second time, giving up :(")
+    def append_warning(self, data: GuildData, em: discord.Embed):
+        if not data.up_to_date:
+            em.set_footer(
+                text=f"Still indexing data before {data.up_to_date_after}",
+                icon_url="https://emojipedia-us.s3.dualstack.us-west-1"
+                         ".amazonaws.com/thumbs/120/twitter/259/warning_26a0.png")
 
     @commands.Cog.listener()
     async def on_ready(self):
         logger.debug(f"Caching messages for {len(self.bot.guilds)} guilds...")
-        for guild in self.bot.guilds:
-            await self.cache_guild(guild)
+        self.cache = {g.id: GuildData(self.bot, g, self.dictionary) for g in self.bot.guilds}
+        await self.cache_guilds_history()
         logger.debug(f"Message cache up-to-date for {len(self.bot.guilds)} guilds...")
 
     @commands.Cog.listener()
     async def on_message(self, msg):
         if not msg.channel.guild:
             return
-        self.cache[msg.channel.guild.id].process_message(msg)
+        await self.cache[msg.channel.guild.id].process_message(msg)
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        await self.cache_guild(guild)
+        await self.cache_guilds_history()
 
     @commands.command(aliases=['exclude'])
     async def optout(self, ctx):
@@ -192,62 +207,37 @@ class MessageStats(commands.Cog, name="Server Statistics"):
     @commands.command()
     async def spellcheck(self, ctx, victim: discord.Member):
         '''Checks the spelling of a user'''
-        if ctx.author.id in self.bot.settings[ctx.guild].stats_exclude:
+        if victim.id in self.bot.settings[ctx.guild].stats_exclude:
             await ctx.send(f"Sorry, {victim.display_name} has requested that their stats not be recorded :confused:")
             return
-        words = 1
-        correct_words = 0
-        async with ctx.channel.typing():
-            async for msgdata in gen(self.cache[ctx.guild.id]):
-                if msgdata.author.id == victim.id:
-                    words += msgdata.total_words
-                    correct_words += msgdata.correct_words
-        ratio = correct_words / words * 100
-        await ctx.send(f"{ratio:.1f}% of the {words:,} words sent by {victim.display_name} are spelled correctly.")
-
-    async def count_messages(self, guild):
-        '''Count the total messages a user has sent in the server'''
-        word_counts = {}
-        message_counts = {}
-        async for msgdata in gen(self.cache[guild.id]):
-            if msgdata.author.id in self.bot.settings[guild].stats_exclude:
-                continue
-            message_counts[msgdata.author] = message_counts.get(msgdata.author, 0) + 1
-            word_counts[msgdata.author] = word_counts.get(msgdata.author, 0) + msgdata.total_words
-
-        return message_counts, word_counts
-
-    async def bin_messages(self, guild, time_granularity: timedelta):
-        time_bins = defaultdict(int)
-        member_bins = defaultdict(int)
-        channel_bins = defaultdict(int)
-        async for msgdata in gen(self.cache[guild.id]):
-            date = msgdata.created_at - ((msgdata.created_at - DISCORD_EPOCH) % time_granularity)
-            time_bins[date.isoformat()] += 1
-            if msgdata.author.id not in self.bot.settings[guild].stats_exclude:
-                member_bins[msgdata.author.id] += 1
-            channel_bins[msgdata.channel_id] += 1
-        return member_bins, channel_bins, time_bins
+        data = self.cache[ctx.guild.id]
+        words = data.member_words[victim.id]
+        ratio = data.correct_words[victim.id] / (words or 1) * 100
+        msg = f"{ratio:.1f}% of the {words:,} words sent by {victim.display_name} are spelled correctly."
+        em = discord.Embed(title="Spellcheck", description=msg, color=0x03fc8c)
+        em.set_author(name=victim.display_name, icon_url=victim.avatar_url)
+        self.append_warning(data, em)
+        await ctx.send(embed=em)
 
     @commands.command()
     async def messagecount(self, ctx, victim: discord.Member = None):
-        async with ctx.channel.typing():
-            message_counts, word_counts = await self.count_messages(ctx.guild)
+        data = self.cache[ctx.guild.id]
 
         with ThreadPoolExecutor() as pool:
-            img = await self.bot.loop.run_in_executor(pool, wordcount_gen.generate, message_counts, word_counts, victim)
-        data = await self.bot.manager_client.publish_file(
+            img = await self.bot.loop.run_in_executor(
+                pool, wordcount_gen.generate, ctx.guild, data.members, data.member_words, victim)
+        resp = await self.bot.manager_client.publish_file(
             iter([message_type.File(file=img)]))
 
-        em = discord.Embed(title="Top 5 Message Senders", description=ctx.guild.name)
-        em.set_image(url=data.url)
-        em.color = 0x7b8fb7
+        em = discord.Embed(title="Top 5 Message Senders", description=ctx.guild.name, color=0x7b8fb7)
+        em.set_image(url=resp.url)
         if victim:
             if victim.id in self.bot.settings[ctx.guild].stats_exclude:
                 em.set_footer(text=f"{victim.display_name} has hidden their stats")
             else:
                 em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
-                    victim.display_name, word_counts[victim], message_counts[victim]), icon_url=victim.avatar_url)
+                    victim.display_name, data.member_words[victim], data.members[victim]), icon_url=victim.avatar_url)
+        self.append_warning(data, em)
 
         await ctx.channel.send(embed=em)
 

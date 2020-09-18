@@ -71,6 +71,7 @@ class EmojiManager:
                 'author_id': e.author_id,
                 'guild_id': self.guild.id,
                 'name': e.name,
+                'url': e.url,
                 'num_uses': e.num_uses,
                 'priority': e.priority,
             }, e.id)
@@ -181,7 +182,8 @@ class EmojiManager:
     async def cache_emoji(self, emoji: ArchitusEmoji) -> None:
         """remove an emoji from the guild"""
         if not self.settings.manage_emojis:
-            logger.warning(f"looks like someone tried to cache an emoji ({emoji} from {self.guild.name}) when they shouldn't have :/")
+            logger.warning(
+                f"looks like someone tried to cache an emoji ({emoji} from {self.guild.name}) when they shouldn't have")
             return
         discord_emoji = self.bot.get_emoji(emoji.discord_id)
         if discord_emoji is None:

@@ -56,6 +56,16 @@ def camelcase_keys(dictionary: dict):
     return dictionary
 
 
+def str_keys_recursive(dictionary):
+    try:
+        for k, v in dictionary.items():
+            dictionary[str(k)] = str_keys_recursive(v)
+            del dictionary[k]
+    except AttributeError:
+        pass
+    return dictionary
+
+
 def time_to_refresh(jwt: JWT):
     issued_at = datetime.strptime(jwt.issued_at, "%Y-%m-%dT%H:%M:%S.%f")
     refresh_in = timedelta(seconds=jwt.expires_in) / 2

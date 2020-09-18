@@ -12,13 +12,13 @@ from collections import namedtuple
 
 COLORS = ['b','g','r','c','m','k']
 
-def generate(message_counts, word_counts, victim) -> bytes:
+def generate(guild, message_counts, word_counts, victim) -> bytes:
     colors = random.sample(COLORS, 2)
     top_5_mesages = sorted(message_counts.items(), key=operator.itemgetter(1))[-5:]
 
-    if victim and victim not in [m[0] for m in top_5_mesages]:
+    if victim and victim.id not in [m[0] for m in top_5_mesages]:
         try:
-            top_5_mesages[0] = (victim, message_counts[victim])
+            top_5_mesages[0] = (victim.id, message_counts[victim])
         except (KeyError, IndexError):
             pass
 
@@ -44,7 +44,8 @@ def generate(message_counts, word_counts, victim) -> bytes:
     ax.set_xlabel('User')
     ax.set_ylabel('Count')
     ax.set_xticks(index + bar_width / 2)
-    ax.set_xticklabels([member.display_name for member, _ in reversed(top_5_mesages)])
+    ax.set_xticklabels([guild.get_member(member).display_name for member, _ in reversed(top_5_mesages)])
+    plt.xticks(rotation=30)
     ax.legend()
 
     fig.tight_layout()
