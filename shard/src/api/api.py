@@ -154,6 +154,7 @@ class Api(Cog):
 
     async def bin_messages(self, guild_id):
         stats_cog = self.bot.cogs["Server Statistics"]
+        emoji_manager = self.bot.cogs["Emoji Manager"].managers[guild_id]
         data = stats_cog.cache.get(guild_id, None)
         if data is None:
             return {}, sc.NOT_FOUND_404
@@ -167,6 +168,9 @@ class Api(Cog):
             'channel_counts': data.channel_counts,
             'time_member_counts': data.times_as_strings,
             'up_to_date': data.up_to_date,
+            'forbidden': data.forbidden,
+            'last_activity': data.last_activity.isoformat(),
+            'popular_emojis': [str(e.id) for e in emoji_manager.emojis[:10]],
         }, sc.OK_200
 
     @fetch_guild

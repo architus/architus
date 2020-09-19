@@ -9,7 +9,7 @@ import discord
 import json
 import aiohttp
 import pytz
-from typing import Dict
+from typing import Dict, List
 
 import src.generate.wordcount as wordcount_gen
 from src.generate import corona, member_growth
@@ -23,7 +23,7 @@ class GuildData:
         self.bot = bot
         self._up_to_date_after = pytz.utc.localize(datetime.now())
         self.guild = guild
-        self.dictionary = dictionary
+        self.dictionary, self.stops = dictionary
         self.forbidden = False
 
         self._join_dates = []
@@ -39,10 +39,25 @@ class GuildData:
         self.time_granularity = time_granularity
         times_box = partial(defaultdict, int)
         self.times = defaultdict(times_box)
+        self.last_activity = DISCORD_EPOCH
 
     def count_correct(self, string):
         '''returns the number of correctly spelled words in a string'''
         return len([w for w in string.split() if w in self.dictionary or w.upper() in ('A', 'I')])
+
+    def _filter_words(self, msg: discord.Message, words: List[str]):
+        if msg.author == self.bot.user:
+            return []
+        filtered = []
+        mentions = {m.mention: m.display_name for m in msg.mentions}
+        for w in words:
+            if w in self.stops:
+                continue
+            if w in mentions.keys():
+                filtered.append(mentions[w])
+            else:
+                filtered.append(w)
+        return filtered
 
     @property
     def up_to_date(self):
@@ -66,10 +81,11 @@ class GuildData:
 
     async def process_message(self, msg):
         self.message_count += 1
+        self.last_activity = msg.created_at
 
         words = [w.lower() for w in msg.content.split()]
         self.correct_word_count += self.count_correct(msg.content)
-        self.words.update(words)
+        self.words.update(self._filter_words(msg, words))
         self.correct_words[msg.author.id] += self.count_correct(msg.content)
         self.member_words[msg.author.id] += len(words)
 
@@ -120,7 +136,7 @@ class GuildData:
 
     @property
     def common_words(self):
-        return self.words.most_common(100)
+        return self.words.most_common(75)
 
 
 class MessageStats(commands.Cog, name="Server Statistics"):
@@ -130,6 +146,8 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         self.cache = {}  # type: Dict[int, GuildData]
         with open('res/words/words.json') as f:
             self.dictionary = json.loads(f.read())
+        with open('res/words/stops.json') as f:
+            self.stops = json.loads(f.read())
 
     async def cache_guilds_history(self):
         while not all(d.up_to_date for d in self.cache.values()):
@@ -164,7 +182,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
     @commands.Cog.listener()
     async def on_ready(self):
         logger.debug(f"Caching messages for {len(self.bot.guilds)} guilds...")
-        self.cache = {g.id: GuildData(self.bot, g, self.dictionary) for g in self.bot.guilds}
+        self.cache = {g.id: GuildData(self.bot, g, (self.dictionary, self.stops)) for g in self.bot.guilds}
         await self.cache_guilds_history()
         logger.debug(f"Message cache up-to-date for {len(self.bot.guilds)} guilds...")
 
