@@ -6,7 +6,7 @@ from flask_cors import CORS
 
 from lib.status_codes import StatusCodes
 from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod
-from lib.models import Log
+# from lib.models import Log # , Emojis
 from lib.auth import JWT, flask_authenticated as authenticated
 from lib.discord_requests import list_guilds_request
 from lib.pool_types import PoolType
@@ -155,17 +155,19 @@ class Coggers(CustomResource):
 
 class Stats(CustomResource):
     @authenticated(member=True)
-    def get(self, guild_id: int):#, jwt: JWT):
+    def get(self, guild_id: int, jwt: JWT):
         '''Request message count statistics from shard and return'''
         data, sc = self.shard.bin_messages(guild_id, routing_guild=guild_id)
         camelcase_keys(data)
         return data, sc
 
 
-class Emojis(CustomResource):
+class Emoji(CustomResource):
 
-    def get(self, guild_id: int):
-        return self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
+    def get(self, emoji_id: int):
+        pass
+        # self.session.query(Emojis).filter(Emojis.id == emoji_id).first()
+        # return self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
 
 
 class ListGuilds(CustomResource):
@@ -196,7 +198,7 @@ def app_factory():
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Stats, "/stats/<int:guild_id>")
-    api.add_resource(Emojis, "/emojis/<int:guild_id>")
+    api.add_resource(Emoji, "/emojis/<int:emoji_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")

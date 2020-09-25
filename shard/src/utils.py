@@ -4,6 +4,7 @@ from aiohttp import ClientSession
 import io
 import functools
 from threading import Lock
+from string import digits
 
 import discord
 
@@ -146,3 +147,22 @@ def bot_commands_only(cmd):
                         return
         return await cmd(self, ctx, *args, **kwargs)
     return bc_cmd
+
+
+def mention_to_name(guild: discord.Guild, mention: str):
+    if mention[0] != '<':
+        raise ValueError(f"this doesn't look like a mention str: {mention}")
+    id = int("".join([n for n in mention if n in digits]))
+    if mention[1] == '@':
+        member = guild.get_member(id)
+        if member is not None:
+            return f"@{member.display_name}"
+    elif mention[1] == '&':
+        rl = guild.get_role(id)
+        if rl is not None:
+            return f"@{rl.name}"
+    elif mention[1] == '#':
+        ch = guild.get_channel(id)
+        if ch is not None:
+            return f"#{ch.name}"
+    return mention

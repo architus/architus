@@ -10,11 +10,13 @@ import json
 import aiohttp
 import pytz
 from typing import Dict, List
+from string import punctuation
 
 import src.generate.wordcount as wordcount_gen
 from src.generate import corona, member_growth
 from lib.config import DISCORD_EPOCH, logger
 from lib.ipc import manager_pb2 as message_type
+from src.utils import mention_to_name
 
 
 class GuildData:
@@ -49,12 +51,11 @@ class GuildData:
         if msg.author == self.bot.user:
             return []
         filtered = []
-        mentions = {m.mention: m.display_name for m in msg.mentions}
         for w in words:
             if w in self.stops:
                 continue
-            if w in mentions.keys():
-                filtered.append(mentions[w])
+            elif w in punctuation:
+                continue
             else:
                 filtered.append(w)
         return filtered
@@ -136,7 +137,14 @@ class GuildData:
 
     @property
     def common_words(self):
-        return self.words.most_common(75)
+        words = self.words.most_common(75)
+        for i, pair in enumerate(words):
+            try:
+                name = mention_to_name(self.guild, pair[0])
+                words[i] = (name, pair[1])
+            except ValueError:
+                continue
+        return words
 
 
 class MessageStats(commands.Cog, name="Server Statistics"):
@@ -191,6 +199,14 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         if not msg.channel.guild:
             return
         await self.cache[msg.channel.guild.id].process_message(msg)
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        if before != self.bot.user:
+            return
+        if before.guild_permissions != after.guild_permissions:
+            self.cache[before.guild.id] = GuildData(self.bot, before.guild, (self.dictionary, self.stops))
+            await self.cache_guilds_history()
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
