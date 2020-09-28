@@ -1,5 +1,4 @@
 import secrets
-from datetime import timedelta
 from typing import List
 
 from discord.ext.commands import Cog, Context
@@ -152,24 +151,26 @@ class Api(Cog):
             return {"message": f"Extension Not Loaded: {e}"}, sc.SERVICE_UNAVAILABLE_503
         return {"message": "Reload signal sent"}, sc.OK_200
 
-    async def bin_messages(self, guild_id):
+    @fetch_guild
+    async def bin_messages(self, guild, member_id):
         stats_cog = self.bot.cogs["Server Statistics"]
-        emoji_manager = self.bot.cogs["Emoji Manager"].managers[guild_id]
-        data = stats_cog.cache.get(guild_id, None)
-        if data is None:
-            return {}, sc.NOT_FOUND_404
+        emoji_manager = self.bot.cogs["Emoji Manager"].managers[guild.id]
+        data = stats_cog.cache.get(guild.id, None)
+        member = guild.get_member(member_id)
+        if data is None or member is None:
+            return {'message': "unknown member or guild"}, sc.NOT_FOUND_404
         return {
             'member_count': data.member_count,
-            'architus_count': data.architus_count,
-            'message_count': data.message_count,
-            'common_words': data.common_words,
-            'mention_counts': data.mention_counts,
-            'member_counts': data.member_counts,
-            'channel_counts': data.channel_counts,
-            'time_member_counts': data.times_as_strings,
+            'architus_count': data.architus_count(member),
+            'message_count': data.message_count(member),
+            'common_words': data.common_words(member),
+            'mention_counts': data.mention_counts(member),
+            'member_counts': data.member_counts(member),
+            'channel_counts': data.channel_counts(member),
+            'time_member_counts': data.times_as_strings(member),
             'up_to_date': data.up_to_date,
             'forbidden': data.forbidden,
-            'last_activity': data.last_activity.isoformat(),
+            'last_activity': data.last_activity(member).isoformat(),
             'popular_emojis': [str(e.id) for e in emoji_manager.emojis[:10]],
         }, sc.OK_200
 

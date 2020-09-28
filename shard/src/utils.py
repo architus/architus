@@ -149,7 +149,7 @@ def bot_commands_only(cmd):
     return bc_cmd
 
 
-def mention_to_name(guild: discord.Guild, mention: str):
+def mention_to_name(guild: discord.Guild, mention: str) -> str:
     if mention[0] != '<':
         raise ValueError(f"this doesn't look like a mention str: {mention}")
     id = int("".join([n for n in mention if n in digits]))

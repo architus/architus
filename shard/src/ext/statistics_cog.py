@@ -1,4 +1,3 @@
-from functools import partial
 from datetime import timedelta, datetime
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -9,7 +8,7 @@ import discord
 import json
 import aiohttp
 import pytz
-from typing import Dict, List
+from typing import Dict, List, Counter as TCounter
 from string import punctuation
 
 import src.generate.wordcount as wordcount_gen
@@ -27,21 +26,20 @@ class GuildData:
         self.guild = guild
         self.dictionary, self.stops = dictionary
         self.forbidden = False
+        self.time_granularity = time_granularity
 
         self._join_dates = []
 
-        self.message_count = 0
-        self.correct_word_count = 0
-        self.words = Counter()
-        self.correct_words = Counter()
-        self.member_words = Counter()
-        self.mentions = Counter()
-        self.members = Counter()
+        self._last_activity = {}
+        self._message_count = Counter()
+        self.correct_word_count = Counter()
+        self.words = defaultdict(Counter)
+        self.correct_words = defaultdict(Counter)
+        self.member_words = defaultdict(Counter)
+        self.mentions = defaultdict(Counter)
+        self.members = defaultdict(Counter)
         self.channels = Counter()
-        self.time_granularity = time_granularity
-        times_box = partial(defaultdict, int)
-        self.times = defaultdict(times_box)
-        self.last_activity = DISCORD_EPOCH
+        self.times = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
 
     def count_correct(self, string):
         '''returns the number of correctly spelled words in a string'''
@@ -59,6 +57,17 @@ class GuildData:
             else:
                 filtered.append(w)
         return filtered
+
+    def _merge_counts(self, count: TCounter[TCounter[int]], member: discord.Member) -> TCounter[int]:
+        combined = Counter()
+        for ch_id, count in count.items():
+            ch = self.guild.get_channel(ch_id)
+            if ch is None:
+                continue
+            perms = ch.permissions_for(member)
+            if perms is not None and perms.read_messages and perms.read_message_history:
+                combined.update(count)
+        return combined
 
     @property
     def up_to_date(self):
@@ -81,63 +90,94 @@ class GuildData:
         return self._join_dates
 
     async def process_message(self, msg):
-        self.message_count += 1
-        self.last_activity = msg.created_at
+        ch = msg.channel
+        self._message_count[ch.id] += 1
+        self._last_activity[ch.id] = msg.created_at
 
         words = [w.lower() for w in msg.content.split()]
-        self.correct_word_count += self.count_correct(msg.content)
-        self.words.update(self._filter_words(msg, words))
-        self.correct_words[msg.author.id] += self.count_correct(msg.content)
-        self.member_words[msg.author.id] += len(words)
+        self.correct_word_count[ch.id] += self.count_correct(msg.content)
+        self.words[ch.id].update(self._filter_words(msg, words))
+        self.correct_words[ch.id][msg.author.id] += self.count_correct(msg.content)
+        self.member_words[ch.id][msg.author.id] += len(words)
 
         date = msg.created_at - ((pytz.utc.localize(msg.created_at) - DISCORD_EPOCH) % self.time_granularity)
-        self.times[date][msg.author.id] += 1
+        self.times[ch.id][date][msg.author.id] += 1
 
-        self.mentions.update([m.id for m in msg.mentions])
+        self.mentions[ch.id].update([m.id for m in msg.mentions])
 
-        self.members[msg.author.id] += 1
+        self.members[ch.id][msg.author.id] += 1
 
-        self.channels[msg.channel.id] += 1
+        self.channels[ch.id] += 1
 
-    @property
-    def architus_count(self):
-        return self.members.get(self.bot.user.id, 0)
+    def architus_count(self, member: discord.Member):
+        return self._merge_counts(self.members, member).get(self.bot.user.id, 0)
 
     @property
     def member_count(self):
         return self.guild.member_count
 
-    @property
-    def times_as_strings(self):
-        return {k.isoformat(): v for k, v in self.times.items()}
+    def times_as_strings(self, member: discord.Member):
+        combined = {}
+        for ch_id, count in self.times.items():
+            ch = self.guild.get_channel(ch_id)
+            if ch is None:
+                continue
+            perms = ch.permissions_for(member)
+            if perms is not None and perms.read_messages and perms.read_message_history:
+                combined.update(count)
+        return {k.isoformat(): v for k, v in combined.items()}
 
-    @property
-    def channel_counts(self):
-        return dict(self.channels)
+    def channel_counts(self, member: discord.Member):
+        counts = {}
+        for ch_id, count in self.channels.items():
+            ch = self.guild.get_channel(ch_id)
+            if ch is None:
+                continue
+            perms = ch.permissions_for(member)
+            if perms is not None and perms.read_messages and perms.read_message_history:
+                counts[ch_id] = count
+        return counts
 
-    @property
-    def member_counts(self):
-        return dict(self.members)
+    def message_count(self, member: discord.Member):
+        msgs = 0
+        for ch_id, count in self.channels.items():
+            ch = self.guild.get_channel(ch_id)
+            if ch is None:
+                continue
+            perms = ch.permissions_for(member)
+            if perms is not None and perms.read_messages and perms.read_message_history:
+                msgs += count
+        return msgs
 
-    @property
-    def mention_counts(self):
-        return dict(self.mentions)
+    def last_activity(self, member: discord.Member):
+        last = DISCORD_EPOCH.replace(tzinfo=None)
+        for ch_id, time in self._last_activity.items():
+            ch = self.guild.get_channel(ch_id)
+            if ch is None:
+                continue
+            perms = ch.permissions_for(member)
+            if perms is not None and perms.read_messages and perms.read_message_history:
+                if time > last:
+                    last = time
+        return last
 
-    @property
-    def mention_count(self):
-        return sum(self.mentions.values())
+    def member_counts(self, member: discord.Member):
+        return dict(self._merge_counts(self.members, member))
 
-    @property
-    def word_count(self):
-        return sum(self.words.values())
+    def mention_counts(self, member: discord.Member):
+        return dict(self._merge_counts(self.mentions, member))
 
-    @property
-    def word_counts(self):
-        return dict(self.member_words)
+    def mention_count(self, member: discord.Member):
+        return sum(self._merge_counts(self.mentions, member).values())
 
-    @property
-    def common_words(self):
-        words = self.words.most_common(75)
+    def word_count(self, member: discord.Member):
+        return sum(self._merge_counts(self.words, member).values())
+
+    def word_counts(self, member: discord.Member):
+        return dict(self._merge_counts(self.member_words, member))
+
+    def common_words(self, member: discord.Member):
+        words = self._merge_counts(self.words, member).most_common(75)
         for i, pair in enumerate(words):
             try:
                 name = mention_to_name(self.guild, pair[0])

@@ -157,7 +157,7 @@ class Stats(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int, jwt: JWT):
         '''Request message count statistics from shard and return'''
-        data, sc = self.shard.bin_messages(guild_id, routing_guild=guild_id)
+        data, sc = self.shard.bin_messages(guild_id, jwt.id, routing_guild=guild_id)
         camelcase_keys(data)
         return data, sc
 
