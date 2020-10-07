@@ -68,6 +68,18 @@ class GuildData:
             if perms is not None and perms.read_messages and perms.read_message_history:
                 combined.update(count)
         return combined
+    
+    def _allowed_channels(self, ch_ids: List[int], member: discord.Member) -> List[int]:
+        allowed = []
+        for ch_id in ch_ids:
+            ch = self.guild.get_channel(ch_id)
+            if ch is None:
+                continue
+            perms = ch.permissions_for(member)
+            if perms is not None and perms.read_messages and perms.read_message_history:
+                allowed.append(ch_id)
+        return allowed
+
 
     @property
     def up_to_date(self):
@@ -118,51 +130,31 @@ class GuildData:
 
     def times_as_strings(self, member: discord.Member):
         combined = {}
-        for ch_id, count in self.times.items():
-            ch = self.guild.get_channel(ch_id)
-            if ch is None:
-                continue
-            perms = ch.permissions_for(member)
-            if perms is not None and perms.read_messages and perms.read_message_history:
-                combined.update(count)
+        for ch_id in self._allowed_channels(self.times.keys(), member):
+            combined.update(self.times[ch_id])
         return {k.isoformat(): v for k, v in combined.items()}
 
     def channel_counts(self, member: discord.Member):
-        counts = {}
-        for ch_id, count in self.channels.items():
-            ch = self.guild.get_channel(ch_id)
-            if ch is None:
-                continue
-            perms = ch.permissions_for(member)
-            if perms is not None and perms.read_messages and perms.read_message_history:
-                counts[ch_id] = count
-        return counts
+        return {i: self.channels[i] for i in self._allowed_channels(self.channels.keys(), member)}
 
     def message_count(self, member: discord.Member):
         msgs = 0
-        for ch_id, count in self.channels.items():
-            ch = self.guild.get_channel(ch_id)
-            if ch is None:
-                continue
-            perms = ch.permissions_for(member)
-            if perms is not None and perms.read_messages and perms.read_message_history:
-                msgs += count
+        for ch_id in self._allowed_channels(self.channels.keys(), member):
+            msgs += self.channels[ch_id]
         return msgs
 
     def last_activity(self, member: discord.Member):
         last = DISCORD_EPOCH.replace(tzinfo=None)
-        for ch_id, time in self._last_activity.items():
-            ch = self.guild.get_channel(ch_id)
-            if ch is None:
-                continue
-            perms = ch.permissions_for(member)
-            if perms is not None and perms.read_messages and perms.read_message_history:
-                if time > last:
-                    last = time
+        for ch_id in self._allowed_channels(self._last_activity.keys(), member):
+            if self._last_activity[ch_id] > last:
+                last = time
         return last
 
     def member_counts(self, member: discord.Member):
         return dict(self._merge_counts(self.members, member))
+    
+    def correct_counts(self, member: discord.Member):
+        return dict(self._merge_counts(self.correct_words, member))
 
     def mention_counts(self, member: discord.Member):
         return dict(self._merge_counts(self.mentions, member))
@@ -214,7 +206,8 @@ class MessageStats(commands.Cog, name="Server Statistics"):
                         guild_d.forbidden = True
                     except HTTPException:
                         logger.exception("error while downloading '{guild.name}.{channel.name}'")
-                        break
+                        # break
+                        # TODO retry a few times
                 else:
                     for msg in msgs:
                         await guild_d.process_message(msg)
@@ -279,14 +272,16 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         await ctx.channel.send(embed=em)
 
     @commands.command()
-    async def spellcheck(self, ctx, victim: discord.Member):
+    async def spellcheck(self, ctx, victim: discord.Member = None):
         '''Checks the spelling of a user'''
+        if victim is None:
+            victim = ctx.author
         if victim.id in self.bot.settings[ctx.guild].stats_exclude:
             await ctx.send(f"Sorry, {victim.display_name} has requested that their stats not be recorded :confused:")
             return
         data = self.cache[ctx.guild.id]
-        words = data.member_words[victim.id]
-        ratio = data.correct_words[victim.id] / (words or 1) * 100
+        words = data.word_counts(ctx.author)[victim.id]
+        ratio = data.correct_counts(ctx.author)[victim.id] / (words or 1) * 100
         msg = f"{ratio:.1f}% of the {words:,} words sent by {victim.display_name} are spelled correctly."
         em = discord.Embed(title="Spellcheck", description=msg, color=0x03fc8c)
         em.set_author(name=victim.display_name, icon_url=victim.avatar_url)
@@ -299,7 +294,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
         with ThreadPoolExecutor() as pool:
             img = await self.bot.loop.run_in_executor(
-                pool, wordcount_gen.generate, ctx.guild, data.members, data.member_words, victim)
+                pool, wordcount_gen.generate, ctx.guild, data.member_counts(ctx.author), data.word_counts(ctx.author), victim)
         resp = await self.bot.manager_client.publish_file(
             iter([message_type.File(file=img)]))
 
@@ -310,7 +305,7 @@ class MessageStats(commands.Cog, name="Server Statistics"):
                 em.set_footer(text=f"{victim.display_name} has hidden their stats")
             else:
                 em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
-                    victim.display_name, data.member_words[victim], data.members[victim]), icon_url=victim.avatar_url)
+                    victim.display_name, data.word_counts(ctx.author)[victim.id], data.member_counts(ctx.author)[victim.id]), icon_url=victim.avatar_url)
         self.append_warning(data, em)
 
         await ctx.channel.send(embed=em)

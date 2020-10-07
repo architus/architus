@@ -44,7 +44,8 @@ def generate(guild, message_counts, word_counts, victim) -> bytes:
     ax.set_xlabel('User')
     ax.set_ylabel('Count')
     ax.set_xticks(index + bar_width / 2)
-    ax.set_xticklabels([guild.get_member(member).display_name for member, _ in reversed(top_5_mesages)])
+    name = lambda x: guild.get_member(x).display_name if guild.get_member(x) else f"{x}"
+    ax.set_xticklabels([name(member) for member, _ in reversed(top_5_mesages)])
     plt.xticks(rotation=30)
     ax.legend()
 
