@@ -147,7 +147,7 @@ class GuildData:
         last = DISCORD_EPOCH.replace(tzinfo=None)
         for ch_id in self._allowed_channels(self._last_activity.keys(), member):
             if self._last_activity[ch_id] > last:
-                last = time
+                last = self._last_activity[ch_id]
         return last
 
     def member_counts(self, member: discord.Member):
