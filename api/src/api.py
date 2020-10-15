@@ -1,8 +1,10 @@
 import json
+from io import BytesIO
 
-from flask import Flask, redirect, request, g
+from flask import Flask, redirect, request, g, send_file, Response
 from flask_restful import Api, Resource
 from flask_cors import CORS
+from werkzeug.wsgi import FileWrapper
 
 from lib.status_codes import StatusCodes
 from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod
@@ -165,9 +167,10 @@ class Stats(CustomResource):
 class Emoji(CustomResource):
 
     def get(self, emoji_id: int):
-        pass
-        # self.session.query(Emojis).filter(Emojis.id == emoji_id).first()
-        # return self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
+        result = self.session.execute('''SELECT img FROM tb_emojis WHERE id = :id''', {'id': emoji_id}).fetchone()
+        if result is None:
+            return "emoji not found", StatusCodes.NOT_FOUND_404
+        return Response(FileWrapper(BytesIO(result['img'])), mimetype="text/plain", direct_passthrough=True)
 
 
 class ListGuilds(CustomResource):

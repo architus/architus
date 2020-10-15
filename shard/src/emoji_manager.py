@@ -38,7 +38,6 @@ class EmojiManager:
                 e['id'],
                 e['discord_id'],
                 e['author_id'],
-                e['url'],
                 e['num_uses'],
                 e['priority'])
             for e in await self.tb_emojis.select_by_guild(self.guild.id)]
@@ -56,7 +55,6 @@ class EmojiManager:
             emoji.author_id,
             self.guild.id,
             emoji.name,
-            await emoji.url(),
             emoji.num_uses,
             emoji.priority,
             binary

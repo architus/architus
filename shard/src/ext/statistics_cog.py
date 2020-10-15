@@ -68,7 +68,7 @@ class GuildData:
             if perms is not None and perms.read_messages and perms.read_message_history:
                 combined.update(count)
         return combined
-    
+
     def _allowed_channels(self, ch_ids: List[int], member: discord.Member) -> List[int]:
         allowed = []
         for ch_id in ch_ids:
@@ -79,7 +79,6 @@ class GuildData:
             if perms is not None and perms.read_messages and perms.read_message_history:
                 allowed.append(ch_id)
         return allowed
-
 
     @property
     def up_to_date(self):
@@ -152,7 +151,7 @@ class GuildData:
 
     def member_counts(self, member: discord.Member):
         return dict(self._merge_counts(self.members, member))
-    
+
     def correct_counts(self, member: discord.Member):
         return dict(self._merge_counts(self.correct_words, member))
 
@@ -200,12 +199,12 @@ class MessageStats(commands.Cog, name="Server Statistics"):
                 for ch in guild_d.guild.text_channels:
                     try:
                         async for msg in ch.history(
-                                before=before.replace(tzinfo=None), after=after.replace(tzinfo=None)):
+                                before=before.replace(tzinfo=None), after=after.replace(tzinfo=None), limit=None):
                             msgs.append(msg)
                     except Forbidden:
                         guild_d.forbidden = True
                     except HTTPException:
-                        logger.exception("error while downloading '{guild.name}.{channel.name}'")
+                        logger.exception(f"error while downloading '{ch.guild.name}.{ch.name}'")
                         # break
                         # TODO retry a few times
                 else:
@@ -294,7 +293,12 @@ class MessageStats(commands.Cog, name="Server Statistics"):
 
         with ThreadPoolExecutor() as pool:
             img = await self.bot.loop.run_in_executor(
-                pool, wordcount_gen.generate, ctx.guild, data.member_counts(ctx.author), data.word_counts(ctx.author), victim)
+                pool,
+                wordcount_gen.generate,
+                ctx.guild,
+                data.member_counts(ctx.author),
+                data.word_counts(ctx.author),
+                victim)
         resp = await self.bot.manager_client.publish_file(
             iter([message_type.File(file=img)]))
 
@@ -305,7 +309,9 @@ class MessageStats(commands.Cog, name="Server Statistics"):
                 em.set_footer(text=f"{victim.display_name} has hidden their stats")
             else:
                 em.set_footer(text="{0} has sent {1:,} words across {2:,} messages".format(
-                    victim.display_name, data.word_counts(ctx.author)[victim.id], data.member_counts(ctx.author)[victim.id]), icon_url=victim.avatar_url)
+                    victim.display_name,
+                    data.word_counts(ctx.author)[victim.id],
+                    data.member_counts(ctx.author)[victim.id]), icon_url=victim.avatar_url)
         self.append_warning(data, em)
 
         await ctx.channel.send(embed=em)
