@@ -1,6 +1,6 @@
 <h1><a href="https://archit.us/"><img alt="Architus" width="340" src="https://raw.githubusercontent.com/architus/architus/develop/.github/readme/logo.svg" /></a></h1>
 
-(https://app.fossa.com/projects/git%2Bgithub.com%2Farchitus%2Farchitus?ref=badge_shield) [![API Uptime](https://img.shields.io/uptimerobot/ratio/7/m782992399-3443671051db8aeaecfe7434.svg?label=API%20uptime)](https://status.archit.us/)
+[![API Uptime](https://img.shields.io/uptimerobot/ratio/7/m782992399-3443671051db8aeaecfe7434.svg?label=API%20uptime)](https://status.archit.us/)
 [![Style](https://github.com/architus/architus/workflows/Style/badge.svg?branch=develop)](https://github.com/architus/architus/actions)
 [![Discord Server](https://img.shields.io/discord/607637793107345431?color=7289DA&logo=discord&logoColor=white)](https://discord.gg/FpyhED)
 
