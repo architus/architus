@@ -1,7 +1,7 @@
 import json
 from io import BytesIO
 
-from flask import Flask, redirect, request, g, send_file, Response
+from flask import Flask, redirect, request, g, Response
 from flask_restful import Api, Resource
 from flask_cors import CORS
 from werkzeug.wsgi import FileWrapper
@@ -91,7 +91,9 @@ class AllGuilds(CustomResource):
 class Logs(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int):
-        rows = self.session.query(Log).filter(Log.guild_id == guild_id).order_by(Log.timestamp.desc()).limit(400).all()
+        # rows = self.session.query(Log).filter(Log.guild_id == guild_id)
+        # .order_by(Log.timestamp.desc()).limit(400).all()
+        rows = []
         self.session.commit()
         logs = []
         for log in rows:

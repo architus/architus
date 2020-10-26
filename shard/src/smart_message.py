@@ -3,6 +3,7 @@ from src.list_embed import ListEmbed
 import pytz
 from pytz import timezone
 
+
 class smart_message:
     def __init__(self, message):
         self.most_recent = message
@@ -49,13 +50,13 @@ class smart_message:
         title = "last %d edits" % (len(self.edits))
         lem = ListEmbed(title, self.ogtime.strftime("%m/%d %I:%M %p"), self.most_recent.author)
         for edit in self.edits:
-            est = self.get_datetime(edit.timestamp)
+            # est = self.get_datetime(edit.timestamp)
             lem.add(edit.timestamp.strftime("%I:%M:%S %p"), edit.content)
         return lem.get_embed()
 
     def get_datetime(self, timestamp):
         utc = timestamp.replace(tzinfo=timezone('UTC'))
-        est = utc.astimezone(timezone('US/Eastern'))
+        # est = utc.astimezone(timezone('US/Eastern'))
         return timestamp
 
 
