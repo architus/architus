@@ -1,5 +1,4 @@
 from typing import Optional
-from io import BytesIO
 
 from PIL import ImageChops, Image
 from discord import Emoji
@@ -7,7 +6,6 @@ from discord import Emoji
 from lib.hoar_frost import HoarFrostGenerator
 from src.utils import download_emoji
 from lib.config import logger, domain_name
-from lib.ipc import manager_pb2 as message
 
 
 hoarfrost_gen = HoarFrostGenerator()
