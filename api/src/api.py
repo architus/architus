@@ -1,12 +1,14 @@
 import json
+from io import BytesIO
 
-from flask import Flask, redirect, request, g
+from flask import Flask, redirect, request, g, send_file, Response
 from flask_restful import Api, Resource
 from flask_cors import CORS
+from werkzeug.wsgi import FileWrapper
 
 from lib.status_codes import StatusCodes
 from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod
-from lib.models import Log
+# from lib.models import Log # , Emojis
 from lib.auth import JWT, flask_authenticated as authenticated
 from lib.discord_requests import list_guilds_request
 from lib.pool_types import PoolType
@@ -157,25 +159,18 @@ class Stats(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int, jwt: JWT):
         '''Request message count statistics from shard and return'''
-        msg_data, _ = self.shard.bin_messages(guild_id, routing_guild=guild_id)
-        guild_data, _ = self.shard.get_guild_data(guild_id, routing_guild=guild_id)
-        return {
-            'members': {
-                'count': guild_data['member_count'],
-            },
-            'messages': {
-                'count': msg_data['total'],
-                'channels': msg_data['channels'],
-                'members': msg_data['members'],
-                'times': msg_data['times'],
-            }
-        }, StatusCodes.OK_200
+        data, sc = self.shard.bin_messages(guild_id, jwt.id, routing_guild=guild_id)
+        camelcase_keys(data)
+        return data, sc
 
 
-class Emojis(CustomResource):
+class Emoji(CustomResource):
 
-    def get(self, guild_id: int):
-        return self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
+    def get(self, emoji_id: int):
+        result = self.session.execute('''SELECT img FROM tb_emojis WHERE id = :id''', {'id': emoji_id}).fetchone()
+        if result is None:
+            return "emoji not found", StatusCodes.NOT_FOUND_404
+        return Response(FileWrapper(BytesIO(result['img'])), mimetype="text/plain", direct_passthrough=True)
 
 
 class ListGuilds(CustomResource):
@@ -206,7 +201,7 @@ def app_factory():
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Stats, "/stats/<int:guild_id>")
-    api.add_resource(Emojis, "/emojis/<int:guild_id>")
+    api.add_resource(Emoji, "/emojis/<int:emoji_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")

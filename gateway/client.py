@@ -26,15 +26,15 @@ async def connect():
     #print(f"requesting spectate guild {guild_id}")
     #await sio.emit('spectate', guild_id)
 
-    for i in range(10):
-        await sio.emit('pool_all_request', {'type': 'guild', 'guildId': guild_id, '_id': 1})
+    #for i in range(10):
+    #    await sio.emit('pool_all_request', {'type': 'guild', 'guildId': guild_id, '_id': 1})
    # await sio.emit('pool_all_request', {'type': 'member', 'guildId': guild_id, '_id': 2})
     #await sio.emit('pool_all_request', {'type': 'role', 'guildId': guild_id, '_id': 3})
     #await sio.emit('pool_all_request', {'type': 'autoResponse', 'guildId': guild_id, '_id': 5})
     #await sio.emit('pool_request', {'type': 'member', 'guildId': guild_id, 'ids': ['214037134477230080', '1111111111111'], '_id': 7})
     #await sio.emit('pool_request', {'type': 'user', 'guildId': None, 'ids': ['214037134477230080', '109462069484486656'], '_id': 9})
-    #await sio.emit('pool_request', {'type': 'customEmoji', 'guildId': guild_id, 'ids': ['711543547145097377'], '_id': 9})
-    #await sio.emit('pool_all_request', {'type': 'customEmoji', 'guildId': guild_id, '_id': 11})
+    await sio.emit('pool_request', {'type': 'customEmoji', 'guildId': guild_id, 'ids': ['711543547145097377'], '_id': 9})
+    await sio.emit('pool_all_request', {'type': 'customEmoji', 'guildId': guild_id, '_id': 11})
 
     # await th
 

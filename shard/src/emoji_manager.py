@@ -38,7 +38,6 @@ class EmojiManager:
                 e['id'],
                 e['discord_id'],
                 e['author_id'],
-                e['url'],
                 e['num_uses'],
                 e['priority'])
             for e in await self.tb_emojis.select_by_guild(self.guild.id)]
@@ -56,7 +55,6 @@ class EmojiManager:
             emoji.author_id,
             self.guild.id,
             emoji.name,
-            await emoji.url(),
             emoji.num_uses,
             emoji.priority,
             binary
@@ -71,6 +69,7 @@ class EmojiManager:
                 'author_id': e.author_id,
                 'guild_id': self.guild.id,
                 'name': e.name,
+                'url': e.url,
                 'num_uses': e.num_uses,
                 'priority': e.priority,
             }, e.id)
@@ -181,7 +180,8 @@ class EmojiManager:
     async def cache_emoji(self, emoji: ArchitusEmoji) -> None:
         """remove an emoji from the guild"""
         if not self.settings.manage_emojis:
-            logger.warning(f"looks like someone tried to cache an emoji ({emoji} from {self.guild.name}) when they shouldn't have :/")
+            logger.warning(
+                f"looks like someone tried to cache an emoji ({emoji} from {self.guild.name}) when they shouldn't have")
             return
         discord_emoji = self.bot.get_emoji(emoji.discord_id)
         if discord_emoji is None:

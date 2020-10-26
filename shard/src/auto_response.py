@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 from random import choice
 import json
 
-from discord import Message, Guild, Member
+from discord import Message, Guild, Member, AllowedMentions
 
 from src.emoji_manager import EmojiManager
 from lib.reggy.reggy import Reggy
@@ -203,10 +203,10 @@ class AutoResponse:
 
         self.count += 1
         content, reacts = await self.resolve_resp(self.response_ast, match, msg)
-        content = "".join(content).replace("@everyone", "\\@everyone").replace("@here", "\\@here")
+        content = "".join(content)
 
         if content.strip() != "":
-            resp_msg = await msg.channel.send(content)
+            resp_msg = await msg.channel.send(content, allowed_mentions=AllowedMentions(everyone=False))
         else:
             resp_msg = None
         for emoji in reacts:
