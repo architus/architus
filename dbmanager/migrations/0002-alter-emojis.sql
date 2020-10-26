@@ -1,0 +1,1 @@
+ALTER TABLE tb_emojis DROP COLUMN url;

@@ -1,7 +1,7 @@
 from lib.discord_requests import async_list_guilds_request
 from lib.status_codes import StatusCodes as s
-from lib.config import logger, which_shard
-import lib.ipc.manager_pb2 as message
+from lib.config import logger, which_shard, NUM_SHARDS
+from asyncio import create_task
 
 guild_attrs = [
     'id', 'name', 'icon', 'splash', 'owner_id', 'region', 'description',
@@ -31,35 +31,95 @@ def guilds_to_dicts(guilds):
         yield guild_dict
 
 
+async def guild_pool_response(shard_client, partial_event, partial_error, payload, jwt):
+    returned_guilds = []
+
+    async def cached_response(shard_id, returned_guilds):
+        resp, sc = await shard_client.users_guilds(jwt.id, routing_key=f"shard_rpc_{shard_id}")
+        if sc != 200:
+            logger.error(f"got bad response from `users_guilds` from shard: {shard_id}")
+            await partial_error(
+                message=f"shard {shard_id} returned error fetching guilds",
+                human="An error occured. Some servers may be temporarily unavailable.",
+                context=[resp],
+                code=sc)
+            return
+        for g in resp:
+            g.update({'owner': g['owner_id'] == jwt.id})
+        if not payload['finished']:
+            payload.update({'data': resp})
+            returned_guilds += resp
+            await partial_event(payload)
+
+    for i in range(NUM_SHARDS):
+        create_task(cached_response(i, returned_guilds))
+
+    resp, sc = await async_list_guilds_request(jwt)
+    if sc != s.OK_200:
+        logger.error(f"discord returned error from guild_list: {resp}")
+        await partial_error(
+            message=f"discord returned error fetching guilds",
+            human="There was a problem connecting to discord. Some servers may be unavailable.",
+            context=[resp],
+            code=sc)
+        return
+    remaining = []
+    ids = [g['id'] for g in returned_guilds]
+    for guild in resp:
+        if str(guild['id']) not in ids:
+            mem_resp, sc = await shard_client.is_member(
+                jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
+            guild.update({
+                'has_architus': mem_resp['member'] if sc == 200 else False,
+                'architus_admin': mem_resp['admin'] if sc == 200 else False,
+            })
+            remaining.append(guild)
+    payload.update({'data': remaining, 'finished': True})
+    await partial_event(payload)
+
+
 class GuildPool:
     def __init__(self, manager_client, shard_client, jwt):
         self.manager_client = manager_client
         self.shard_client = shard_client
         self.jwt = jwt
         self.return_guilds = []
+        self.list_task = None
+
+    async def fetch_guilds(self):
+        resp, sc = await async_list_guilds_request(self.jwt)
+        if sc != s.OK_200:
+            logger.debug(resp)
+            return []
+
+        guilds = []
+
+        for guild in resp:
+            mem_resp, _ = await self.shard_client.is_member(
+                self.jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
+            guild.update({
+                'has_architus': mem_resp['member'],
+                'architus_admin': mem_resp['admin'],
+            })
+            guilds.append(guild)
+
+        return guilds
 
     async def fetch_architus_guilds(self):
-        all_guilds_message = await self.manager_client.all_guilds(message.AllGuildsRequest())
-        all_guilds = guilds_to_dicts(all_guilds_message)
-        for guild in all_guilds:
-            resp, _ = await self.shard_client.is_member(
-                self.jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
-            if resp['member']:
-                guild.update({
-                    'id': str(guild['id']),
-                    'has_architus': True,
-                    'architus_admin': resp['admin'],
-                    'owner': guild['owner_id'] == self.jwt.id,
-                    'permissions': resp['permissions']
-                })
-                del guild['owner_id']
-                del guild['admin_ids']
-                self.return_guilds.append(guild)
+        # get discord request started
+        self.list_task = create_task(async_list_guilds_request(self.jwt))
 
+        tasks = (create_task(
+            self.shard_client.users_guilds(self.jwt.id, routing_key=f"shard_rpc_{i}"))
+            for i in range(NUM_SHARDS))
+
+        self.return_guilds = [guild for t in tasks for guild in (await t)[0]]
+        for g in self.return_guilds:
+            g.update({'owner': g['owner_id'] == self.jwt.id})
         return self.return_guilds
 
     async def fetch_remaining_guilds(self):
-        resp, sc = await async_list_guilds_request(self.jwt)
+        resp, sc = await self.list_task
         if sc != s.OK_200:
             logger.debug(resp)
             return []
