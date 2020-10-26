@@ -55,7 +55,7 @@ class smart_message:
         return lem.get_embed()
 
     def get_datetime(self, timestamp):
-        utc = timestamp.replace(tzinfo=timezone('UTC'))
+        # utc = timestamp.replace(tzinfo=timezone('UTC'))
         # est = utc.astimezone(timezone('US/Eastern'))
         return timestamp
 
