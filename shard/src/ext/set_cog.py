@@ -3,7 +3,7 @@ from src.auto_response import GuildAutoResponses, TriggerCollisionException, Lon
     ShortTriggerException, UserLimitException, UnknownResponseException, DisabledException, PermissionException
 from lib.response_grammar.response import ParseError
 from lib.reggy.reggy import NotParseable
-from src.utils import bot_commands_only
+from src.utils import bot_commands_only, doc_url
 from lib.config import logger
 
 from contextlib import suppress
@@ -70,8 +70,10 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
     @commands.command()
     @bot_commands_only
+    @doc_url("https://docs.archit.us/features/auto-responses/#removing-auto-responses")
     async def remove(self, ctx, trigger):
-        """remove an auto response"""
+        """remove <trigger>::<response>
+        Remove an auto response."""
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)
 
@@ -90,12 +92,10 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
     @commands.command()
     @bot_commands_only
+    @doc_url("https://docs.archit.us/features/auto-responses/#setting-auto-responses")
     async def set(self, ctx, *args):
-        """
-        Sets an auto response
-        use the syntax 'set trigger::response'
-        check out the docs for advanced options:
-        https://docs.archit.us/features/auto-responses/
+        """set <trigger>::<response>
+        Sets an auto response.
         """
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)

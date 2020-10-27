@@ -141,6 +141,9 @@ intents.members = True
 intents.presences = True
 architus = Architus(command_prefix=command_prefix, max_messages=10000, intents=intents)
 
+# Remove default help command so it doesn't conflict with ours
+architus.help_command = None
+
 for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
     architus.load_extension(f"src.ext.{ext[:-3]}")
 

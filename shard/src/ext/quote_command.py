@@ -3,11 +3,14 @@ from discord.ext import commands
 from pytz import timezone
 
 from lib.config import logger
+from src.utils import doc_url
 
 
 @commands.command()
+@doc_url("https://docs.archit.us/commands/quote")
 async def quote(ctx, message: discord.Message):
-    '''Quotes a previous message in a pretty format. Use url or id.'''
+    '''quote <message url|message id>
+    Quotes a previous message in a pretty format. Use url or id.'''
 
     utc = message.created_at.replace(tzinfo=timezone('UTC'))
     est = utc.astimezone(timezone('US/Eastern'))

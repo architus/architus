@@ -15,7 +15,7 @@ import src.generate.wordcount as wordcount_gen
 from src.generate import corona, member_growth
 from lib.config import DISCORD_EPOCH, logger
 from lib.ipc import manager_pb2 as message_type
-from src.utils import mention_to_name
+from src.utils import mention_to_name, doc_url
 
 
 class GuildData:
@@ -245,9 +245,11 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         await self.cache_guilds_history()
 
     @commands.command(aliases=['exclude'])
+    @doc_url("https://docs.archit.us/commands/statistics/#optout")
     async def optout(self, ctx):
-        """Prevents Architus from displaying statistics about you
-        run again to reallow collection
+        """optout
+        Prevents Architus from displaying statistics about you.
+        Run again to reallow collection.
         """
         settings = self.bot.settings[ctx.guild]
         excludes = settings.stats_exclude
@@ -261,7 +263,11 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         settings.stats_exclude = excludes
 
     @commands.command(aliases=['growth'])
+    @doc_url("https://docs.archit.us/commands/statistics/#joins")
     async def joins(self, ctx):
+        """growth
+        View a pretty chart of member growth on the server.
+        """
         img = member_growth.generate(ctx.guild.members)
         data = await self.bot.manager_client.publish_file(iter([message_type.File(file=img)]))
         em = discord.Embed(title="Server Growth", description=ctx.guild.name)
@@ -271,8 +277,11 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         await ctx.channel.send(embed=em)
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/statistics/#spellcheck")
     async def spellcheck(self, ctx, victim: discord.Member = None):
-        '''Checks the spelling of a user'''
+        """spellcheck <member>
+        check the spelling of a member
+        """
         if victim is None:
             victim = ctx.author
         if victim.id in self.bot.settings[ctx.guild].stats_exclude:
@@ -288,7 +297,11 @@ class MessageStats(commands.Cog, name="Server Statistics"):
         await ctx.send(embed=em)
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/statistics/#messagecount")
     async def messagecount(self, ctx, victim: discord.Member = None):
+        """messagecount [member]
+        Displays a graph of the top message senders. Optionally include a member to always include.
+        """
         data = self.cache[ctx.guild.id]
 
         with ThreadPoolExecutor() as pool:
@@ -322,7 +335,11 @@ class CoronaStats(commands.Cog, name="Coronavirus Data"):
         self.bot = bot
 
     @commands.command(aliases=['covid', 'covid-19', 'covid19', 'coronavirus'])
+    @doc_url("https://docs.archit.us/commands/statistics/#corona")
     async def corona(self, ctx, deaths_only: bool = False):
+        """corona
+        Sends a graph of current coronavirus statistics.
+        """
         async with aiohttp.ClientSession() as session:
             url = 'http://coronavirusapi.com/time_series.csv'
             async with session.get(url) as resp:

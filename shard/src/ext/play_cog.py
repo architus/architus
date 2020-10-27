@@ -1,5 +1,6 @@
 from discord.ext import commands
 from src.guild_player import GuildPlayer
+from src.utils import doc_url
 import discord
 
 
@@ -13,8 +14,9 @@ class Play(commands.Cog, name="Music Player"):
         self.players = {}
 
     @commands.command(aliases=['p'])
+    @doc_url("https://docs.archit.us/commands/music/#play")
     async def play(self, ctx, url):
-        '''
+        '''play <search item|youtube url|spotify url>
         Add a song to the music queue.
         Supports youtube and spotify links.
         '''
@@ -91,8 +93,10 @@ class Play(commands.Cog, name="Music Player"):
         await ctx.channel.send(message)
 
     @commands.command(aliases=['q'])
+    @doc_url("https://docs.archit.us/commands/music/#queue")
     async def queue(self, ctx):
-        '''List songs in queue.'''
+        '''queue
+        List songs in queue.'''
         if ctx.guild not in self.players:
             self.players[ctx.guild] = GuildPlayer(self.bot)
         player = self.players[ctx.guild]
@@ -104,8 +108,10 @@ class Play(commands.Cog, name="Music Player"):
         await ctx.channel.send(embed=player.qembed())
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/music/#skip")
     async def skip(self, ctx):
-        '''Skip a song'''
+        '''skip
+        Skip a song.'''
         if ctx.guild not in self.players:
             self.players[ctx.guild] = GuildPlayer(self.bot)
         player = self.players[ctx.guild]
@@ -116,8 +122,10 @@ class Play(commands.Cog, name="Music Player"):
             await ctx.channel.send("No songs left. goodbye")
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/music/#clear")
     async def clear(self, ctx):
-        '''Clear all songs from queue.'''
+        '''clear
+        Clear all songs from queue.'''
         if ctx.guild not in self.players:
             self.players[ctx.guild] = GuildPlayer(self.bot)
         player = self.players[ctx.guild]
