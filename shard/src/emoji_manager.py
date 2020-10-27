@@ -6,7 +6,7 @@ import re
 from typing import Optional, List
 from io import BytesIO
 
-from src.utils import send_message_webhook
+from src.utils import send_message_webhook, doc_url
 from src.architus_emoji import ArchitusEmoji
 from src.generate.emoji_list import generate
 from lib.config import logger
@@ -377,6 +377,7 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
         logger.debug("emoji managers ready")
 
     @commands.command(aliases=['emotes', 'emoji', 'emote'])
+    @doc_url("https://docs.archit.us/features/emoji-manager/")
     async def emojis(self, ctx):
         """
         List currently cached emojis.

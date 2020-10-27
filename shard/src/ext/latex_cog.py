@@ -89,12 +89,13 @@ class Latexify(commands.Cog, name="Latex Compiler"):
                 await ctx.send(embed=embed)
                 return
 
-            convert = await create_subprocess_exec('dvipng', '-T', 'tight', '-Q', '32', '-D', '1500', '-fg', 'rgb 1.0 1.0 1.0',
-                                                   '-bg', 'transparent', '--gamma', '100', 'out.dvi',
-                                                   cwd=work_dir,
-                                                   stdout=DEVNULL,
-                                                   stderr=DEVNULL,
-                                                   close_fds=True)
+            convert = await create_subprocess_exec(
+                'dvipng', '-T', 'tight', '-Q', '32', '-D', '1500', '-fg', 'rgb 1.0 1.0 1.0',
+                '-bg', 'transparent', '--gamma', '100', 'out.dvi',
+                cwd=work_dir,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+                close_fds=True)
             await convert.wait()
 
             if not os.path.isfile(os.path.join(work_dir, 'out1.png')):

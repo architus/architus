@@ -3,6 +3,7 @@ from discord.ext import commands
 import discord
 
 from lib.config import logger
+from src.utils import doc_url
 
 
 class Roles(commands.Cog):
@@ -21,6 +22,7 @@ class Roles(commands.Cog):
             logger.exception("could not add %s to %s" % (member.display_name, 'default role'))
 
     @commands.command(aliases=['rank', 'join', 'roles'])
+    @doc_url("https://docs.archit.us/features/role-manager")
     async def role(self, ctx, *arg):
         '''role [role to join]
         List available roles to join or join a role.'''

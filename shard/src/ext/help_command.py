@@ -1,8 +1,8 @@
 import discord
 from discord.ext import commands
-from src.utils import doc_url
 
 from typing import Optional
+
 
 @commands.command()
 async def help(ctx, command_name: Optional[str]):
@@ -38,18 +38,21 @@ async def help(ctx, command_name: Optional[str]):
         usage = help_text[usage_start:usage_end]
         extra = help_text[help_text.find('\n') + 1:].replace('\n', ' ')
         try:
-            link = command.callback.__doc_url__
+            url = command.callback.__doc_url__
+            link = f" [more info...]({url})"
         except AttributeError:
-            link = None
+            link = ""
+            url = None
         msg = discord.Embed(title=f"{command_title} | Architus Docs",
                             # description=extra,
-                            url=link)
+                            url=url)
         msg.add_field(name="Usage",
-                      value=f"```{prefix}{command_name} {usage}```{extra} [More info...]({link})")
+                      value=f"```{prefix}{command_name} {usage}```{extra}{link}")
     msg.colour = 0x83bdff
     msg.set_author(name="Architus Docs",
                    icon_url="https://docs.archit.us/img/logo_hex.png")
     await ctx.send(embed=msg)
+
 
 def setup(bot):
     bot.add_command(help)
