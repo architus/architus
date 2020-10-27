@@ -25,7 +25,7 @@ class MockChannel(object):
         self.reactions = reactions
         self.resp_id = resp_id
 
-    async def send(self, *args):
+    async def send(self, *args, **kwargs):
         for thing in args:
             self.sends.append(thing)
         return MockMessage(self.bot, self.resp_id, self.sends, self.reactions, 0)
