@@ -228,6 +228,6 @@ class Song:
                     return video['title'] if 'title' in video else 'n/a'
             except Exception:
                 logger.exception("error fetching title")
-                return "unable to fetch title"
+                return "<error fetching title>"
         self._title = await self.loop.run_in_executor(None, fetch_title)
         return self._title
