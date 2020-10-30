@@ -105,7 +105,7 @@ class Play(commands.Cog, name="Music Player"):
         if not settings.music_enabled:
             return
 
-        await ctx.channel.send(embed=player.qembed())
+        await ctx.channel.send(embed=await player.qembed())
 
     @commands.command()
     @doc_url("https://docs.archit.us/commands/music/#skip")

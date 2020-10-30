@@ -53,7 +53,7 @@ uWSGI
 websockets
 Werkzeug
 yarl
-youtube-dl
+youtube-dlc
 pyyaml
 pika
 aio-pika

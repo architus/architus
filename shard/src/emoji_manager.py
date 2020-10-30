@@ -69,7 +69,7 @@ class EmojiManager:
                 'author_id': e.author_id,
                 'guild_id': self.guild.id,
                 'name': e.name,
-                'url': e.url,
+                # 'url': e.url,
                 'num_uses': e.num_uses,
                 'priority': e.priority,
             }, e.id)
@@ -193,6 +193,8 @@ class EmojiManager:
         # no need to update the db here cause we're about to trigger the on_emoji_removed event
 
     async def load_emoji(self, emoji: ArchitusEmoji) -> ArchitusEmoji:
+        if not self.settings.manage_emojis:
+            return emoji
         if emoji.loaded:
             logger.debug(f"{emoji} already loaded")
             self.sort()
