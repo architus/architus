@@ -1,7 +1,7 @@
-from discord import VoiceChannel, opus, FFmpegPCMAudio
+from discord import VoiceChannel, opus, FFmpegPCMAudio, Embed
 import youtube_dlc as youtube_dl
 
-from typing import List, Option
+from typing import List, Optional
 from random import choice
 from functools import partial
 import asyncio
@@ -37,17 +37,17 @@ class Song:
         self.download_url = download_url
 
     @classmethod
-    async def from_youtube(cls, search: str, retries: int = 0) -> Option['Song']:
+    async def from_youtube(cls, search: str, retries: int = 0) -> Optional['Song']:
         ydl = youtube_dl.YoutubeDL(ytdl_opts)
         f = partial(ydl.extract_info, search, download=False)
         loop = asyncio.get_running_loop()
         try:
             data = await loop.run_in_executor(None, f)
         except (youtube_dl.utils.ExtractorError, youtube_dl.utils.DownloadError):
-            logger.exception(f"error downloading video data... ({retries + 1}/3)")
+            logger.exception(f"error downloading video data... ({retries + 1}/4)")
             if retries > 2:
                 return
-            return cls.from_youtube(search, retries=retries + 1)
+            return await cls.from_youtube(search, retries=retries + 1)
         if data['_type'] == 'playlist':
             try:
                 data = data['entries'][0]
@@ -64,6 +64,9 @@ class Song:
         # TODO
         return []
 
+    def __repr__(self):
+        return f"[{self.name}]({self.url})"
+
 
 class SongQueue:
     def __init__(self, bot, guild):
@@ -77,6 +80,8 @@ class SongQueue:
             self.push(s)
 
     def insert(self, i: int, song: Song) -> None:
+        if song is None:
+            return
         self.q.insert(i, song)
 
     def push(self, song: Song) -> None:
@@ -96,16 +101,12 @@ class SongQueue:
     def __len__(self):
         return len(self.q)
 
-    async def qembed(self):
-        name = self.name or "None"
-        lem = list_embed("Currently Playing:", "*%s*" % name, self.bot.user)
-        lem.color = 0x6600ff
-        lem.icon_url = ''
-        lem.name = "Song Queue"
-        for i in range(len(self.q)):
-            song = self.q[len(self.q) - i - 1]
-            lem.add("%d. *%s*" % (i + 1, await song.title()), song.url)
-        return lem.get_embed()
+    def embed(self):
+        songs = "\n".join(f"{i}. *{song}*" for i, song in enumerate(self.q))
+        em = Embed(title=self.now_playing.name, url=self.now_playing.url, description=songs, color=0x6600ff)
+        em.set_author(name="Now Playing:")
+        em.add_field(name="Shuffle", value="*off*")
+        return em
 
 
 class VoiceManager:
@@ -143,11 +144,11 @@ class VoiceManager:
         if self.channel is None or self.voice is None:
             raise
         if self.is_playing:
-            await self.voice.stop()
+            self.voice.stop()
         if song is None:
             song = self.q.pop(self.shuffle)
 
-        await self.voice.play(FFmpegPCMAudio(song.download_url, **ffmpeg_options), after=self._finalizer)
+        self.voice.play(FFmpegPCMAudio(song.download_url, **ffmpeg_options), after=self._finalizer)
         return song
 
     def _finalizer(self, error):
