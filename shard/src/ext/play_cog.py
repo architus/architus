@@ -1,11 +1,70 @@
 from discord.ext import commands
 from src.guild_player import GuildPlayer
+from src.voice_manager import VoiceManager, Song
 from src.utils import doc_url
 from lib.config import logger
 import discord
 
 
-class Play(commands.Cog, name="Music Player"):
+class VoiceCog(commands.Cog, name="Voice"):
+    def __init__(self, bot):
+        self.bot = bot
+        self.players = {}
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        self.voice_managers = {g.id: VoiceManager(self.bot, g) for g in self.bot.guilds}
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        self.voice_managers[guild.id] = VoiceManager(self.bot, guild)
+
+    @commands.command(aliases=['p'])
+    @doc_url("https://docs.archit.us/commands/music/#play")
+    async def play(self, ctx, *song: str):
+        '''play <search item|youtube url|spotify url>
+        Add a song to the music queue.
+        Supports youtube and spotify links.
+        '''
+        manager = self.voice_managers[ctx.guild.id]
+        settings = self.bot.settings[ctx.guild]
+        if ctx.author.voice and (ch := ctx.author.voice.channel):
+            if ch.id != manager.channel.id:
+                if ctx.author.id not in settings.admin_ids:
+                    ctx.send("Please join a voice channel to use music commands")
+                    return
+            await manager.join(ch)
+        else:
+            ctx.send("Please join a voice channel to use music commands")
+            return
+
+        arg = "".join(song)
+
+        try:
+            if ('/playlist/' in arg or '/track/' in arg):
+                songs = Song.from_spotify(arg)
+            else:
+                songs = [Song.from_youtube(arg)]
+        except Exception as e:
+            logger.exception("")
+            await ctx.send(f"error queuing music {e}")
+        else:
+            manager.q.insert_l(songs)
+        if self.manager.is_playing:
+            msg = '\n'.join(s.name for s in songs)
+            await ctx.send(f"successuflly queued: {msg}")
+        else:
+            try:
+                song = await manager.play()
+            except Exception as e:
+                logger.exception("")
+                await ctx.send(f"error queuing music {e}")
+            else:
+                msg = song.name if 'youtu' in arg else song.url
+                await ctx.send(f"now playing: {msg}")
+
+
+class BPlay(commands.Cog, name="Music Player"):
     '''
     Can join voice and play beautiful noises
     '''
@@ -139,4 +198,4 @@ class Play(commands.Cog, name="Music Player"):
 
 
 def setup(bot):
-    bot.add_cog(Play(bot))
+    bot.add_cog(VoiceCog(bot))
