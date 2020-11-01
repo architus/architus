@@ -1,5 +1,5 @@
 from discord.ext import commands
-from typing import Dict
+from typing import Dict, List
 from src.guild_player import GuildPlayer
 from src.voice_manager import VoiceManager, Song
 from src.utils import doc_url
@@ -20,6 +20,26 @@ class VoiceCog(commands.Cog, name="Voice"):
     async def on_guild_join(self, guild):
         self.voice_managers[guild.id] = VoiceManager(self.bot, guild)
 
+    async def enqueue(self, ctx, query: str) -> List[Song]:
+        manager = self.voice_managers[ctx.guild.id]
+        try:
+            if ('/playlist/' in query or '/track/' in query):
+                songs = await Song.from_spotify(query)
+            else:
+                songs = [await Song.from_youtube(query)]
+        except Exception as e:
+            logger.exception("")
+            await ctx.send(f"Error queuing song {e}")
+            return ()
+        else:
+            manager.q.insert_l(songs)
+
+        if len(songs) > 1:
+            await ctx.send(f"*Successfully queued {len(songs)} songs*")
+        elif len(songs) == 1:
+            await ctx.send(f"Successfully queued *{songs[0].name}*")
+        return songs
+
     @commands.command(aliases=['p'])
     @doc_url("https://docs.archit.us/commands/music/#play")
     async def play(self, ctx, *song: str):
@@ -39,28 +59,19 @@ class VoiceCog(commands.Cog, name="Voice"):
             ctx.send("Please join a voice channel to use music commands")
             return
 
-        arg = "".join(song)
+        arg = " ".join(song)
         async with ctx.channel.typing():
+            if len(await self.enqueue(ctx, arg)) < 1:
+                return
 
-            try:
-                if ('/playlist/' in arg or '/track/' in arg):
-                    songs = await Song.from_spotify(arg)
-                else:
-                    songs = [await Song.from_youtube(arg)]
-            except Exception as e:
-                logger.exception("")
-                await ctx.send(f"error queuing music {e}")
-            else:
-                manager.q.insert_l(songs)
             if manager.is_playing:
-                msg = '\n'.join(s.name for s in songs)
-                await ctx.send(f"successuflly queued: {msg}")
+                pass
             else:
                 try:
                     song = await manager.play()
                 except Exception as e:
                     logger.exception("")
-                    await ctx.send(f"error queuing music {e}")
+                    await ctx.send(f"error playing music {e}")
                 else:
                     msg = song.name if 'youtu' in arg else song.url
                     await ctx.send(f"now playing: {msg}")
@@ -69,11 +80,25 @@ class VoiceCog(commands.Cog, name="Voice"):
     @doc_url("https://docs.archit.us/commands/")
     async def queue(self, ctx):
         '''queue [add|rm|show|{song}] args'''
-        await ctx.send(embed=self.voice_managers[ctx.guild.id].q.embed())
+        if ctx.invoked_subcommand is None:
+            await ctx.send(embed=self.voice_managers[ctx.guild.id].q.embed())
 
-    @queue.command()
-    async def add(self, ctx):
-        await ctx.send("q add")
+    @queue.command(aliases=['a'])
+    async def add(self, ctx, *query):
+        '''queue add <songs>'''
+        await self.enqueue(ctx, " ".join(query))
+
+    @queue.command(aliases=['remove', 'r'])
+    async def rm(self, ctx, index: int):
+        '''queue rm <index>'''
+        manager = self.voice_managers[ctx.guild.id]
+        try:
+            song = manager.q[index - 1]
+            del manager.q[index - 1]
+        except IndexError:
+            await ctx.send("not sure what song you're talking about")
+        else:
+            await ctx.send(f"removed *{song.name}*")
 
 
 class BPlay(commands.Cog, name="Music Player"):

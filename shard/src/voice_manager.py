@@ -7,7 +7,6 @@ from functools import partial
 import asyncio
 
 from lib.config import logger
-from src.list_embed import ListEmbed as list_embed
 
 
 ffmpeg_options = {
@@ -100,6 +99,12 @@ class SongQueue:
 
     def __len__(self):
         return len(self.q)
+
+    def __getitem__(self, key):
+        return self.q[key]
+
+    def __delitem__(self, key):
+        del self.q[key]
 
     def embed(self):
         songs = "\n".join(f"{i}. *{song}*" for i, song in enumerate(self.q))
