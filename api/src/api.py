@@ -144,17 +144,11 @@ class Settings(CustomResource):
 
 class Coggers(CustomResource):
     '''provide an endpoint to reload cogs in the bot'''
-    @authenticated()
-    def get(self, extension: str = None, jwt: JWT = None):
-        if jwt.id == 214037134477230080:  # johnyburd
-            return self.shard.get_extensions()
-        return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
+    def get(self, extension: str = None):
+        return self.shard.get_extensions()
 
-    @authenticated()
-    def post(self, extension: str, jwt: JWT):
-        if jwt.id == 214037134477230080:  # johnyburd
-            return self.shard.reload_extension(extension)
-        return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
+    def post(self, extension: str):
+        return self.shard.reload_extension(extension, routing_guild="all")
 
 
 class Stats(CustomResource):
@@ -209,5 +203,6 @@ def app_factory():
     api.add_resource(RedirectCallback, "/redirect")
     api.add_resource(GuildCounter, "/guild-count")
     api.add_resource(Invite, "/invite/<int:guild_id>")
-    api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
+    if not is_prod:
+        api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
     return app

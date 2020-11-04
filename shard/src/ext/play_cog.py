@@ -5,16 +5,34 @@ from src.voice_manager import VoiceManager, Song
 from src.utils import doc_url
 from lib.config import logger
 import discord
+import asyncio
+
+
+class VoiceManagers(dict):
+    def __init__(self, bot):
+        self.bot = bot
+        super().__init__()
+
+    def __missing__(self, key):
+        if key not in self:
+            guild = self.bot.get_guild(key)
+            if not guild:
+                raise KeyError(f"No guild found for id: {key}")
+            self[key] = VoiceManager(self.bot, self.bot.get_guild(key))
+        return self[key]
 
 
 class VoiceCog(commands.Cog, name="Voice"):
     def __init__(self, bot):
         self.bot = bot
-        self.voice_managers = {}  # type: Dict[int, VoiceManager]
+        self.voice_managers = VoiceManagers(bot)  # type: Dict[int, VoiceManager]
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        self.voice_managers = {g.id: VoiceManager(self.bot, g) for g in self.bot.guilds}
+    @commands.command()
+    async def test(self, ctx):
+        m = self.voice_managers[ctx.guild.id]
+        while m.linebuffer:
+            await ctx.send(m.linebuffer.pop(0))
+
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
@@ -26,7 +44,7 @@ class VoiceCog(commands.Cog, name="Voice"):
             if ('/playlist/' in query or '/track/' in query):
                 songs = await Song.from_spotify(query)
             else:
-                songs = [await Song.from_youtube(query)]
+                songs = await Song.from_youtube(query)
         except Exception as e:
             logger.exception("")
             await ctx.send(f"Error queuing song {e}")
@@ -99,6 +117,13 @@ class VoiceCog(commands.Cog, name="Voice"):
             await ctx.send("not sure what song you're talking about")
         else:
             await ctx.send(f"removed *{song.name}*")
+
+    @queue.command()
+    async def shuffle(self, ctx):
+        '''queue shuffle'''
+        q = self.voice_managers[ctx.guild.id].q
+        q.shuffle = not q.shuffle
+        await ctx.send(f"Shuffle is **{'on' if q.shuffle else 'off'}**")
 
 
 class BPlay(commands.Cog, name="Music Player"):

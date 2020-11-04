@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from flask_restful import Resource, reqparse
 from flask import g
 
-from lib.config import get_session, which_shard
+from lib.config import get_session, which_shard, NUM_SHARDS
 from lib.auth import JWT
 from lib.ipc.blocking_rpc_client import get_rpc_client
 
@@ -18,6 +18,11 @@ class ShardClientWrapper:
 
     def __getattr__(self, name):
         def call(*args, routing_guild=None, **kwargs):
+            if routing_guild == "all":
+                ret = []
+                for i in range(NUM_SHARDS):
+                    ret.append(self.client.call(name, *args, routing_key=f"shard_rpc_{i}", **kwargs))
+                return ret
             return self.client.call(name, *args, routing_key=f"shard_rpc_{which_shard(routing_guild)}", **kwargs)
         return call
 
