@@ -8,6 +8,28 @@ import discord
 import asyncio
 
 
+def (cmd):
+    """Adds the restriction that a command must be run in a bot commands channel if the guild has one set
+    Does nothing if not in a guild
+    Requires that the command be in the context of a cog that has the attribute `self.bot`
+    """
+    @functools.wraps(cmd)
+    async def bc_cmd(self, ctx, *args, **kwargs):
+        if ctx.guild:
+            settings = self.bot.settings[ctx.guild]
+            if settings.bot_commands_channels\
+                    and ctx.channel.id not in settings.bot_commands_channels\
+                    and ctx.author.id not in settings.admin_ids:
+
+                for channel_id in settings.bot_commands_channels:
+                    bc_ch = discord.utils.get(ctx.guild.channels, id=channel_id)
+                    if bc_ch:
+                        await ctx.send(f"Please use {bc_ch.mention} for that command")
+                        return
+        return await cmd(self, ctx, *args, **kwargs)
+    return bc_cmd
+
+
 class VoiceManagers(dict):
     def __init__(self, bot):
         self.bot = bot
@@ -19,7 +41,7 @@ class VoiceManagers(dict):
             if not guild:
                 raise KeyError(f"No guild found for id: {key}")
             self[key] = VoiceManager(self.bot, self.bot.get_guild(key))
-        return self[key]
+        return self[key]uuu
 
 
 class VoiceCog(commands.Cog, name="Voice"):
@@ -93,6 +115,14 @@ class VoiceCog(commands.Cog, name="Voice"):
                 else:
                     msg = song.name if 'youtu' in arg else song.url
                     await ctx.send(f"now playing: {msg}")
+    @commands.command()
+    async def skip(self, ctx):
+        '''
+        requires author in vc
+        requires bot in vc & playing
+        '''
+        manager = self.VoiceManagers[ctx.guild.id]
+
 
     @commands.group(aliases=["q"])
     @doc_url("https://docs.archit.us/commands/")
