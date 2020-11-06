@@ -1,4 +1,4 @@
-from discord import VoiceChannel, opus, FFmpegPCMAudio, Embed, Guild
+from discord import VoiceChannel, opus, FFmpegPCMAudio, Embed, Guild, errors
 import youtube_dlc as youtube_dl
 
 from typing import List, Optional, Tuple
@@ -126,6 +126,12 @@ class SongQueue:
             self.now_playing = self.q[-1]
             return self.q.pop()
 
+    def clear(self) -> int:
+        n = len(self.q)
+        self.q = []
+        self.now_playing = None
+        return n
+
     def __len__(self):
         return len(self.q)
 
@@ -187,9 +193,10 @@ class VoiceManager:
         else:
             self.voice.move_to(ch)
 
-    async def disconnect(self):
-        if self.voice is not None:
-            await self.voice.disconnect()
+    async def disconnect(self, force=False):
+        if self.channel is not None:
+            await self.voice.disconnect(force=force)
+            self.voice = None
 
     async def play(self, song: Song = None):
         if self.channel is None or self.voice is None:
@@ -198,8 +205,16 @@ class VoiceManager:
             self.voice.stop()
         if song is None:
             song = self.q.pop()
-
-        self.voice.play(FFmpegPCMAudio(song.download_url, **ffmpeg_options), after=self._finalizer)
+        try:
+            self.voice.play(FFmpegPCMAudio(song.filename, **ffmpeg_options), after=self._finalizer)
+        except errors.ClientException:
+            return
+            logger.exception("hello")
+            ch = self.channel
+            logger.debug(ch)
+            await self.disconnect(force=True)
+            await self.join(ch)
+            return await self.play(song=song)
         self.q.started_at = datetime.now()
         return song
 
