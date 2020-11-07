@@ -37,6 +37,15 @@ class Setting:
         self._update_db()
 
     @property
+    def twitch_channel_id(self) -> int:
+        return self._settings_dict.get('twitch_channel_id', None)
+
+    @twitch_channel_id.setter
+    def twitch_channel_id(self, new_twitch_channel_id: int):
+        self._settings_dict['twitch_channel_id'] = new_twitch_channel_id
+        self._update_db()
+
+    @property
     def scrim_channel_id(self) -> int:
         if 'scrim_channel_id' in self._settings_dict:
             return self._settings_dict.get('scrim_channel_id')

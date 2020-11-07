@@ -239,6 +239,11 @@ class Api(Cog):
         else:
             return {'error': "Unknown Pool"}, sc.BAD_REQUEST_400
 
+    async def twitch_update(self, stream):
+        twitch_update = self.bot.cogs['Twitch Notification']
+        await twitch_update.update(stream)
+        return {}, sc.OK_200
+
     async def handle_mock_user_action(
             self,
             action: int = None,

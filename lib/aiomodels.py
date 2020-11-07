@@ -101,3 +101,10 @@ class TbEmojis(Base):
         async with (await self.pool()).acquire() as conn:
             return await conn.fetch(
                 f'SELECT * FROM {self.__class__.__tablename__} WHERE guild_id = $1 ORDER BY priority', guild_id)
+
+class TwitchStream(Base):
+    __tablename__ = 'tb_twitch_subs'
+
+    async def select_by_stream_id(self, stream_user_id):
+        async with (await self.pool()).acquire() as conn:
+            return await conn.fetch(f'SELECT * FROM {self.__class__.__tablename__} WHERE stream_user_id = $1', stream_user_id)
