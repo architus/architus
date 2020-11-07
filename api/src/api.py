@@ -1,7 +1,7 @@
 import json
 from io import BytesIO
 
-from flask import Flask, redirect, request, g, Response
+from flask import Flask, redirect, request, g, Response, make_response
 from flask_restful import Api, Resource
 from flask_cors import CORS
 from werkzeug.wsgi import FileWrapper
@@ -187,7 +187,7 @@ class ListGuilds(CustomResource):
 class Twitch(CustomResource):
     def get(self):
         challenge = request.args.get("hub.challenge")
-        return challenge, StatusCodes.OK_200
+        return make_response(challenge, StatusCodes.OK_200)        
 
     def post(self):
         print(request.json['data'])
