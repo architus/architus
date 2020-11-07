@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 from random import choice
 from functools import partial
 import asyncio
+import os
 from datetime import datetime
 
 from lib.config import logger
@@ -34,15 +35,35 @@ ytdl_opts = {
 
 
 class Song:
-    def __init__(self, url: str, name: str, download_url: str, filename: str, duration: int):
+    def __init__(
+            self,
+            url: str,
+            name: str,
+            download_url: str,
+            filename: str,
+            duration: int,
+            thumbnail_url: str):
         self.url = url
         self.name = name
         self.download_url = download_url
         self.filename = filename
         self.duration = duration
+        self.thumbnail_url = thumbnail_url
+
+    def as_embed(self) -> Embed:
+        em = Embed(
+            title=self.name,
+            url=self.url,
+            color=0xFF0000
+        )
+        em.set_thumbnail(url=self.thumbnail_url)
+        em.set_author(name="Youtube", url="https://youtube.com")
+        em.set_footer(text=format_seconds(self.duration, self.duration > 3600))
+        return em
 
     @classmethod
     async def from_youtube(cls, search: str, no_playlist: bool = True, retries: int = 0) -> List['Song']:
+        """takes a youtube url of a song or playlist or a search query"""
         opts = ytdl_opts.copy()
         opts.update({'noplaylist': no_playlist})
         ydl = youtube_dl.YoutubeDL(opts)
@@ -56,17 +77,19 @@ class Song:
             if retries > 2:
                 return []
             return await cls.from_youtube(search, retries=retries + 1)
-        logger.debug(f"num of entries: {len(data['entries'])}")
+
+        entries = data['entries'] if 'entries' in data else [data]
         try:
             return [
-                cls(e['webpage_url'], e['title'], e['url'], ydl.prepare_filename(e), e['duration'])
-                for e in data['entries']]
+                cls(e['webpage_url'], e['title'], e['url'], ydl.prepare_filename(e), e['duration'], e['thumbnail'])
+                for e in entries]
         except KeyError:
             logger.exception(data)
             return []
 
     @classmethod
     async def from_spotify(cls, spotify_url: str) -> List['Song']:
+        """takes spotify track url or playlist url"""
         loop = asyncio.get_running_loop()
         if '/track/' in spotify_url:
             urls = [spotify_url]
@@ -86,6 +109,12 @@ class Song:
 
     def __repr__(self):
         return f"[{self.name}]({self.url})"
+
+    def __eq__(self, song):
+        if isinstance(song, self.__class__):
+            # this is the only equality that matters for deleting old songs
+            return self.filename == song.filename
+        return False
 
 
 class SongQueue:
@@ -141,6 +170,9 @@ class SongQueue:
     def __delitem__(self, key):
         del self.q[key]
 
+    def __contains__(self, key):
+        return key in self.q
+
     def embed(self):
         songs = "\n".join(f"**{i + 1:>2}.** *{song}*" for i, song in enumerate(self.q[::-1]))
         i = 0
@@ -173,6 +205,7 @@ class VoiceManager:
         self.guild = guild
         self.voice = None
         self.q = SongQueue(bot, guild)
+        self.garbage = []  # type: List[Song]
 
         if not opus.is_loaded():
             opus.load_opus('res/libopus.so')
@@ -184,6 +217,19 @@ class VoiceManager:
     @property
     def is_playing(self):
         return self.voice is not None and self.voice.is_playing()
+
+    async def empty_garbage(self):
+        loop = asyncio.get_running_loop()
+
+        def empty():
+            for song in self.garbage:
+                if song in self.q:
+                    continue
+                if os.path.exists(song.filename):
+                    os.remove(song.filename)
+                self.garbage.remove(song)
+        logger.debug(f"garbage contains {len(self.garbage)} items, emptying...")
+        await loop.run_in_executor(None, empty)
 
     async def join(self, ch: VoiceChannel):
         if self.channel is None:
@@ -198,6 +244,21 @@ class VoiceManager:
             await self.voice.disconnect(force=force)
             self.voice = None
 
+    async def skip(self) -> Optional[Song]:
+        if not self.voice:
+            return
+        # check if this is the last song before we stop cause race conditions
+        last = len(self.q) == 0
+        then_playing = self.q.now_playing
+        # stopping the player will trigger the finalizer and automatically queue the next track
+        self.voice.stop()
+        if last:
+            raise IndexError("no more songs")
+        while self.q.now_playing and self.q.now_playing == then_playing:
+            # yield until the song changes
+            await asyncio.sleep(0)
+        return self.q.now_playing
+
     async def play(self, song: Song = None):
         if self.channel is None or self.voice is None:
             raise
@@ -207,8 +268,9 @@ class VoiceManager:
             song = self.q.pop()
         try:
             self.voice.play(FFmpegPCMAudio(song.filename, **ffmpeg_options), after=self._finalizer)
+        except IOError:
+            raise Exception("There was a problem downloading the song (probably too large)")
         except errors.ClientException:
-            return
             logger.exception("hello")
             ch = self.channel
             logger.debug(ch)
@@ -219,6 +281,8 @@ class VoiceManager:
         return song
 
     def _finalizer(self, error):
+        if self.q.now_playing:
+            self.garbage.append(self.q.now_playing)
         self.q.started_at = None
         if error is not None:
             logger.error(error)

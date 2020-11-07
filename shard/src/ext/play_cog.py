@@ -1,10 +1,8 @@
 from discord.ext import commands
 from typing import Dict, List
-from src.guild_player import GuildPlayer
 from src.voice_manager import VoiceManager, Song
 from src.utils import doc_url
 from lib.config import logger
-import discord
 import functools
 
 
@@ -53,16 +51,16 @@ class VoiceCog(commands.Cog, name="Voice"):
     @commands.command()
     async def test(self, ctx):
         m = self.voice_managers[ctx.guild.id]
-        while m.linebuffer:
-            await ctx.send(m.linebuffer.pop(0))
+        await m.empty_garbage()
 
     async def enqueue(self, ctx, query: str) -> List[Song]:
         manager = self.voice_managers[ctx.guild.id]
+        yt_playlist = 'youtu' in query and '&list=' in query
         try:
             if ('/playlist/' in query or '/track/' in query):
                 songs = await Song.from_spotify(query)
             else:
-                songs = await Song.from_youtube(query)
+                songs = await Song.from_youtube(query, no_playlist=not yt_playlist)
         except Exception as e:
             logger.exception("")
             await ctx.send(f"Error queuing song {e}")
@@ -98,20 +96,22 @@ class VoiceCog(commands.Cog, name="Voice"):
                     logger.exception("")
                     await ctx.send(f"error playing music {e}")
                 else:
-                    msg = song.name if 'youtu' in arg else song.url
-                    await ctx.send(f"now playing: {msg}")
+                    # msg = song.name if 'youtu' in arg else song.url
+                    # await ctx.send(f"🎶 **Now playing:** {msg}")
+                    await ctx.send(embed=song.as_embed())
 
     @commands.command()
     @doc_url("https://docs.archit.us/commands/music/#skip")
     @requires_voice
     async def skip(self, ctx):
         try:
-            song = await ctx.voice_manager.play()
+            song = await ctx.voice_manager.skip()
         except IndexError:
             await ctx.send("no more songs, goodbye")
             await ctx.voice_manager.disconnect()
         else:
-            await ctx.send(f"now playing: {song.name}")
+            # await ctx.send(f"🎶 **Now playing:** {song.url if song else 'n/a'}")
+            await ctx.send(embed=song.as_embed())
 
     @commands.group(aliases=["q"])
     @doc_url("https://docs.archit.us/commands/#queue")
@@ -132,7 +132,7 @@ class VoiceCog(commands.Cog, name="Voice"):
     @requires_voice
     async def rm(self, ctx, index: int):
         '''queue rm <index>'''
-        q = ctx.voice_manager
+        q = ctx.voice_manager.q
         try:
             song = q[index - 1]
             del q[index - 1]
@@ -155,138 +155,6 @@ class VoiceCog(commands.Cog, name="Voice"):
         manager = self.voice_managers[ctx.guild.id]
         manager.q.shuffle = not manager.q.shuffle
         await ctx.send(f"Shuffle is **{'on' if manager.q.shuffle else 'off'}**")
-
-
-class BPlay(commands.Cog, name="Music Player"):
-    '''
-    Can join voice and play beautiful noises
-    '''
-
-    def __init__(self, bot):
-        self.bot = bot
-        self.players = {}
-
-    @commands.command(aliases=['p'])
-    @doc_url("https://docs.archit.us/commands/music/#play")
-    async def play(self, ctx, url):
-        '''play <search item|youtube url|spotify url>
-        Add a song to the music queue.
-        Supports youtube and spotify links.
-        '''
-
-        if ctx.guild not in self.players:
-            self.players[ctx.guild] = GuildPlayer(self.bot)
-        player = self.players[ctx.guild]
-        settings = self.bot.settings[ctx.guild]
-
-        if not settings.music_enabled:
-            return True
-
-        async with ctx.channel.typing():
-            if not discord.opus.is_loaded():
-                discord.opus.load_opus('res/libopus.so')
-            if not (player.is_connected()):
-                voice = await ctx.author.voice.channel.connect()
-                player.voice = voice
-            else:
-                await player.voice.move_to(ctx.author.voice.channel)
-
-            arg = ctx.message.content.split(' ')
-            add = arg[0] != '!playnow' and (player.q or (player.voice and player.voice.is_playing()))
-            message = ''
-            if (len(arg) > 1):
-                try:
-                    if ('/playlist/' in arg[1]):
-                        urls = await player.add_spotify_playlist(arg[1])
-                        message = "Queuing \"" + urls[0] + "\"."
-                        del urls[0]
-                        await player.add_url(urls[0])
-                        name = await player.play()
-                        for track in urls:
-                            await player.add_url(track)
-                        if (name):
-                            message += "\n🎶 **Playing:** *%s*" % name
-                    elif ('/track/' in arg[1]):
-                        if (add):
-                            name = await player.add_url(arg[1])
-                            message = '**Queued:** *%s*' % name
-                        else:
-                            await player.add_url_now(arg[1])
-                            name = await player.play()
-                            if (name):
-                                message = "🎶 **Now playing:** *%s*" % name
-                    elif ('youtu' in arg[1]):
-                        if (add):
-                            name = await player.add_url(arg[1])
-                            message = '**Queued:** *%s*' % name
-                        else:
-                            player.pause()
-                            await player.add_url_now(arg[1])
-                            name = await player.play()
-                            if (name):
-                                message = "🎶 **Playing:** *%s*" % name
-                    else:
-                        del arg[0]
-                        url = await player.get_youtube_url(' '.join(arg))
-                        if (add):
-                            await player.add_url(url)
-                            message = "**Queued:** *%s*" % url
-                        else:
-                            await player.add_url_now(url)
-                            name = await player.play()
-                            if (name):
-                                message = "🎶 **Now Playing:** " + url
-                except Exception:
-                    logger.exception("error queuing song")
-                    message = f"❌ error queuing"
-            else:
-                if (len(player.q) == 0):
-                    message = "Play what, " + self.author.mention + "?"
-                else:
-                    name = await player.play()
-                    if (name):
-                        message = "🎶 **Now playing:** *%s*" % name
-
-        await ctx.channel.send(message)
-
-    @commands.command(aliases=['q'])
-    @doc_url("https://docs.archit.us/commands/music/#queue")
-    async def queue(self, ctx):
-        '''queue
-        List songs in queue.'''
-        if ctx.guild not in self.players:
-            self.players[ctx.guild] = GuildPlayer(self.bot)
-        player = self.players[ctx.guild]
-        settings = self.bot.settings[ctx.guild]
-
-        if not settings.music_enabled:
-            return
-
-        await ctx.channel.send(embed=await player.qembed())
-
-    @commands.command()
-    @doc_url("https://docs.archit.us/commands/music/#skip")
-    async def skip(self, ctx):
-        '''skip
-        Skip a song.'''
-        if ctx.guild not in self.players:
-            self.players[ctx.guild] = GuildPlayer(self.bot)
-        player = self.players[ctx.guild]
-        name = await player.skip()
-        if name:
-            await ctx.channel.send(f"🎶 **Now playing:** *{name}*")
-        else:
-            await ctx.channel.send("No songs left. goodbye")
-
-    @commands.command()
-    async def clear(self, ctx):
-        '''clear
-        Clear all songs from queue.'''
-        if ctx.guild not in self.players:
-            self.players[ctx.guild] = GuildPlayer(self.bot)
-        player = self.players[ctx.guild]
-        await ctx.channel.send("Removed %d songs from queue." % len(player.q))
-        player.clearq()
 
 
 def setup(bot):

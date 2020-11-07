@@ -1,4 +1,13 @@
 #!/bin/bash
+
+if [ $# -eq 0 ] ; then
+    echo "please specify a module to reload (e.g. $0 ext-set_cog)"
+	exit -1
+fi
+port=5000
+if [ ! -z "$2" ]; then
+	port="$2"
+fi
 containers=$(docker-compose ps | grep -o "architus_shard_")
 i=0
 while IFS= read -r c; do
@@ -6,6 +15,5 @@ while IFS= read -r c; do
 	echo "$c$i"
 	docker cp shard "$c$i":/
 	docker exec "$c$i" /bin/sh -c "cp -r /shard/* /app"
-	#docker exec "$c$i" /bin/sh -c ls /
 done <<< "$containers"
-curl -XPOST localhost:5001/coggers/src-ext-play_cog
+curl -XPOST "localhost:$port/coggers/src-$1"
