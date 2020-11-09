@@ -105,6 +105,15 @@ class TbEmojis(Base):
 class TwitchStream(Base):
     __tablename__ = 'tb_twitch_subs'
 
-    async def select_by_stream_id(self, stream_user_id):
+    async def select_distinct_by_stream_id(self, stream_user_id):
         async with (await self.pool()).acquire() as conn:
-            return await conn.fetch(f'SELECT * FROM {self.__class__.__tablename__} WHERE stream_user_id = $1', stream_user_id)
+            return await conn.fetch(f'SELECT DISTINCT * FROM {self.__class__.__tablename__} WHERE stream_user_id = $1', stream_user_id)
+    
+    async def select_distinct_stream_id(self):
+        async with (await self.pool()).acquire() as conn:
+            return await conn.fetch(f'SELECT DISTINCT stream_user_id FROM {self.__class__.__tablename__}')
+    
+    async def delete_by_stream_id(self, stream_user_id, guild_id):
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(f'DELETE FROM {self.__class__.__tablename__} WHERE stream_user_id = $1 AND guild_id = {guild_id}', stream_user_id)
