@@ -1,8 +1,5 @@
 import spotipy
 import spotipy.oauth2 as oauth2
-import lyricwikia
-
-from titlecase import titlecase
 
 
 def generate_token():
@@ -23,8 +20,8 @@ spotify = spotipy.Spotify(auth=token)
 def generate_metadata(raw_song):
     """ Fetch a song's metadata from Spotify. """
     meta_tags = spotify.track(raw_song)
-    artist = spotify.artist(meta_tags['artists'][0]['id'])
-    album = spotify.album(meta_tags['album']['id'])
+    # artist = spotify.artist(meta_tags['artists'][0]['id'])
+    # album = spotify.album(meta_tags['album']['id'])
 
     """     try:
         meta_tags[u'genre'] = titlecase(artist['genres'][0])

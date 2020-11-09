@@ -4,7 +4,7 @@ from lib.config import FAKE_GUILD_IDS
 from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog
 import discord
-from typing import List
+from typing import List, Optional
 
 RYTHMS_ID = 235088799074484224
 
@@ -34,6 +34,25 @@ class Setting:
     @music_enabled.setter
     def music_enabled(self, new_music_enabled: bool):
         self._settings_dict['music_enabled'] = new_music_enabled
+        self._update_db()
+
+    @property
+    def music_role(self) -> Optional[discord.Role]:
+        role_id = self._settings_dict.get('music_role_id', None)
+        return self.guild.get_role(role_id)
+
+    @music_role.setter
+    def music_role(self, new_music_role: discord.Role):
+        self._settings_dict['music_role_id'] = new_music_role.id
+        self._update_db()
+
+    @property
+    def music_volume(self) -> float:
+        return self._settings_dict.get('music_volume', 0.30)
+
+    @music_volume.setter
+    def music_volume(self, new_music_volume):
+        self._settings_dict['music_volume'] = new_music_volume
         self._update_db()
 
     @property

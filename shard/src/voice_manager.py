@@ -1,4 +1,4 @@
-from discord import VoiceChannel, opus, FFmpegPCMAudio, Embed, Guild, errors
+from discord import VoiceChannel, opus, FFmpegPCMAudio, PCMVolumeTransformer, Embed, Guild, errors
 import youtube_dlc as youtube_dl
 
 from typing import List, Optional, Tuple
@@ -14,7 +14,7 @@ from src.utils import format_seconds
 
 
 ffmpeg_options = {
-    'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
+    'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -af loudnorm=I=-16:TP=-1.5:LRA=11',
 }
 
 ytdl_opts = {
@@ -73,7 +73,7 @@ class Song:
         try:
             data = await loop.run_in_executor(None, f)
         except (youtube_dl.utils.ExtractorError, youtube_dl.utils.DownloadError):
-            logger.exception(f"error downloading video data... ({retries + 1}/4)")
+            logger.debug(f"error downloading video data... ({retries + 1}/4)")
             if retries > 2:
                 return []
             return await cls.from_youtube(search, retries=retries + 1)
@@ -218,6 +218,10 @@ class VoiceManager:
     def is_playing(self):
         return self.voice is not None and self.voice.is_playing()
 
+    @property
+    def settings(self):
+        return self.bot.settings[self.guild]
+
     async def empty_garbage(self):
         loop = asyncio.get_running_loop()
 
@@ -254,10 +258,12 @@ class VoiceManager:
         self.voice.stop()
         if last:
             raise IndexError("no more songs")
-        while self.q.now_playing and self.q.now_playing == then_playing:
+        for _ in range(50):
             # yield until the song changes
+            if self.q.now_playing and self.q.now_playing is not then_playing:
+                return self.q.now_playing
             await asyncio.sleep(0)
-        return self.q.now_playing
+        return None
 
     async def play(self, song: Song = None):
         if self.channel is None or self.voice is None:
@@ -266,10 +272,12 @@ class VoiceManager:
             self.voice.stop()
         if song is None:
             song = self.q.pop()
-        try:
-            self.voice.play(FFmpegPCMAudio(song.filename, **ffmpeg_options), after=self._finalizer)
-        except IOError:
+        if not os.path.exists(song.filename):
             raise Exception("There was a problem downloading the song (probably too large)")
+        try:
+            self.voice.play(PCMVolumeTransformer(
+                FFmpegPCMAudio(song.filename, **ffmpeg_options),
+                self.settings.music_volume), after=self._finalizer)
         except errors.ClientException:
             logger.exception("hello")
             ch = self.channel
@@ -292,3 +300,6 @@ class VoiceManager:
         else:
             coro = self.play()
         asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
+
+        if len(self.garbage) > 10:
+            asyncio.create_task(self.empty_garbage())

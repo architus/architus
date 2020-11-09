@@ -1,4 +1,5 @@
 from discord.ext import commands
+from discord import AllowedMentions
 from typing import Dict, List
 from src.voice_manager import VoiceManager, Song
 from src.utils import doc_url
@@ -7,29 +8,50 @@ import functools
 
 
 def requires_voice(cmd):
+    """
+    checks the following before executing the the decorated command:
+        - music enabled
+        - no music role OR author in music role OR is an admin
+        - bot is in voice with author
+    also inserts the voice manager into the context
+    """
     @functools.wraps(cmd)
     async def new_cmd(self, ctx, *args, **kwargs):
         if ctx.guild:
             settings = self.bot.settings[ctx.guild]
             manager = self.voice_managers[ctx.guild.id]
+
             if not settings.music_enabled:
                 logger.debug(f"music commands disabled for {ctx.guild.id}")
                 return
+
+            if settings.music_role and settings.music_role not in ctx.author.roles \
+                    and ctx.author.id not in settings.admin_ids:
+                logger.debug(f"{ctx.author} tried to use music command but is not allowed")
+                await ctx.send(
+                    f"You must be a member of {settings.music_role.mention}",
+                    allowed_mentions=AllowedMentions.none())
+                return
+
             if ch := manager.channel:
                 if ctx.author.voice and (author_ch := ctx.author.voice.channel):
                     if ch.id != author_ch.id and ctx.author.id not in settings.admin_ids:
                         await ctx.send(f"Please join {ch} to use music commands :)")
                         return
+
             if not (ctx.author.voice and ctx.author.voice.channel):
                 await ctx.send("Please join a voice channel to use music commands :)")
                 return
             await manager.join(ctx.author.voice.channel)
+
             ctx.voice_manager = manager
+
         return await cmd(self, ctx, *args, **kwargs)
     return new_cmd
 
 
 class VoiceManagers(dict):
+    """fancy defaultdict"""
     def __init__(self, bot):
         self.bot = bot
         super().__init__()
@@ -47,11 +69,6 @@ class VoiceCog(commands.Cog, name="Voice"):
     def __init__(self, bot):
         self.bot = bot
         self.voice_managers = VoiceManagers(bot)  # type: Dict[int, VoiceManager]
-
-    @commands.command()
-    async def test(self, ctx):
-        m = self.voice_managers[ctx.guild.id]
-        await m.empty_garbage()
 
     async def enqueue(self, ctx, query: str) -> List[Song]:
         manager = self.voice_managers[ctx.guild.id]
@@ -71,7 +88,7 @@ class VoiceCog(commands.Cog, name="Voice"):
         if len(songs) > 1:
             await ctx.send(f"*Successfully queued {len(songs)} songs*")
         elif len(songs) == 1:
-            await ctx.send(f"Successfully queued *{songs[0].name}*")
+            await ctx.send(f"*Successfully queued \"{songs[0].name}\"*")
         return songs
 
     @commands.command(aliases=['p'])
@@ -84,21 +101,24 @@ class VoiceCog(commands.Cog, name="Voice"):
         '''
         arg = " ".join(song)
         async with ctx.channel.typing():
-            if len(await self.enqueue(ctx, arg)) < 1:
-                return
+            if len(arg) > 0:
+                if len(await self.enqueue(ctx, arg)) < 1:
+                    await ctx.send("Unable to find that song; try linking it directly")
+                    return
 
             if ctx.voice_manager.is_playing:
-                pass
+                return
+            try:
+                song = await ctx.voice_manager.play()
+            except IndexError:
+                logger.exception("")
+                await ctx.send("nothing to play, goodbye")
+                await ctx.voice_manager.disconnect()
+            except Exception as e:
+                logger.exception("")
+                await ctx.send(f"error playing music: {e}")
             else:
-                try:
-                    song = await ctx.voice_manager.play()
-                except Exception as e:
-                    logger.exception("")
-                    await ctx.send(f"error playing music {e}")
-                else:
-                    # msg = song.name if 'youtu' in arg else song.url
-                    # await ctx.send(f"🎶 **Now playing:** {msg}")
-                    await ctx.send(embed=song.as_embed())
+                await ctx.send(embed=song.as_embed())
 
     @commands.command()
     @doc_url("https://docs.archit.us/commands/music/#skip")
@@ -125,7 +145,9 @@ class VoiceCog(commands.Cog, name="Voice"):
     @requires_voice
     async def add(self, ctx, *query):
         '''queue add <songs>'''
-        await self.enqueue(ctx, " ".join(query))
+        async with ctx.channel.typing():
+            if len(await self.enqueue(ctx, " ".join(query))) < 1:
+                await ctx.send("Unable to find that song; try linking it directly")
 
     @queue.command(aliases=['remove', 'r'])
     @doc_url("https://docs.archit.us/commands/#queue")
@@ -133,9 +155,10 @@ class VoiceCog(commands.Cog, name="Voice"):
     async def rm(self, ctx, index: int):
         '''queue rm <index>'''
         q = ctx.voice_manager.q
+        index = len(q) - index
         try:
-            song = q[index - 1]
-            del q[index - 1]
+            song = q[index]
+            del q[index]
         except IndexError:
             await ctx.send("not sure what song you're talking about")
         else:
@@ -145,6 +168,13 @@ class VoiceCog(commands.Cog, name="Voice"):
     @doc_url("https://docs.archit.us/commands/music/#clear")
     @requires_voice
     async def clear(self, ctx):
+        n = ctx.voice_manager.q.clear()
+        await ctx.send(f"cleared {n} songs from queue")
+
+    @commands.command(name="clear")
+    @doc_url("https://docs.archit.us/commands/music/#clear")
+    @requires_voice
+    async def other_clear(self, ctx):
         n = ctx.voice_manager.q.clear()
         await ctx.send(f"cleared {n} songs from queue")
 
