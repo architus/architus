@@ -1,12 +1,13 @@
 import spotipy
 import spotipy.oauth2 as oauth2
+from lib.config import spotify_client_secret
 
 
 def generate_token():
     """ Generate the token. Please respect these credentials :) """
     credentials = oauth2.SpotifyClientCredentials(
         client_id='1b4fadd2be3b48bda672c6e67caf7957',
-        client_secret='4c1fba736efb4dd8a363c4bdbac6ce81')
+        client_secret=spotify_client_secret)
     token = credentials.get_access_token()
     return token
 
