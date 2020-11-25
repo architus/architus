@@ -11,6 +11,7 @@ const DISCORD_EPOCH_OFFSET: u64 = 1_420_070_400_000;
 /// Handles atomic provisioning of HoarFrost Ids
 ///
 /// See https://discord.com/developers/docs/reference#snowflakes
+#[derive(Debug)]
 pub struct IdProvisioner {
     combined_process_id: u64,
     internal_counter: AtomicU64,

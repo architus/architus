@@ -23,6 +23,7 @@ reqwest = "0.10"
 twilight-gateway = "0.2"
 twilight-model = "0.2"
 static_assertions = "1.1.0"
+thiserror = "1.0.22"
 
 [dependencies.jmespath]
 git = "https://github.com/jmespath/jmespath.rs"

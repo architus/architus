@@ -2,7 +2,6 @@ use logs_lib::id::HoarFrost;
 use logs_lib::{to_json, ActionOrigin, ActionType};
 use serde::ser;
 use serde::Serialize;
-use twilight_model::id::{AuditLogEntryId, GuildId, UserId};
 
 /// Normalized log event to send to log ingestion
 #[derive(Clone, PartialEq, Debug, Serialize)]
@@ -21,15 +20,15 @@ pub struct NormalizedEvent {
     /// An optional *human-readable* reason/message of the event
     pub reason: Option<String>,
     /// Related guild the event ocurred in
-    pub guild_id: Option<GuildId>,
+    pub guild_id: Option<u64>,
     /// Id of the entity that caused the event to occur
-    pub agent_id: Option<UserId>,
+    pub agent_id: Option<u64>,
     /// Id of the entity that the event is about/affects
     /// (can be any Id type)
     pub subject_id: Option<u64>,
     /// Id of the corresponding audit log entry this event corresponds to, if any
     /// (included for indexing purposes)
-    pub audit_log_id: Option<AuditLogEntryId>,
+    pub audit_log_id: Option<u64>,
 }
 
 impl NormalizedEvent {
@@ -65,6 +64,16 @@ impl Source {
         Self {
             gateway: to_json(gateway_event),
             audit_log: None,
+        }
+    }
+
+    #[must_use]
+    pub fn origin(&self) -> ActionOrigin {
+        match (self.gateway.as_ref(), self.audit_log.as_ref()) {
+            (Some(_), Some(_)) => ActionOrigin::Hybrid,
+            (Some(_), None) => ActionOrigin::Gateway,
+            (None, Some(_)) => ActionOrigin::AuditLog,
+            (None, None) => ActionOrigin::Internal,
         }
     }
 }
