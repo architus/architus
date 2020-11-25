@@ -9,11 +9,10 @@ use config::Configuration;
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use log::{debug, error, info};
+use logs_lib::time;
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
 use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
 use twilight_model::gateway::event::shard::Payload;
-use logs_lib::time;
-use std::sync::Arc;
 
 /// Bootstraps the bot and begins listening for gateway events
 #[tokio::main]
@@ -63,15 +62,18 @@ async fn run() -> Result<()> {
     let events = shard.some_events(event_types);
 
     // Initialize the gateway event processor
-    let processor = Arc::new(gateway::Processor::new());
+    // and register all known gateway event handlers
+    // (see gateway/processors.rs)
+    let processor = gateway::sub_processors::register_all(gateway::Processor::new());
 
     shard.start().await.context("Could not start shard")?;
     info!("Created shard and preparing to listen for gateway events");
 
     // Listen for all raw gateway events and process them,
     // re-emitting half-processed gateway events to be consumed by the processor
-    let processor_copy = Arc::clone(&processor);
+    let processor_ref = &processor;
     let gateway_event_stream = events.filter_map(|event| async move {
+        // let processor_copy2 = Arc::clone(&processor_ref);
         if let Event::ShardPayload(Payload { bytes }) = event {
             if let Ok(json) = std::str::from_utf8(&bytes) {
                 // Use twilight's fast pre-deserializer to determine the op type,
@@ -86,21 +88,27 @@ async fn run() -> Result<()> {
 
                     if let Some(event_type) = event_type.as_deref() {
                         // Make sure we can process the event
-                        if !processor_copy.can_process(event_type) {
+                        if !processor_ref.can_process(event_type) {
                             return None;
                         }
 
-                        // Convert the event into an owned version
-                        // and emit as the stream item
-                        let event_type = event_type.to_owned();
                         let result = serde_json::from_str::<serde_json::Value>(json);
                         if let Ok(value) = result {
-                            return Some(OriginalEvent {
-                                seq,
-                                event_type,
-                                json: value,
-                                rx_timestamp: time::millisecond_ts(),
-                            });
+                            if let serde_json::Value::Object(map) = value {
+                                // Attempt to find the ".d" value
+                                let mut map = map;
+                                if let Some(inner_json) = map.remove("d") {
+                                    // Convert the event into an owned version
+                                    // and emit as the stream item
+                                    let event_type = event_type.to_owned();
+                                    return Some(OriginalEvent {
+                                        seq,
+                                        event_type,
+                                        json: inner_json,
+                                        rx_timestamp: time::millisecond_ts(),
+                                    });
+                                }
+                            }
                         }
                     }
                 }
@@ -114,7 +122,7 @@ async fn run() -> Result<()> {
     // and process them in parallel where possible via buffer_unordered
     let normalized_event_stream = gateway_event_stream
         .map(|event| async move {
-            match processor.normalize(event).await {
+            match processor_ref.normalize(event).await {
                 Ok(normalized_event) => Some(normalized_event),
                 Err(err) => {
                     debug!("Event normalization failed for event: {:?}", err);
@@ -122,14 +130,17 @@ async fn run() -> Result<()> {
                 }
             }
         })
-        .buffer_unordered(config.normalized_stream_concurrency);
+        .buffer_unordered(config.normalization_stream_concurrency)
+        .filter_map(|event_option| async move { event_option });
 
     // Send each normalized event to the logging import service,
     // acting as a sink for this stream
     normalized_event_stream
         .for_each_concurrent(Some(config.import_stream_concurrency), |event| async move {
             // TODO implement sending via gRPC to import service
-            info!("Normalized event received at sink: {:?}", event);
+            if let Some(s) = serde_json::to_string_pretty(&event).ok() {
+                info!("Normalized event received at sink: {}", s);
+            }
         })
         .await;
 
