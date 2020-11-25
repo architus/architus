@@ -1,14 +1,31 @@
-use logs_lib::ActionType;
 use jmespath::Expression;
+use logs_lib::ActionType;
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
+
+/// Builder for creating a processing chain for gateway actions
+pub struct GatewayProcessor {
+    events: HashMap<TypeId, EventProcessor>,
+}
+
+impl GatewayProcessor {
+    pub fn add<T: ?Sized + Any>(mut self, p: EventProcessor) -> Self {
+        let event_type = TypeId::of::<T>();
+        self.events.insert(event_type, p);
+        self
+    }
+}
 
 /// Represents a shareable static configuration that describes
-/// how to translate gateway actions into normalized events
-pub struct GatewayProcessor {
-    pub action_type: ActionType,
-    pub timestamp_src: TimestampSource,
-    pub subject_id_src: Option<Path>,
-    pub agent_id_src: Option<Path>,
-    pub audit_log_src: Option<AuditLogSource>,
+/// how to translate a single gateway event into a normalized event
+pub enum EventProcessor {
+    Static {
+        action_type: ActionType,
+        timestamp_src: TimestampSource,
+        subject_id_src: Option<Path>,
+        agent_id_src: Option<Path>,
+        audit_log_src: Option<AuditLogSource>,
+    },
 }
 
 pub enum TimestampSource {
@@ -18,9 +35,7 @@ pub enum TimestampSource {
     Snowflake(Path),
 }
 
-pub struct AuditLogSource {
-    
-}
+pub struct AuditLogSource {}
 
 pub enum Path {
     Gateway(Expression<'static>),
@@ -34,7 +49,7 @@ impl Path {
     pub fn gateway(query: &str) -> Self {
         Self::Gateway(jmespath::compile(query).unwrap())
     }
-    
+
     /// Creates an audit log path from the given string,
     /// panicking if there was a parsing error.
     /// Only use in initialization pathways that will fail-fast
@@ -42,4 +57,3 @@ impl Path {
         Self::AuditLog(jmespath::compile(query).unwrap())
     }
 }
-

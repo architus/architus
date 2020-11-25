@@ -1,0 +1,4 @@
+[secrets]
+# Make sure to replace this with the Discord token
+# from the Discord developers bot page
+discord_token = "<REPLACE_ME>"
