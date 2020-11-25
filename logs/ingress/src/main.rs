@@ -1,24 +1,25 @@
-// mod audit_log;
 mod config;
-// mod data;
 mod event;
-// mod gateway;
+mod gateway;
 
+use crate::gateway::OriginalEvent;
 use anyhow::{Context, Result};
 use clap::{App, Arg};
 use config::Configuration;
-use lazy_static::lazy_static;
-use log::{error, info};
 use futures::StreamExt;
-use tokio_compat_02::FutureExt;
+use lazy_static::lazy_static;
+use log::{debug, error, info};
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
+use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
 use twilight_model::gateway::event::shard::Payload;
+use logs_lib::time;
+use std::sync::Arc;
 
 /// Bootstraps the bot and begins listening for gateway events
 #[tokio::main]
 async fn main() {
     env_logger::init();
-    match run().compat().await {
+    match run().await {
         Ok(_) => info!("Exiting"),
         Err(err) => error!("{:?}", err),
     }
@@ -59,23 +60,78 @@ async fn run() -> Result<()> {
     let config = Configuration::try_load(config_path)?;
     let event_types = EventTypeFlags::SHARD_PAYLOAD;
     let mut shard = Shard::new(config.secrets.discord_token, *INTENTS);
-    let mut events = shard.some_events(event_types);
+    let events = shard.some_events(event_types);
+
+    // Initialize the gateway event processor
+    let processor = Arc::new(gateway::Processor::new());
 
     shard.start().await.context("Could not start shard")?;
     info!("Created shard and preparing to listen for gateway events");
 
-    // Listen for all raw gateway events and process them
-    while let Some(event) = events.next().await {
-        match event {
-            Event::ShardPayload(Payload{ bytes }) => {
-                if let Ok(as_str) = std::str::from_utf8(&bytes) {
-                    // TODO consume
-                    println!("Event: {}", as_str);
+    // Listen for all raw gateway events and process them,
+    // re-emitting half-processed gateway events to be consumed by the processor
+    let processor_copy = Arc::clone(&processor);
+    let gateway_event_stream = events.filter_map(|event| async move {
+        if let Event::ShardPayload(Payload { bytes }) = event {
+            if let Ok(json) = std::str::from_utf8(&bytes) {
+                // Use twilight's fast pre-deserializer to determine the op type,
+                // and only deserialize it if it:
+                // - is a proper Gateway dispatch event
+                // - has a matching processor
+                if let Some(deserializer) = GatewayEventDeserializer::from_json(json) {
+                    let (op, seq, event_type) = deserializer.into_parts();
+                    if op != 0 {
+                        return None;
+                    }
+
+                    if let Some(event_type) = event_type.as_deref() {
+                        // Make sure we can process the event
+                        if !processor_copy.can_process(event_type) {
+                            return None;
+                        }
+
+                        // Convert the event into an owned version
+                        // and emit as the stream item
+                        let event_type = event_type.to_owned();
+                        let result = serde_json::from_str::<serde_json::Value>(json);
+                        if let Ok(value) = result {
+                            return Some(OriginalEvent {
+                                seq,
+                                event_type,
+                                json: value,
+                                rx_timestamp: time::millisecond_ts(),
+                            });
+                        }
+                    }
                 }
-            },
-            _ => {},
+            }
         }
-    }
+
+        None
+    });
+
+    // Normalize each event coming from the gateway,
+    // and process them in parallel where possible via buffer_unordered
+    let normalized_event_stream = gateway_event_stream
+        .map(|event| async move {
+            match processor.normalize(event).await {
+                Ok(normalized_event) => Some(normalized_event),
+                Err(err) => {
+                    debug!("Event normalization failed for event: {:?}", err);
+                    None
+                }
+            }
+        })
+        .buffer_unordered(config.normalized_stream_concurrency);
+
+    // Send each normalized event to the logging import service,
+    // acting as a sink for this stream
+    normalized_event_stream
+        .for_each_concurrent(Some(config.import_stream_concurrency), |event| async move {
+            // TODO implement sending via gRPC to import service
+            info!("Normalized event received at sink: {:?}", event);
+        })
+        .await;
 
     Ok(())
 }

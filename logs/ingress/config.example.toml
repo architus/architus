@@ -1,3 +1,10 @@
+# Maximum number of executing futures for gateway event normalization processing
+normalization_stream_concurrency = 20
+
+# Maximum number of executing futures for sending normalized events
+# to the import service
+import_stream_concurrency = 8
+
 [secrets]
 # Make sure to replace this with the Discord token
 # from the Discord developers bot page
