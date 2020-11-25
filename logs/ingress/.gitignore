@@ -1,5 +1,5 @@
 # Build artifacts
 target/
 
-# Test files
-.env
+# Configuration files
+config.toml

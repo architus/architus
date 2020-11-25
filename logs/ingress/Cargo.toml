@@ -9,21 +9,20 @@ edition = "2018"
 [dependencies]
 lazy_static = "1.4"
 log = "0.4"
-env_logger = "0.7"
-tokio = { version = "0.2", features = ["macros"] }
+env_logger = "0.8"
+tokio = { version = "0.3", features = ["rt-multi-thread", "macros"] }
+tokio-compat-02 = "0.1.2"
 futures = "0.3"
 logs_lib = { path = "../lib" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+toml = "0.5"
+anyhow = "1.0"
+clap = "2.33"
 backoff = "0.1"
 reqwest = "0.10"
-
-[dependencies.serenity]
-version = "0.8"
-git = "https://github.com/Lakelezz/serenity"
-branch = "await"
-default-features = false
-features = ["client", "model", "gateway", "native_tls_backend", "cache", "utils", "framework", "standard_framework"]
+twilight-gateway = "0.2"
+twilight-model = "0.2"
 
 [dependencies.jmespath]
 git = "https://github.com/jmespath/jmespath.rs"
