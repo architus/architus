@@ -9,6 +9,10 @@ use std::io::Read;
 pub struct Configuration {
     /// Collection of secret values used to connect to services
     pub secrets: Secrets,
+    /// Maximum number of executing futures for gateway event normalization processing
+    pub normalized_stream_concurrency: usize,
+    /// Maximum number of executing futures for normalized event importing
+    pub import_stream_concurrency: usize,
 }
 
 /// Collection of secret values used to connect to services
