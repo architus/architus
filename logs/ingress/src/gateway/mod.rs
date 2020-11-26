@@ -60,9 +60,11 @@ impl Processor {
     /// and adding it to the internal map
     #[must_use]
     fn register(mut self, event_type: GatewayEventType, sub_processor: EventProcessor) -> Self {
+        let pattern: &[_] = &['\'', '"'];
         let event_type_str =
             serde_json::to_string(&event_type).expect("GatewayEventType was not serializable");
-        self.sub_processors.insert(event_type_str, sub_processor);
+        let trimmed = String::from(event_type_str.trim_matches(pattern));
+        self.sub_processors.insert(trimmed, sub_processor);
         self
     }
 

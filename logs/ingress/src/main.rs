@@ -13,9 +13,9 @@ use anyhow::{Context, Result};
 use backoff::{future::FutureOperation as _, ExponentialBackoff};
 use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use logging::logging_client::LoggingClient;
-use logging::{submit_reply, SubmitRequest};
+use logging::SubmitRequest;
 use logs_lib::time;
 use std::convert::{Into, TryFrom};
 use std::future::Future;
@@ -46,9 +46,11 @@ lazy_static! {
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    let config_path = std::env::args().nth(1).expect("no config path given\
+    let config_path = std::env::args().nth(1).expect(
+        "no config path given\
         Usage: \
-        ingress-service [config-path]");
+        ingress-service [config-path]",
+    );
 
     // Parse the config from the path and use it to initialize the event stream
     let config = Configuration::try_load(config_path)?;
@@ -160,7 +162,7 @@ fn pipe_normalized_events(
             match processor.normalize(event).await {
                 Ok(normalized_event) => Some(normalized_event),
                 Err(err) => {
-                    debug!("Event normalization failed for event: {:?}", err);
+                    warn!("Event normalization failed for event: {:?}", err);
                     None
                 }
             }
@@ -169,13 +171,9 @@ fn pipe_normalized_events(
 }
 
 #[derive(Error, Clone, Debug)]
-pub enum SubmissionError {
-    #[error("gRPC call failed import log event: {0}")]
+enum SubmissionError {
+    #[error("gRPC call failed to import log event: {0}")]
     GrpcFailure(tonic::Status),
-    #[error("unknown reply type variant received")]
-    UnknownReplyVariant,
-    #[error("failure status returned from submission: {0}")]
-    FailureReply(String),
 }
 
 /// Stream sink that takes in each normalized event and sends them to the logging service
@@ -202,21 +200,15 @@ fn import_log_events(
                 let payload = payload.clone();
                 async move {
                     // Send the gRPC response and get the reply
-                    let reply = client
+                    Ok(client
                         .submit(payload)
                         .await
-                        .map_err(SubmissionError::GrpcFailure)?
-                        .into_inner();
-
-                    match reply.variant {
-                        Some(submit_reply::Variant::Success(result)) => Ok(result),
-                        Some(submit_reply::Variant::Failure(failure)) => {
-                            Err(SubmissionError::FailureReply(failure.message).into())
-                        }
-                        None => Err(backoff::Error::Permanent(
-                            SubmissionError::UnknownReplyVariant,
-                        )),
-                    }
+                        .map_err(|err| {
+                            warn!("Log event submission failed; retrying after an exponential backoff: \
+                            {:?}", err);
+                            SubmissionError::GrpcFailure(err)
+                        })?
+                        .into_inner())
                 }
             };
 
