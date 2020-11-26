@@ -5,6 +5,7 @@ mod logging {
 
 use crate::config::Configuration;
 use anyhow::{Context, Result};
+use log::info;
 use logging::logging_server::{Logging, LoggingServer};
 use logging::{SubmitReply, SubmitRequest};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
@@ -29,8 +30,10 @@ async fn main() -> Result<()> {
     let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), config.port);
     let logging = LoggingService {};
     let service = LoggingServer::new(logging);
-    Server::builder()
-        .add_service(service)
+    let server = Server::builder().add_service(service);
+
+    info!("Serving gRPC server at {}", addr);
+    server
         .serve(addr)
         .await
         .context("An error occurred while running the gRPC server")?;
@@ -51,8 +54,13 @@ impl Logging for LoggingService {
         &self,
         request: Request<SubmitRequest>,
     ) -> StdResult<Response<SubmitReply>, Status> {
-        let _event = request.into_inner().event;
+        let event = request.into_inner().event;
+
         // TODO implement
-        unimplemented!()
+        info!("Received event from RPC call: {:?}", event);
+        Ok(Response::new(SubmitReply {
+            actual_id: 0,
+            actual_timestamp: 0,
+        }))
     }
 }

@@ -14,30 +14,12 @@ message SubmitRequest {
 }
 
 message SubmitReply {
-    oneof variant {
-       SubmitReplySuccess success = 1;
-       SubmitReplyFailure failure = 2;
-    }
-}
-
-message SubmitReplySuccess {
     // Actual ID of the generated event object,
     // which may not be the same as the original ID (if given)
     fixed64 actual_id = 1;
     // Actual timestamp of the generated event object,
     // which will be the same as the original timestamp if given
     uint64 actual_timestamp = 2;
-}
-
-message SubmitReplyFailure {
-    // The type of the failure
-    SubmitReplyFailureReason reason = 1;
-    // Gives the human-readable reason for the failure
-    string message = 2;
-}
-
-enum SubmitReplyFailureReason {
-    Unknown = 0;
 }
 
 message EventSource {
