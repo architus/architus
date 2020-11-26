@@ -167,7 +167,7 @@ fn pipe_gateway_events(
 
 /// Stream processor function that invokes the core event processing logic
 /// on each incoming original gateway event,
-/// attempting to asynchronously convert them into NormalizedEvents
+/// attempting to asynchronously convert them into `NormalizedEvent`s
 fn pipe_normalized_events(
     in_stream: impl Stream<Item = OriginalEvent>,
     processor: Arc<gateway::Processor>,
@@ -205,49 +205,51 @@ fn import_log_events(
 ) -> impl Future<Output = ()> {
     let config = config.clone();
     let client = client.clone();
-    in_stream
-        .for_each_concurrent(Some(config.import_stream_concurrency), move |event| {
-            let client = client.clone();
-            let config = config.clone();
-            async move {
-                let payload: SubmitRequest = event.into();
-                let submit = move || {
-                    let mut client = client.clone();
-                    // Note: we have to clone the payload for each retry,
-                    // which isn't ideal but required since Tonic moves it
-                    let payload = payload.clone();
-                    async move {
-                        // Send the gRPC response and get the reply
-                        let reply = client
-                            .submit(payload)
-                            .await
-                            .map_err(SubmissionError::GrpcFailure)?
-                            .into_inner();
+    in_stream.for_each_concurrent(Some(config.import_stream_concurrency), move |event| {
+        let client = client.clone();
+        let config = config.clone();
+        async move {
+            let payload = SubmitRequest {
+                event: Some(event.into()),
+            };
 
-                        match reply.variant {
-                            Some(submit_reply::Variant::Success(result)) => Ok(result),
-                            Some(submit_reply::Variant::Failure(failure)) => {
-                                Err(SubmissionError::FailureReply(failure.message).into())
-                            }
-                            None => Err(backoff::Error::Permanent(
-                                SubmissionError::UnknownReplyVariant,
-                            )),
+            let submit = move || {
+                let mut client = client.clone();
+                // Note: we have to clone the payload for each retry,
+                // which isn't ideal but required since Tonic moves it
+                let payload = payload.clone();
+                async move {
+                    // Send the gRPC response and get the reply
+                    let reply = client
+                        .submit(payload)
+                        .await
+                        .map_err(SubmissionError::GrpcFailure)?
+                        .into_inner();
+
+                    match reply.variant {
+                        Some(submit_reply::Variant::Success(result)) => Ok(result),
+                        Some(submit_reply::Variant::Failure(failure)) => {
+                            Err(SubmissionError::FailureReply(failure.message).into())
                         }
+                        None => Err(backoff::Error::Permanent(
+                            SubmissionError::UnknownReplyVariant,
+                        )),
                     }
-                };
-
-                // Attempt the submission with an exponential backoff loop
-                let backoff = ExponentialBackoff {
-                    max_interval: config.import_backoff_max_interval,
-                    max_elapsed_time: Some(config.import_backoff_duration),
-                    multiplier: config.import_backoff_multiplier,
-                    initial_interval: config.import_backoff_initial_interval,
-                    ..ExponentialBackoff::default()
-                };
-                match submit.retry(backoff).await {
-                    Ok(result) => debug!("Submitted log event: {:?}", result),
-                    Err(err) => info!("Failed to submit log event: {:?}", err),
                 }
+            };
+
+            // Attempt the submission with an exponential backoff loop
+            let backoff = ExponentialBackoff {
+                max_interval: config.import_backoff_max_interval,
+                max_elapsed_time: Some(config.import_backoff_duration),
+                multiplier: config.import_backoff_multiplier,
+                initial_interval: config.import_backoff_initial_interval,
+                ..ExponentialBackoff::default()
+            };
+            match submit.retry(backoff).await {
+                Ok(result) => debug!("Submitted log event: {:?}", result),
+                Err(err) => info!("Failed to submit log event: {:?}", err),
             }
-        })
+        }
+    })
 }

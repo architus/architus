@@ -1,5 +1,4 @@
 use crate::time;
-use mac_address;
 use serde::{Deserialize, Serialize};
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -32,10 +31,10 @@ impl IdProvisioner {
         let mac_addr_significant = get_mac_address().map(|bytes| bytes[0] as u64).unwrap_or(0);
         let worker_id = mac_addr_significant & 0b11111;
         let process_id = process::id() as u64 & 0b11111;
-        return Self {
+        Self {
             combined_process_id: (worker_id << 17) | (process_id << 12),
             internal_counter: AtomicU64::new(0),
-        };
+        }
     }
 
     /// Atomically provisions a new Id

@@ -1,11 +1,11 @@
 /// Gets the current millisecond unix timestamp
 #[must_use]
 pub fn millisecond_ts() -> u64 {
-    time::millisecond_ts()
+    imp::millisecond_ts()
 }
 
 #[cfg(target_os = "linux")]
-mod time {
+mod imp {
     use libc::{clock_gettime, timespec, CLOCK_REALTIME};
 
     /// Invokes `clock_gettime` from time.h in libc to get a `timespec` struct
@@ -14,7 +14,7 @@ mod time {
             tv_nsec: 0i64,
             tv_sec: 0i64
         };
-        
+
         // unsafe needed for FFI call to libc
         // (it's (almost?) impossible for this call to break safety)
         let result = unsafe { clock_gettime(CLOCK_REALTIME, &mut tp_out) };

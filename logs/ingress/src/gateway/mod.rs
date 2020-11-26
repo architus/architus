@@ -29,7 +29,7 @@ pub enum ProcessingError {
 /// Represents a collection of processors that each have
 /// a corresponding gateway event type
 /// and are capable of normalizing raw JSON of that type
-/// into NormalizedEvents
+/// into `NormalizedEvent`s
 #[derive(Debug)]
 pub struct Processor {
     sub_processors: HashMap<String, EventProcessor>,
@@ -60,10 +60,8 @@ impl Processor {
     /// and adding it to the internal map
     #[must_use]
     fn register(mut self, event_type: GatewayEventType, sub_processor: EventProcessor) -> Self {
-        let event_type_str = match serde_json::to_string(&event_type) {
-            Ok(s) => s,
-            Err(_) => panic!("GatewayEventType was not serializable"),
-        };
+        let event_type_str =
+            serde_json::to_string(&event_type).expect("GatewayEventType was not serializable");
         self.sub_processors.insert(event_type_str, sub_processor);
         self
     }
@@ -80,9 +78,7 @@ impl Processor {
             return Ok(sub_processor.apply(event, &self.id_provisioner)?);
         }
 
-        Err(ProcessingError::SubProcessorNotFound(
-            event.event_type.clone(),
-        ))?
+        Err(ProcessingError::SubProcessorNotFound(event.event_type).into())
     }
 }
 
@@ -128,8 +124,7 @@ impl EventProcessor {
                     TimestampSource::TimeOfIngress => event.rx_timestamp,
                     TimestampSource::Snowflake(path) => path
                         .apply_id(Some(&event.json), audit_log_entry.as_ref())
-                        .map(|snowflake| id::extract_timestamp(snowflake))
-                        .unwrap_or(event.rx_timestamp),
+                        .map_or(event.rx_timestamp, id::extract_timestamp),
                 };
                 let reason = reason_src
                     .as_ref()
@@ -181,7 +176,7 @@ pub enum TimestampSource {
 #[derive(Clone, Debug)]
 pub struct AuditLogSource {}
 
-/// Represents a wrapper around JMESPath values to scope a path
+/// Represents a wrapper around `JMESPath` values to scope a path
 /// to the gateway and/or audit log JSON objects
 #[derive(Clone, Debug)]
 pub enum Path {
@@ -208,10 +203,10 @@ impl Path {
 
     /// Attempts to resolve the path to a JSON value,
     /// using both the gateway and audit log JSON as potential sources
-    pub fn apply<'a, 'b>(
+    pub fn apply(
         &self,
-        gateway: Option<&'a serde_json::Value>,
-        audit_log: Option<&'b serde_json::Value>,
+        gateway: Option<&serde_json::Value>,
+        audit_log: Option<&serde_json::Value>,
     ) -> Option<Arc<jmespath::Variable>> {
         match self {
             Self::Gateway(expr) => match gateway {
@@ -227,10 +222,10 @@ impl Path {
 
     /// Attempts to resolve the path to a u64 value from a string,
     /// using both the gateway and audit log JSON as potential sources
-    pub fn apply_id<'a, 'b>(
+    pub fn apply_id(
         &self,
-        gateway: Option<&'a serde_json::Value>,
-        audit_log: Option<&'b serde_json::Value>,
+        gateway: Option<&serde_json::Value>,
+        audit_log: Option<&serde_json::Value>,
     ) -> Option<u64> {
         self.apply(gateway, audit_log)
             .and_then(|value| value.as_string().and_then(|s| s.parse::<u64>().ok()))
