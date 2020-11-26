@@ -1,10 +1,9 @@
+use crate::logging::{self, Event as LogEvent, EventOrigin, EventSource, EventType};
 use logs_lib::id::HoarFrost;
-use logs_lib::{to_json, ActionOrigin, ActionType};
-use serde::ser;
-use serde::Serialize;
+use std::convert::Into;
 
 /// Normalized log event to send to log ingestion
-#[derive(Clone, PartialEq, Debug, Serialize)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct NormalizedEvent {
     /// Id using snowflake format,
     /// using the *time that the event was received by wherever it's ingested*
@@ -14,9 +13,9 @@ pub struct NormalizedEvent {
     /// The source data, including the original gateway/audit log entries
     pub source: Source,
     /// The origin of the event
-    pub origin: ActionOrigin,
+    pub origin: EventOrigin,
     /// The type of action the event is
-    pub action_type: ActionType,
+    pub event_type: EventType,
     /// An optional *human-readable* reason/message of the event
     pub reason: Option<String>,
     /// Related guild the event occurred in
@@ -31,7 +30,46 @@ pub struct NormalizedEvent {
     pub audit_log_id: Option<u64>,
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize)]
+impl Into<LogEvent> for NormalizedEvent {
+    fn into(self) -> LogEvent {
+        let mut log_event = LogEvent {
+            id: self.id.0,
+            timestamp: self.timestamp,
+            source: Some(EventSource {
+                gateway: self
+                    .source
+                    .gateway
+                    .and_then(|json| serde_json::to_string(&json).ok())
+                    .unwrap_or_else(|| String::from("")),
+                audit_log: self
+                    .source
+                    .audit_log
+                    .and_then(|json| serde_json::to_string(&json).ok())
+                    .unwrap_or_else(|| String::from("")),
+            }),
+            reason: self.reason.unwrap_or_else(|| String::from("")),
+            guild_id: self.guild_id.unwrap_or(0),
+            agent_id: self.agent_id.unwrap_or(0),
+            subject_id: self.subject_id.unwrap_or(0),
+            audit_log_id: self.audit_log_id.unwrap_or(0),
+            ..LogEvent::default()
+        };
+        // Enum values have to be set manually with Tonic
+        log_event.set_origin(self.origin);
+        log_event.set_event_type(self.event_type);
+        return log_event;
+    }
+}
+
+impl Into<logging::SubmitRequest> for NormalizedEvent {
+    fn into(self) -> logging::SubmitRequest {
+        logging::SubmitRequest {
+            event: Some(self.into()),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub struct Source {
     pub gateway: Option<serde_json::Value>,
     pub audit_log: Option<serde_json::Value>,
@@ -39,28 +77,12 @@ pub struct Source {
 
 impl Source {
     #[must_use]
-    pub fn empty() -> Self {
-        Self {
-            gateway: None,
-            audit_log: None,
-        }
-    }
-
-    #[must_use]
-    pub fn gateway<T: ser::Serialize>(gateway_event: &T) -> Self {
-        Self {
-            gateway: to_json(gateway_event),
-            audit_log: None,
-        }
-    }
-
-    #[must_use]
-    pub fn origin(&self) -> ActionOrigin {
+    pub fn origin(&self) -> EventOrigin {
         match (self.gateway.as_ref(), self.audit_log.as_ref()) {
-            (Some(_), Some(_)) => ActionOrigin::Hybrid,
-            (Some(_), None) => ActionOrigin::Gateway,
-            (None, Some(_)) => ActionOrigin::AuditLog,
-            (None, None) => ActionOrigin::Internal,
+            (Some(_), Some(_)) => EventOrigin::Hybrid,
+            (Some(_), None) => EventOrigin::Gateway,
+            (None, Some(_)) => EventOrigin::AuditLog,
+            (None, None) => EventOrigin::Internal,
         }
     }
 }

@@ -44,102 +44,102 @@ message EventSource {
 }
 
 enum EventOrigin {
-    UnknownOrigin = 0;
+    EventOriginUnknown = 0;
     // Action originated from the gateway and was caught as it originated
-    Gateway = 1;
+    EventOriginGateway = 1;
     // Action originated from the audit log
-    AuditLog = 2;
+    EventOriginAuditLog = 2;
     // Gateway events that also incorporate a corresponding audit log entry
-    Hybrid = 3;
+    EventOriginHybrid = 3;
     // Action originated from a scheduled recovery job where the bot knew it had
     // ingestion downtime and ran a recovery job to collect all relevant origin/update events
-    ScheduledRecovery = 4;
+    EventOriginScheduledRecovery = 4;
     // Action originated from an unscheduled recovery job where the bot was
     // scanning history and verifying that the logs have the up-to-date state
-    UnscheduledRecovery = 5;
+    EventOriginUnscheduledRecovery = 5;
     // Action comes from the internal logs endpoint
-    Logs = 6;
+    EventOriginLogs = 6;
     // Action comes from some other internal process
-    Internal = 7;
+    EventOriginInternal = 7;
 }
 
 enum EventType {
-    UnknownType = 0;
+    EventTypeUnknown = 0;
 
-    GuildUpdate = 1;
-    ChannelCreate = 10;
-    ChannelUpdate = 11;
-    ChannelDelete = 12;
-    ChannelOverwriteCreate = 13;
-    ChannelOverwriteUpdate = 14;
-    ChannelOverwriteDelete = 15;
-    MemberKick = 20;
-    MemberPrune = 21;
-    MemberBanAdd = 22;
-    MemberBanRemove = 23;
-    MemberUpdate = 24;
-    MemberRoleUpdate = 25;
-    MemberMove = 26;
-    MemberDisconnect = 27;
-    BotAdd = 28;
-    RoleCreate = 30;
-    RoleUpdate = 31;
-    RoleDelete = 32;
-    InviteCreate = 40;
-    InviteUpdate = 41;
-    InviteDelete = 42;
-    WebhookCreate = 50;
-    WebhookUpdate = 51;
-    WebhookDelete = 52;
-    EmojiCreate = 60;
-    EmojiUpdate = 61;
-    EmojiDelete = 62;
-    MessageDelete = 72;
-    MessageBulkDelete = 73;
-    MessagePin = 74;
-    MessageUnpin = 75;
-    IntegrationCreate = 80;
-    IntegrationUpdate = 81;
-    IntegrationDelete = 82;
+    EventTypeGuildUpdate = 1;
+    EventTypeChannelCreate = 10;
+    EventTypeChannelUpdate = 11;
+    EventTypeChannelDelete = 12;
+    EventTypeChannelOverwriteCreate = 13;
+    EventTypeChannelOverwriteUpdate = 14;
+    EventTypeChannelOverwriteDelete = 15;
+    EventTypeMemberKick = 20;
+    EventTypeMemberPrune = 21;
+    EventTypeMemberBanAdd = 22;
+    EventTypeMemberBanRemove = 23;
+    EventTypeMemberUpdate = 24;
+    EventTypeMemberRoleUpdate = 25;
+    EventTypeMemberMove = 26;
+    EventTypeMemberDisconnect = 27;
+    EventTypeBotAdd = 28;
+    EventTypeRoleCreate = 30;
+    EventTypeRoleUpdate = 31;
+    EventTypeRoleDelete = 32;
+    EventTypeInviteCreate = 40;
+    EventTypeInviteUpdate = 41;
+    EventTypeInviteDelete = 42;
+    EventTypeWebhookCreate = 50;
+    EventTypeWebhookUpdate = 51;
+    EventTypeWebhookDelete = 52;
+    EventTypeEmojiCreate = 60;
+    EventTypeEmojiUpdate = 61;
+    EventTypeEmojiDelete = 62;
+    EventTypeMessageDelete = 72;
+    EventTypeMessageBulkDelete = 73;
+    EventTypeMessagePin = 74;
+    EventTypeMessageUnpin = 75;
+    EventTypeIntegrationCreate = 80;
+    EventTypeIntegrationUpdate = 81;
+    EventTypeIntegrationDelete = 82;
 
-    MessageSend = 3001;
-    MessageEdit = 3002;
-    ReactionAdd = 3003;
-    ReactionRemove = 3004;
-    ReactionRemoveAll = 3005;
-    MemberJoin = 3006;
-    MemberLeave = 3007;
-    GuildUnavailable = 3008;
-    VoiceStateUpdate = 3009;
-    VoiceServerUpdate = 3010;
+    EventTypeMessageSend = 3001;
+    EventTypeMessageEdit = 3002;
+    EventTypeReactionAdd = 3003;
+    EventTypeReactionRemove = 3004;
+    EventTypeReactionRemoveAll = 3005;
+    EventTypeMemberJoin = 3006;
+    EventTypeMemberLeave = 3007;
+    EventTypeGuildUnavailable = 3008;
+    EventTypeVoiceStateUpdate = 3009;
+    EventTypeVoiceServerUpdate = 3010;
 
-    AutoResponseCreate = 3100;
-    AutoResponseUpdate = 3101;
-    AutoResponseDelete = 3102;
-    AutoResponseTrigger = 3103;
-    
-    LogRevert = 3200;
-    LogRollback = 3201;
-    LogRecoveryRun = 3202;
+    EventTypeAutoResponseCreate = 3100;
+    EventTypeAutoResponseUpdate = 3101;
+    EventTypeAutoResponseDelete = 3102;
+    EventTypeAutoResponseTrigger = 3103;
 
-    CustomEmojiCreate = 3300;
-    CustomEmojiUpdate = 3301;
-    CustomEmojiDelete = 3302;
-    CustomEmojiUse = 3303;
-    CustomEmojiCache = 3304;
-    CustomEmojiLoad = 3305;
+    EventTypeLogRevert = 3200;
+    EventTypeLogRollback = 3201;
+    EventTypeLogRecoveryRun = 3202;
 
-    SettingsUpdate = 3400;
+    EventTypeCustomEmojiCreate = 3300;
+    EventTypeCustomEmojiUpdate = 3301;
+    EventTypeCustomEmojiDelete = 3302;
+    EventTypeCustomEmojiUse = 3303;
+    EventTypeCustomEmojiCache = 3304;
+    EventTypeCustomEmojiLoad = 3305;
 
-    ArchitusJoin = 4000;
-    ArchitusLeave = 4001;
-    UserPrivacyUpdate = 4002;
+    EventTypeSettingsUpdate = 3400;
 
-    LogDebug = 9000;
-    LogInfo = 9001;
-    LogWarn = 9002;
-    LogError = 9003;
-    LogCritical = 9004;
+    EventTypeArchitusJoin = 4000;
+    EventTypeArchitusLeave = 4001;
+    EventTypeUserPrivacyUpdate = 4002;
+
+    EventTypeLogDebug = 9000;
+    EventTypeLogInfo = 9001;
+    EventTypeLogWarn = 9002;
+    EventTypeLogError = 9003;
+    EventTypeLogCritical = 9004;
 }
 
 message Event {
@@ -156,7 +156,7 @@ message Event {
     // The origin type of the event
     EventOrigin origin = 4;
     // The type of action the event is
-    EventType type = 5;
+    EventType event_type = 5;
     // Related guild the event occurred in
     fixed64 guild_id = 6;
     // Id of the entity that caused the event to occur
@@ -167,5 +167,7 @@ message Event {
     // Id of the corresponding audit log entry this event corresponds to; if any
     // (included for indexing purposes)
     fixed64 audit_log_id  = 9;
+    // Optional reason for the log event (can attach additional info here
+    string reason = 10;
 }
 

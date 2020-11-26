@@ -1,15 +1,15 @@
 pub mod sub_processors;
 
 use crate::event::{NormalizedEvent, Source};
+use crate::logging::EventType;
 use anyhow::Result;
 use jmespath::Expression;
 use logs_lib::id::{self, IdProvisioner};
-use logs_lib::ActionType;
 use static_assertions::assert_impl_all;
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
-use twilight_model::gateway::event::EventType;
+use twilight_model::gateway::event::EventType as GatewayEventType;
 
 /// Represents a single gateway event that is ready to be normalized
 #[derive(Clone, Debug)]
@@ -59,10 +59,10 @@ impl Processor {
     /// acting as a builder. Works by serializing the event type into a string
     /// and adding it to the internal map
     #[must_use]
-    fn register(mut self, event_type: EventType, sub_processor: EventProcessor) -> Self {
+    fn register(mut self, event_type: GatewayEventType, sub_processor: EventProcessor) -> Self {
         let event_type_str = match serde_json::to_string(&event_type) {
             Ok(s) => s,
-            Err(_) => panic!("EventType was not serializable"),
+            Err(_) => panic!("GatewayEventType was not serializable"),
         };
         self.sub_processors.insert(event_type_str, sub_processor);
         self
@@ -91,7 +91,7 @@ impl Processor {
 #[derive(Clone, Debug)]
 pub enum EventProcessor {
     Static {
-        action_type: ActionType,
+        event_type: EventType,
         timestamp_src: TimestampSource,
         subject_id_src: Option<Path>,
         agent_id_src: Option<Path>,
@@ -110,7 +110,7 @@ impl EventProcessor {
     ) -> Result<NormalizedEvent> {
         match self {
             Self::Static {
-                action_type,
+                event_type,
                 timestamp_src,
                 subject_id_src,
                 agent_id_src,
@@ -157,7 +157,7 @@ impl EventProcessor {
                     timestamp,
                     source,
                     origin,
-                    action_type: *action_type,
+                    event_type: *event_type,
                     reason,
                     guild_id,
                     agent_id,

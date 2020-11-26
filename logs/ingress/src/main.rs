@@ -2,18 +2,26 @@ mod config;
 mod event;
 mod gateway;
 
+mod logging {
+    tonic::include_proto!("logging");
+}
+
+use crate::config::Configuration;
 use crate::event::NormalizedEvent;
 use crate::gateway::OriginalEvent;
 use anyhow::{Context, Result};
+use backoff::{future::FutureOperation as _, ExponentialBackoff};
 use clap::{App, Arg};
-use config::Configuration;
 use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use log::{debug, error, info};
+use logging::logging_client::LoggingClient;
+use logging::{submit_reply, SubmitRequest};
 use logs_lib::time;
-use std::convert::TryFrom;
+use std::convert::{Into, TryFrom};
 use std::future::Future;
 use std::sync::Arc;
+use thiserror::Error;
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
 use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
 use twilight_model::gateway::event::shard::Payload;
@@ -63,7 +71,7 @@ async fn run() -> Result<()> {
     // Parse the config from the path and use it to initialize the event stream
     let config = Configuration::try_load(config_path)?;
     let event_types = EventTypeFlags::SHARD_PAYLOAD;
-    let mut shard = Shard::new(config.secrets.discord_token, *INTENTS);
+    let mut shard = Shard::new(config.secrets.discord_token.clone(), *INTENTS);
     let events = shard.some_events(event_types);
 
     // Initialize the gateway event processor
@@ -73,6 +81,11 @@ async fn run() -> Result<()> {
         gateway::Processor::new(),
     ));
 
+    // Connect to the logging service to sink normalized events into
+    let client = LoggingClient::connect(config.services.logging.clone())
+        .await
+        .context("Could not connect to logging service")?;
+
     shard.start().await.context("Could not start shard")?;
     info!("Created shard and preparing to listen for gateway events");
 
@@ -80,23 +93,16 @@ async fn run() -> Result<()> {
     // re-emitting half-processed gateway events to be consumed by the processor
     let gateway_event_stream = pipe_gateway_events(events, Arc::clone(&processor));
 
-    // Normalize each event coming from the gateway,
+    // Normalize each event coming from the gateway into a NormalizedEvent,
     // and process them in parallel where possible via buffer_unordered
     let normalized_event_stream =
         pipe_normalized_events(gateway_event_stream, Arc::clone(&processor))
             .buffer_unordered(config.normalization_stream_concurrency)
             .filter_map(|event_option| async move { event_option });
 
-    // Send each normalized event to the logging import service,
+    // Send each log event to the logging import service,
     // acting as a sink for this stream
-    normalized_event_stream
-        .for_each_concurrent(Some(config.import_stream_concurrency), |event| async move {
-            // TODO implement sending via gRPC to import service
-            if let Some(s) = serde_json::to_string_pretty(&event).ok() {
-                info!("Normalized event received at sink: {}", s);
-            }
-        })
-        .await;
+    import_log_events(normalized_event_stream, &client, &config).await;
 
     Ok(())
 }
@@ -178,4 +184,70 @@ fn pipe_normalized_events(
             }
         }
     })
+}
+
+#[derive(Error, Clone, Debug)]
+pub enum SubmissionError {
+    #[error("gRPC call failed import log event: {0}")]
+    GrpcFailure(tonic::Status),
+    #[error("unknown reply type variant received")]
+    UnknownReplyVariant,
+    #[error("failure status returned from submission: {0}")]
+    FailureReply(String),
+}
+
+/// Stream sink that takes in each normalized event and sends them to the logging service
+/// for importing, retrying with an exponential backoff if the calls fail
+fn import_log_events(
+    in_stream: impl Stream<Item = NormalizedEvent>,
+    client: &LoggingClient<tonic::transport::Channel>,
+    config: &Configuration,
+) -> impl Future<Output = ()> {
+    let config = config.clone();
+    let client = client.clone();
+    in_stream
+        .for_each_concurrent(Some(config.import_stream_concurrency), move |event| {
+            let client = client.clone();
+            let config = config.clone();
+            async move {
+                let payload: SubmitRequest = event.into();
+                let submit = move || {
+                    let mut client = client.clone();
+                    // Note: we have to clone the payload for each retry,
+                    // which isn't ideal but required since Tonic moves it
+                    let payload = payload.clone();
+                    async move {
+                        // Send the gRPC response and get the reply
+                        let reply = client
+                            .submit(payload)
+                            .await
+                            .map_err(SubmissionError::GrpcFailure)?
+                            .into_inner();
+
+                        match reply.variant {
+                            Some(submit_reply::Variant::Success(result)) => Ok(result),
+                            Some(submit_reply::Variant::Failure(failure)) => {
+                                Err(SubmissionError::FailureReply(failure.message).into())
+                            }
+                            None => Err(backoff::Error::Permanent(
+                                SubmissionError::UnknownReplyVariant,
+                            )),
+                        }
+                    }
+                };
+
+                // Attempt the submission with an exponential backoff loop
+                let backoff = ExponentialBackoff {
+                    max_interval: config.import_backoff_max_interval,
+                    max_elapsed_time: Some(config.import_backoff_duration),
+                    multiplier: config.import_backoff_multiplier,
+                    initial_interval: config.import_backoff_initial_interval,
+                    ..ExponentialBackoff::default()
+                };
+                match submit.retry(backoff).await {
+                    Ok(result) => debug!("Submitted log event: {:?}", result),
+                    Err(err) => info!("Failed to submit log event: {:?}", err),
+                }
+            }
+        })
 }
