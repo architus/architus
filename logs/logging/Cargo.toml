@@ -5,10 +5,15 @@ authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
 
 [dependencies]
+config = "0.10"
+log = "0.4"
+env_logger = "0.8"
+anyhow = "1.0"
 tonic = "0.3"
 prost = "0.6"
 futures = "0.3"
 tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "macros"] }
+serde = { version = "1.0", features = ["derive"] }
 
 [build-dependencies]
 tonic-build = "0.3"

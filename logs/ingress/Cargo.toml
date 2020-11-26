@@ -6,7 +6,6 @@ edition = "2018"
 
 [dependencies]
 logs_lib = { path = "../lib" }
-clap = "2.33"
 config = "0.10"
 log = "0.4"
 env_logger = "0.8"
