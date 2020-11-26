@@ -5,26 +5,31 @@ authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
 
 [dependencies]
-lazy_static = "1.4"
+logs_lib = { path = "../lib" }
+clap = "2.33"
+config = "0.10"
 log = "0.4"
 env_logger = "0.8"
+lazy_static = "1.4"
+static_assertions = "1.1.0"
+anyhow = "1.0"
+thiserror = "1.0.22"
 # Using tokio v2 because twilight uses it
-tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "macros"] }
+tonic = "0.3"
+prost = "0.6"
 futures = "0.3"
-logs_lib = { path = "../lib" }
+tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "macros"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-toml = "0.5"
-anyhow = "1.0"
-clap = "2.33"
-reqwest = "0.10"
+serde-humantime = "0.1"
 twilight-gateway = "0.2"
 twilight-model = "0.2"
-static_assertions = "1.1.0"
-thiserror = "1.0.22"
-# TODO upgrade along with re-write of audit log search functionality
-backoff = "0.1"
+backoff = { version = "0.2", features = ["tokio"] }
 
 [dependencies.jmespath]
 git = "https://github.com/jmespath/jmespath.rs"
 features = ["sync"]
+
+[build-dependencies]
+tonic-build = "0.3"
+anyhow = "1.0"
