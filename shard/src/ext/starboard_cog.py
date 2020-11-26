@@ -1,9 +1,9 @@
 from discord.ext import commands
 import discord
-import base64
 
 from src.utils import timezone_aware_format
 from lib.config import logger
+from lib.ipc import manager_pb2 as message_type
 
 
 class StarboardCog(commands.Cog):
@@ -31,11 +31,12 @@ class StarboardCog(commands.Cog):
         em = discord.Embed(
             title=timezone_aware_format(message.created_at), description=message.content, colour=0x42f468)
         img = await message.author.avatar_url.read()
-        data, _ = await self.bot.manager_client.publish_file(location='avatars',
-                                                             name=message.author.id,
-                                                             data=base64.b64encode(img).decode('ascii'))
+        data = await self.bot.manager_client.publish_file(iter([
+            message_type.File(location='avatars',
+                              name=str(message.author.id),
+                              file=img)]))
 
-        em.set_author(name=message.author.display_name, icon_url=data['url'])
+        em.set_author(name=message.author.display_name, icon_url=data.url)
         if message.embeds:
             em.set_image(url=message.embeds[0].url)
         elif message.attachments:

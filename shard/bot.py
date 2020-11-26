@@ -1,14 +1,16 @@
 import asyncio
 import os
+import time
 
 from discord.ext.commands import Bot
 import discord
 
-from src.utils import guild_to_dict
+from src.utils import guild_to_message, guild_to_dict
 from lib.config import get_session, secret_token, logger, AsyncConnWrapper
-from lib.ipc import async_rpc_server, async_rpc_client, blocking_rpc_client
+from lib.ipc import async_rpc_server
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
+from lib.ipc import grpc_client, manager_pb2 as message
 
 
 class Architus(Bot):
@@ -21,12 +23,19 @@ class Architus(Bot):
         self.hoarfrost_gen = HoarFrostGenerator()
 
         logger.debug("registering with manager...")
-        manager_client = blocking_rpc_client.shardRPC()
-        shard_info, _ = manager_client.register(routing_key='manager_rpc', retry_in=1)
-        self.shard_id = shard_info['shard_id']
+        manager_client = grpc_client.get_blocking_client('manager:50051')
+        while True:
+            try:
+                shard_info = manager_client.register(message.RegisterRequest())
+                break
+            except Exception:
+                logger.info("Trying to get shard id from manager")
+                time.sleep(3)
+        self.shard_id = shard_info.shard_id
+        shard_dict = {'shard_id': shard_info.shard_id, 'shard_count': shard_info.shard_count}
         logger.info(f"Got shard_id {self.shard_id}")
 
-        kwargs.update(shard_info)
+        kwargs.update(shard_dict)
         super().__init__(**kwargs)
 
     def run(self, token):
@@ -41,8 +50,7 @@ class Architus(Bot):
             )
         )
 
-        self.manager_client = async_rpc_client.shardRPC(self.loop, default_key='manager_rpc')
-        self.loop.create_task(self.manager_client.connect())
+        self.manager_client = grpc_client.get_async_client('manager:50051')
 
         self.loop.create_task(self.emitter.connect())
 
@@ -64,15 +72,34 @@ class Architus(Bot):
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
             name=f"the tragedy of darth plagueis the wise {self.shard_id}", type=2))
-        await self.manager_client.guild_update(self.shard_id, self.guilds_as_dicts)
+        while True:
+            try:
+                await self.manager_client.guild_update(self.guilds_as_message)
+            except Exception:
+                logger.exception(
+                    f"Shard {self.shard_id} failed to send manager its guild list... trying again in a bit")
+                await asyncio.sleep(10)
+            else:
+                return
 
     async def on_guild_join(self, guild):
         logger.info(f" -- JOINED NEW GUILD: {guild.name} -- ")
-        await self.manager_client.guild_update(self.shard_id, self.guilds_as_dicts)
+        try:
+            await self.manager_client.guild_update(self.guilds_as_message)
+        except Exception:
+            logger.info(f"Shard {self.shard_id} failed to send manager its guild list")
 
     @property
     def settings(self):
         return self.cogs['GuildSettings']
+
+    @property
+    def guilds_as_message(self):
+        for guild in self.guilds:
+            guild_message = guild_to_message(guild)
+            guild_message.shard_id = self.shard_id
+            guild_message.admin_ids.extend(self.settings[guild].admins_ids)
+            yield guild_message
 
     @property
     def guilds_as_dicts(self):
@@ -87,20 +114,21 @@ class Architus(Bot):
         await self.wait_until_ready()
         while not self.is_closed():
             await asyncio.sleep(0.5)
-            await self.manager_client.checkin(self.shard_id)
+            try:
+                await self.manager_client.checkin(message.ShardID(shard_id=self.shard_id))
+            except Exception:
+                logger.info(f"Shard {self.shard_id} failed to checkin with manager")
 
     async def list_guilds(self):
         """Update the manager with the guilds that we know about"""
         await self.wait_until_ready()
         while not self.is_closed():
-            logger.info("Current guilds:")
             for guild in self.guilds:
                 if guild.me.display_name == 'archit.us':
                     try:
                         await guild.me.edit(nick='architus')
                     except discord.Forbidden:
                         logger.warning(f"couldn't change nickname in {guild.name}")
-                logger.info("{} - {} ({})".format(guild.name, guild.id, guild.member_count))
             await asyncio.sleep(600)
 
 
@@ -108,7 +136,13 @@ def command_prefix(bot: Architus, msg: discord.Message):
     return bot.settings[msg.guild].command_prefix
 
 
-architus = Architus(command_prefix=command_prefix, max_messages=10000)
+intents = discord.Intents.default()
+intents.members = True
+intents.presences = True
+architus = Architus(command_prefix=command_prefix, max_messages=10000, intents=intents)
+
+# Remove default help command so it doesn't conflict with ours
+architus.help_command = None
 
 for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
     architus.load_extension(f"src.ext.{ext[:-3]}")

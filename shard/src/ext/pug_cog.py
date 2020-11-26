@@ -12,8 +12,8 @@ class Pug(commands.Cog):
 
     @commands.command(aliases=['pug', 'pugs', 'startpugs', 'anypuggers'])
     async def startpug(self, ctx, requiredPlayers: int = 10, game: str = ""):
-        '''
-        Starts a tally for pugs
+        '''pug [number of players] [game name]
+        Starts a tally for pugs.
         '''
         def advertise_message(players, emoji, game):
             return f"{players} more {emoji}'s for {game}{' ' if game != '' else ''}pugs"

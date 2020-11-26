@@ -1,5 +1,4 @@
 import secrets
-from datetime import timedelta
 from typing import List
 
 from discord.ext.commands import Cog, Context
@@ -12,6 +11,8 @@ from src.auto_response import GuildAutoResponses
 from src.api.util import fetch_guild
 from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
+from lib.ipc import manager_pb2 as message
+from src.utils import guild_to_dict
 
 
 class Api(Cog):
@@ -45,10 +46,45 @@ class Api(Cog):
         return {'message': 'pong'}, sc.OK_200
 
     async def guild_count(self):
-        return await self.bot.manager_client.guild_count()
+        try:
+            resp = await self.bot.manager_client.guild_count(message.GuildCountRequest())
+            return {'guild_count': resp.guild_count, 'user_count': resp.user_count}, sc.OK_200
+        except Exception:
+            logger.info(f"Shard {self.bot.shard_id} failed to get guild count from manager")
+            return {'guild_count': -1, 'user_count': -1}, sc.INTERNAL_SERVER_ERROR_500
+
+    async def all_guilds(self):
+        all_guilds = []
+        for g in await self.bot.manager_client.all_guilds(message.AllGuildsRequest()):
+            all_guilds.append({
+                'id': g.id,
+                'name': g.name,
+                'icon': g.icon,
+                'region': g.region,
+                'description': g.description,
+                'preferred_locale': g.preferred_locale,
+                'member_count': g.member_count,
+            })
+        return {'guilds': all_guilds}, sc.OK_200
 
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
+
+    async def users_guilds(self, user_id):
+        users_guilds = []
+        for guild in self.bot.guilds:
+            member = guild.get_member(int(user_id))
+            if member is not None:
+                settings = self.bot.settings[guild]
+
+                g = guild_to_dict(guild)
+                g.update({
+                    "has_architus": True,
+                    "architus_admin": int(user_id) in settings.admins_ids,
+                    'permissions': member.guild_permissions.value,
+                })
+                users_guilds.append(g)
+        return users_guilds, sc.OK_200
 
     async def is_member(self, user_id, guild_id):
         '''check if user is a member or admin of the given guild'''
@@ -116,14 +152,26 @@ class Api(Cog):
         return {"message": "Reload signal sent"}, sc.OK_200
 
     @fetch_guild
-    async def bin_messages(self, guild):
+    async def bin_messages(self, guild, member_id):
         stats_cog = self.bot.cogs["Server Statistics"]
-        members, channels, times = stats_cog.bin_messages(guild, timedelta(minutes=5))
+        emoji_manager = self.bot.cogs["Emoji Manager"].managers[guild.id]
+        data = stats_cog.cache.get(guild.id, None)
+        member = guild.get_member(member_id)
+        if data is None or member is None:
+            return {'message': "unknown member or guild"}, sc.NOT_FOUND_404
         return {
-            'total': len(stats_cog.cache[guild.id]),
-            'members': members,
-            'channels': channels,
-            'times': times,
+            'member_count': data.member_count,
+            'architus_count': data.architus_count(member),
+            'message_count': data.message_count(member),
+            'common_words': data.common_words(member),
+            'mention_counts': data.mention_counts(member),
+            'member_counts': data.member_counts(member),
+            'channel_counts': data.channel_counts(member),
+            'time_member_counts': data.times_as_strings(member),
+            'up_to_date': data.up_to_date,
+            'forbidden': data.forbidden,
+            'last_activity': data.last_activity(member).isoformat(),
+            'popular_emojis': [str(e.id) for e in emoji_manager.emojis[:10]],
         }, sc.OK_200
 
     @fetch_guild
@@ -141,12 +189,16 @@ class Api(Cog):
         return {'value': "unknown setting"}, sc.NOT_FOUND_404
 
     async def tag_autbot_guilds(self, guild_list, user_id: int):
-        all_guilds, _ = await self.bot.manager_client.all_guilds()
+        try:
+            all_guilds = [guild for guild in await self.bot.manager_client.all_guilds(message.AllGuildsRequest())]
+        except Exception:
+            logger.exception(f"Shard {self.bot.shard_id} failed to get guild list from manager")
+            return {'guilds': []}, sc.INTERNAL_SERVER_ERROR_500
         for guild_dict in guild_list:
             for guild in all_guilds:
-                if int(guild['id']) == int(guild_dict['id']):
+                if guild.id == int(guild_dict['id']):
                     guild_dict['has_architus'] = True
-                    guild_dict['architus_admin'] = user_id in guild['admin_ids']
+                    guild_dict['architus_admin'] = user_id in guild.admin_ids
                     break
             else:
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
@@ -246,7 +298,8 @@ class Api(Cog):
 
                 responses = self.bot.get_cog("Auto Responses").responses
                 responses.setdefault(
-                    guild_id, GuildAutoResponses(self.bot, MockGuild(guild_id), no_db=int(guild_id) < FAKE_GUILD_IDS))
+                    guild_id, GuildAutoResponses(
+                        self.bot, MockGuild(guild_id), None, no_db=int(guild_id) < FAKE_GUILD_IDS))
                 if triggered_command:
                     # found builtin command, creating fake context
                     ctx = Context(**{

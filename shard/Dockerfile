@@ -32,16 +32,30 @@ RUN python3.8 setup.py install
 RUN python3.8 setup.py check
 
 WORKDIR /app
-
 COPY ./shard/requirements.txt /app
 
 # Install any needed packages specified in requirements.txt
+ENV GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS 16
+RUN python3.8 -m pip install --upgrade pip
+RUN python3.8 -m pip install wheel
 RUN python3.8 -m pip install --trusted-host pypi.python.org -r requirements.txt
 #RUN apk del libpng-dev jpeg-dev libffi-dev libxml2-dev python3-dev libxslt-dev freetype-dev
 
+WORKDIR /pyre2
+
+# Install custom discord.py library
+WORKDIR /app
+WORKDIR /
+WORKDIR /app
+RUN git clone --branch master https://github.com/architus/discord.py
+WORKDIR ./discord.py
+RUN python3.8 -m pip install -U .[voice]
+
+WORKDIR /app
+
 RUN mkdir -p /etc/cron.d
 RUN touch /var/log/cron.log
-RUN echo "@hourly root python3.8 -m pip install youtube-dl --upgrade > /var/log/cron.log 2>&1\n# Empty line for syntax" >> /etc/cron.d/youtube-dl_update
+RUN echo "@hourly root python3.8 -m pip install youtube-dlc --upgrade > /var/log/cron.log 2>&1\n# Empty line for syntax" >> /etc/cron.d/youtube-dl_update
 RUN chmod 0744 /etc/cron.d/youtube-dl_update
 RUN crontab /etc/cron.d/youtube-dl_update
 RUN cron

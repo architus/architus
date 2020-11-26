@@ -3,10 +3,36 @@ from pytz import timezone
 from aiohttp import ClientSession
 import io
 import functools
+from threading import Lock
+from string import digits
 
 import discord
 
 from lib.config import logger
+from lib.ipc import manager_pb2 as message
+
+
+class TCPLock:
+    """
+    A basic thread safe TCP socket.
+    """
+    def __init__(self, s):
+        self.connection = s
+        self.lock = Lock()
+
+    def write(self, b):
+        self.lock.acquire()
+        self.connection.send(b)
+        self.lock.release()
+
+    def send(self, b):
+        self.write(b)
+
+    def recv(self, num_bytes):
+        self.lock.acquire()
+        msg = self.connection.recv(num_bytes)
+        self.lock.release()
+        return msg
 
 
 async def download_emoji(emoji: discord.Emoji) -> io.BytesIO:
@@ -52,6 +78,28 @@ def guild_to_dict(guild: discord.Guild) -> dict:
     return data
 
 
+def guild_to_message(guild: discord.Guild):
+    return message.Guild(
+        id=guild.id,
+        name=guild.name,
+        icon=guild.icon,
+        splash=guild.splash,
+        owner_id=guild.owner_id,
+        region=repr(guild.region),
+        afk_timeout=guild.afk_timeout,
+        unavailable=guild.unavailable,
+        max_members=guild.max_members,
+        banner=guild.banner,
+        description=guild.description,
+        mfa_level=guild.mfa_level,
+        features=guild.features,
+        premium_tier=guild.premium_tier,
+        premium_subscription_count=guild.premium_subscription_count,
+        preferred_locale=guild.preferred_locale,
+        member_count=guild.member_count
+    )
+
+
 def user_to_dict(user: discord.User) -> dict:
     params = ('id', 'name', 'avatar', 'discriminator')
     data = {p: getattr(user, p) for p in params}
@@ -79,6 +127,13 @@ def role_to_dict(role: discord.Role) -> dict:
     return data
 
 
+def doc_url(url: str):
+    def wrap(func):
+        func.__doc_url__ = url
+        return func
+    return wrap
+
+
 def bot_commands_only(cmd):
     """Adds the restriction that a command must be run in a bot commands channel if the guild has one set
     Does nothing if not in a guild
@@ -99,3 +154,22 @@ def bot_commands_only(cmd):
                         return
         return await cmd(self, ctx, *args, **kwargs)
     return bc_cmd
+
+
+def mention_to_name(guild: discord.Guild, mention: str) -> str:
+    if mention[0] != '<':
+        raise ValueError(f"this doesn't look like a mention str: {mention}")
+    id = int("".join([n for n in mention if n in digits]))
+    if mention[1] == '@':
+        member = guild.get_member(id)
+        if member is not None:
+            return f"@{member.display_name}"
+    elif mention[1] == '&':
+        rl = guild.get_role(id)
+        if rl is not None:
+            return f"@{rl.name}"
+    elif mention[1] == '#':
+        ch = guild.get_channel(id)
+        if ch is not None:
+            return f"#{ch.name}"
+    return mention

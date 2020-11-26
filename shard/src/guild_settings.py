@@ -228,7 +228,7 @@ class Setting:
 
     @property
     def admins_ids(self) -> List[int]:
-        default_admins = [self.guild.owner.id]
+        default_admins = []
         default_admins += [m.id for role in self.guild.roles for m in role.members if role.permissions.administrator]
 
         return list(set(default_admins + [int(a) for a in self._settings_dict.get('admins', [])]))
@@ -325,12 +325,15 @@ class Setting:
         self._update_db()
 
     def _load_from_db(self, guild_id) -> dict:
+        if self.guild_id < FAKE_GUILD_IDS:
+            return {}
         settings_row = None
         try:
             settings_row = self.session.query(Settings).filter_by(server_id=int(guild_id)).one()
         except NoResultFound:
             new_guild = Settings(int(self.guild_id), json.dumps({}))
             self.session.add(new_guild)
+        self.session.commit()
         return json.loads(settings_row.json_blob) if settings_row else {}
 
     def _update_db(self):

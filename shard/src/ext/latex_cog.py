@@ -3,15 +3,16 @@
 # Inspired by: https://github.com/chuanshi/slacklatex
 from discord.ext import commands
 from discord.ext.commands import cooldown, BucketType
+from src.utils import doc_url
 
-from discord import File
+from discord import File, Embed
 
 from string import Template
 import tempfile
 import os
 
 from asyncio import create_subprocess_exec, wait_for, TimeoutError
-from asyncio.subprocess import DEVNULL
+from asyncio.subprocess import DEVNULL, PIPE
 
 
 class Latexify(commands.Cog, name="Latex Compiler"):
@@ -38,14 +39,10 @@ class Latexify(commands.Cog, name="Latex Compiler"):
 
     @commands.command(aliases=['tex'])
     @cooldown(2, 15, BucketType.user)
+    @doc_url("https://docs.archit.us/commands/latex/")
     async def latex(self, ctx, *latex):
-        """
-        Use: !latex [valid latex code]
-        Parameters do not need to be passed inside of quotes. They will
-        be automatically joined together with a space in between them.
-        Latex code is just inside of a plain document environment so add
-        dollar signs if you need them. The packages mathrsfs and amsmath
-        are included by default.
+        """latex <latex code>
+        Compiles latex to a png.
         """
         for l in latex:
             for c in self.illegal_commands:
@@ -63,26 +60,42 @@ class Latexify(commands.Cog, name="Latex Compiler"):
             tex = await create_subprocess_exec('latex', '-halt-on-error', '-no-shell-escape',
                                                '-interaction batchmode', 'out.tex',
                                                cwd=work_dir,
-                                               stdout=DEVNULL,
+                                               stdout=PIPE,
                                                stderr=DEVNULL,
                                                close_fds=True)
 
             try:
-                await wait_for(tex.wait(), timeout=3)
+                stdout, _ = await wait_for(tex.communicate(), timeout=3)
             except TimeoutError:
                 await ctx.send("Compilation took too long")
                 tex.kill()
                 return
 
             if not os.path.isfile(os.path.join(work_dir, 'out.dvi')):
-                await ctx.send("Compilation failed")
+                output = stdout.decode('ascii')
+
+                # The only latex output that we want comes after the first '!'
+                # Pdflatex includes a bunch of boilerplate output at the beginning
+                # about the state of the environment that we don't really need.
+                # In addition, the last two lines of output are just saying where
+                # pdflatex stored the logs to but the discord user doesn't have
+                # access to those so just get rid of them.
+                error_msg = output[output.index('!'):]
+                error_msg = "\n".join(error_msg.split('\n')[:-3])
+
+                embed = Embed(title="Latex Compilation Error", description="Something went wrong")
+                embed.add_field(name="Latex Code", value=latex, inline=False)
+                embed.add_field(name="Compiler Error", value=error_msg, inline=False)
+                await ctx.send(embed=embed)
                 return
 
-            convert = await create_subprocess_exec('dvipng', '-T', 'tight', '-D', '300', 'out.dvi',
-                                                   cwd=work_dir,
-                                                   stdout=DEVNULL,
-                                                   stderr=DEVNULL,
-                                                   close_fds=True)
+            convert = await create_subprocess_exec(
+                'dvipng', '-T', 'tight', '-Q', '32', '-D', '1500', '-fg', 'rgb 1.0 1.0 1.0',
+                '-bg', 'transparent', '--gamma', '100', 'out.dvi',
+                cwd=work_dir,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+                close_fds=True)
             await convert.wait()
 
             if not os.path.isfile(os.path.join(work_dir, 'out1.png')):
