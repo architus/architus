@@ -1,7 +1,7 @@
 pub mod sub_processors;
 
 use crate::event::{NormalizedEvent, Source};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use jmespath::Expression;
 use logs_lib::id::{self, IdProvisioner};
 use logs_lib::ActionType;
@@ -60,10 +60,9 @@ impl Processor {
     /// and adding it to the internal map
     #[must_use]
     fn register(mut self, event_type: EventType, sub_processor: EventProcessor) -> Self {
-        let value = serde_json::to_value(event_type).expect("EventType should be serializable");
-        let event_type_str = match value {
-            serde_json::Value::String(s) => s,
-            _ => panic!("serialization from EventType produced non-string"),
+        let event_type_str = match serde_json::to_string(&event_type) {
+            Ok(s) => s,
+            Err(_) => panic!("EventType was not serializable"),
         };
         self.sub_processors.insert(event_type_str, sub_processor);
         self
@@ -123,6 +122,8 @@ impl EventProcessor {
                 // TODO add audit log entry support
                 let audit_log_entry: Option<serde_json::Value> = None;
                 let id = id_provisioner.with_ts(event.rx_timestamp);
+
+                // Extract all fields based on the static sub-processor definition
                 let timestamp = match timestamp_src {
                     TimestampSource::TimeOfIngress => event.rx_timestamp,
                     TimestampSource::Snowflake(path) => path
@@ -130,26 +131,21 @@ impl EventProcessor {
                         .map(|snowflake| id::extract_timestamp(snowflake))
                         .unwrap_or(event.rx_timestamp),
                 };
-                let reason = match reason_src {
-                    Some(path) => path
-                        .apply(Some(&event.json), audit_log_entry.as_ref())
-                        .and_then(|value| value.as_string().cloned()),
-                    None => None,
-                };
-                let subject_id = match subject_id_src {
-                    Some(path) => path.apply_id(Some(&event.json), audit_log_entry.as_ref()),
-                    None => None,
-                };
-                let guild_id = match guild_id_src {
-                    Some(path) => path
-                        .apply_id(Some(&event.json), audit_log_entry.as_ref()),
-                    None => None,
-                };
-                let agent_id = match agent_id_src {
-                    Some(path) => path
-                        .apply_id(Some(&event.json), audit_log_entry.as_ref()),
-                    None => None,
-                };
+                let reason = reason_src
+                    .as_ref()
+                    .and_then(|path| path.apply(Some(&event.json), audit_log_entry.as_ref()))
+                    .and_then(|value| value.as_string().cloned());
+                let subject_id = subject_id_src
+                    .as_ref()
+                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
+                let guild_id = guild_id_src
+                    .as_ref()
+                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
+                let agent_id = agent_id_src
+                    .as_ref()
+                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
+
+                // Construct the source from the original JSON values
                 let source = Source {
                     gateway: Some(event.json),
                     audit_log: audit_log_entry,

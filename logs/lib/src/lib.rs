@@ -1,8 +1,6 @@
 pub mod id;
 pub mod time;
 
-use serde::Serialize;
-use log::debug;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize_repr, Deserialize_repr)]
@@ -24,17 +22,6 @@ pub enum ActionOrigin {
     Logs = 6,
     // Action comes from some other internal process
     Internal = 7,
-}
-
-impl ActionOrigin {
-    /// Upgrades an action origin to include an audit log entry
-    pub fn upgrade(&self) -> ActionOrigin {
-        match self {
-            Self::Gateway | Self::Hybrid => Self::Hybrid,
-            Self::AuditLog => Self::AuditLog,
-            _ => *self
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Serialize_repr, Deserialize_repr)]
@@ -156,17 +143,4 @@ pub enum ActionType {
     InternalWarn = 9102,
     InternalError = 9103,
     InternalCritical = 9104,
-}
-
-/// Attempts to serialize the given value to a JSON value,
-/// logging if serialization fails for any reason
-#[must_use]
-pub fn to_json<T: Serialize>(source: &T) -> Option<serde_json::Value> {
-    let result = serde_json::to_value(source);
-    if let Err(e) = result {
-        debug!("an error occurred while serializing event data: {:?}", e);
-        None
-    } else {
-        result.ok()
-    }
 }

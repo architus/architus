@@ -2,17 +2,22 @@ mod config;
 mod event;
 mod gateway;
 
+use crate::event::NormalizedEvent;
 use crate::gateway::OriginalEvent;
 use anyhow::{Context, Result};
 use clap::{App, Arg};
 use config::Configuration;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use log::{debug, error, info};
 use logs_lib::time;
+use std::convert::TryFrom;
+use std::future::Future;
+use std::sync::Arc;
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
 use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
 use twilight_model::gateway::event::shard::Payload;
+use twilight_model::gateway::OpCode;
 
 /// Bootstraps the bot and begins listening for gateway events
 #[tokio::main]
@@ -64,74 +69,23 @@ async fn run() -> Result<()> {
     // Initialize the gateway event processor
     // and register all known gateway event handlers
     // (see gateway/processors.rs)
-    let processor = gateway::sub_processors::register_all(gateway::Processor::new());
+    let processor = Arc::new(gateway::sub_processors::register_all(
+        gateway::Processor::new(),
+    ));
 
     shard.start().await.context("Could not start shard")?;
     info!("Created shard and preparing to listen for gateway events");
 
     // Listen for all raw gateway events and process them,
     // re-emitting half-processed gateway events to be consumed by the processor
-    let processor_ref = &processor;
-    let gateway_event_stream = events.filter_map(|event| async move {
-        // let processor_copy2 = Arc::clone(&processor_ref);
-        if let Event::ShardPayload(Payload { bytes }) = event {
-            if let Ok(json) = std::str::from_utf8(&bytes) {
-                // Use twilight's fast pre-deserializer to determine the op type,
-                // and only deserialize it if it:
-                // - is a proper Gateway dispatch event
-                // - has a matching processor
-                if let Some(deserializer) = GatewayEventDeserializer::from_json(json) {
-                    let (op, seq, event_type) = deserializer.into_parts();
-                    if op != 0 {
-                        return None;
-                    }
-
-                    if let Some(event_type) = event_type.as_deref() {
-                        // Make sure we can process the event
-                        if !processor_ref.can_process(event_type) {
-                            return None;
-                        }
-
-                        let result = serde_json::from_str::<serde_json::Value>(json);
-                        if let Ok(value) = result {
-                            if let serde_json::Value::Object(map) = value {
-                                // Attempt to find the ".d" value
-                                let mut map = map;
-                                if let Some(inner_json) = map.remove("d") {
-                                    // Convert the event into an owned version
-                                    // and emit as the stream item
-                                    let event_type = event_type.to_owned();
-                                    return Some(OriginalEvent {
-                                        seq,
-                                        event_type,
-                                        json: inner_json,
-                                        rx_timestamp: time::millisecond_ts(),
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        None
-    });
+    let gateway_event_stream = pipe_gateway_events(events, Arc::clone(&processor));
 
     // Normalize each event coming from the gateway,
     // and process them in parallel where possible via buffer_unordered
-    let normalized_event_stream = gateway_event_stream
-        .map(|event| async move {
-            match processor_ref.normalize(event).await {
-                Ok(normalized_event) => Some(normalized_event),
-                Err(err) => {
-                    debug!("Event normalization failed for event: {:?}", err);
-                    None
-                }
-            }
-        })
-        .buffer_unordered(config.normalization_stream_concurrency)
-        .filter_map(|event_option| async move { event_option });
+    let normalized_event_stream =
+        pipe_normalized_events(gateway_event_stream, Arc::clone(&processor))
+            .buffer_unordered(config.normalization_stream_concurrency)
+            .filter_map(|event_option| async move { event_option });
 
     // Send each normalized event to the logging import service,
     // acting as a sink for this stream
@@ -145,4 +99,83 @@ async fn run() -> Result<()> {
         .await;
 
     Ok(())
+}
+
+/// Stream processor function that takes in a raw stream of gateway events
+/// and uses twilight's fast pre-deserializer to validate that
+/// they are valid and usable events before parsing and re-emitting them
+fn pipe_gateway_events(
+    in_stream: impl Stream<Item = Event>,
+    processor: Arc<gateway::Processor>,
+) -> impl Stream<Item = OriginalEvent> {
+    // Get the opcode byte number for `OpCode::Event` packets
+    let event_opcode: u8 =
+        match serde_json::to_value(OpCode::Event).expect("Couldn't turn OpCode::Event into json") {
+            serde_json::Value::Number(n) => n
+                .as_u64()
+                .and_then(|i| TryFrom::try_from(i).ok())
+                .expect("Couldn't turn OpCode::Event into u8"),
+            _ => panic!("serialization from OpCode produced non-u8"),
+        };
+
+    in_stream.filter_map(move |event| {
+        let processor_copy = Arc::clone(&processor);
+        async move {
+            if let Event::ShardPayload(Payload { bytes }) = event {
+                let json = std::str::from_utf8(&bytes).ok()?;
+                // Use twilight's fast pre-deserializer to determine the op type,
+                // and only deserialize it if it:
+                // - is a proper Gateway dispatch event
+                // - has a matching processor
+                let deserializer = GatewayEventDeserializer::from_json(json)?;
+                let (op, seq, event_type) = deserializer.into_parts();
+                if op != event_opcode {
+                    return None;
+                }
+
+                // Make sure we can process the event
+                let event_type = event_type.as_deref()?;
+                if !processor_copy.can_process(event_type) {
+                    return None;
+                }
+
+                let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
+                if let serde_json::Value::Object(map) = value {
+                    // Attempt to find the ".d" value (contains the Gateway message payload)
+                    // https://discord.com/developers/docs/topics/gateway#payloads-gateway-payload-structure
+                    let mut map = map;
+                    let inner_json = map.remove("d")?;
+                    return Some(OriginalEvent {
+                        seq,
+                        event_type: event_type.to_owned(),
+                        json: inner_json,
+                        rx_timestamp: time::millisecond_ts(),
+                    });
+                }
+            }
+
+            None
+        }
+    })
+}
+
+/// Stream processor function that invokes the core event processing logic
+/// on each incoming original gateway event,
+/// attempting to asynchronously convert them into NormalizedEvents
+fn pipe_normalized_events(
+    in_stream: impl Stream<Item = OriginalEvent>,
+    processor: Arc<gateway::Processor>,
+) -> impl Stream<Item = impl Future<Output = Option<NormalizedEvent>>> {
+    in_stream.map(move |event| {
+        let processor = Arc::clone(&processor);
+        async move {
+            match processor.normalize(event).await {
+                Ok(normalized_event) => Some(normalized_event),
+                Err(err) => {
+                    debug!("Event normalization failed for event: {:?}", err);
+                    None
+                }
+            }
+        }
+    })
 }

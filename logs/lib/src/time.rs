@@ -1,4 +1,4 @@
-/// Gets the second unix timestamp for the stat filename
+/// Gets the current millisecond unix timestamp
 #[must_use]
 pub fn millisecond_ts() -> u64 {
     time::millisecond_ts()
