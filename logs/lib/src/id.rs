@@ -17,31 +17,18 @@ pub struct IdProvisioner {
     internal_counter: AtomicU64,
 }
 
-// Architus-style ID
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
-pub struct HoarFrost(pub u64);
-
-impl HoarFrost {
-    /// Extracts the creation timestamp of the given hoar frost Id
-    ///
-    /// See https://discord.com/developers/docs/reference#snowflakes
-    #[must_use]
-    pub fn extract_timestamp(&self) -> u64 {
-        (self.0 >> 22) + DISCORD_EPOCH_OFFSET
-    }
-}
-
-#[must_use]
-fn get_mac_address() -> Option<[u8; 6]> {
-    mac_address::get_mac_address()
-        .ok()
-        .flatten()
-        .map(|mac| mac.bytes())
-}
-
 impl Default for IdProvisioner {
     #[must_use]
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl IdProvisioner {
+    /// Creates a new IdProvisioner and examines the system configuration
+    /// for the PID and some MAC address
+    #[must_use]
+    pub fn new() -> Self {
         let mac_addr_significant = get_mac_address().map(|bytes| bytes[0] as u64).unwrap_or(0);
         let worker_id = mac_addr_significant & 0b11111;
         let process_id = process::id() as u64 & 0b11111;
@@ -50,23 +37,11 @@ impl Default for IdProvisioner {
             internal_counter: AtomicU64::new(0),
         };
     }
-}
-
-impl IdProvisioner {
-    #[must_use]
-    pub fn new() -> Self {
-        Default::default()
-    }
 
     /// Atomically provisions a new Id
     #[must_use]
     pub fn provision(&self) -> HoarFrost {
-        // Note: we can use Ordering::Relaxed here because the overall ordering
-        // doesn't really matter; all that matters is that the operation is atomic
-        // (since the timestamp is at a more significant bit than the counter)
-        let increment = self.internal_counter.fetch_add(1, Ordering::Relaxed) & 0b111111111111;
-        let timestamp = (time::millisecond_ts() - DISCORD_EPOCH_OFFSET) << 22;
-        HoarFrost(increment | timestamp | self.combined_process_id)
+        self.with_ts(time::millisecond_ts())
     }
 
     /// Atomically provisions a new Id using the given timestamp
@@ -81,10 +56,33 @@ impl IdProvisioner {
     }
 }
 
+/// Attempts to get the first non-local MAC address of the current system
+#[must_use]
+fn get_mac_address() -> Option<[u8; 6]> {
+    mac_address::get_mac_address()
+        .ok()
+        .flatten()
+        .map(|mac| mac.bytes())
+}
+
 /// Extracts the creation timestamp of the given snowflake-format Id
 ///
 /// See https://discord.com/developers/docs/reference#snowflakes
 #[must_use]
 pub fn extract_timestamp(snowflake: u64) -> u64 {
     (snowflake >> 22) + DISCORD_EPOCH_OFFSET
+}
+
+// Architus-style ID
+#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+pub struct HoarFrost(pub u64);
+
+impl HoarFrost {
+    /// Extracts the creation timestamp of the given hoar frost Id
+    ///
+    /// See https://discord.com/developers/docs/reference#snowflakes
+    #[must_use]
+    pub fn extract_timestamp(&self) -> u64 {
+        extract_timestamp(self.0)
+    }
 }

@@ -1,21 +1,40 @@
 syntax = "proto3";
-package Logs;
+package Logging;
 
-service LogStore {
-    rpc submit(SubmitRequest) returns (Empty) {}
-    rpc submit_spread(SubmitSpreadRequest) returns (Empty) {}
+service Logging {
+    rpc submit(SubmitRequest) returns (SubmitReply) {}
 }
 
 message SubmitRequest {
     Event event = 1;
 }
 
-message SubmitSpreadRequest {
-    Event event = 1;
-    repeated fixed64 guild_ids = 2;
+message SubmitReply {
+    oneof variant {
+       SubmitReplySuccess success = 1;
+       SubmitReplyFailure failure = 2;
+    }
 }
 
-message Empty {}
+message SubmitReplySuccess {
+    // Actual ID of the generated event object,
+    // which may not be the same as the original ID (if given)
+    fixed64 actual_id = 1;
+    // Actual timestamp of the generated event object,
+    // which will be the same as the original timestamp if given
+    uint64 actual_timestamp = 2;
+}
+
+message SubmitReplyFailure {
+    // The type of the failure
+    SubmitReplyFailureReason reason = 1;
+    // Gives the human-readable reason for the failure
+    string message = 2;
+}
+
+enum SubmitReplyFailureReason {
+    Unknown = 0;
+}
 
 message EventSource {
     // Source gateway event inner object (optional)
@@ -25,7 +44,7 @@ message EventSource {
 }
 
 enum EventOrigin {
-    Unknown = 0;
+    UnknownOrigin = 0;
     // Action originated from the gateway and was caught as it originated
     Gateway = 1;
     // Action originated from the audit log
@@ -126,11 +145,11 @@ enum EventType {
 message Event {
     // Id using snowflake format;
     // using the *time that the event was received by wherever it's ingested*
-    // (effectively required)
+    // Will be generated if not provided
     fixed64 id = 1;
     // Unix timestamp of the *time of the underlying event* (if available),
     // else some meaningful timestamp describing when the event was ingested
-    // (effectively required)
+    // Will be generated if not provided
     uint64 timestamp = 2;
     // The source data; including the original gateway/audit log entries
     EventSource source = 3;
@@ -138,7 +157,7 @@ message Event {
     EventOrigin origin = 4;
     // The type of action the event is
     EventType type = 5;
-    // Related guild the event ocurred in
+    // Related guild the event occurred in
     fixed64 guild_id = 6;
     // Id of the entity that caused the event to occur
     fixed64 agent_id = 7;
