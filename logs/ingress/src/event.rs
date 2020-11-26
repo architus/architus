@@ -1,4 +1,4 @@
-use crate::logging::{self, Event as LogEvent, EventOrigin, EventSource, EventType};
+use crate::logging::{Event as LogEvent, EventOrigin, EventSource, EventType};
 use logs_lib::id::HoarFrost;
 use std::convert::Into;
 
@@ -32,6 +32,8 @@ pub struct NormalizedEvent {
 
 impl Into<LogEvent> for NormalizedEvent {
     fn into(self) -> LogEvent {
+        // Convert the normalized event struct (specific to this service)
+        // into the `LogEvent` struct, which is the gRPC-serializable struct
         let mut log_event = LogEvent {
             id: self.id.0,
             timestamp: self.timestamp,
@@ -57,18 +59,12 @@ impl Into<LogEvent> for NormalizedEvent {
         // Enum values have to be set manually with Tonic
         log_event.set_origin(self.origin);
         log_event.set_event_type(self.event_type);
-        return log_event;
+        log_event
     }
 }
 
-impl Into<logging::SubmitRequest> for NormalizedEvent {
-    fn into(self) -> logging::SubmitRequest {
-        logging::SubmitRequest {
-            event: Some(self.into()),
-        }
-    }
-}
-
+/// Represents the in-memory version of the original JSON that this event represents,
+/// included in the event struct for future data processing
 #[derive(Clone, PartialEq, Debug)]
 pub struct Source {
     pub gateway: Option<serde_json::Value>,
@@ -76,6 +72,8 @@ pub struct Source {
 }
 
 impl Source {
+    /// Calculates the `EventOrigin` variant for this source object,
+    /// using the presence of the each sub-field to produce the result
     #[must_use]
     pub fn origin(&self) -> EventOrigin {
         match (self.gateway.as_ref(), self.audit_log.as_ref()) {

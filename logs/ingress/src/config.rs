@@ -43,7 +43,7 @@ pub struct Services {
 
 impl Configuration {
     /// Attempts to load the config from the file, called once at startup
-    pub fn try_load(path: impl AsRef<str>) -> Result<Configuration> {
+    pub fn try_load(path: impl AsRef<str>) -> Result<Self> {
         let path = path.as_ref();
         debug!("Loading configuration from {}", path);
         // Use config to load the values and merge with the environment
@@ -55,7 +55,7 @@ impl Configuration {
             // Eg.. `INGRESS_SECRETS__DISCORD_TOKEN=X ./target/ingress-service`
             // would set the `secrets.discord_token` key
             .merge(config::Environment::with_prefix("INGRESS").separator("__"))
-            .context(format!("Could not merge in values from the environment"))?;
+            .context("Could not merge in values from the environment")?;
         let config = settings
             .try_into()
             .context("Loading the Configuration struct from the merged config failed")?;

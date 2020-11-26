@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
-    // Compile the logging protobuf definitions into the server code
+    // Compile the logging protobuf definitions into the client code
     tonic_build::configure()
         .build_client(true)
         .build_server(false)

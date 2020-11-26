@@ -4,13 +4,13 @@ normalization_stream_concurrency = 20
 # to the import service
 import_stream_concurrency = 8
 # Max interval to use between import retries
-import_backoff_max_interval = "2m"
+import_backoff_max_interval = "10m"
 # Overall duration of import retries (exceeding this causes the operation to give up)
 import_backoff_duration = "10m"
 # Multiplier between consecutive backoff intervals to use between import retries
-import_backoff_multiplier = 3.0
+import_backoff_multiplier = 4.0
 # Initial backoff interval to use between import retries
-import_backoff_initial_interval = "5s"
+import_backoff_initial_interval = "1.25s"
 
 [services]
 # URL of the logging service that normalized LogEvents are forwarded to
