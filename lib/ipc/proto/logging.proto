@@ -2,6 +2,10 @@ syntax = "proto3";
 package Logging;
 
 service Logging {
+    // Submit a single log event to be imported into the Elasticsearch database.
+    // Will automatically provision an ID if not given and fill in a timestamp,
+    // ensuring that the ID of the logging.Event is unique within the data store
+    // (re-generating it if necessary)
     rpc submit(SubmitRequest) returns (SubmitReply) {}
 }
 

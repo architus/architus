@@ -1,0 +1,2 @@
+# Port that the main gRPC server listens on
+port = 8173

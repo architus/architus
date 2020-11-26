@@ -51,7 +51,7 @@ impl Configuration {
         settings
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
-            // Add in settings from the environment (with a prefix of APP)
+            // Add in settings from the environment (with a prefix of INGRESS)
             // Eg.. `INGRESS_SECRETS__DISCORD_TOKEN=X ./target/ingress-service`
             // would set the `secrets.discord_token` key
             .merge(config::Environment::with_prefix("INGRESS").separator("__"))

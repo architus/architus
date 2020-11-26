@@ -10,11 +10,11 @@ import_backoff_duration = "10m"
 # Multiplier between consecutive backoff intervals to use between import retries
 import_backoff_multiplier = 4.0
 # Initial backoff interval to use between import retries
-import_backoff_initial_interval = "1.25s"
+import_backoff_initial_interval = "1s"
 
 [services]
 # URL of the logging service that normalized LogEvents are forwarded to
-logging = "http://logging"
+logging = "http://[::1]:8173"
 
 # Note: these should be specified using environment variables in production
 # For example, to specify `discord_token`,

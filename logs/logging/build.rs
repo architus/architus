@@ -1,4 +1,4 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
     // Compile the logging protobuf definitions into the server code
