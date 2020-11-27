@@ -5,6 +5,7 @@ authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
 
 [dependencies]
+logs_lib = { path = "../lib" }
 config = "0.10"
 log = "0.4"
 env_logger = "0.8"

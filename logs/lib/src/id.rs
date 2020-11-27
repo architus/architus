@@ -38,12 +38,16 @@ impl IdProvisioner {
     }
 
     /// Atomically provisions a new Id
+    /// (mutates inner state but doesn't require &mut self because the mutation is atomic
+    /// and requiring mutability would make the API un-ergonomic)
     #[must_use]
     pub fn provision(&self) -> HoarFrost {
         self.with_ts(time::millisecond_ts())
     }
 
     /// Atomically provisions a new Id using the given timestamp
+    /// (mutates inner state but doesn't require &mut self because the mutation is atomic
+    /// and requiring mutability would make the API un-ergonomic)
     #[must_use]
     pub fn with_ts(&self, timestamp: u64) -> HoarFrost {
         // Note: we can use Ordering::Relaxed here because the overall ordering

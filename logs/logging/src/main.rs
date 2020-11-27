@@ -8,6 +8,8 @@ use anyhow::{Context, Result};
 use log::info;
 use logging::logging_server::{Logging, LoggingServer};
 use logging::{SubmitReply, SubmitRequest};
+use logs_lib::id::IdProvisioner;
+use logs_lib::time;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::result::Result as StdResult;
 use tonic::transport::Server;
@@ -28,7 +30,7 @@ async fn main() -> Result<()> {
 
     // Start the server on the specified port
     let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), config.port);
-    let logging = LoggingService {};
+    let logging = LoggingService::new();
     let service = LoggingServer::new(logging);
     let server = Server::builder().add_service(service);
 
@@ -42,7 +44,23 @@ async fn main() -> Result<()> {
 }
 
 #[derive(Debug)]
-struct LoggingService;
+struct LoggingService {
+    id_provisioner: IdProvisioner,
+}
+
+impl Default for LoggingService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LoggingService {
+    fn new() -> Self {
+        Self {
+            id_provisioner: IdProvisioner::new(),
+        }
+    }
+}
 
 #[tonic::async_trait]
 impl Logging for LoggingService {
@@ -54,13 +72,44 @@ impl Logging for LoggingService {
         &self,
         request: Request<SubmitRequest>,
     ) -> StdResult<Response<SubmitReply>, Status> {
+        let timestamp = time::millisecond_ts();
         let event = request.into_inner().event;
+        if let Some(mut event) = event {
+            // Add in a timestamp if needed
+            if event.timestamp == 0 {
+                event.timestamp = timestamp;
+            }
 
-        // TODO implement
-        info!("Received event from RPC call: {:?}", event);
-        Ok(Response::new(SubmitReply {
-            actual_id: 0,
-            actual_timestamp: 0,
-        }))
+            // Provision an Id if needed
+            if event.id == 0 {
+                event.timestamp = self.id_provisioner.with_ts(timestamp).0;
+            }
+
+            // Insert into the ES database,
+            // regenerating the ID if needed (by incrementing by 1)
+            info!("Received event from RPC call: {:?}", event);
+            return Ok(Response::new(SubmitReply {
+                actual_id: event.id,
+                actual_timestamp: event.timestamp,
+            }));
+            // TODO actually implement
+            // loop {
+            //     match self.database.insert(&event) {
+            //         Ok(_) => {
+            //             return Ok(Response::new(SubmitReply{
+            //                 actual_id: event.id,
+            //                 actual_timestamp: event.timestamp,
+            //             }))
+            //         },
+            //         Err(err) => {
+            //             warn!("Insertion of log event into Elasticsearch data store failed: {:?}", err);
+            //             // Re-create the id and try again
+            //             event.id += 1;
+            //         }
+            //     }
+            // }
+        }
+
+        Err(Status::invalid_argument("No event given to import"))
     }
 }
