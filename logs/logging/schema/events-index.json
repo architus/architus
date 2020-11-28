@@ -1,0 +1,44 @@
+{
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "unsigned_long"
+      },
+      "timestamp": {
+        "type": "date"
+      },
+      "source": {
+        "type": "object",
+        "properties": {
+          "gateway": {
+            "type": "flattened"
+          },
+          "audit_log": {
+            "type": "flattened"
+          }
+        }
+      },
+      "origin": {
+        "type": "integer"
+      },
+      "event_type": {
+        "type": "integer"
+      },
+      "guild_id": {
+        "type": "unsigned_long"
+      },
+      "agent_id": {
+        "type": "unsigned_long"
+      },
+      "subject_id": {
+        "type": "unsigned_long"
+      },
+      "audit_log_id": {
+        "type": "unsigned_long"
+      },
+      "reason": {
+        "type": "text"
+      }
+    }
+  }
+}

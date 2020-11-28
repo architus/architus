@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
-use log::debug;
+use log::{info, debug};
 use serde::Deserialize;
 use std::time::Duration;
 
 /// Configuration object loaded upon startup
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Configuration {
     /// Collection of secret values used to connect to services
     pub secrets: Secrets,
@@ -28,14 +28,14 @@ pub struct Configuration {
 }
 
 /// Collection of secret values used to connect to services
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Secrets {
     /// Discord bot token used to authenticate with the Gateway API
     pub discord_token: String,
 }
 
 /// Collection of external services that this service connects to
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Services {
     /// URL of the logging service that normalized LogEvents are forwarded to
     pub logging: String,
@@ -45,7 +45,7 @@ impl Configuration {
     /// Attempts to load the config from the file, called once at startup
     pub fn try_load(path: impl AsRef<str>) -> Result<Self> {
         let path = path.as_ref();
-        debug!("Loading configuration from {}", path);
+        info!("Loading configuration from {}", path);
         // Use config to load the values and merge with the environment
         let mut settings = config::Config::default();
         settings
@@ -59,6 +59,7 @@ impl Configuration {
         let config = settings
             .try_into()
             .context("Loading the Configuration struct from the merged config failed")?;
+        debug!("Configuration: {:?}", config);
         Ok(config)
     }
 }

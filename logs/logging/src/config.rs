@@ -1,19 +1,28 @@
 use anyhow::{Context, Result};
-use log::debug;
+use log::{debug, info};
 use serde::Deserialize;
 
 /// Configuration object loaded upon startup
-#[derive(Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Configuration {
     /// Port that the main gRPC server listens on
     pub port: u16,
+    /// Collection of external services that this service connects to
+    pub services: Services,
+}
+
+/// Collection of external services that this service connects to
+#[derive(Debug, Deserialize, Clone)]
+pub struct Services {
+    /// URL of the Elasticsearch instance to store log entries in
+    pub elasticsearch: String,
 }
 
 impl Configuration {
     /// Attempts to load the config from the file, called once at startup
     pub fn try_load(path: impl AsRef<str>) -> Result<Self> {
         let path = path.as_ref();
-        debug!("Loading configuration from {}", path);
+        info!("Loading configuration from {}", path);
         // Use config to load the values and merge with the environment
         let mut settings = config::Config::default();
         settings
@@ -27,6 +36,7 @@ impl Configuration {
         let config = settings
             .try_into()
             .context("Loading the Configuration struct from the merged config failed")?;
+        debug!("Configuration: {:?}", config);
         Ok(config)
     }
 }

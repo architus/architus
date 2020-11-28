@@ -3,6 +3,11 @@ name = "logging-service"
 version = "0.1.0"
 authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
+description = """\
+Logging service for the logging component of Architus.\
+Accepts log objects via gRPC and imports them into an Elasticsearch data store.
+"""
+license = "MIT"
 
 [dependencies]
 logs_lib = { path = "../lib" }
@@ -13,8 +18,10 @@ anyhow = "1.0"
 tonic = "0.3"
 prost = "0.6"
 futures = "0.3"
-tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "macros"] }
+tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "time", "macros"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+elasticsearch = "7.10.0-alpha.1"
 
 [build-dependencies]
 tonic-build = "0.3"

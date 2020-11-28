@@ -1,2 +1,6 @@
 # Port that the main gRPC server listens on
 port = 8173
+
+[services]
+# URL of the Elasticsearch instance to store log entries in
+elasticsearch = "http://[::1]:9200"
