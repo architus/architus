@@ -7,7 +7,7 @@ use thiserror::Error;
 
 /// Represents the JSON-serializable version of the stored Elasticsearch log event
 /// See lib/ipc/proto/logging.proto for the original definition of this struct
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, juniper::GraphQLObject)]
 pub struct StoredEvent {
     pub id: HoarFrost,
     pub timestamp: u64,
@@ -27,7 +27,7 @@ pub struct StoredEvent {
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, juniper::GraphQLObject)]
 pub struct StoredSource {
     pub gateway: Option<serde_json::Value>,
     pub audit_log: Option<serde_json::Value>,
