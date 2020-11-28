@@ -1,14 +1,11 @@
 [package]
-name = "logs_lib"
+name = "architus-id"
 version = "0.1.0"
 authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-log = "0.4"
-serde_repr = "0.1"
 mac_address = "1.0"
 
 # Unix-specific dependencies

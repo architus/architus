@@ -1,5 +1,5 @@
 use crate::logging::{Event as LogEvent, EventOrigin, EventSource, EventType};
-use logs_lib::id::HoarFrost;
+use architus_id::HoarFrost;
 use std::convert::Into;
 
 /// Normalized log event to send to log ingestion
@@ -16,10 +16,8 @@ pub struct NormalizedEvent {
     pub origin: EventOrigin,
     /// The type of action the event is
     pub event_type: EventType,
-    /// An optional *human-readable* reason/message of the event
-    pub reason: Option<String>,
     /// Related guild the event occurred in
-    pub guild_id: Option<u64>,
+    pub guild_id: u64,
     /// Id of the entity that caused the event to occur
     pub agent_id: Option<u64>,
     /// Id of the entity that the event is about/affects
@@ -28,6 +26,10 @@ pub struct NormalizedEvent {
     /// Id of the corresponding audit log entry this event corresponds to, if any
     /// (included for indexing purposes)
     pub audit_log_id: Option<u64>,
+    /// Channel that the event occurred in
+    pub channel_id: Option<u64>,
+    /// An optional *human-readable* reason/message of the event
+    pub reason: Option<String>,
 }
 
 impl Into<LogEvent> for NormalizedEvent {
@@ -48,14 +50,20 @@ impl Into<LogEvent> for NormalizedEvent {
                     .audit_log
                     .and_then(|json| serde_json::to_string(&json).ok())
                     .unwrap_or_else(|| String::from("")),
+                internal: self
+                    .source
+                    .internal
+                    .and_then(|json| serde_json::to_string(&json).ok())
+                    .unwrap_or_else(|| String::from("")),
             }),
             origin: self.origin.into(),
             event_type: self.event_type.into(),
-            reason: self.reason.unwrap_or_else(|| String::from("")),
-            guild_id: self.guild_id.unwrap_or(0),
+            guild_id: self.guild_id,
             agent_id: self.agent_id.unwrap_or(0),
             subject_id: self.subject_id.unwrap_or(0),
             audit_log_id: self.audit_log_id.unwrap_or(0),
+            channel_id: self.audit_log_id.unwrap_or(0),
+            reason: self.reason.unwrap_or_else(|| String::from("")),
         }
     }
 }
@@ -66,14 +74,15 @@ impl Into<LogEvent> for NormalizedEvent {
 pub struct Source {
     pub gateway: Option<serde_json::Value>,
     pub audit_log: Option<serde_json::Value>,
+    pub internal: Option<serde_json::Value>,
 }
 
 impl Source {
     /// Calculates the `EventOrigin` variant for this source object,
     /// using the presence of the each sub-field to produce the result
     #[must_use]
-    pub fn origin(&self) -> EventOrigin {
-        match (self.gateway.as_ref(), self.audit_log.as_ref()) {
+    pub const fn origin(&self) -> EventOrigin {
+        match (&self.gateway, &self.audit_log) {
             (Some(_), Some(_)) => EventOrigin::Hybrid,
             (Some(_), None) => EventOrigin::Gateway,
             (None, Some(_)) => EventOrigin::AuditLog,

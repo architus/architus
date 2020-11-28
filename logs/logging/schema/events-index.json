@@ -5,7 +5,8 @@
         "type": "unsigned_long"
       },
       "timestamp": {
-        "type": "date"
+        "type": "date",
+        "format": "epoch_millis"
       },
       "source": {
         "type": "object",
@@ -14,6 +15,9 @@
             "type": "flattened"
           },
           "audit_log": {
+            "type": "flattened"
+          },
+          "internal": {
             "type": "flattened"
           }
         }
@@ -34,6 +38,9 @@
         "type": "unsigned_long"
       },
       "audit_log_id": {
+        "type": "unsigned_long"
+      },
+      "channel_id": {
         "type": "unsigned_long"
       },
       "reason": {

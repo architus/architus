@@ -10,11 +10,12 @@ Accepts log objects via gRPC and imports them into an Elasticsearch data store.
 license = "MIT"
 
 [dependencies]
-logs_lib = { path = "../lib" }
+architus-id = { path = "../../lib/id-rs" }
 config = "0.10"
 log = "0.4"
 env_logger = "0.8"
 anyhow = "1.0"
+thiserror = "1.0.22"
 tonic = "0.3"
 prost = "0.6"
 futures = "0.3"
