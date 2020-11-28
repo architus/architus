@@ -13,15 +13,16 @@ use crate::config::Configuration;
 use crate::event::NormalizedEvent;
 use crate::gateway::OriginalEvent;
 use anyhow::{Context, Result};
+use architus_id::time;
 use backoff::{future::FutureOperation as _, ExponentialBackoff};
 use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use logging::logging_client::LoggingClient;
-use logging::SubmitRequest;
-use logs_lib::time;
+use logging::Event as LogEvent;
 use std::convert::{Into, TryFrom};
 use std::future::Future;
+use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
@@ -89,7 +90,12 @@ async fn main() -> Result<()> {
 
     // Send each log event to the logging import service,
     // acting as a sink for this stream
-    import_log_events(normalized_event_stream, &client, &config).await;
+    import_log_events(
+        normalized_event_stream,
+        &Arc::new(client),
+        &Arc::new(config),
+    )
+    .await;
 
     Ok(())
 }
@@ -181,23 +187,21 @@ enum SubmissionError {
 
 /// Stream sink that takes in each normalized event and sends them to the logging service
 /// for importing, retrying with an exponential backoff if the calls fail
+#[allow(clippy::future_not_send)]
 fn import_log_events(
     in_stream: impl Stream<Item = NormalizedEvent>,
-    client: &LoggingClient<tonic::transport::Channel>,
-    config: &Configuration,
+    client: &Arc<LoggingClient<tonic::transport::Channel>>,
+    config: &Arc<Configuration>,
 ) -> impl Future<Output = ()> {
-    let config = config.clone();
-    let client = client.clone();
+    let config = Arc::clone(config);
+    let client = Arc::clone(client);
     in_stream.for_each_concurrent(Some(config.import_stream_concurrency), move |event| {
-        let client = client.clone();
-        let config = config.clone();
+        let client = Arc::clone(&client);
+        let config = Arc::clone(&config);
         async move {
-            let payload = SubmitRequest {
-                event: Some(event.into()),
-            };
-
+            let payload: LogEvent = event.into();
             let submit = move || {
-                let mut client = client.clone();
+                let mut client = Deref::deref(&client).clone();
                 // Note: we have to clone the payload for each retry,
                 // which isn't ideal but required since Tonic moves it
                 let payload = payload.clone();

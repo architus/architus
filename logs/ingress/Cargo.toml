@@ -10,7 +10,7 @@ Listens for Discord gateway events and forwards them to the logging service\
 license = "MIT"
 
 [dependencies]
-logs_lib = { path = "../lib" }
+architus-id = { path = "../../lib/id-rs" }
 config = "0.10"
 log = "0.4"
 env_logger = "0.8"

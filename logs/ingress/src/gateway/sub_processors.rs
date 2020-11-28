@@ -14,6 +14,7 @@ pub fn register_all(processor: Processor) -> Processor {
             agent_id_src: Some(Path::gateway("author.id")),
             audit_log_src: None,
             guild_id_src: Some(Path::gateway("guild_id")),
+            channel_id_src: Some(Path::gateway("channel_id")),
             reason_src: None,
         },
     )

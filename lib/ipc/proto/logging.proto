@@ -6,11 +6,7 @@ service Logging {
     // Will automatically provision an ID if not given and fill in a timestamp,
     // ensuring that the ID of the logging.Event is unique within the data store
     // (re-generating it if necessary)
-    rpc submit(SubmitRequest) returns (SubmitReply) {}
-}
-
-message SubmitRequest {
-    Event event = 1;
+    rpc submit(Event) returns (SubmitReply) {}
 }
 
 message SubmitReply {
@@ -32,6 +28,8 @@ message EventSource {
     string gateway = 1;
     // Source audit log entry entity object (optional)
     string audit_log = 2;
+    // Source internal data object (optional)
+    string internal = 3;
 }
 
 enum EventOrigin {
@@ -48,10 +46,8 @@ enum EventOrigin {
     // Action originated from an unscheduled recovery job where the bot was
     // scanning history and verifying that the logs have the up-to-date state
     EventOriginUnscheduledRecovery = 5;
-    // Action comes from the internal logs endpoint
-    EventOriginLogs = 6;
     // Action comes from some other internal process
-    EventOriginInternal = 7;
+    EventOriginInternal = 6;
 }
 
 enum EventType {
@@ -125,12 +121,6 @@ enum EventType {
     EventTypeArchitusJoin = 4000;
     EventTypeArchitusLeave = 4001;
     EventTypeUserPrivacyUpdate = 4002;
-
-    EventTypeLogDebug = 9000;
-    EventTypeLogInfo = 9001;
-    EventTypeLogWarn = 9002;
-    EventTypeLogError = 9003;
-    EventTypeLogCritical = 9004;
 }
 
 message Event {
@@ -149,16 +139,19 @@ message Event {
     // The type of action the event is
     EventType event_type = 5;
     // Related guild the event occurred in
+    // (required)
     fixed64 guild_id = 6;
-    // Id of the entity that caused the event to occur
+    // Id of the entity that caused the event to occur, if applicable
     fixed64 agent_id = 7;
-    // Id of the entity that the event is about/affects
+    // Id of the entity that the event is about/affects, if applicable
     // (can be any Id type)
     fixed64 subject_id = 8;
     // Id of the corresponding audit log entry this event corresponds to; if any
     // (included for indexing purposes)
     fixed64 audit_log_id  = 9;
+    // The channel that the event occurred in, if applicable
+    fixed64 channel_id = 10;
     // Optional reason for the log event (can attach additional info here
-    string reason = 10;
+    string reason = 11;
 }
 

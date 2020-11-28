@@ -3,8 +3,8 @@ pub mod sub_processors;
 use crate::event::{NormalizedEvent, Source};
 use crate::logging::EventType;
 use anyhow::Result;
+use architus_id::IdProvisioner;
 use jmespath::Expression;
-use logs_lib::id::{self, IdProvisioner};
 use static_assertions::assert_impl_all;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -24,6 +24,8 @@ pub struct OriginalEvent {
 pub enum ProcessingError {
     #[error("no sub-processor found for event type {0}")]
     SubProcessorNotFound(String),
+    #[error("no guild id was parsed for event type {0}")]
+    NoGuildId(String),
 }
 
 /// Represents a collection of processors that each have
@@ -95,6 +97,7 @@ pub enum EventProcessor {
         agent_id_src: Option<Path>,
         audit_log_src: Option<AuditLogSource>,
         guild_id_src: Option<Path>,
+        channel_id_src: Option<Path>,
         reason_src: Option<Path>,
     },
 }
@@ -115,6 +118,7 @@ impl EventProcessor {
                 // TODO use audit log source
                 audit_log_src: _audit_log_src,
                 guild_id_src,
+                channel_id_src,
                 reason_src,
             } => {
                 // TODO add audit log entry support
@@ -126,7 +130,7 @@ impl EventProcessor {
                     TimestampSource::TimeOfIngress => event.rx_timestamp,
                     TimestampSource::Snowflake(path) => path
                         .apply_id(Some(&event.json), audit_log_entry.as_ref())
-                        .map_or(event.rx_timestamp, id::extract_timestamp),
+                        .map_or(event.rx_timestamp, architus_id::extract_timestamp),
                 };
                 let reason = reason_src
                     .as_ref()
@@ -137,8 +141,12 @@ impl EventProcessor {
                     .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
                 let guild_id = guild_id_src
                     .as_ref()
-                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
+                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()))
+                    .ok_or_else(|| ProcessingError::NoGuildId(event.event_type.clone()))?;
                 let agent_id = agent_id_src
+                    .as_ref()
+                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
+                let channel_id = channel_id_src
                     .as_ref()
                     .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
 
@@ -146,6 +154,7 @@ impl EventProcessor {
                 let source = Source {
                     gateway: Some(event.json),
                     audit_log: audit_log_entry,
+                    internal: None,
                 };
                 let origin = source.origin();
 
@@ -159,6 +168,7 @@ impl EventProcessor {
                     guild_id,
                     agent_id,
                     subject_id,
+                    channel_id,
                     audit_log_id: None,
                 })
             }

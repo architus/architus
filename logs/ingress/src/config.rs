@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use log::{info, debug};
+use log::{debug, info};
 use serde::Deserialize;
 use std::time::Duration;
 

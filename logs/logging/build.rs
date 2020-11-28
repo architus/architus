@@ -6,6 +6,7 @@ fn main() -> Result<()> {
         .build_client(false)
         .build_server(true)
         .type_attribute(".", "#[derive(serde::Serialize)]")
+        .type_attribute(".", "#[derive(serde::Deserialize)]")
         .compile(&["logging.proto"], &["../../lib/ipc/proto"])
         .context("Compiling logging.proto definitions")?;
 
