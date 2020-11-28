@@ -2,20 +2,75 @@ syntax = "proto3";
 package Logging;
 
 service Logging {
-    // Submit a single log event to be imported into the Elasticsearch database.
-    // Will automatically provision an ID if not given and fill in a timestamp,
-    // ensuring that the ID of the logging.Event is unique within the data store
-    // (re-generating it if necessary)
-    rpc submit(Event) returns (SubmitReply) {}
+  // Submit a single log event to be imported into the Elasticsearch database.
+  // Will automatically provision an ID if not given and fill in a timestamp,
+  // ensuring that the ID of the logging.Event is unique within the data store
+  // (re-generating it if necessary)
+  rpc submit(SubmitRequest) returns (SubmitResponse) {}
+  // Submits a GraphQL search request to the service
+  // and retrieves the results.
+  // Note that this does not support mutations
+  rpc search(SearchRequest) returns (SearchResponse) {}
 }
 
-message SubmitReply {
-    // Actual ID of the generated event object,
-    // which may not be the same as the original ID (if given)
-    fixed64 actual_id = 1;
-    // Actual timestamp of the generated event object,
-    // which will be the same as the original timestamp if given
-    uint64 actual_timestamp = 2;
+message SubmitRequest {
+  // The log event being submitted
+  Event event = 1;
+}
+
+message SubmitResponse {
+  // Actual ID of the generated event object,
+  // which may not be the same as the original ID (if given)
+  fixed64 actual_id = 1;
+  // Actual timestamp of the generated event object,
+  // which will be the same as the original timestamp if given
+  uint64 actual_timestamp = 2;
+}
+
+message SearchRequest {
+  // Direct GraphQL query (required)
+  string query = 1;
+  // Operation name (only required if multiple operations are present in the query)
+  string operation_name = 2;
+  // JSON-encoded map of variables -> values
+  string variables_json = 3;
+}
+
+message SearchResponse {
+  // JSON-encoded result object, with data and errors values according to the spec
+  string result_json = 1;
+}
+
+message Event {
+  // Id using snowflake format;
+  // using the *time that the event was received by wherever it's ingested*
+  // Will be generated if not provided
+  fixed64 id = 1;
+  // Unix timestamp of the *time of the underlying event* (if available),
+  // else some meaningful timestamp describing when the event was ingested
+  // Will be generated if not provided
+  uint64 timestamp = 2;
+  // The source data; including the original gateway/audit log entries
+  EventSource source = 3;
+  // The origin type of the event
+  EventOrigin origin = 4;
+  // The type of action the event is
+  EventType event_type = 5;
+  // Related guild the event occurred in
+  // (required)
+  fixed64 guild_id = 6;
+  // Id of the entity that caused the event to occur, if applicable
+  fixed64 agent_id = 7;
+  // Id of the entity that the event is about/affects, if applicable
+  // (can be any Id type)
+  fixed64 subject_id = 8;
+  // Id of the corresponding audit log entry this event corresponds to; if any
+  // (included for indexing purposes)
+  fixed64 audit_log_id  = 9;
+  // The channel that the event occurred in, if applicable
+  fixed64 channel_id = 10;
+  // Optional reason for the log event (can attach additional info here
+  string reason = 11;
 }
 
 // The backing JSON that represents the source of the event.
@@ -24,134 +79,101 @@ message SubmitReply {
 // which may cause problems in the future.
 // Instead, the internal JSON is sent as a string
 message EventSource {
-    // Source gateway event inner object (optional)
-    string gateway = 1;
-    // Source audit log entry entity object (optional)
-    string audit_log = 2;
-    // Source internal data object (optional)
-    string internal = 3;
+  // Source gateway event inner object (optional)
+  string gateway = 1;
+  // Source audit log entry entity object (optional)
+  string audit_log = 2;
+  // Source internal data object (optional)
+  string internal = 3;
 }
 
 enum EventOrigin {
-    EventOriginUnknown = 0;
-    // Action originated from the gateway and was caught as it originated
-    EventOriginGateway = 1;
-    // Action originated from the audit log
-    EventOriginAuditLog = 2;
-    // Gateway events that also incorporate a corresponding audit log entry
-    EventOriginHybrid = 3;
-    // Action originated from a scheduled recovery job where the bot knew it had
-    // ingestion downtime and ran a recovery job to collect all relevant origin/update events
-    EventOriginScheduledRecovery = 4;
-    // Action originated from an unscheduled recovery job where the bot was
-    // scanning history and verifying that the logs have the up-to-date state
-    EventOriginUnscheduledRecovery = 5;
-    // Action comes from some other internal process
-    EventOriginInternal = 6;
+  EventOriginUnknown = 0;
+  // Action originated from the gateway and was caught as it originated
+  EventOriginGateway = 1;
+  // Action originated from the audit log
+  EventOriginAuditLog = 2;
+  // Gateway events that also incorporate a corresponding audit log entry
+  EventOriginHybrid = 3;
+  // Action originated from a scheduled recovery job where the bot knew it had
+  // ingestion downtime and ran a recovery job to collect all relevant origin/update events
+  EventOriginScheduledRecovery = 4;
+  // Action originated from an unscheduled recovery job where the bot was
+  // scanning history and verifying that the logs have the up-to-date state
+  EventOriginUnscheduledRecovery = 5;
+  // Action comes from some other internal process
+  EventOriginInternal = 6;
 }
 
 enum EventType {
-    EventTypeUnknown = 0;
+  EventTypeUnknown = 0;
 
-    EventTypeGuildUpdate = 1;
-    EventTypeChannelCreate = 10;
-    EventTypeChannelUpdate = 11;
-    EventTypeChannelDelete = 12;
-    EventTypeChannelOverwriteCreate = 13;
-    EventTypeChannelOverwriteUpdate = 14;
-    EventTypeChannelOverwriteDelete = 15;
-    EventTypeMemberKick = 20;
-    EventTypeMemberPrune = 21;
-    EventTypeMemberBanAdd = 22;
-    EventTypeMemberBanRemove = 23;
-    EventTypeMemberUpdate = 24;
-    EventTypeMemberRoleUpdate = 25;
-    EventTypeMemberMove = 26;
-    EventTypeMemberDisconnect = 27;
-    EventTypeBotAdd = 28;
-    EventTypeRoleCreate = 30;
-    EventTypeRoleUpdate = 31;
-    EventTypeRoleDelete = 32;
-    EventTypeInviteCreate = 40;
-    EventTypeInviteUpdate = 41;
-    EventTypeInviteDelete = 42;
-    EventTypeWebhookCreate = 50;
-    EventTypeWebhookUpdate = 51;
-    EventTypeWebhookDelete = 52;
-    EventTypeEmojiCreate = 60;
-    EventTypeEmojiUpdate = 61;
-    EventTypeEmojiDelete = 62;
-    EventTypeMessageDelete = 72;
-    EventTypeMessageBulkDelete = 73;
-    EventTypeMessagePin = 74;
-    EventTypeMessageUnpin = 75;
-    EventTypeIntegrationCreate = 80;
-    EventTypeIntegrationUpdate = 81;
-    EventTypeIntegrationDelete = 82;
+  EventTypeGuildUpdate = 1;
+  EventTypeChannelCreate = 10;
+  EventTypeChannelUpdate = 11;
+  EventTypeChannelDelete = 12;
+  EventTypeChannelOverwriteCreate = 13;
+  EventTypeChannelOverwriteUpdate = 14;
+  EventTypeChannelOverwriteDelete = 15;
+  EventTypeMemberKick = 20;
+  EventTypeMemberPrune = 21;
+  EventTypeMemberBanAdd = 22;
+  EventTypeMemberBanRemove = 23;
+  EventTypeMemberUpdate = 24;
+  EventTypeMemberRoleUpdate = 25;
+  EventTypeMemberMove = 26;
+  EventTypeMemberDisconnect = 27;
+  EventTypeBotAdd = 28;
+  EventTypeRoleCreate = 30;
+  EventTypeRoleUpdate = 31;
+  EventTypeRoleDelete = 32;
+  EventTypeInviteCreate = 40;
+  EventTypeInviteUpdate = 41;
+  EventTypeInviteDelete = 42;
+  EventTypeWebhookCreate = 50;
+  EventTypeWebhookUpdate = 51;
+  EventTypeWebhookDelete = 52;
+  EventTypeEmojiCreate = 60;
+  EventTypeEmojiUpdate = 61;
+  EventTypeEmojiDelete = 62;
+  EventTypeMessageDelete = 72;
+  EventTypeMessageBulkDelete = 73;
+  EventTypeMessagePin = 74;
+  EventTypeMessageUnpin = 75;
+  EventTypeIntegrationCreate = 80;
+  EventTypeIntegrationUpdate = 81;
+  EventTypeIntegrationDelete = 82;
 
-    EventTypeMessageSend = 3001;
-    EventTypeMessageEdit = 3002;
-    EventTypeReactionAdd = 3003;
-    EventTypeReactionRemove = 3004;
-    EventTypeReactionRemoveAll = 3005;
-    EventTypeMemberJoin = 3006;
-    EventTypeMemberLeave = 3007;
-    EventTypeGuildUnavailable = 3008;
-    EventTypeVoiceStateUpdate = 3009;
-    EventTypeVoiceServerUpdate = 3010;
+  EventTypeMessageSend = 3001;
+  EventTypeMessageEdit = 3002;
+  EventTypeReactionAdd = 3003;
+  EventTypeReactionRemove = 3004;
+  EventTypeReactionRemoveAll = 3005;
+  EventTypeMemberJoin = 3006;
+  EventTypeMemberLeave = 3007;
+  EventTypeGuildUnavailable = 3008;
+  EventTypeVoiceStateUpdate = 3009;
+  EventTypeVoiceServerUpdate = 3010;
 
-    EventTypeAutoResponseCreate = 3100;
-    EventTypeAutoResponseUpdate = 3101;
-    EventTypeAutoResponseDelete = 3102;
-    EventTypeAutoResponseTrigger = 3103;
+  EventTypeAutoResponseCreate = 3100;
+  EventTypeAutoResponseUpdate = 3101;
+  EventTypeAutoResponseDelete = 3102;
+  EventTypeAutoResponseTrigger = 3103;
 
-    EventTypeLogRevert = 3200;
-    EventTypeLogRollback = 3201;
-    EventTypeLogRecoveryRun = 3202;
+  EventTypeLogRevert = 3200;
+  EventTypeLogRollback = 3201;
+  EventTypeLogRecoveryRun = 3202;
 
-    EventTypeCustomEmojiCreate = 3300;
-    EventTypeCustomEmojiUpdate = 3301;
-    EventTypeCustomEmojiDelete = 3302;
-    EventTypeCustomEmojiUse = 3303;
-    EventTypeCustomEmojiCache = 3304;
-    EventTypeCustomEmojiLoad = 3305;
+  EventTypeCustomEmojiCreate = 3300;
+  EventTypeCustomEmojiUpdate = 3301;
+  EventTypeCustomEmojiDelete = 3302;
+  EventTypeCustomEmojiUse = 3303;
+  EventTypeCustomEmojiCache = 3304;
+  EventTypeCustomEmojiLoad = 3305;
 
-    EventTypeSettingsUpdate = 3400;
+  EventTypeSettingsUpdate = 3400;
 
-    EventTypeArchitusJoin = 4000;
-    EventTypeArchitusLeave = 4001;
-    EventTypeUserPrivacyUpdate = 4002;
+  EventTypeArchitusJoin = 4000;
+  EventTypeArchitusLeave = 4001;
+  EventTypeUserPrivacyUpdate = 4002;
 }
-
-message Event {
-    // Id using snowflake format;
-    // using the *time that the event was received by wherever it's ingested*
-    // Will be generated if not provided
-    fixed64 id = 1;
-    // Unix timestamp of the *time of the underlying event* (if available),
-    // else some meaningful timestamp describing when the event was ingested
-    // Will be generated if not provided
-    uint64 timestamp = 2;
-    // The source data; including the original gateway/audit log entries
-    EventSource source = 3;
-    // The origin type of the event
-    EventOrigin origin = 4;
-    // The type of action the event is
-    EventType event_type = 5;
-    // Related guild the event occurred in
-    // (required)
-    fixed64 guild_id = 6;
-    // Id of the entity that caused the event to occur, if applicable
-    fixed64 agent_id = 7;
-    // Id of the entity that the event is about/affects, if applicable
-    // (can be any Id type)
-    fixed64 subject_id = 8;
-    // Id of the corresponding audit log entry this event corresponds to; if any
-    // (included for indexing purposes)
-    fixed64 audit_log_id  = 9;
-    // The channel that the event occurred in, if applicable
-    fixed64 channel_id = 10;
-    // Optional reason for the log event (can attach additional info here
-    string reason = 11;
-}
-

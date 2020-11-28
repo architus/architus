@@ -19,7 +19,7 @@ use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
 use logging::logging_client::LoggingClient;
-use logging::Event as LogEvent;
+use logging::SubmitRequest;
 use std::convert::{Into, TryFrom};
 use std::future::Future;
 use std::ops::Deref;
@@ -199,7 +199,10 @@ fn import_log_events(
         let client = Arc::clone(&client);
         let config = Arc::clone(&config);
         async move {
-            let payload: LogEvent = event.into();
+            let payload = SubmitRequest{
+                event: Some(event.into()),
+            };
+
             let submit = move || {
                 let mut client = Deref::deref(&client).clone();
                 // Note: we have to clone the payload for each retry,

@@ -18,7 +18,7 @@ use elasticsearch::params::OpType;
 use elasticsearch::{Elasticsearch, IndexParts};
 use log::{debug, info, warn};
 use logging::logging_server::{Logging, LoggingServer};
-use logging::{Event, SubmitReply};
+use logging::{SearchRequest, SearchResponse, SubmitRequest, SubmitResponse};
 use std::convert::TryInto;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::result::Result as StdResult;
@@ -82,9 +82,15 @@ impl Logging for LoggingService {
     /// Will automatically provision an ID if not given and fill in a timestamp,
     /// ensuring that the ID of the LogEvent is unique within the data store
     /// (re-generating it if necessary)
-    async fn submit(&self, request: Request<Event>) -> StdResult<Response<SubmitReply>, Status> {
+    async fn submit(
+        &self,
+        request: Request<SubmitRequest>,
+    ) -> StdResult<Response<SubmitResponse>, Status> {
         let timestamp = time::millisecond_ts();
-        let mut event = request.into_inner();
+        let mut event = request
+            .into_inner()
+            .event
+            .ok_or(Status::invalid_argument("no event given"))?;
 
         // Add in a timestamp if needed
         if event.timestamp == 0 {
@@ -130,7 +136,7 @@ impl Logging for LoggingService {
                 })?;
 
             return match ElasticResponse::error_for_status_code(response) {
-                Ok(_) => Ok(Response::new(SubmitReply {
+                Ok(_) => Ok(Response::new(SubmitResponse {
                     actual_id: stored_event.id.into(),
                     actual_timestamp: stored_event.timestamp,
                 })),
@@ -151,5 +157,15 @@ impl Logging for LoggingService {
                 }
             };
         }
+    }
+
+    /// Submits a GraphQL search request to the service
+    /// and retrieves the results.
+    /// Note that this does not support mutations
+    async fn search(
+        &self,
+        request: Request<SearchRequest>,
+    ) -> StdResult<Response<SearchResponse>, Status> {
+        Err(Status::unimplemented("not yet implemented"))
     }
 }
