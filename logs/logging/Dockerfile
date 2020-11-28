@@ -5,7 +5,7 @@ FROM rust:1.48 as builder
 RUN rustup component add rustfmt
 ENV REPO_ROOT=/opt/architus
 ENV SERVICE=logs/logging
-ENV LOGS_LIB=logs/lib
+ENV LOGS_LIB=lib/id-rs
 ENV PROTO=lib/ipc/proto
 # Copy logging service itself
 WORKDIR $REPO_ROOT/$SERVICE
