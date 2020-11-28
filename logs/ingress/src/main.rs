@@ -1,8 +1,11 @@
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+
 mod config;
 mod event;
 mod gateway;
 
 mod logging {
+    #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
     tonic::include_proto!("logging");
 }
 
@@ -47,9 +50,9 @@ lazy_static! {
 async fn main() -> Result<()> {
     env_logger::init();
     let config_path = std::env::args().nth(1).expect(
-        "no config path given\
-        Usage: \
-        ingress-service [config-path]",
+        "no config path given \
+        \nUsage: \
+        \ningress-service [config-path]",
     );
 
     // Parse the config from the path and use it to initialize the event stream
@@ -205,7 +208,7 @@ fn import_log_events(
                         .await
                         .map_err(|err| {
                             warn!("Log event submission failed; retrying after an exponential backoff: \
-                            {:?}", err);
+                            \n{:?}", err);
                             SubmissionError::GrpcFailure(err)
                         })?
                         .into_inner())

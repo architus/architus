@@ -22,6 +22,11 @@ message SubmitReply {
     uint64 actual_timestamp = 2;
 }
 
+// The backing JSON that represents the source of the event.
+// Note that this message does not use the generic Struct message
+// (from the Google well-known types) because it only supports f64 numbers,
+// which may cause problems in the future.
+// Instead, the internal JSON is sent as a string
 message EventSource {
     // Source gateway event inner object (optional)
     string gateway = 1;

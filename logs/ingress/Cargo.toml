@@ -3,6 +3,11 @@ name = "ingress-service"
 version = "0.1.0"
 authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
+description = """\
+Ingress service for the logging component of Architus.\
+Listens for Discord gateway events and forwards them to the logging service\
+"""
+license = "MIT"
 
 [dependencies]
 logs_lib = { path = "../lib" }

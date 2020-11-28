@@ -34,7 +34,7 @@ impl Into<LogEvent> for NormalizedEvent {
     fn into(self) -> LogEvent {
         // Convert the normalized event struct (specific to this service)
         // into the `LogEvent` struct, which is the gRPC-serializable struct
-        let mut log_event = LogEvent {
+        LogEvent {
             id: self.id.0,
             timestamp: self.timestamp,
             source: Some(EventSource {
@@ -49,17 +49,14 @@ impl Into<LogEvent> for NormalizedEvent {
                     .and_then(|json| serde_json::to_string(&json).ok())
                     .unwrap_or_else(|| String::from("")),
             }),
+            origin: self.origin.into(),
+            event_type: self.event_type.into(),
             reason: self.reason.unwrap_or_else(|| String::from("")),
             guild_id: self.guild_id.unwrap_or(0),
             agent_id: self.agent_id.unwrap_or(0),
             subject_id: self.subject_id.unwrap_or(0),
             audit_log_id: self.audit_log_id.unwrap_or(0),
-            ..LogEvent::default()
-        };
-        // Enum values have to be set manually with Tonic
-        log_event.set_origin(self.origin);
-        log_event.set_event_type(self.event_type);
-        log_event
+        }
     }
 }
 
