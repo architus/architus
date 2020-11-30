@@ -91,7 +91,7 @@ async fn serve_http(search: SearchProvider, config: &Configuration) -> Result<()
         Body, Method, Response as HttpResponse, Server as HttpServer, StatusCode as HttpStatusCode,
     };
 
-    if let Some(port) = config.graphql_http_port {
+    if let Some(port) = config.graphql.http_port {
         let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), port);
         let new_service = make_service_fn(move |_| {
             let search = search.clone();

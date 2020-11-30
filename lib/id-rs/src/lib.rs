@@ -70,6 +70,14 @@ fn get_mac_address() -> Option<[u8; 6]> {
         .map(mac_address::MacAddress::bytes)
 }
 
+/// Naively converts a timestamp into an ID boundary.
+/// This should not be used as an actual ID,
+/// rather; it can be used as a range boundary for filtering/querying
+#[must_use]
+pub const fn id_bound_from_ts(timestamp: u64) -> u64 {
+    (timestamp - DISCORD_EPOCH_OFFSET) << 22
+}
+
 /// Extracts the creation timestamp of the given snowflake-format Id
 ///
 /// See <https://discord.com/developers/docs/reference#snowflakes>

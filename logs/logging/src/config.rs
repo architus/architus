@@ -7,11 +7,10 @@ use serde::Deserialize;
 pub struct Configuration {
     /// Port that the main gRPC server listens on
     pub port: u16,
-    /// Port that the optional GraphQL HTTP server runs on
-    /// (used in development)
-    pub graphql_http_port: Option<u16>,
     /// Collection of external services that this service connects to
     pub services: Services,
+    /// Options related to the GraphQL search API
+    pub graphql: GraphQL,
 }
 
 /// Collection of external services that this service connects to
@@ -19,6 +18,15 @@ pub struct Configuration {
 pub struct Services {
     /// URL of the Elasticsearch instance to store log entries in
     pub elasticsearch: String,
+}
+
+/// Options related to the GraphQL search API
+#[derive(Debug, Deserialize, Clone)]
+pub struct GraphQL {
+    /// Port that the optional GraphQL HTTP server runs on (used in development)
+    pub http_port: Option<u16>,
+    /// Default item limit that is used if no limit is provided
+    pub default_limit: i32,
 }
 
 impl Configuration {
