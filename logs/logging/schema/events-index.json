@@ -12,10 +12,10 @@
         "type": "object",
         "properties": {
           "gateway": {
-            "type": "flattened"
+            "type": "object"
           },
           "audit_log": {
-            "type": "flattened"
+            "type": "object"
           },
           "internal": {
             "type": "flattened"

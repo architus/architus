@@ -5,8 +5,14 @@ fn main() -> Result<()> {
     tonic_build::configure()
         .build_client(false)
         .build_server(true)
-        .type_attribute(".", "#[derive(::serde::Serialize)]")
-        .type_attribute(".", "#[derive(::serde::Deserialize)]")
+        .type_attribute(
+            ".Logging.EventOrigin",
+            "#[derive(::serde_repr::Serialize_repr, ::serde_repr::Deserialize_repr)]",
+        )
+        .type_attribute(
+            ".Logging.EventType",
+            "#[derive(::serde_repr::Serialize_repr, ::serde_repr::Deserialize_repr)]",
+        )
         .type_attribute(".Logging.EventOrigin", "#[derive(::juniper::GraphQLEnum)]")
         .type_attribute(".Logging.EventType", "#[derive(::juniper::GraphQLEnum)]")
         .compile(&["logging.proto"], &["../../lib/ipc/proto"])

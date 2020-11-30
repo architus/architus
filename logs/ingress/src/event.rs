@@ -62,7 +62,7 @@ impl Into<LogEvent> for NormalizedEvent {
             agent_id: self.agent_id.unwrap_or(0),
             subject_id: self.subject_id.unwrap_or(0),
             audit_log_id: self.audit_log_id.unwrap_or(0),
-            channel_id: self.audit_log_id.unwrap_or(0),
+            channel_id: self.channel_id.unwrap_or(0),
             reason: self.reason.unwrap_or_else(|| String::from("")),
         }
     }

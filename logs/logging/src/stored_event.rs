@@ -1,3 +1,4 @@
+use crate::graphql::json::GraphQLJson;
 use crate::logging::Event;
 use crate::logging::{EventOrigin, EventType};
 use architus_id::HoarFrost;
@@ -7,7 +8,7 @@ use thiserror::Error;
 
 /// Represents the JSON-serializable version of the stored Elasticsearch log event
 /// See lib/ipc/proto/logging.proto for the original definition of this struct
-#[derive(Debug, Deserialize, Serialize, juniper::GraphQLObject)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct StoredEvent {
     pub id: HoarFrost,
     pub timestamp: u64,
@@ -27,11 +28,61 @@ pub struct StoredEvent {
     pub reason: Option<String>,
 }
 
+// Define custom resolvers for most fields
+// The main reason for this is to convert all `u64`'s
+// into `String`'s because GraphQL/JSON/JavaScript doesn't do non-`i32` values well
+#[juniper::graphql_object]
+impl StoredEvent {
+    fn id(&self) -> String {
+        self.id.to_string()
+    }
+
+    fn timestamp(&self) -> String {
+        self.timestamp.to_string()
+    }
+
+    fn source(&self) -> &StoredSource {
+        &self.source
+    }
+
+    fn origin(&self) -> &EventOrigin {
+        &self.origin
+    }
+
+    fn event_type(&self) -> &EventType {
+        &self.event_type
+    }
+
+    fn guild_id(&self) -> String {
+        self.guild_id.to_string()
+    }
+
+    fn agent_id(&self) -> Option<String> {
+        self.agent_id.as_ref().map(ToString::to_string)
+    }
+
+    fn subject_id(&self) -> Option<String> {
+        self.subject_id.as_ref().map(ToString::to_string)
+    }
+
+    fn audit_log_id(&self) -> Option<String> {
+        self.audit_log_id.as_ref().map(ToString::to_string)
+    }
+
+    fn channel_id(&self) -> Option<String> {
+        self.channel_id.as_ref().map(ToString::to_string)
+    }
+
+    fn reason(&self) -> Option<&str> {
+        self.reason.as_ref().map(String::as_str)
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, juniper::GraphQLObject)]
 pub struct StoredSource {
-    pub gateway: Option<serde_json::Value>,
-    pub audit_log: Option<serde_json::Value>,
-    pub internal: Option<serde_json::Value>,
+    pub gateway: Option<GraphQLJson>,
+    pub audit_log: Option<GraphQLJson>,
+    pub internal: Option<GraphQLJson>,
 }
 
 #[derive(Error, Debug)]
@@ -64,6 +115,7 @@ impl TryFrom<Event> for StoredEvent {
                     .source
                     .as_ref()
                     .map(|source| &source.gateway)
+                    .filter(|json| !json.is_empty())
                     .map(|gateway| serde_json::from_str(gateway))
                     .transpose()
                     .map_err(ParsingError::SerdeError)?,
@@ -71,6 +123,7 @@ impl TryFrom<Event> for StoredEvent {
                     .source
                     .as_ref()
                     .map(|source| &source.audit_log)
+                    .filter(|json| !json.is_empty())
                     .map(|audit_log| serde_json::from_str(audit_log))
                     .transpose()
                     .map_err(ParsingError::SerdeError)?,
@@ -78,6 +131,7 @@ impl TryFrom<Event> for StoredEvent {
                     .source
                     .as_ref()
                     .map(|source| &source.internal)
+                    .filter(|json| !json.is_empty())
                     .map(|internal| serde_json::from_str(internal))
                     .transpose()
                     .map_err(ParsingError::SerdeError)?,
