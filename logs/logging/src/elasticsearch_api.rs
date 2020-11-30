@@ -6,10 +6,10 @@ pub mod search {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Response<T> {
-        pub took: i64,
-        pub timed_out: bool,
+        pub took: Option<i64>,
+        pub timed_out: Option<bool>,
         #[serde(rename = "_shards")]
-        pub shards: Shards,
+        pub shards: Option<Shards>,
         pub hits: Hits<T>,
     }
 
@@ -24,7 +24,7 @@ pub mod search {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Hits<T> {
         pub total: HitsTotal,
-        pub max_score: f64,
+        pub max_score: Option<f64>,
         pub hits: Vec<HitObject<T>>,
     }
 
@@ -51,7 +51,7 @@ pub mod search {
         #[serde(rename = "_id")]
         pub id: String,
         #[serde(rename = "_score")]
-        pub score: f64,
+        pub score: Option<f64>,
         #[serde(rename = "_source")]
         pub source: T,
     }

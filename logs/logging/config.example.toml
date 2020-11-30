@@ -1,8 +1,12 @@
 # Port that the main gRPC server listens on
 port = 8173
-# Port that the optional GraphQL HTTP server runs on
-# (used in development)
-graphql_http_port = 8174
+
+# Options related to the GraphQL search API
+[graphql]
+# Port that the optional GraphQL HTTP server runs on (used in development)
+http_port = 8174
+# Default item limit that is used if no limit is provided
+default_limit = 100
 
 [services]
 # URL of the Elasticsearch instance to store log entries in
