@@ -34,6 +34,10 @@ message SearchRequest {
   string operation_name = 2;
   // JSON-encoded map of variables -> values
   string variables_json = 3;
+  // Allowed channel Ids to include in this request
+  repeated fixed64 channel_id_whitelist = 4;
+  // Whether to enable the channel id whitelist
+  bool enable_channel_id_whitelist = 5;
 }
 
 message SearchResponse {

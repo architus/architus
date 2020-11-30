@@ -1,6 +1,8 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
 mod config;
+mod elasticsearch_api;
+mod graphql;
 mod stored_event;
 mod logging {
     #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
@@ -8,6 +10,7 @@ mod logging {
 }
 
 use crate::config::Configuration;
+use crate::graphql::SearchProvider;
 use crate::stored_event::StoredEvent;
 use anyhow::{Context, Result};
 use architus_id::{time, IdProvisioner};
@@ -16,12 +19,14 @@ use elasticsearch::http::transport::Transport;
 use elasticsearch::http::StatusCode;
 use elasticsearch::params::OpType;
 use elasticsearch::{Elasticsearch, IndexParts};
+use futures::try_join;
 use log::{debug, info, warn};
 use logging::logging_server::{Logging, LoggingServer};
 use logging::{SearchRequest, SearchResponse, SubmitRequest, SubmitResponse};
 use std::convert::TryInto;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::result::Result as StdResult;
+use std::sync::Arc;
 use std::time::Duration;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
@@ -40,15 +45,31 @@ async fn main() -> Result<()> {
     let config = Configuration::try_load(config_path)?;
 
     // Connect to Elasticsearch
-    let elasticsearch = config.services.elasticsearch;
-    info!("Connecting to Elasticsearch at {}", elasticsearch);
-    let elasticsearch_transport =
-        Transport::single_node(&elasticsearch).context("Could not connect to Elasticsearch")?;
-    let elasticsearch_client = Elasticsearch::new(elasticsearch_transport);
+    let es_path = &config.services.elasticsearch;
+    info!("Connecting to Elasticsearch at {}", es_path);
+    let es_transport =
+        Transport::single_node(es_path).context("Could not connect to Elasticsearch")?;
+    let elasticsearch = Arc::new(Elasticsearch::new(es_transport));
 
+    // Create the search provider and pass it into both servers
+    // (cloning it is cheat since it uses Arc<> internally)
+    let search = SearchProvider::new(&elasticsearch, &config);
+    let grpc_future = serve_grpc(&elasticsearch, search.clone(), &config);
+    let http_future = serve_http(search.clone(), &config);
+
+    try_join!(grpc_future, http_future)?;
+    Ok(())
+}
+
+/// Starts the main gRPC server using tonic that is used to import and search the logs
+async fn serve_grpc(
+    elasticsearch: &Arc<Elasticsearch>,
+    search: SearchProvider,
+    config: &Configuration,
+) -> Result<()> {
     // Start the server on the specified port
     let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), config.port);
-    let logging = LoggingService::new(elasticsearch_client);
+    let logging = LoggingService::new(elasticsearch, search);
     let service = LoggingServer::new(logging);
     let server = Server::builder().add_service(service);
 
@@ -61,17 +82,64 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
+/// Starts the embedded HTTP server if configured,
+/// used to serve the GraphiQL utility in development
+/// in addition to the normal graphql route needed to make it function
+async fn serve_http(search: SearchProvider, config: &Configuration) -> Result<()> {
+    use hyper::service::{make_service_fn, service_fn};
+    use hyper::{
+        Body, Method, Response as HttpResponse, Server as HttpServer, StatusCode as HttpStatusCode,
+    };
+
+    if let Some(port) = config.graphql_http_port {
+        let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), port);
+        let new_service = make_service_fn(move |_| {
+            let search = search.clone();
+            async {
+                Ok::<_, hyper::Error>(service_fn(move |req| {
+                    let search = search.clone();
+                    async move {
+                        match (req.method(), req.uri().path()) {
+                            (&Method::GET, "/") => juniper_hyper::graphiql("/graphql", None).await,
+                            (&Method::GET, "/playground") => {
+                                juniper_hyper::playground("/graphql", None).await
+                            }
+                            (&Method::GET, "/graphql") | (&Method::POST, "/graphql") => {
+                                juniper_hyper::graphql(search.schema(), search.context(), req).await
+                            }
+                            _ => {
+                                let mut response = HttpResponse::new(Body::empty());
+                                *response.status_mut() = HttpStatusCode::NOT_FOUND;
+                                Ok(response)
+                            }
+                        }
+                    }
+                }))
+            }
+        });
+
+        let server = HttpServer::bind(&addr).serve(new_service);
+        info!("Serving GraphQL HTTP at http://{}", addr);
+        server
+            .await
+            .context("An error occurred while running the HTTP server")?;
+    }
+
+    Ok(())
+}
+
 struct LoggingService {
     id_provisioner: IdProvisioner,
-    elasticsearch: Elasticsearch,
+    elasticsearch: Arc<Elasticsearch>,
+    search: SearchProvider,
 }
 
 impl LoggingService {
-    fn new(elasticsearch: Elasticsearch) -> Self {
+    fn new(elasticsearch: &Arc<Elasticsearch>, search: SearchProvider) -> Self {
         Self {
             id_provisioner: IdProvisioner::new(),
-            elasticsearch,
+            elasticsearch: Arc::clone(&elasticsearch),
+            search,
         }
     }
 }
@@ -164,7 +232,7 @@ impl Logging for LoggingService {
     /// Note that this does not support mutations
     async fn search(
         &self,
-        request: Request<SearchRequest>,
+        _request: Request<SearchRequest>,
     ) -> StdResult<Response<SearchResponse>, Status> {
         Err(Status::unimplemented("not yet implemented"))
     }

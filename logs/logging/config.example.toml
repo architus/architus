@@ -1,5 +1,8 @@
 # Port that the main gRPC server listens on
 port = 8173
+# Port that the optional GraphQL HTTP server runs on
+# (used in development)
+graphql_http_port = 8174
 
 [services]
 # URL of the Elasticsearch instance to store log entries in

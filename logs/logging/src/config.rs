@@ -7,6 +7,9 @@ use serde::Deserialize;
 pub struct Configuration {
     /// Port that the main gRPC server listens on
     pub port: u16,
+    /// Port that the optional GraphQL HTTP server runs on
+    /// (used in development)
+    pub graphql_http_port: Option<u16>,
     /// Collection of external services that this service connects to
     pub services: Services,
 }
