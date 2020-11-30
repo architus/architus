@@ -31,7 +31,7 @@ pub struct StoredEvent {
 // Define custom resolvers for most fields
 // The main reason for this is to convert all `u64`'s
 // into `String`'s because GraphQL/JSON/JavaScript doesn't do non-`i32` values well
-#[juniper::graphql_object]
+#[juniper::graphql_object(name = "Event")]
 impl StoredEvent {
     fn id(&self) -> String {
         self.id.to_string()
