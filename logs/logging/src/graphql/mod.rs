@@ -1,17 +1,12 @@
 pub mod json;
 
-use crate::config::Configuration;
-use crate::elasticsearch_api::search::Response as SearchResponse;
+use crate::config::{Configuration, GraphQL as GraphQLConfig};
+use crate::elasticsearch_api::search::{HitsTotal, Response as SearchResponse};
 use crate::stored_event::StoredEvent;
 use elasticsearch::{Elasticsearch, SearchParts};
-use juniper::parser::ScalarToken;
-use juniper::{
-    graphql_value, EmptyMutation, EmptySubscription, FieldError, FieldResult, ParseScalarResult,
-    ParseScalarValue, RootNode, ScalarValue,
-};
+use juniper::{graphql_value, EmptyMutation, EmptySubscription, FieldError, FieldResult, RootNode};
 use log::debug;
 use serde_json::json;
-use std::cmp;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
@@ -21,19 +16,22 @@ use thiserror::Error;
 /// Defines the context factory for search requests
 #[derive(Clone)]
 pub struct SearchProvider {
-    context: Arc<Context>,
+    base_context: Arc<Context>,
     schema: Arc<Schema>,
 }
 
 impl SearchProvider {
     pub fn new(elasticsearch: &Arc<Elasticsearch>, config: &Configuration) -> Self {
         Self {
-            context: Arc::new(Context {
+            base_context: Arc::new(Context {
                 elasticsearch: Arc::clone(elasticsearch),
-                default_limit: cmp::max(config.graphql.default_limit, 0),
+                config: Arc::new(config.graphql.clone()),
+                index: Arc::from(config.log_index.as_str()),
+                guild_id: None,
+                channel_whitelist: None,
             }),
             schema: Arc::new(Schema::new(
-                Root,
+                Query,
                 EmptyMutation::<Context>::new(),
                 EmptySubscription::<Context>::new(),
             )),
@@ -44,29 +42,35 @@ impl SearchProvider {
         Arc::clone(&self.schema)
     }
 
-    pub fn context(&self) -> Arc<Context> {
-        Arc::clone(&self.context)
+    pub fn context(&self, guild_id: Option<u64>, channel_whitelist: Option<Vec<u64>>) -> Context {
+        let mut context = (*self.base_context).clone();
+        context.guild_id = guild_id;
+        context.channel_whitelist = channel_whitelist;
+        context
     }
 }
 
 /// The root GraphQL schema type,
 /// including the query root (and empty mutations/subscriptions)
-pub type Schema = RootNode<'static, Root, EmptyMutation<Context>, EmptySubscription<Context>>;
+pub type Schema = RootNode<'static, Query, EmptyMutation<Context>, EmptySubscription<Context>>;
 
 /// Defines the context object that is passed to query methods
+#[derive(Clone)]
 pub struct Context {
     elasticsearch: Arc<Elasticsearch>,
-    /// Default limit of items to fetch if none is given
-    default_limit: i32,
+    config: Arc<GraphQLConfig>,
+    index: Arc<str>,
+    guild_id: Option<u64>,
+    channel_whitelist: Option<Vec<u64>>,
 }
 
 impl juniper::Context for Context {}
 
 /// Defines the GraphQL query root
-pub struct Root;
+pub struct Query;
 
 #[juniper::graphql_object(context = Context)]
-impl Root {
+impl Query {
     // TODO add filter fields as individual parameters and then construct `EventFilterInput`
     /// Queries for a single event in the log store,
     /// returning the first event if found
@@ -86,28 +90,50 @@ impl Root {
     ) -> FieldResult<EventConnection> {
         // Resolve the limit and after fields
         let limit = limit
-            .map(|limit| {
-                if limit > 0 {
-                    Ok(limit)
-                } else {
-                    Err(format!("Invalid value given to `limit`: {}", limit))
-                }
-            })
-            .transpose()?
-            .unwrap_or(context.default_limit);
+            .map(usize::try_from)
+            .transpose()
+            .map_err(|original| format!("Invalid value given to `limit`: {}", original))?
+            .unwrap_or(context.config.default_page_size);
         let after = after
-            .map(|after| {
-                if after >= 0 {
-                    Ok(limit)
-                } else {
-                    Err(format!("Invalid value given to `after`: {}", after))
-                }
-            })
-            .transpose()?
+            .map(usize::try_from)
+            .transpose()
+            .map_err(|original| format!("Invalid value given to `after`: {}", original))?
             .unwrap_or(0);
+
+        // Make sure the after & limit are valid
+        if limit > context.config.max_page_size {
+            return Err(format!(
+                "Invalid value given to `limit`: {} > max ({})",
+                limit, context.config.max_page_size
+            )
+            .into());
+        }
+        if limit + after > context.config.max_pagination_amount {
+            return Err(format!(
+                "Invalid values given to `limit` and `after`: limit + after ({}) > max ({})",
+                limit + after,
+                context.config.max_pagination_amount
+            )
+            .into());
+        }
 
         // Resolve the filter and sort expressions into the Elasticsearch search DSL
         let mut elasticsearch_params = ElasticsearchParams::from_inputs(filter, sort);
+
+        // Add in the guild id filter
+        if let Some(guild_id) = context.guild_id.as_ref() {
+            elasticsearch_params.add_filter(json!({"match": {"guild_id": *guild_id}}));
+        }
+
+        // Add in the channel id filter
+        if let Some(channel_id_whitelist) = context.channel_whitelist.as_ref() {
+            elasticsearch_params.add_filter(json!({
+                "bool": {
+                    "minimum_should_match": 1,
+                    "should": channel_id_whitelist.clone(),
+                },
+            }));
+        }
 
         // Add in the snapshot field if given
         let mut previous_snapshot = None;
@@ -142,9 +168,10 @@ impl Root {
             }
         });
         debug!("Sending search body to Elasticsearch: {:?}", body);
+        let index = [context.index.as_ref()];
         let send_future = context
             .elasticsearch
-            .search(SearchParts::Index(&["events"]))
+            .search(SearchParts::Index(&index))
             .body(body)
             .send();
         let query_time = architus_id::time::millisecond_ts();
@@ -153,7 +180,7 @@ impl Root {
         let response_body = response.json::<serde_json::Value>().await?;
         debug!("Received response from Elasticsearch: {:?}", response_body);
         let search_result: SearchResponse<StoredEvent> = serde_json::from_value(response_body)?;
-        let total_count = i32::try_from(search_result.hits.total.value).unwrap_or(0);
+        let total = search_result.hits.total;
         let nodes = search_result
             .hits
             .hits
@@ -162,30 +189,51 @@ impl Root {
             .collect::<_>();
 
         Ok(EventConnection {
-            total_count,
+            total,
             nodes,
-            query_time,
             previous_snapshot,
+            query_time,
+            after,
+            limit,
+            max_pagination_amount: context.config.max_pagination_amount,
         })
     }
 }
 
 /// Connection object that allows consumers to traverse the log graph
 pub struct EventConnection {
-    total_count: i32,
+    total: HitsTotal,
     nodes: Vec<StoredEvent>,
     previous_snapshot: Option<SnapshotToken>,
     query_time: u64,
+    after: usize,
+    limit: usize,
+    max_pagination_amount: usize,
 }
 
 #[juniper::graphql_object]
 impl EventConnection {
-    fn total_count(&self) -> i32 {
-        self.total_count
-    }
-
     fn nodes(&self) -> &Vec<StoredEvent> {
         &self.nodes
+    }
+
+    fn page_info(&self) -> PageInfo {
+        let current_page = self.after / self.limit;
+        let next_page_start = self.limit.saturating_add(self.after).saturating_add(1);
+        let next_page_end = self.limit.saturating_mul(2).saturating_add(self.after);
+        let total_count = usize::try_from(self.total.value).unwrap_or(0);
+        let total_pageable = total_count - (self.after % self.limit);
+        let page_count = (total_pageable.saturating_sub(1) / self.limit).saturating_add(1);
+        PageInfo {
+            current_page: i32::try_from(current_page).unwrap_or(i32::max_value()),
+            has_previous_page: current_page > 0,
+            has_next_page: next_page_end < self.max_pagination_amount
+                && next_page_start <= total_count,
+            item_count: i32::try_from(self.nodes.len()).unwrap_or(i32::max_value()),
+            page_count: i32::try_from(page_count).unwrap_or(i32::max_value()),
+            per_page: i32::try_from(self.limit).unwrap_or(i32::max_value()),
+            total_count: i32::try_from(total_count).unwrap_or(i32::max_value()),
+        }
     }
 
     fn snapshot(&self) -> SnapshotToken {
@@ -193,7 +241,7 @@ impl EventConnection {
         // and use that as an inclusive upper bound for the snapshot token
         self.previous_snapshot
             .as_ref()
-            .map(|t| t.clone())
+            .cloned()
             .unwrap_or_else(|| SnapshotToken(architus_id::id_bound_from_ts(self.query_time)))
     }
 }
@@ -221,9 +269,9 @@ pub enum SnapshotParsingError {
 }
 
 #[juniper::graphql_scalar(description = "SnapshotToken")]
-impl<S> GraphQLScalar for SnapshotToken
+impl<S> juniper::GraphQLScalar for SnapshotToken
 where
-    S: ScalarValue,
+    S: juniper::ScalarValue,
 {
     fn resolve(&self) -> juniper::Value {
         juniper::Value::scalar(self.to_string())
@@ -231,12 +279,12 @@ where
 
     fn from_input_value(v: &juniper::InputValue) -> Option<SnapshotToken> {
         v.as_scalar_value()
-            .and_then(|v| v.as_str())
+            .and_then(juniper::ScalarValue::as_str)
             .and_then(|s| FromStr::from_str(s).ok())
     }
 
-    fn from_str(value: ScalarToken) -> ParseScalarResult<S> {
-        <String as ParseScalarValue<S>>::from_str(value)
+    fn from_str(value: juniper::parser::ScalarToken) -> juniper::ParseScalarResult<S> {
+        <String as juniper::ParseScalarValue<S>>::from_str(value)
     }
 }
 
@@ -249,7 +297,7 @@ impl FromStr for SnapshotToken {
             u64::from_be_bytes(base64_bytes.try_into().map_err(|original: Vec<u8>| {
                 SnapshotParsingError::InvalidLength(original.len())
             })?);
-        Ok(SnapshotToken(id))
+        Ok(Self(id))
     }
 }
 
@@ -338,4 +386,16 @@ pub struct EventFilterInput {
 pub struct EventSortInput {
     // TODO use real input fields
     id: Option<i32>,
+}
+
+/// Includes metadata about a search's pagination
+#[derive(juniper::GraphQLObject)]
+pub struct PageInfo {
+    current_page: i32,
+    has_previous_page: bool,
+    has_next_page: bool,
+    item_count: i32,
+    page_count: i32,
+    per_page: i32,
+    total_count: i32,
 }

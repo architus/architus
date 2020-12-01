@@ -74,11 +74,12 @@ impl StoredEvent {
     }
 
     fn reason(&self) -> Option<&str> {
-        self.reason.as_ref().map(String::as_str)
+        self.reason.as_deref()
     }
 }
 
 #[derive(Debug, Deserialize, Serialize, juniper::GraphQLObject)]
+#[graphql(name = "EventSource")]
 pub struct StoredSource {
     pub gateway: Option<GraphQLJson>,
     pub audit_log: Option<GraphQLJson>,
@@ -138,7 +139,7 @@ impl TryFrom<Event> for StoredEvent {
             },
             origin: EventOrigin::from_i32(value.origin).unwrap_or(EventOrigin::Unknown),
             event_type: EventType::from_i32(value.event_type).unwrap_or(EventType::Unknown),
-            guild_id: some_unless(value.agent_id, 0).ok_or(ParsingError::MissingGuildId)?,
+            guild_id: some_unless(value.guild_id, 0).ok_or(ParsingError::MissingGuildId)?,
             agent_id: some_unless(value.agent_id, 0),
             subject_id: some_unless(value.subject_id, 0),
             audit_log_id: some_unless(value.audit_log_id, 0),
