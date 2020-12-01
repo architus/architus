@@ -219,16 +219,17 @@ impl EventConnection {
 
     fn page_info(&self) -> PageInfo {
         let current_page = self.after / self.limit;
-        let next_page_start = self.limit.saturating_add(self.after).saturating_add(1);
-        let next_page_end = self.limit.saturating_mul(2).saturating_add(self.after);
+        let previous_page_start = self.after.saturating_sub(self.limit);
+        let next_page_start = self.after.saturating_add(self.limit);
+        let next_page_end = next_page_start.saturating_add(self.limit);
         let total_count = usize::try_from(self.total.value).unwrap_or(0);
         let total_pageable = total_count - (self.after % self.limit);
         let page_count = (total_pageable.saturating_sub(1) / self.limit).saturating_add(1);
         PageInfo {
             current_page: i32::try_from(current_page).unwrap_or(i32::max_value()),
-            has_previous_page: current_page > 0,
-            has_next_page: next_page_end < self.max_pagination_amount
-                && next_page_start <= total_count,
+            has_previous_page: current_page > 0 && previous_page_start <= total_count,
+            has_next_page: next_page_end <= self.max_pagination_amount
+                && next_page_start < total_count,
             item_count: i32::try_from(self.nodes.len()).unwrap_or(i32::max_value()),
             page_count: i32::try_from(page_count).unwrap_or(i32::max_value()),
             per_page: i32::try_from(self.limit).unwrap_or(i32::max_value()),

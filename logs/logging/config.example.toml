@@ -1,7 +1,7 @@
 # Port that the main gRPC server listens on
 port = 8173
 # Elasticsearch index containing the stored log events
-logs_index = "events"
+log_index = "events"
 
 # Options related to the GraphQL search API
 [graphql]
