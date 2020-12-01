@@ -34,15 +34,19 @@ message SearchRequest {
   string operation_name = 2;
   // JSON-encoded map of variables -> values
   string variables_json = 3;
+  // Guild to scope this request to
+  fixed64 guild_id = 4;
   // Allowed channel Ids to include in this request
-  repeated fixed64 channel_id_whitelist = 4;
+  repeated fixed64 channel_id_whitelist = 5;
   // Whether to enable the channel id whitelist
-  bool enable_channel_id_whitelist = 5;
+  bool enable_channel_id_whitelist = 6;
 }
 
 message SearchResponse {
   // JSON-encoded result object, with data and errors values according to the spec
   string result_json = 1;
+  // Whether the request was successful (and whether to send a 200 or 400)
+  bool is_ok = 2;
 }
 
 message Event {

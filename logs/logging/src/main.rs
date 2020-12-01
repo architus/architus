@@ -20,6 +20,8 @@ use elasticsearch::http::StatusCode;
 use elasticsearch::params::OpType;
 use elasticsearch::{Elasticsearch, IndexParts};
 use futures::try_join;
+use juniper::http::GraphQLRequest;
+use juniper::InputValue;
 use log::{debug, info, warn};
 use logging::logging_server::{Logging, LoggingServer};
 use logging::{SearchRequest, SearchResponse, SubmitRequest, SubmitResponse};
@@ -61,7 +63,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Starts the main gRPC server using tonic that is used to import and search the logs
+/// Starts the main `gRPC` server using tonic that is used to import and search the logs
 async fn serve_grpc(
     elasticsearch: &Arc<Elasticsearch>,
     search: SearchProvider,
@@ -69,7 +71,7 @@ async fn serve_grpc(
 ) -> Result<()> {
     // Start the server on the specified port
     let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), config.port);
-    let logging = LoggingService::new(elasticsearch, search);
+    let logging = LoggingService::new(elasticsearch, search, &config.log_index);
     let service = LoggingServer::new(logging);
     let server = Server::builder().add_service(service);
 
@@ -83,7 +85,7 @@ async fn serve_grpc(
 }
 
 /// Starts the embedded HTTP server if configured,
-/// used to serve the GraphiQL utility in development
+/// used to serve the `GraphiQL` utility in development
 /// in addition to the normal graphql route needed to make it function
 async fn serve_http(search: SearchProvider, config: &Configuration) -> Result<()> {
     use hyper::service::{make_service_fn, service_fn};
@@ -105,7 +107,8 @@ async fn serve_http(search: SearchProvider, config: &Configuration) -> Result<()
                                 juniper_hyper::playground("/graphql", None).await
                             }
                             (&Method::GET, "/graphql") | (&Method::POST, "/graphql") => {
-                                juniper_hyper::graphql(search.schema(), search.context(), req).await
+                                let context = Arc::new(search.context(None, None));
+                                juniper_hyper::graphql(search.schema(), context, req).await
                             }
                             _ => {
                                 let mut response = HttpResponse::new(Body::empty());
@@ -132,14 +135,20 @@ struct LoggingService {
     id_provisioner: IdProvisioner,
     elasticsearch: Arc<Elasticsearch>,
     search: SearchProvider,
+    index: String,
 }
 
 impl LoggingService {
-    fn new(elasticsearch: &Arc<Elasticsearch>, search: SearchProvider) -> Self {
+    fn new(
+        elasticsearch: &Arc<Elasticsearch>,
+        search: SearchProvider,
+        index: impl AsRef<str>,
+    ) -> Self {
         Self {
             id_provisioner: IdProvisioner::new(),
-            elasticsearch: Arc::clone(&elasticsearch),
+            elasticsearch: Arc::clone(elasticsearch),
             search,
+            index: String::from(index.as_ref()),
         }
     }
 }
@@ -158,7 +167,7 @@ impl Logging for LoggingService {
         let mut event = request
             .into_inner()
             .event
-            .ok_or(Status::invalid_argument("no event given"))?;
+            .ok_or_else(|| Status::invalid_argument("no event given"))?;
 
         // Add in a timestamp if needed
         if event.timestamp == 0 {
@@ -193,7 +202,10 @@ impl Logging for LoggingService {
             })?;
             let response = self
                 .elasticsearch
-                .index(IndexParts::IndexId("events", &stored_event.id.to_string()))
+                .index(IndexParts::IndexId(
+                    &self.index,
+                    &stored_event.id.to_string(),
+                ))
                 .body(&event_json)
                 .op_type(OpType::Create)
                 .send()
@@ -232,8 +244,46 @@ impl Logging for LoggingService {
     /// Note that this does not support mutations
     async fn search(
         &self,
-        _request: Request<SearchRequest>,
+        request: Request<SearchRequest>,
     ) -> StdResult<Response<SearchResponse>, Status> {
-        Err(Status::unimplemented("not yet implemented"))
+        // Build the context from the params
+        let request = request.into_inner();
+        let channel_whitelist = if request.enable_channel_id_whitelist {
+            Some(request.channel_id_whitelist)
+        } else {
+            None
+        };
+        let context = self
+            .search
+            .context(Some(request.guild_id), channel_whitelist);
+
+        // Build the GraphQL request
+        let query = request.query;
+        let operation_name = Some(request.operation_name).filter(String::is_empty);
+        let variables_json = request.variables_json;
+        let variables = if variables_json.is_empty() {
+            None
+        } else {
+            Some(
+                serde_json::from_str::<InputValue>(&variables_json).map_err(|err| {
+                    let message = format!("cannot decode variables JSON: {:?}", err);
+                    Status::invalid_argument(message)
+                })?,
+            )
+        };
+        let graphql_request = GraphQLRequest::new(query, operation_name, variables);
+
+        // Execute the request
+        let schema = self.search.schema();
+        let graphql_response = graphql_request.execute(&schema, &context).await;
+        let response = SearchResponse {
+            is_ok: graphql_response.is_ok(),
+            result_json: serde_json::to_string(&graphql_response).map_err(|err| {
+                let message = format!("cannot encode result JSON: {:?}", err);
+                Status::data_loss(message)
+            })?,
+        };
+
+        Ok(Response::new(response))
     }
 }

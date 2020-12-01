@@ -11,6 +11,8 @@ pub struct Configuration {
     pub services: Services,
     /// Options related to the GraphQL search API
     pub graphql: GraphQL,
+    /// Elasticsearch index containing the stored log events
+    pub log_index: String,
 }
 
 /// Collection of external services that this service connects to
@@ -25,8 +27,19 @@ pub struct Services {
 pub struct GraphQL {
     /// Port that the optional GraphQL HTTP server runs on (used in development)
     pub http_port: Option<u16>,
-    /// Default item limit that is used if no limit is provided
-    pub default_limit: i32,
+    /// Default limit of items to fetch in a single page if none is given
+    pub default_page_size: usize,
+    /// Limit on a single page's size
+    /// This is important large pages greatly increase resource utilization
+    /// `https://www.elastic.co/guide/en/elasticsearch/reference/7.10/paginate-search-results.html`
+    pub max_page_size: usize,
+    /// Limit on overall pagination size.
+    /// This is important because of the way Elasticsearch works;
+    /// deep pagination requires ignored pages to still be loaded,
+    /// so we limit then to avoid this restriction.
+    /// This should be resolved via UX design on the frontend
+    /// `https://www.elastic.co/guide/en/elasticsearch/reference/7.10/paginate-search-results.html`
+    pub max_pagination_amount: usize,
 }
 
 impl Configuration {

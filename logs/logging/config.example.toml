@@ -1,12 +1,25 @@
 # Port that the main gRPC server listens on
 port = 8173
+# Elasticsearch index containing the stored log events
+logs_index = "events"
 
 # Options related to the GraphQL search API
 [graphql]
 # Port that the optional GraphQL HTTP server runs on (used in development)
 http_port = 8174
-# Default item limit that is used if no limit is provided
-default_limit = 100
+# Default limit of items to fetch in a single page if none is given
+default_page_size = 100
+# Limit on a single page's size
+# This is important large pages greatly increase resource utilization
+# https://www.elastic.co/guide/en/elasticsearch/reference/7.10/paginate-search-results.html
+max_page_size = 500
+# Limit on overall pagination size.
+# This is important because of the way Elasticsearch works;
+# deep pagination requires ignored pages to still be loaded,
+# so we limit then to avoid this restriction.
+# This should be resolved via UX design on the frontend
+# https://www.elastic.co/guide/en/elasticsearch/reference/7.10/paginate-search-results.html
+max_pagination_amount = 5000
 
 [services]
 # URL of the Elasticsearch instance to store log entries in

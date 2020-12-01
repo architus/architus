@@ -1,10 +1,12 @@
-/// From proof-of-concept repository at https://github.com/nlinker/rust-graphql-json
+/// From proof-of-concept repository at `https://github.com/nlinker/rust-graphql-json`
 /// Related upstream issues:
-///  - https://github.com/graphql-rust/juniper/issues/280
-///  - https://github.com/graphql-rust/juniper/pull/325
+///  - `https://github.com/graphql-rust/juniper/issues/280`
+///  - `https://github.com/graphql-rust/juniper/pull/325`
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[allow(clippy::module_name_repetitions)]
 pub struct GraphQLJson(pub serde_json::Value);
 
 #[juniper::graphql_scalar(
@@ -41,9 +43,9 @@ where
         serde_json::Value::Bool(b) => juniper::Value::scalar(*b),
         serde_json::Value::Number(n) => {
             if let Some(n) = n.as_u64() {
-                juniper::Value::scalar(n as i32)
+                juniper::Value::scalar(i32::try_from(n).unwrap_or(0))
             } else if let Some(n) = n.as_i64() {
-                juniper::Value::scalar(n as i32)
+                juniper::Value::scalar(i32::try_from(n).unwrap_or(0))
             } else if let Some(n) = n.as_f64() {
                 juniper::Value::scalar(n)
             } else {

@@ -1,6 +1,6 @@
 /// Contains bindings for the elasticsearch search API,
 /// used to make working with responses more ergonomic
-/// Source: https://www.elastic.co/guide/en/elasticsearch/reference/7.10/search-search.html#search-api-response-body
+/// Source: `https://www.elastic.co/guide/en/elasticsearch/reference/7.10/search-search.html#search-api-response-body`
 pub mod search {
     use serde::{Deserialize, Serialize};
 
