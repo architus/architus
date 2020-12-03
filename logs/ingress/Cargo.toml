@@ -29,6 +29,7 @@ serde-humantime = "0.1"
 twilight-gateway = "0.2"
 twilight-model = "0.2"
 backoff = { version = "0.2", features = ["tokio"] }
+chrono = "0.4"
 
 [dependencies.jmespath]
 git = "https://github.com/jmespath/jmespath.rs"
