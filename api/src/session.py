@@ -5,7 +5,7 @@ from secrets import randbits
 from flask_restful import Resource
 from flask import redirect, request
 
-from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN
+from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN, is_prod
 from lib.status_codes import StatusCodes as s
 from lib.auth import JWT, flask_authenticated as authenticated
 from lib.discord_requests import identify_request, token_exchange_request, refresh_token_request
@@ -17,7 +17,10 @@ SAFE_REDIRECT_URI = quote_plus(REDIRECT_URI)
 
 def make_token_cookie_header(token: str, max_age: int) -> dict:
     '''creates a set-cookie header for storing the auth token'''
-    return {'Set-Cookie': f'token={token}; Max-Age={max_age}; Path=/; Domain={DOMAIN}; Secure; HttpOnly'}
+    cookie = f'token={token}; Max-Age={max_age}; Path=/; Domain={DOMAIN}; Secure; HttpOnly'
+    if not is_prod:
+        cookie += '; SameSite=None'
+    return {'Set-Cookie': cookie}
 
 
 def generate_refresh_response(jwt: JWT) -> tuple:
