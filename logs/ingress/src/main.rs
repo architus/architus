@@ -15,6 +15,7 @@ use crate::gateway::OriginalEvent;
 use anyhow::{Context, Result};
 use architus_id::time;
 use backoff::{future::FutureOperation as _, ExponentialBackoff};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use log::{debug, error, info, warn};
@@ -203,6 +204,7 @@ fn import_log_events(
                 event: Some(event.into()),
             };
 
+            let original_payload = payload.clone();
             let submit = move || {
                 let mut client = Deref::deref(&client).clone();
                 // Note: we have to clone the payload for each retry,
@@ -230,10 +232,34 @@ fn import_log_events(
                 initial_interval: config.import_backoff_initial_interval,
                 ..ExponentialBackoff::default()
             };
+
             match submit.retry(backoff).await {
-                Ok(result) => debug!("Submitted log event: {:?}", result),
+                Ok(result) => {
+                    match readable_timestamp(result.actual_timestamp) {
+                        Ok(timestamp) => {
+                            info!("Submitted log event '{}' at {}", result.actual_id, timestamp);
+                            debug!("Actual event: {:?}", original_payload);
+                        },
+                        Err(err) => {
+                            warn!("Submitted log event '{}' at invalid time ({}): {:?}",
+                                result.actual_id, result.actual_timestamp, err);
+                            info!("Actual event: {:?}", original_payload);
+                        }
+                    }
+                },
                 Err(err) => info!("Failed to submit log event: {:?}", err),
             }
         }
     })
+}
+
+fn readable_timestamp(timestamp: u64) -> Result<String> {
+    let sec =
+        i64::try_from(timestamp / 1_000).context("Could not convert timestamp seconds to i64")?;
+    let nsec = u32::try_from((timestamp % 1_000).saturating_mul(1_000_000))
+        .context("Could not convert timestamp nanoseconds to u32")?;
+    let naive_datetime = NaiveDateTime::from_timestamp_opt(sec, nsec)
+        .context("Could not convert timestamp to Naive DateTime")?;
+    let datetime: DateTime<Utc> = DateTime::from_utc(nai    ve_datetime, Utc);
+    Ok(datetime.format("%Y-%m-%d %H:%M:%S").to_string())
 }

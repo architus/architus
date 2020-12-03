@@ -1,7 +1,9 @@
+pub mod inputs;
 pub mod json;
 
 use crate::config::{Configuration, GraphQL as GraphQLConfig};
 use crate::elasticsearch_api::search::{HitsTotal, Response as SearchResponse};
+use crate::graphql::inputs::{EventFilterInput, EventSortInput};
 use crate::stored_event::StoredEvent;
 use elasticsearch::{Elasticsearch, SearchParts};
 use juniper::{graphql_value, EmptyMutation, EmptySubscription, FieldError, FieldResult, RootNode};
@@ -118,7 +120,7 @@ impl Query {
         }
 
         // Resolve the filter and sort expressions into the Elasticsearch search DSL
-        let mut elasticsearch_params = ElasticsearchParams::from_inputs(filter, sort);
+        let mut elasticsearch_params = ElasticsearchParams::from_inputs(filter, sort)?;
 
         // Add in the guild id filter
         if let Some(guild_id) = context.guild_id.as_ref() {
@@ -155,11 +157,16 @@ impl Query {
             }
         }
 
+        // Reverse the sorts so that the most recently applied has the highest priority
+        let reversed_sorts = elasticsearch_params
+            .sort
+            .map(|s| s.into_iter().rev().collect::<serde_json::Value>());
+
         // Send the Elasticsearch search request
         let body = json!({
             "from": after,
             "size": limit,
-            "sort": elasticsearch_params.sort,
+            "sort": reversed_sorts,
             "query": {
                 "bool": {
                     "filter": elasticsearch_params.filter,
@@ -245,6 +252,18 @@ impl EventConnection {
             .cloned()
             .unwrap_or_else(|| SnapshotToken(architus_id::id_bound_from_ts(self.query_time)))
     }
+}
+
+/// Includes metadata about a search's pagination
+#[derive(juniper::GraphQLObject)]
+pub struct PageInfo {
+    current_page: i32,
+    has_previous_page: bool,
+    has_next_page: bool,
+    item_count: i32,
+    page_count: i32,
+    per_page: i32,
+    total_count: i32,
 }
 
 /// Represents an opaque snapshot token that just includes an inner ID.
@@ -367,36 +386,28 @@ impl ElasticsearchParams {
     }
 
     /// Converts the given input structs into the compound params
-    fn from_inputs(_filter: Option<EventFilterInput>, _sort: Option<EventSortInput>) -> Self {
-        // TODO implement
+    fn from_inputs(
+        filter: Option<EventFilterInput>,
+        sort: Option<EventSortInput>,
+    ) -> FieldResult<Self> {
         let mut params = Self::new();
         params.add_sort(json!({"id": {"order": "desc"}}));
-        params
+        filter.to_elasticsearch(&mut params)?;
+        sort.to_elasticsearch(&mut params)?;
+        Ok(params)
     }
 }
 
-/// Filter input object that allows for filtering the results of `allEvent`
-#[derive(juniper::GraphQLInputObject)]
-pub struct EventFilterInput {
-    // TODO use real input fields
-    id: Option<i32>,
+trait QueryInput {
+    fn to_elasticsearch(&self, params: &mut ElasticsearchParams) -> FieldResult<()>;
 }
 
-/// Sort input object that allows for sorting the results of `allEvent`
-#[derive(juniper::GraphQLInputObject)]
-pub struct EventSortInput {
-    // TODO use real input fields
-    id: Option<i32>,
-}
+impl<T: QueryInput> QueryInput for Option<T> {
+    fn to_elasticsearch(&self, params: &mut ElasticsearchParams) -> FieldResult<()> {
+        if let Some(inner_value) = self {
+            inner_value.to_elasticsearch(params)?;
+        }
 
-/// Includes metadata about a search's pagination
-#[derive(juniper::GraphQLObject)]
-pub struct PageInfo {
-    current_page: i32,
-    has_previous_page: bool,
-    has_next_page: bool,
-    item_count: i32,
-    page_count: i32,
-    per_page: i32,
-    total_count: i32,
+        Ok(())
+    }
 }
