@@ -138,7 +138,7 @@ def command_prefix(bot: Architus, msg: discord.Message):
 
 intents = discord.Intents.default()
 intents.members = True
-intents.presences = True
+intents.presences = False
 architus = Architus(command_prefix=command_prefix, max_messages=10000, intents=intents)
 
 # Remove default help command so it doesn't conflict with ours

@@ -36,7 +36,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        self.responses[guild.id] = await GuildAutoResponses.new(self.bot, guild)
+        self.responses[guild.id] = await GuildAutoResponses.new(self.bot, guild, self.executor)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, react, user):
