@@ -70,6 +70,11 @@ class Api(Cog):
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
 
+    @fetch_guild
+    async def get_playlist(self, guild):
+        voice = self.bot.cogs['Voice'].voice_managers[guild.id]
+        return voice.q.as_dict(), sc.OK_200
+
     async def users_guilds(self, user_id):
         users_guilds = []
         for guild in self.bot.guilds:

@@ -61,6 +61,14 @@ class Song:
         em.set_footer(text=format_seconds(self.duration, self.duration > 3600))
         return em
 
+    def as_dict(self):
+        return {
+            'url': self.url,
+            'name': self.name,
+            'duration': self.duration,
+            'thumbnail_url': self.thumbnail_url,
+        }
+
     @classmethod
     async def from_youtube(cls, search: str, no_playlist: bool = True, retries: int = 0) -> List['Song']:
         """takes a youtube url of a song or playlist or a search query"""
@@ -125,6 +133,14 @@ class SongQueue:
         self.now_playing = None  # type: Optional[Song]
         self.started_at = None  # type: Optional[datetime]
         self.shuffle = False  # type: bool
+
+    def as_dict(self):
+        return {
+            'pos': self.position,
+            'now_playing': self.now_playing,
+            'shuffle': self.shuffle,
+            'songs': [s.as_dict() for s in self.q],
+        }
 
     @property
     def position(self) -> Optional[Tuple[int, int]]:
