@@ -128,9 +128,18 @@ class GuildData:
         return self.guild.member_count
 
     def times_as_strings(self, member: discord.Member):
+        """this is disgusting"""
         combined = {}
         for ch_id in self._allowed_channels(self.times.keys(), member):
-            combined.update(self.times[ch_id])
+            for date, members in self.times[ch_id].items():
+                if date in combined:
+                    for member, count in members.items():
+                        if member in combined[date]:
+                            combined[date][member] += count
+                        else:
+                            combined[date][member] = count
+                else:
+                    combined[date] = members
         return {k.isoformat(): v for k, v in combined.items()}
 
     def channel_counts(self, member: discord.Member):

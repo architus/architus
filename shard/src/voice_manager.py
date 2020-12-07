@@ -137,7 +137,7 @@ class SongQueue:
     def as_dict(self):
         return {
             'pos': self.position,
-            'now_playing': self.now_playing,
+            'now_playing': self.now_playing.as_dict(),
             'shuffle': self.shuffle,
             'songs': [s.as_dict() for s in self.q],
         }
