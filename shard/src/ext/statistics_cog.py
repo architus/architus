@@ -130,6 +130,8 @@ class GuildData:
         combined = {}
         for ch_id in self._allowed_channels(self.times.keys(), member):
             for date, members in self.times[ch_id].items():
+                if date < datetime.now - timedelta(days=90):
+                    break
                 if date in combined:
                     for member, count in members.items():
                         if member in combined[date]:

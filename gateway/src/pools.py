@@ -78,59 +78,42 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
     await partial_event(payload)
 
 
-class GuildPool:
-    def __init__(self, manager_client, shard_client, jwt):
-        self.manager_client = manager_client
-        self.shard_client = shard_client
-        self.jwt = jwt
-        self.return_guilds = []
-        self.list_task = None
+async def pool_response(shard_client, guild_id, pool_type, ids, partial_event, partial_error, payload, jwt):
+    return_data = []
+    not_cached = []
 
-    async def fetch_guilds(self):
-        resp, sc = await async_list_guilds_request(self.jwt)
-        if sc != s.OK_200:
-            logger.debug(resp)
-            return []
+    shard_id = which_shard(guild_id)
 
-        guilds = []
+    async def shard_request(entity, fetch):
+        resp, sc = await shard_client.pool_request(
+            guild_id, pool_type, entity, fetch=fetch, routing_key=f"shard_rpc_{shard_id}")
+        if sc != 200:
+            logger.error(f"got bad response from `pool_request` from shard: {shard_id}")
+            await partial_error(
+                message=f"shard {shard_id} returned error fetching entity {entity} of type {pool_type}",
+                human="An error occured fetching {pool_type}.",
+                context=[resp],
+                code=sc)
+            return
+        if resp['data']:
+            return_data.append(resp['data'])
+        else:
+            not_cached.append(entity)
+            await partial_event(payload)
 
-        for guild in resp:
-            mem_resp, _ = await self.shard_client.is_member(
-                self.jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
-            guild.update({
-                'has_architus': mem_resp['member'],
-                'architus_admin': mem_resp['admin'],
-            })
-            guilds.append(guild)
+    tasks = [create_task(shard_request(id, False)) for id in ids]
+    for t in tasks:
+        await t
+    payload.update({'data': return_data, 'finished': len(not_cached) == 0})
+    if len(return_data) > 0:
+        await partial_event(payload)
+    if payload['finished']:
+        return
 
-        return guilds
-
-    async def fetch_architus_guilds(self):
-        # get discord request started
-        self.list_task = create_task(async_list_guilds_request(self.jwt))
-
-        tasks = (create_task(
-            self.shard_client.users_guilds(self.jwt.id, routing_key=f"shard_rpc_{i}"))
-            for i in range(NUM_SHARDS))
-
-        self.return_guilds = [guild for t in tasks for guild in (await t)[0]]
-        for g in self.return_guilds:
-            g.update({'owner': g['owner_id'] == self.jwt.id})
-        return self.return_guilds
-
-    async def fetch_remaining_guilds(self):
-        resp, sc = await self.list_task
-        if sc != s.OK_200:
-            logger.debug(resp)
-            return []
-        remaining = []
-        ids = [g['id'] for g in self.return_guilds]
-        for guild in resp:
-            if str(guild['id']) not in ids:
-                guild.update({
-                    'has_architus': False,
-                    'architus_admin': False,
-                })
-                remaining.append(guild)
-
-        return remaining
+    return_data = []
+    tasks = [create_task(shard_request(id, True)) for id in not_cached]
+    for t in tasks:
+        await t
+    payload.update(
+        {'data': return_data, 'finished': True, 'nonexistant': [i for i in not_cached if i not in return_data]})
+    await partial_event(payload)
