@@ -70,15 +70,13 @@ class GuildData:
         return combined
 
     def _allowed_channels(self, ch_ids: List[int], member: discord.Member) -> List[int]:
-        allowed = []
         for ch_id in ch_ids:
             ch = self.guild.get_channel(ch_id)
             if ch is None:
                 continue
             perms = ch.permissions_for(member)
             if perms is not None and perms.read_messages and perms.read_message_history:
-                allowed.append(ch_id)
-        return allowed
+                yield ch_id
 
     @property
     def up_to_date(self):
@@ -139,7 +137,7 @@ class GuildData:
                         else:
                             combined[date][member] = count
                 else:
-                    combined[date] = members
+                    combined[date] = dict(members)
         return {k.isoformat(): v for k, v in combined.items()}
 
     def channel_counts(self, member: discord.Member):
