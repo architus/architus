@@ -79,41 +79,31 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
 
 
 async def pool_response(shard_client, guild_id, pool_type, ids, partial_event, partial_error, payload, jwt):
-    return_data = []
-    not_cached = []
-
-    shard_id = which_shard(guild_id)
-
-    async def shard_request(entity, fetch):
-        resp, sc = await shard_client.pool_request(
-            guild_id, pool_type, entity, fetch=fetch, routing_key=f"shard_rpc_{shard_id}")
-        if sc != 200:
-            logger.error(f"got bad response from `pool_request` from shard: {shard_id}")
-            await partial_error(
-                message=f"shard {shard_id} returned error fetching entity {entity} of type {pool_type}",
-                human="An error occured fetching {pool_type}.",
-                context=[resp],
-                code=sc)
-            return
-        if resp['data']:
-            return_data.append(resp['data'])
-        else:
-            not_cached.append(entity)
-            await partial_event(payload)
-
-    tasks = [create_task(shard_request(id, False)) for id in ids]
-    for t in tasks:
-        await t
-    payload.update({'data': return_data, 'finished': len(not_cached) == 0})
-    if len(return_data) > 0:
+    resp, sc = await shard_client.pool_request(
+        guild_id, pool_type, ids, fetch=False, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+    if sc != 200:
+        logger.error(f"got bad response from `pool_request` for guild: {guild_id}")
+        await partial_error(
+            message=f"guild {guild_id} returned error fetching entities of type {pool_type}",
+            human=f"An error occured fetching {pool_type}.",
+            context=[resp],
+            code=sc)
+        return
+    payload.update({'data': resp['data'], 'finished': len(resp['nonexistant']) == 0})
+    if len(payload['data']) > 0:
         await partial_event(payload)
     if payload['finished']:
         return
 
-    return_data = []
-    tasks = [create_task(shard_request(id, True)) for id in not_cached]
-    for t in tasks:
-        await t
-    payload.update(
-        {'data': return_data, 'finished': True, 'nonexistant': [i for i in not_cached if i not in return_data]})
+    resp, sc = await shard_client.pool_request(
+        guild_id, pool_type, ids, fetch=True, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+    if sc != 200:
+        logger.error(f"got bad response from `pool_request` for guild: {guild_id}")
+        await partial_error(
+            message=f"guild {guild_id} returned error fetching entities of type {pool_type}",
+            human=f"An error occured fetching {pool_type}.",
+            context=[resp],
+            code=sc)
+        return
+    payload.update({'data': resp['data'], 'finished': True, 'nonexistant': resp['nonexistant']})
     await partial_event(payload)
