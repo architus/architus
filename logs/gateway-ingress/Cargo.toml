@@ -1,0 +1,32 @@
+[package]
+name = "logs-gateway-ingress"
+version = "0.1.0"
+authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
+edition = "2018"
+description = """\
+Terminates an active Gateway session with the Discord API\
+and routes incoming messages to a durable queue backed by RabbitMQ\
+"""
+license = "MIT"
+
+[dependencies]
+gateway-queue-lib = { package = "logs-gateway-queue-lib", path = "../gateway-queue-lib" }
+architus-id = { path = "../../lib/id-rs" }
+config = "0.10"
+log = "0.4"
+env_logger = "0.8"
+lazy_static = "1.4"
+static_assertions = "1.1"
+anyhow = "1.0"
+chrono = "0.4"
+# Using tokio v2 because twilight uses it
+tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "macros"] }
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-humantime = "0.1"
+twilight-gateway = "0.2"
+twilight-model = "0.2"
+backoff = { version = "0.2", features = ["tokio"] }
+lapin = "1.6"
+tokio-amqp = "0.2"

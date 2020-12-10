@@ -1,0 +1,23 @@
+# Name of the durable queue that events get published to
+rabbitmq_queue_name = "normalize"
+# Length of time that consecutive guild uptime events are grouped together in
+guild_uptime_debounce_delay = "200ms"
+
+# Parameters for the backoff used to connect to external services during initialization
+[initialization_backoff]
+initial_interval = "0.5s"
+max_interval = "30s"
+duration = "2m"
+multiplier = 2.0
+
+[services]
+# Full AMQP URL to connect to the gateway queue at
+gateway_queue = "amqp://127.0.0.1:5672/%2f"
+
+# Note: these should be specified using environment variables in production
+# For example, to specify `discord_token`,
+# give a value to the `INGRESS_SECRETS__DISCORD_TOKEN` variable
+[secrets]
+# Make sure to replace this with the Discord token
+# from the Discord developers bot page
+discord_token = "<REPLACE_ME>"

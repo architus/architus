@@ -1,0 +1,15 @@
+[package]
+name = "logs-gateway-queue-lib"
+version = "0.1.0"
+authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
+edition = "2018"
+description = """\
+Includes type definitions for the data puublished/consumed\
+on the logs/gateway-queue\
+"""
+license = "MIT"
+
+[dependencies]
+architus-id = { path = "../../lib/id-rs" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
