@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use backoff::ExponentialBackoff;
+use deadpool::managed::PoolConfig;
 use log::{debug, info};
 use serde::Deserialize;
 use std::time::Duration;
@@ -12,9 +13,9 @@ pub struct Configuration {
     /// Collection of external services that this service connects to
     pub services: Services,
     /// Parameters for the backoff used to connect to external services during initialization
-    pub initialization_backoff: ConfigBackoff,
-    /// Name of the durable queue that events get published to
-    pub rabbitmq_queue_name: String,
+    pub initialization_backoff: Backoff,
+    /// Config options related to the Gateway Queue
+    pub gateway_queue: GatewayQueue,
     /// Length of time that consecutive guild uptime events are grouped together in
     #[serde(with = "serde_humantime")]
     pub guild_uptime_debounce_delay: Duration,
@@ -34,10 +35,23 @@ pub struct Services {
     pub gateway_queue: String,
 }
 
+/// Config options related to the Gateway Queue
+#[derive(Default, Debug, Deserialize, Clone)]
+pub struct GatewayQueue {
+    /// Name of the exchange that events are sent to
+    pub exchange: String,
+    /// Name of the durable queue that events get published to
+    pub queue_name: String,
+    /// Routing key for messages
+    pub routing_key: String,
+    /// Configuration for the connection pool that sits in front of a connection to the gateway queue
+    pub connection_pool: PoolConfig,
+}
+
 /// Controls an exponential backoff and can be loaded from a config file
 /// TODO move to shared crate
 #[derive(Default, Debug, Deserialize, Clone)]
-pub struct ConfigBackoff {
+pub struct Backoff {
     #[serde(with = "serde_humantime")]
     pub initial_interval: Duration,
     #[serde(with = "serde_humantime")]
@@ -47,21 +61,21 @@ pub struct ConfigBackoff {
     pub multiplier: f64,
 }
 
-impl ConfigBackoff {
+impl Backoff {
     pub fn build(&self) -> ExponentialBackoff {
         self.into()
     }
 }
 
-impl<'a> Into<ExponentialBackoff> for &'a ConfigBackoff {
+impl<'a> Into<ExponentialBackoff> for &'a Backoff {
     fn into(self) -> ExponentialBackoff {
         ExponentialBackoff {
-            current_interval: self.initial_interval.clone(),
-            initial_interval: self.initial_interval.clone(),
-            multiplier: self.multiplier.clone(),
-            max_interval: self.max_interval.clone(),
-            max_elapsed_time: Some(self.duration.clone()),
-            ..Default::default()
+            current_interval: self.initial_interval,
+            initial_interval: self.initial_interval,
+            multiplier: self.multiplier,
+            max_interval: self.max_interval,
+            max_elapsed_time: Some(self.duration),
+            ..ExponentialBackoff::default()
         }
     }
 }

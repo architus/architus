@@ -11,7 +11,7 @@ use tokio::sync::{mpsc, oneshot};
 /// Represents a single released update from a debounced pool,
 /// including all items added to or removed from the pool since the last release.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DebouncedPoolUpdate<T> {
+pub struct Update<T> {
     pub added: Option<Vec<T>>,
     pub removed: Option<Vec<T>>,
 }
@@ -34,32 +34,34 @@ impl<T: Clone + Eq + Hash> PoolInner<T> {
         }
     }
 
-    fn release(&mut self) -> Option<DebouncedPoolUpdate<T>> {
+    fn release(&mut self) -> Option<Update<T>> {
         // Process added items if there are any
-        let mut added: Option<Vec<T>> = None;
-        if !self.added.is_empty() {
+        let added = if self.added.is_empty() {
+            None
+        } else {
             let mut added_vec = Vec::with_capacity(self.added.len());
             for item in self.added.drain() {
                 self.pool.insert(item.clone());
                 added_vec.push(item);
             }
-            added = Some(added_vec);
-        }
+            Some(added_vec)
+        };
 
         // Process removed items if there are any
-        let mut removed: Option<Vec<T>> = None;
-        if !self.removed.is_empty() {
+        let removed = if self.removed.is_empty() {
+            None
+        } else {
             let mut removed_vec = Vec::with_capacity(self.removed.len());
             for item in self.removed.drain() {
                 self.pool.remove(&item);
                 removed_vec.push(item);
             }
-            removed = Some(removed_vec);
-        }
+            Some(removed_vec)
+        };
 
         // Only return an update if there were any items
         if added.is_some() || removed.is_some() {
-            Some(DebouncedPoolUpdate { added, removed })
+            Some(Update { added, removed })
         } else {
             warn!("a release on a DebouncedPool was performed but no items were updated");
             None
@@ -76,7 +78,7 @@ impl<T: Clone + Eq + Hash> PoolInner<T> {
 pub struct DebouncedPool<T: Clone + Eq + Hash> {
     delay: Arc<Duration>,
     inner: Arc<Mutex<PoolInner<T>>>,
-    release_publish: mpsc::UnboundedSender<DebouncedPoolUpdate<T>>,
+    release_publish: mpsc::UnboundedSender<Update<T>>,
 }
 
 assert_impl_all!(DebouncedPool<u64>: Sync, Send);
@@ -84,9 +86,8 @@ assert_impl_all!(DebouncedPool<u64>: Sync, Send);
 impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
     /// Creates a new shared debounced pool
     /// and returns a consumer for the published update messages
-    pub fn new(delay: Duration) -> (Self, mpsc::UnboundedReceiver<DebouncedPoolUpdate<T>>) {
-        let (release_publish, release_consume) =
-            mpsc::unbounded_channel::<DebouncedPoolUpdate<T>>();
+    pub fn new(delay: Duration) -> (Self, mpsc::UnboundedReceiver<Update<T>>) {
+        let (release_publish, release_consume) = mpsc::unbounded_channel::<Update<T>>();
         let new_pool = Self {
             inner: Arc::new(Mutex::new(PoolInner::new())),
             delay: Arc::new(delay),
@@ -97,6 +98,7 @@ impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
 
     /// Adds a single item to the pool,
     /// potentially starting a timer for an update
+    #[allow(clippy::if_same_then_else)]
     pub fn add(&self, value: T) {
         let mut inner_state = self.inner.lock().expect("debounced pool poisoned");
         if inner_state.removed.contains(&value) {
@@ -120,9 +122,10 @@ impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
 
     /// Removes a single item from the pool,
     /// potentially starting a timer for an update
+    #[allow(clippy::if_same_then_else)]
     pub fn remove(&self, value: T) {
         let mut inner_state = self.inner.lock().expect("debounced pool poisoned");
-        if inner_state.added.contains(&value) {
+        if inner_state.removed.contains(&value) {
             // Reverse the addition before it gets released
             // (note: we don't need to check to potentially release
             // since a non-empty addition set means a release is pending)
@@ -142,7 +145,7 @@ impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
 
     /// Attempts to release the currently debounced updates immediately, if they exist.
     /// If a debounced release timer is currently running, then cancels it.
-    pub fn release(&self) -> Option<DebouncedPoolUpdate<T>> {
+    pub fn release(&self) -> Option<Update<T>> {
         let mut inner_state = self.inner.lock().expect("debounced pool poisoned");
         let cancel = std::mem::replace(&mut inner_state.preparing_release_cancel, None);
         if let Some(cancel) = cancel {
@@ -175,7 +178,7 @@ impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
         let inner_state_mutex = Arc::clone(&self.inner);
         let delay = Arc::clone(&self.delay);
         tokio::spawn(async move {
-            tokio::time::delay_for((*delay).clone()).await;
+            tokio::time::delay_for(*delay).await;
             let mut inner_state = inner_state_mutex.lock().expect("debounced pool poisoned");
 
             // Make sure the release wasn't cancelled

@@ -1,8 +1,7 @@
 use crate::config::Configuration;
-use crate::debounced_pool::{DebouncedPool, DebouncedPoolUpdate};
-use anyhow::Result;
+use crate::debounced_pool::{DebouncedPool, Update as DebouncedPoolUpdate};
+use crate::UptimeEvent;
 use futures::{stream, Stream, StreamExt as _1};
-use log::info;
 use static_assertions::assert_impl_all;
 use std::sync::{Arc, Mutex};
 use tokio::stream::StreamExt as _2;
@@ -22,32 +21,10 @@ pub enum UpdateMessage {
     GatewayHeartbeat,
 }
 
-/// Represents a bulk uptime event that is dispatched to the uptime service
-#[derive(Clone, Debug, PartialEq)]
-enum UptimeEvent {
-    Online(Vec<u64>),
-    Offline(Vec<u64>),
-    Heartbeat(Vec<u64>),
-}
-
-impl UptimeEvent {
-    fn from_pool_update(update: DebouncedPoolUpdate<u64>) -> Vec<Self> {
-        let mut updates = Vec::new();
-        if let Some(added) = update.added {
-            updates.push(Self::Online(added));
-        }
-        if let Some(removed) = update.removed {
-            updates.push(Self::Offline(removed));
-        }
-
-        updates
-    }
-}
-
-/// Represents an uptime tracking handler for the ingress service,
+/// Represents a guild-level connection tracking handler for the ingress service,
 /// deriving a stateful status of the connection to each external service
-/// and using that to inform heartbeat/online/offline events sent to an uptime tracking service
-/// on a per-guild basis.
+/// and using that to inform heartbeat/online/offline events eventually sent
+/// to an uptime tracking service.
 /// This information is then used to inform scheduled indexing jobs.
 ///
 /// When creating, gives a multi-producer channel that can be used to send updates
@@ -64,7 +41,7 @@ impl Tracker {
     pub fn new(config: Arc<Configuration>) -> (Self, UnboundedSender<UpdateMessage>) {
         let (update_sender, update_receiver) = mpsc::unbounded_channel::<UpdateMessage>();
         let (active_guilds, debounced_guild_updates) =
-            DebouncedPool::new(config.guild_uptime_debounce_delay.clone());
+            DebouncedPool::new(config.guild_uptime_debounce_delay);
         let new_tracker = Self {
             updates: update_receiver,
             debounced_guild_updates,
@@ -77,33 +54,9 @@ impl Tracker {
         (new_tracker, update_sender)
     }
 
-    /// Runs the tracker to completion, listening for updates in the channel
-    /// and returning early if an error occurs with connecting to the uptime service initially
-    pub async fn run(self) -> Result<()> {
-        // First, connect to the uptime tracking service
-        // TODO implement
-
-        // Pipe uptime events to uptime service
-        self.stream_events()
-            .for_each(|event| async move {
-                // Note: we measure the time received at the sink,
-                // but the timing doesn't really matter that much as long as it is measured
-                // before a potential retry loop
-                // (the propagation delay between the stream processors
-                // is generally <250ms even if debounced)
-                let timestamp = architus_id::time::millisecond_ts();
-
-                // TODO implement
-                info!("Uptime event at {}: {:?}", timestamp, event);
-            })
-            .await;
-
-        Ok(())
-    }
-
     /// Listen for incoming updates and use them to update the internal state.
-    /// Emits outgoing uptime events to be forwarded to the uptime service
-    fn stream_events(self) -> impl Stream<Item = UptimeEvent> {
+    /// Emits outgoing uptime events to be eventually forwarded to the uptime service
+    pub fn stream_events(self) -> impl Stream<Item = UptimeEvent> {
         let uptime_events = self.state.pipe_updates(self.updates);
         let debounced_uptime_events = self
             .state
@@ -134,6 +87,11 @@ impl TrackerState {
         let pool_copy = self.active_guilds.clone();
         let connection_status_mutex = Arc::clone(&self.connection_status);
         in_stream.flat_map(move |update| {
+            // Note the timestamp that this was received,
+            // (ignores the propagation delay from source to here,
+            // but since this processor is synchronous,
+            // this should be negligible and provides a more ergonomic upstream API)
+            let timestamp = architus_id::time::millisecond_ts();
             match update {
                 // For guild online/offline,
                 // instead of emitting an event right now,
@@ -151,10 +109,13 @@ impl TrackerState {
                         .lock()
                         .expect("connection status poisoned");
                     // Only emit an uptime event if the entire service just became online
-                    let events = if connection_status.online_update(update) {
+                    let events = if connection_status.online_update(&update) {
                         pool_copy.release();
                         let items = pool_copy.items::<Vec<_>>();
-                        let events = vec![UptimeEvent::Online(items)];
+                        let events = vec![UptimeEvent::Online {
+                            guilds: items,
+                            timestamp,
+                        }];
                         events
                     } else {
                         Vec::with_capacity(0)
@@ -166,9 +127,12 @@ impl TrackerState {
                         .lock()
                         .expect("connection status poisoned");
                     // Only emit an uptime event if the entire service just became offline
-                    let events = if connection_status.offline_update(update) {
+                    let events = if connection_status.offline_update(&update) {
                         let items = pool_copy.items::<Vec<_>>();
-                        let events = vec![UptimeEvent::Offline(items)];
+                        let events = vec![UptimeEvent::Offline {
+                            guilds: items,
+                            timestamp,
+                        }];
                         pool_copy.release();
                         events
                     } else {
@@ -181,13 +145,14 @@ impl TrackerState {
                         .lock()
                         .expect("connection status poisoned");
                     let events = if connection_status.online() {
-                        let mut events = if let Some(update) = pool_copy.release() {
-                            UptimeEvent::from_pool_update(update)
-                        } else {
-                            Vec::new()
-                        };
+                        let mut events = pool_copy
+                            .release()
+                            .map_or_else(Vec::new, pool_update_to_uptime);
                         let items = pool_copy.items();
-                        events.push(UptimeEvent::Heartbeat(items));
+                        events.push(UptimeEvent::Heartbeat {
+                            guilds: items,
+                            timestamp,
+                        });
                         events
                     } else {
                         Vec::with_capacity(0)
@@ -210,7 +175,7 @@ impl TrackerState {
                 .lock()
                 .expect("connection status poisoned");
             let events = if connection_status.online() {
-                UptimeEvent::from_pool_update(update)
+                pool_update_to_uptime(update)
             } else {
                 Vec::with_capacity(0)
             };
@@ -219,7 +184,31 @@ impl TrackerState {
     }
 }
 
+fn pool_update_to_uptime(update: DebouncedPoolUpdate<u64>) -> Vec<UptimeEvent> {
+    // Use the timestamp that the debounced pool update is processed
+    // since it can contain any backing items that happened at any point
+    // from t_now to t_now - debounced_delay
+    let timestamp = architus_id::time::millisecond_ts();
+
+    let mut updates = Vec::new();
+    if let Some(added) = update.added {
+        updates.push(UptimeEvent::Online {
+            guilds: added,
+            timestamp,
+        });
+    }
+    if let Some(removed) = update.removed {
+        updates.push(UptimeEvent::Offline {
+            guilds: removed,
+            timestamp,
+        });
+    }
+
+    updates
+}
+
 /// Holds the connection state to the gateway and queue
+/// and utility methods to capture the rising/falling edges of overall connection
 struct ConnectionStatus {
     gateway_online: bool,
     queue_online: bool,
@@ -237,7 +226,7 @@ impl ConnectionStatus {
         self.gateway_online && self.queue_online
     }
 
-    fn online_update(&mut self, update: UpdateMessage) -> bool {
+    fn online_update(&mut self, update: &UpdateMessage) -> bool {
         let offline_before = !self.online();
         match update {
             UpdateMessage::QueueOnline => self.queue_online = true,
@@ -248,7 +237,7 @@ impl ConnectionStatus {
         offline_before && online_after
     }
 
-    fn offline_update(&mut self, update: UpdateMessage) -> bool {
+    fn offline_update(&mut self, update: &UpdateMessage) -> bool {
         let online_before = self.online();
         match update {
             UpdateMessage::QueueOffline => self.queue_online = false,
@@ -278,9 +267,15 @@ mod tests {
     impl PartialEq for TestWrapper {
         fn eq(&self, other: &Self) -> bool {
             match (&self.0, &other.0) {
-                (UptimeEvent::Online(a), UptimeEvent::Online(b))
-                | (UptimeEvent::Offline(a), UptimeEvent::Offline(b))
-                | (UptimeEvent::Heartbeat(a), UptimeEvent::Heartbeat(b)) => set(a) == set(b),
+                (UptimeEvent::Online { guilds: a, .. }, UptimeEvent::Online { guilds: b, .. })
+                | (
+                    UptimeEvent::Offline { guilds: a, .. },
+                    UptimeEvent::Offline { guilds: b, .. },
+                )
+                | (
+                    UptimeEvent::Heartbeat { guilds: a, .. },
+                    UptimeEvent::Heartbeat { guilds: b, .. },
+                ) => set(a) == set(b),
                 _ => false,
             }
         }
@@ -297,13 +292,17 @@ mod tests {
         let (tracker, update_tx) = Tracker::new(Arc::new(config));
         let mut event_stream = tracker.stream_events();
 
+        // Note: timestamp is ignored when asserting equality
         update_tx.send(UpdateMessage::GuildOnline(0))?;
         update_tx.send(UpdateMessage::GuildOnline(1))?;
         update_tx.send(UpdateMessage::GuildOnline(2))?;
         tokio::time::delay_for(Duration::from_millis(50)).await;
         assert_eq!(
             event_stream.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online(vec![0, 1, 2])))
+            Some(TestWrapper(UptimeEvent::Online {
+                guilds: vec![0, 1, 2],
+                timestamp: 0
+            }))
         );
 
         Ok(())
@@ -316,12 +315,16 @@ mod tests {
         let (tracker, update_tx) = Tracker::new(Arc::new(config));
         let mut event_stream = tracker.stream_events();
 
+        // Note: timestamp is ignored when asserting equality
         update_tx.send(UpdateMessage::GuildOnline(0))?;
         update_tx.send(UpdateMessage::GuildOnline(1))?;
         tokio::time::delay_for(Duration::from_millis(50)).await;
         assert_eq!(
             event_stream.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online(vec![0, 1])))
+            Some(TestWrapper(UptimeEvent::Online {
+                guilds: vec![0, 1],
+                timestamp: 0
+            }))
         );
 
         update_tx.send(UpdateMessage::GuildOnline(2))?;
@@ -329,15 +332,24 @@ mod tests {
         update_tx.send(UpdateMessage::GatewayHeartbeat)?;
         assert_eq!(
             event_stream.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online(vec![2])))
+            Some(TestWrapper(UptimeEvent::Online {
+                guilds: vec![2],
+                timestamp: 0
+            }))
         );
         assert_eq!(
             event_stream.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Offline(vec![0])))
+            Some(TestWrapper(UptimeEvent::Offline {
+                guilds: vec![0],
+                timestamp: 0
+            }))
         );
         assert_eq!(
             event_stream.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Heartbeat(vec![1, 2])))
+            Some(TestWrapper(UptimeEvent::Heartbeat {
+                guilds: vec![1, 2],
+                timestamp: 0
+            }))
         );
 
         Ok(())
@@ -350,18 +362,25 @@ mod tests {
         let (tracker, update_tx) = Tracker::new(Arc::new(config));
         let mut event_stream = tracker.stream_events();
 
+        // Note: timestamp is ignored when asserting equality
         update_tx.send(UpdateMessage::GuildOnline(0))?;
         update_tx.send(UpdateMessage::GuildOnline(1))?;
         tokio::time::delay_for(Duration::from_millis(50)).await;
         assert_eq!(
             event_stream.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online(vec![0, 1])))
+            Some(TestWrapper(UptimeEvent::Online {
+                guilds: vec![0, 1],
+                timestamp: 0
+            }))
         );
 
         update_tx.send(UpdateMessage::GatewayOffline)?;
         assert_eq!(
             event_stream.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Offline(vec![0, 1])))
+            Some(TestWrapper(UptimeEvent::Offline {
+                guilds: vec![0, 1],
+                timestamp: 0
+            }))
         );
 
         update_tx.send(UpdateMessage::QueueOffline)?;
@@ -369,7 +388,10 @@ mod tests {
         update_tx.send(UpdateMessage::GatewayOnline)?;
         assert_eq!(
             event_stream.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online(vec![0, 1])))
+            Some(TestWrapper(UptimeEvent::Online {
+                guilds: vec![0, 1],
+                timestamp: 0
+            }))
         );
 
         Ok(())
