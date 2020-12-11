@@ -10,16 +10,16 @@
 #![deny(clippy::all)]
 
 use db::*;
+use diesel::r2d2::ConnectionManager;
 use diesel::PgConnection;
 use log::{info, warn};
+use r2d2::PooledConnection;
 use std::env;
 use tokio::sync::mpsc;
 use tonic::{transport::Server, Request, Response, Status};
 
-use diesel::r2d2::ConnectionManager;
 use feature_gate::feature_gate_server::{FeatureGate, FeatureGateServer};
 use feature_gate::*;
-use r2d2::PooledConnection;
 
 type RpcResponse<T> = Result<Response<T>, Status>;
 
