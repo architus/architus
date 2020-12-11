@@ -253,8 +253,9 @@ class EmojiManager:
         does not check for duplicates
         """
         logger.debug(f"added emoji: {emoji}")
-        while len(self.guild_emojis) >= self.max_emojis:
-            await self.cache_worst_emoji()
+        if self.settings.manage_emojis:
+            while len(self.guild_emojis) >= self.max_emojis:
+                await self.cache_worst_emoji()
 
         self.emojis.append(emoji)
         await self._insert_into_db(emoji)

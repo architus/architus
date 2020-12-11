@@ -173,3 +173,12 @@ def mention_to_name(guild: discord.Guild, mention: str) -> str:
         if ch is not None:
             return f"#{ch.name}"
     return mention
+
+
+def format_seconds(s: int, hours: bool = False):
+    if hours:
+        hours, remainder = divmod(s, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return '{}:{:02}:{:02}'.format(int(hours), int(minutes), int(seconds))
+    minutes, seconds = divmod(s, 60)
+    return '{}:{:02}'.format(int(minutes), int(seconds))
