@@ -174,6 +174,52 @@ impl FeatureGate for Gate {
         }
     }
 
+    /// Checks to see if a list of guilds have a certain feature.
+    ///
+    /// Will return a list of true/false values on successfully querying the database
+    /// in the same order as the provided guild id list.
+    /// If the feature asked about does not exist, then it will return a
+    /// default value of false for each guild.
+    /// If the database is not able to be contacted, then it will return an
+    /// internal server error status code.
+    ///
+    /// The number of supported guilds to check at once is at least 256, but may be more.
+    async fn batch_check_guild_features(
+        &self,
+        request: Request<BatchCheck>,
+    ) -> RpcResponse<BatchCheckResult> {
+        let conn = match self.get_connection() {
+            Some(c) => c,
+            None => return Err(Status::internal("Database connection failed")),
+        };
+        let batch_check = request.into_inner();
+
+        // Limit the number of items supported at once
+        if batch_check.guild_ids.len() > 256 {
+            return Err(Status::invalid_argument(format!(
+                "Batched check operation only supports 256 guild-checks at once (provided {})",
+                batch_check.guild_ids.len()
+            )));
+        }
+
+        let result = batch_check_guild_feature(
+            &conn,
+            &batch_check
+                .guild_ids
+                .iter()
+                .map(|id| *id as i64)
+                .collect::<Vec<_>>(),
+            &batch_check.feature_name,
+        );
+        match result {
+            Ok(list) => Ok(Response::new(BatchCheckResult { has_feature: list })),
+            Err(DatabaseError::UnknownFeature) => Ok(Response::new(BatchCheckResult {
+                has_feature: vec![false; batch_check.guild_ids.len()],
+            })),
+            Err(_) => Err(Status::internal("Database connection failed")),
+        }
+    }
+
     // A type association for doing a streaming response.
     type GetFeaturesStream = mpsc::Receiver<Result<Feature, Status>>;
 

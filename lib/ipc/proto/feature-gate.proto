@@ -7,6 +7,8 @@ service FeatureGate {
     rpc AddGuildFeature(FeatureAddition) returns (AddResult);
     rpc RemoveGuildFeature(FeatureRemoval) returns (RemoveResult);
     rpc CheckGuildFeature(GuildFeature) returns (FeatureResult);
+    // The number of supported guilds to check at once is at least 256, but may be more.
+    rpc BatchCheckGuildFeatures(BatchCheck) returns (BatchCheckResult);
     rpc GetFeatures(FeatureList) returns (stream Feature);
     rpc GetGuildFeatures(Guild) returns (stream Feature);
 }
@@ -35,6 +37,11 @@ message GuildFeature {
     fixed64 guild_id = 2;
 }
 
+message BatchCheck {
+  string feature_name = 1;
+  repeated fixed64 guild_ids = 2;
+}
+
 message Guild {
     fixed64 guild_id = 1;
 }
@@ -60,4 +67,8 @@ message RemoveResult {
 
 message FeatureResult {
     bool has_feature = 1;
+}
+
+message BatchCheckResult {
+  repeated bool has_feature = 1;
 }
