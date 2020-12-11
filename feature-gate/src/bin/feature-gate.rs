@@ -27,9 +27,8 @@ pub mod feature_gate {
     include!("../../grpc/featuregate.rs");
 }
 
-/// Structure for handling all of the gRPC requests. Just holds
-/// the address of the postgres database so that it can be used
-/// to connect to the database for each RPC request.
+/// Structure for handling all of the gRPC requests.
+/// Holds a connection pool that can issue RAII connection handles
 pub struct Gate {
     connection_pool: r2d2::Pool<ConnectionManager<PgConnection>>,
 }
