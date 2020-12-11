@@ -43,7 +43,7 @@ class Pools:
         if member is None and fetch:
             with suppress(NotFound):
                 member = await guild.fetch_member(int(member_id))
-        return member_to_dict(member) if member else {}
+        return member_to_dict(member)
 
     async def get_user(self, user_id, fetch=False):
         user = self.bot.get_user(int(user_id))
