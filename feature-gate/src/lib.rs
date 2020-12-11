@@ -164,7 +164,7 @@ pub fn check_guild_feature(conn: &PgConnection, guild_id: i64, feature: &str) ->
 ///
 /// First gets the feature id and then checks to see if each of the guild id-feature id
 /// pairs can be found in the guild feature database.
-/// Returns a list of booleans in the same order as the input guild_ids list
+/// Returns a list of booleans in the same order as the input `guild_ids` list
 /// where each element corresponds to whether the corresponding guild has the feature.
 ///
 /// # Arguments
@@ -177,7 +177,7 @@ pub fn check_guild_feature(conn: &PgConnection, guild_id: i64, feature: &str) ->
 /// * `DatabaseError::Query` - The query to the database failed
 pub fn batch_check_guild_feature(
     conn: &PgConnection,
-    guild_ids: &Vec<i64>,
+    guild_ids: &[i64],
     feature: &str,
 ) -> DbResult<Vec<bool>> {
     let feature_id = get_feature_id(conn, feature)?;

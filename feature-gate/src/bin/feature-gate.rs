@@ -10,15 +10,16 @@
 #![deny(clippy::all)]
 
 use db::*;
-use diesel::connection::Connection;
 use diesel::PgConnection;
 use log::{info, warn};
 use std::env;
 use tokio::sync::mpsc;
 use tonic::{transport::Server, Request, Response, Status};
 
+use diesel::r2d2::ConnectionManager;
 use feature_gate::feature_gate_server::{FeatureGate, FeatureGateServer};
 use feature_gate::*;
+use r2d2::PooledConnection;
 
 type RpcResponse<T> = Result<Response<T>, Status>;
 
@@ -29,14 +30,13 @@ pub mod feature_gate {
 /// Structure for handling all of the gRPC requests. Just holds
 /// the address of the postgres database so that it can be used
 /// to connect to the database for each RPC request.
-#[derive(Debug)]
 pub struct Gate {
-    pub db_addr: String,
+    connection_pool: r2d2::Pool<ConnectionManager<PgConnection>>,
 }
 
 impl Gate {
-    fn get_connection(&self) -> Option<PgConnection> {
-        PgConnection::establish(&self.db_addr).ok()
+    fn get_connection(&self) -> Option<PooledConnection<ConnectionManager<PgConnection>>> {
+        self.connection_pool.get().ok()
     }
 }
 
@@ -313,8 +313,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_url = format!("postgresql://{}{}@postgres:5432/autbot", db_usr, db_pass);
 
     let addr = "0.0.0.0:50555".parse()?;
+    let manager: ConnectionManager<PgConnection> = ConnectionManager::new(database_url);
+    let pool = r2d2::Pool::builder()
+        .max_size(16)
+        .build(manager)
+        .expect("Could not build connection pool");
     let gate = Gate {
-        db_addr: database_url,
+        connection_pool: pool,
     };
 
     Server::builder()
