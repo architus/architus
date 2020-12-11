@@ -38,6 +38,7 @@ impl ActiveGuilds {
 
     /// Determines whether the given `guild_id` should have events forwarded to the queue
     pub fn is_active(&self, _guild_id: u64) -> bool {
+        // TODO implement
         false
     }
 }

@@ -215,14 +215,14 @@ struct ConnectionStatus {
 }
 
 impl ConnectionStatus {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             gateway_online: true,
             queue_online: true,
         }
     }
 
-    fn online(&self) -> bool {
+    const fn online(&self) -> bool {
         self.gateway_online && self.queue_online
     }
 
