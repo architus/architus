@@ -21,7 +21,7 @@ use lapin::{types::FieldTable, BasicProperties, Connection, ConnectionProperties
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
-use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
+use twilight_gateway::{Event, EventType, EventTypeFlags, Intents, Shard};
 use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
 use twilight_model::gateway::event::shard::Payload;
 use twilight_model::gateway::OpCode;
@@ -394,7 +394,9 @@ fn process_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<Gate
         }
 
         // Make sure we should forward the event
-        let event_type = event_type.as_deref()?;
+        let event_type_str = event_type.as_deref()?;
+        let event_type =
+            serde_json::from_str::<EventType>(&format!(r#""{}""#, event_type_str)).ok();
         if !should_forward(event_type) {
             return None;
         }
@@ -405,12 +407,12 @@ fn process_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<Gate
             // https://discord.com/developers/docs/topics/gateway#payloads-gateway-payload-structure
             let mut map = map;
             let inner_json = map.remove("d")?;
-            let guild_id = try_extract_guild_id(&inner_json, event_type);
+            let guild_id = try_extract_guild_id(&inner_json, event_type, event_type_str);
             return Some(GatewayEvent {
                 id,
                 ingress_timestamp: timestamp,
                 inner: inner_json,
-                event_type: event_type.to_owned(),
+                event_type: event_type_str.to_owned(),
                 guild_id,
             });
         }
@@ -421,20 +423,70 @@ fn process_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<Gate
 
 /// Determines whether the ingress shard should forward events to the queue
 /// (certain events, such as raw gateway lifecycle events, should not be forwarded)
-fn should_forward(_event_type: &str) -> bool {
-    false
+const fn should_forward(event_type: Option<EventType>) -> bool {
+    // Don't forward lifecycle events:
+    // `https://discord.com/developers/docs/topics/gateway#commands-and-events-gateway-events`
+    // Default to forwarding an event if it is not identified
+    !matches!(
+        event_type,
+        Some(EventType::GatewayHeartbeat)
+            | Some(EventType::GatewayHeartbeatAck)
+            | Some(EventType::GatewayHello)
+            | Some(EventType::GatewayInvalidateSession)
+            | Some(EventType::GatewayReconnect)
+            | Some(EventType::MemberChunk)
+            | Some(EventType::PresenceUpdate)
+            | Some(EventType::PresencesReplace)
+            | Some(EventType::Ready)
+            | Some(EventType::Resumed)
+            | Some(EventType::ShardConnected)
+            | Some(EventType::ShardConnecting)
+            | Some(EventType::ShardDisconnected)
+            | Some(EventType::ShardIdentifying)
+            | Some(EventType::ShardReconnecting)
+            | Some(EventType::ShardPayload)
+            | Some(EventType::ShardResuming)
+            | Some(EventType::TypingStart)
+            | Some(EventType::UnavailableGuild)
+    )
 }
 
 /// Attempts to extract a guild id from a partially-serialized gateway event
-fn try_extract_guild_id(_json_value: &serde_json::Value, _event_type: &str) -> Option<u64> {
-    // TODO implement
+fn try_extract_guild_id(
+    json_value: &serde_json::Value,
+    _event_type: Option<EventType>,
+    raw_event_type: &str,
+) -> Option<u64> {
+    if let serde_json::Value::Object(map) = json_value {
+        if let Some(guild_id_value) = map.get("guild_id") {
+            if let serde_json::Value::String(guild_id_string) = guild_id_value {
+                // Attempt to parse the guild id string to a u64
+                return guild_id_string.parse::<u64>().ok();
+            }
+        }
+    }
+
+    log::warn!(
+        "Couldn't identify guild_id value for event type '{}'",
+        raw_event_type
+    );
     None
 }
 
+/// Acts as a stream sink for uptime events,
+/// sending them to the uptime service
 async fn sink_uptime_events(
     _uptime_service_client: (),
-    _in_stream: impl Stream<Item = UptimeEvent>,
+    in_stream: impl Stream<Item = UptimeEvent>,
 ) -> Result<()> {
-    // TODO implement
+    // Note: we don't exit the service if this part fails;
+    // this is an acceptable degradation
+    in_stream
+        .for_each_concurrent(None, move |event| async move {
+            // TODO implement sending to service
+            log::info!("Sending UptimeEvent: {:?}", event);
+        })
+        .await;
+
     Ok(())
 }

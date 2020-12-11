@@ -12,6 +12,7 @@ pub struct Manager {
 }
 
 impl Manager {
+    #[allow(clippy::missing_const_for_fn)]
     pub fn new(connection: Connection) -> Self {
         Self { connection }
     }
