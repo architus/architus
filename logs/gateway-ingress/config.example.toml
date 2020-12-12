@@ -1,9 +1,23 @@
 # Length of time that consecutive guild uptime events are grouped together in
 guild_uptime_debounce_delay = "200ms"
+# Name of the feature that enables indexing on a guild
+indexing_feature = "beta/logs-indexing"
+# Size of the guild chunks to send to the feature-gate service to check their feature
+feature_gate_batch_check_size = 256
+# How long to keep offline guilds in the active guild cache
+# (Allows for detecting guilds that enable/disable their indexing rapidly)
+active_guild_eviction_duration = "30m"
+# The amount of time to wait between polls to the feature-gate service
+# to retrieve the current status of all guilds and whether they have indexing enabled
+# Lowering increases I/O on the feature-gate and lock contention on the processing hot-path
+# while increasing response times for indexing enable/disable actions
+active_guilds_poll_interval = "1m"
 
 [services]
 # Full AMQP URL to connect to the gateway queue at
 gateway_queue = "amqp://127.0.0.1:5672/%2f"
+# Combined host/port of the feature-gate service
+feature_gate = "[::1]:50555"
 
 # Config options related to the Gateway Queue
 [gateway_queue]
@@ -22,9 +36,16 @@ timeouts = { create = "5s" }
 
 # Parameters for the backoff used to connect to external services during initialization
 [initialization_backoff]
-initial_interval = "0.5s"
+initial_interval = "500ms"
 max_interval = "30s"
 duration = "2m"
+multiplier = 2.0
+
+# Parameters for the backoff used to send RPC calls to other services
+[rpc_backoff]
+initial_interval = "100ms"
+max_interval = "1s"
+duration = "5s"
 multiplier = 2.0
 
 # Note: these should be specified using environment variables in production
