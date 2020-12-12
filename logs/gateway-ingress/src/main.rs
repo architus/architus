@@ -7,7 +7,12 @@ mod config;
 mod connection;
 mod debounced_pool;
 
-use crate::active_guilds::ActiveGuilds;
+mod feature_gate {
+    #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
+    tonic::include_proto!("featuregate");
+}
+
+use crate::active_guilds::{ActiveGuilds, FeatureGateClient};
 use crate::config::Configuration;
 use crate::connection::{Tracker, UpdateMessage};
 use anyhow::{anyhow, Context, Result};
@@ -63,7 +68,7 @@ async fn main() -> Result<()> {
     let feature_gate_client = connect_to_feature_gate(Arc::clone(&config))
         .await
         .context("Could not connect to the active guild service")?;
-    let active_guilds = ActiveGuilds::new(feature_gate_client);
+    let active_guilds = ActiveGuilds::new(feature_gate_client, Arc::clone(&config));
 
     // Connect to the uptime service to ensure that it has a healthy connection
     let uptime_service_client = connect_to_uptime_service(Arc::clone(&config))
@@ -168,9 +173,27 @@ async fn connect_to_queue(config: Arc<Configuration>) -> Result<Connection> {
 }
 
 /// Creates a new connection to the feature gate service
-/// TODO implement and change return type
-async fn connect_to_feature_gate(_config: Arc<Configuration>) -> Result<()> {
-    Ok(())
+async fn connect_to_feature_gate(config: Arc<Configuration>) -> Result<FeatureGateClient> {
+    let initialization_backoff = config.initialization_backoff.build();
+    let feature_gate_url = config.services.feature_gate.clone();
+    let connect = || async {
+        let conn = FeatureGateClient::connect(feature_gate_url.clone())
+            .await
+            .map_err(|err| {
+                log::warn!(
+                    "Couldn't connect to feature-gate, retrying after backoff: {:?}",
+                    err
+                );
+                err
+            })?;
+        Ok(conn)
+    };
+    let connection = connect
+        .retry(initialization_backoff)
+        .await
+        .context("Could not connect to feature-gate")?;
+    log::info!("Connected to feature-gate at {}", feature_gate_url);
+    Ok(connection)
 }
 
 /// Creates a new connection to the uptime service
@@ -313,9 +336,10 @@ async fn publish_events(
                 // Create the `GatewayEvent` from the raw event
                 if let Some(gateway_event) = process_raw_event(event, timestamp, id) {
                     // Make sure the guild is active before forwarding
-                    let should_process = gateway_event
-                        .guild_id
-                        .map_or(true, |id| active_guilds.is_active(id));
+                    let should_process = match gateway_event.guild_id {
+                        Some(id) => active_guilds.is_active(id).await,
+                        None => true,
+                    };
                     if !should_process {
                         return Ok(());
                     }
@@ -424,7 +448,7 @@ fn process_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<Gate
 /// Determines whether the ingress shard should forward events to the queue
 /// (certain events, such as raw gateway lifecycle events, should not be forwarded)
 const fn should_forward(event_type: Option<EventType>) -> bool {
-    // Don't forward lifecycle events:
+    // Don't forward lifecycle events (or typing/presence updates):
     // `https://discord.com/developers/docs/topics/gateway#commands-and-events-gateway-events`
     // Default to forwarding an event if it is not identified
     !matches!(

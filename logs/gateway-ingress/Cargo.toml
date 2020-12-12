@@ -32,3 +32,9 @@ lapin = "1.6"
 tokio-amqp = "0.2"
 deadpool = "0.6"
 async-trait = "0.1"
+tonic = "0.3"
+prost = "0.6"
+
+[build-dependencies]
+tonic-build = "0.3"
+anyhow = "1.0"
