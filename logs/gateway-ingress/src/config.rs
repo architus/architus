@@ -14,6 +14,10 @@ pub struct Configuration {
     pub services: Services,
     /// Parameters for the backoff used to connect to external services during initialization
     pub initialization_backoff: Backoff,
+    /// Parameters for the backoff used to send RPC calls to other services
+    pub rpc_backoff: Backoff,
+    /// Name of the feature that enables indexing on a guild
+    pub indexing_feature: String,
     /// Config options related to the Gateway Queue
     pub gateway_queue: GatewayQueue,
     /// Length of time that consecutive guild uptime events are grouped together in
@@ -33,6 +37,8 @@ pub struct Secrets {
 pub struct Services {
     /// Full AMQP URL to connect to the gateway queue at
     pub gateway_queue: String,
+    /// Combined host/port of the feature-gate service
+    pub feature_gate: String,
 }
 
 /// Config options related to the Gateway Queue
