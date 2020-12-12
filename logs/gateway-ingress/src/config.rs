@@ -23,6 +23,16 @@ pub struct Configuration {
     /// Length of time that consecutive guild uptime events are grouped together in
     #[serde(with = "serde_humantime")]
     pub guild_uptime_debounce_delay: Duration,
+    /// Size of the guild chunks to send to the feature-gate service to check their feature
+    pub feature_gate_batch_check_size: usize,
+    /// How long to keep offline guilds in the active guild cache
+    /// (Allows for detecting guilds that enable/disable their indexing rapidly)
+    pub active_guild_eviction_duration: Duration,
+    /// The amount of time to wait between polls to the feature-gate service
+    /// to retrieve the current status of all guilds and whether they have indexing enabled
+    /// Lowering increases I/O on the feature-gate and lock contention on the processing hot-path
+    /// while increasing response times for indexing enable/disable actions
+    pub active_guilds_poll_interval: Duration,
 }
 
 /// Collection of secret values used to connect to services

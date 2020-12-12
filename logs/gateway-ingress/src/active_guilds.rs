@@ -1,5 +1,5 @@
 use crate::config::Configuration;
-use crate::feature_gate::GuildFeature;
+use crate::feature_gate::{BatchCheck, GuildFeature};
 use crate::UptimeEvent;
 use anyhow::Result;
 use backoff::future::FutureOperation;
@@ -27,16 +27,56 @@ pub struct ActiveGuilds {
 /// Represents the cached online/offline + indexing enabled/disabled status of a single guild
 #[derive(Clone, Debug)]
 enum GuildStatus {
-    Loaded {
-        is_active: bool,
-        // The moment that the guild went offline is used for eviction purposes
-        // upon periodic polling
-        eviction_timer_start: Option<Instant>,
-    },
+    Loaded(LoadedState),
     /// If a guild is loading its active status,
     /// then there will be a broadcast channel in this map
     /// that can be subscribed to once the entry is populated.
     Loading(broadcast::Sender<bool>),
+}
+
+#[derive(Clone, Debug)]
+struct LoadedState {
+    is_active: bool,
+    connection: GuildConnection,
+}
+
+enum ActiveEdge {
+    Rising,
+    Falling,
+}
+
+impl LoadedState {
+    fn update(&mut self, active: bool) -> Option<ActiveEdge> {
+        let active_before = self.active();
+        self.is_active = active;
+        let active_after = self.active();
+        match (active_before, active_after) {
+            (true, false) => Some(ActiveEdge::Falling),
+            (false, true) => Some(ActiveEdge::Rising),
+            _ => None,
+        }
+    }
+
+    const fn active(&self) -> bool {
+        match self.connection {
+            GuildConnection::Online => self.is_active,
+            GuildConnection::Offline(_) => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum GuildConnection {
+    Online,
+    // Contains the moment that the guild went offline is used for eviction purposes
+    // upon periodic polling
+    Offline(Instant),
+}
+
+impl GuildConnection {
+    fn offline() -> Self {
+        Self::Offline(Instant::now())
+    }
 }
 
 assert_impl_all!(ActiveGuilds: Sync, Send);
@@ -53,9 +93,108 @@ impl ActiveGuilds {
 
     /// Runs a task that continuously polls the feature gate to maintain an active list of guilds
     /// that have log indexing enabled
+    /// Note: clippy lint ignore is due to bug I discovered;
+    /// remove once `https://github.com/rust-lang/rust-clippy/issues/6446` is addressed
+    #[allow(clippy::await_holding_lock)]
     pub async fn go_poll(&self) -> Result<()> {
-        // TODO implement
-        Ok(())
+        loop {
+            tokio::time::delay_for(self.config.active_guilds_poll_interval).await;
+
+            // Get a list of all active guilds by their guild ids (only include loaded ones;
+            // loading ones will be eagerly loaded faster than we can bulk-fetch them anyways)
+            let guilds_read = self.guilds.read().expect("active guilds lock poisoned");
+            let active_guilds = guilds_read
+                .iter()
+                .filter_map(|(guild_id, status)| match status {
+                    GuildStatus::Loading(_) => None,
+                    GuildStatus::Loaded { .. } => Some(guild_id),
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            drop(guilds_read);
+
+            // Chunk the active guild ids by the batch check's max size and send a request for each
+            let mut results = HashMap::<u64, bool>::with_capacity(active_guilds.len());
+            for guild_chunk in active_guilds.chunks(self.config.feature_gate_batch_check_size) {
+                let send = || async {
+                    let mut feature_gate_client = (*self.feature_gate_client).clone();
+                    let result = feature_gate_client
+                        .batch_check_guild_features(BatchCheck {
+                            feature_name: self.config.indexing_feature.clone(),
+                            guild_ids: Vec::from(guild_chunk),
+                        })
+                        .await;
+                    consume_rpc_result(result)
+                };
+                let result = send.retry(self.config.rpc_backoff.build()).await;
+                match result {
+                    Ok(batch_result) => {
+                        if batch_result.has_feature.len() != guild_chunk.len() {
+                            log::warn!(
+                                "feature-gate service returned batch result with different length than input; expected: {}, actual: {}",
+                                guild_chunk.len(),
+                                batch_result.has_feature.len()
+                            );
+                            // Ignore and move to the next chunk
+                            continue;
+                        }
+                        for (guild_id, result) in guild_chunk.iter().zip(batch_result.has_feature) {
+                            results.insert(*guild_id, result);
+                        }
+                    }
+                    Err(err) => {
+                        log::warn!("An error occurred while sending RPC message to feature-gate service: {:?}", err);
+                        // Ignore and move to the next poll interval
+                        continue;
+                    }
+                }
+            }
+
+            // Acquire a write lock and merge the results of the polling into the map
+            let mut guilds_write = self.guilds.write().expect("active guilds lock poisoned");
+            let mut rising_edge_guilds = Vec::<u64>::new();
+            let mut falling_edge_guilds = Vec::<u64>::new();
+            for (guild_id, is_active) in results {
+                // Only update the status if it is still in the map
+                guilds_write.entry(guild_id).and_modify(|status| {
+                    if let GuildStatus::Loaded(state) = status {
+                        // Note the result of the update,
+                        // and prepare to send guild online/offline messages if the edge changes
+                        match state.update(is_active) {
+                            Some(ActiveEdge::Rising) => rising_edge_guilds.push(guild_id),
+                            Some(ActiveEdge::Falling) => falling_edge_guilds.push(guild_id),
+                            None => {}
+                        }
+                    }
+
+                    // Do nothing if the guild is loading
+                    // (this shouldn't be possible since we filtered, but there might be
+                    // a rapid offline->online scenario that could cause this)
+                });
+            }
+
+            // Check for evictions
+            let mut to_evict = Vec::<u64>::new();
+            for (guild_id, status) in guilds_write.iter_mut() {
+                if let GuildStatus::Loaded(LoadedState {
+                    connection: GuildConnection::Offline(eviction_timer_start),
+                    ..
+                }) = status
+                {
+                    let elapsed = Instant::now().duration_since(*eviction_timer_start);
+                    if elapsed > self.config.active_guild_eviction_duration {
+                        // Evict the guild
+                        to_evict.push(*guild_id);
+                    }
+                }
+            }
+            for guild_id in to_evict {
+                guilds_write.remove(&guild_id);
+            }
+            drop(guilds_write);
+
+            // TODO Send polling edge results to shared channel
+        }
     }
 
     /// Filters uptime events to ensure that they only contain active guilds
@@ -79,7 +218,7 @@ impl ActiveGuilds {
         loop {
             let guilds_read = self.guilds.read().expect("active guilds lock poisoned");
             return match guilds_read.get(&guild_id) {
-                Some(GuildStatus::Loaded { is_active, .. }) => *is_active,
+                Some(GuildStatus::Loaded(LoadedState { is_active, .. })) => *is_active,
                 Some(GuildStatus::Loading(loading_tx)) => {
                     // Start waiting on the channel
                     // Note: since we require that signalers acquire the write lock
@@ -135,17 +274,21 @@ impl ActiveGuilds {
                     };
                     let result = send.retry(self.config.rpc_backoff.build()).await;
                     let is_active = result.map_or_else(|err| {
-                        log::warn!("Could not contact the feature-gate service for information about indexing on guild {}: {:?}", guild_id, err);
+                        log::warn!(
+                            "Could not contact the feature-gate service for information about indexing on guild {}: {:?}",
+                            guild_id,
+                            err
+                        );
                         // Default to true if the feature gate cannot be contacted
                         // for graceful degradation
                         true
                     }, |r| r.has_feature);
-                    let default_status = GuildStatus::Loaded {
+                    let default_status = GuildStatus::Loaded(LoadedState {
                         is_active,
-                        // Note: we start the eviction timer for eagerly loaded guilds
-                        // If we receive the Online event for the guild, the timer will be removed
-                        eviction_timer_start: Some(Instant::now()),
-                    };
+                        // Note: we set eagerly loaded guilds as offline
+                        // If we receive the Online event for the guild, the status will be updated
+                        connection: GuildConnection::offline(),
+                    });
 
                     // Broadcast the value on the channel after acquiring the write lock again
                     let mut guilds_write =
@@ -165,9 +308,9 @@ impl ActiveGuilds {
                         .entry(guild_id)
                         .and_modify(|status| {
                             match status {
-                                GuildStatus::Loaded {
+                                GuildStatus::Loaded(LoadedState {
                                     is_active: active, ..
-                                } => *active = is_active,
+                                }) => *active = is_active,
                                 _ => *status = default_status.clone(),
                             };
                         })
