@@ -27,11 +27,13 @@ pub struct Configuration {
     pub feature_gate_batch_check_size: usize,
     /// How long to keep offline guilds in the active guild cache
     /// (Allows for detecting guilds that enable/disable their indexing rapidly)
+    #[serde(with = "serde_humantime")]
     pub active_guild_eviction_duration: Duration,
     /// The amount of time to wait between polls to the feature-gate service
     /// to retrieve the current status of all guilds and whether they have indexing enabled
     /// Lowering increases I/O on the feature-gate and lock contention on the processing hot-path
     /// while increasing response times for indexing enable/disable actions
+    #[serde(with = "serde_humantime")]
     pub active_guilds_poll_interval: Duration,
 }
 
