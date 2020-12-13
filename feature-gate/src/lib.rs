@@ -12,10 +12,8 @@ pub mod schema;
 #[macro_use]
 extern crate diesel;
 
-use diesel::pg::expression::dsl::any;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
-use std::collections::HashSet;
 use thiserror::Error;
 
 /// Simple custom error type for letting the library user know what went
@@ -155,54 +153,6 @@ pub fn check_guild_feature(conn: &PgConnection, guild_id: i64, feature: &str) ->
             } else {
                 Ok(true)
             }
-        }
-        Err(_) => Err(DatabaseError::Query),
-    }
-}
-
-/// Checks to see if a list of guilds has the associated feature.
-///
-/// First gets the feature id and then checks to see if each of the guild id-feature id
-/// pairs can be found in the guild feature database.
-/// Returns a list of booleans in the same order as the input `guild_ids` list
-/// where each element corresponds to whether the corresponding guild has the feature.
-///
-/// # Arguments
-/// * `conn` - Database connection
-/// * `guild_ids` - List of Guild IDs to check
-/// * `feature` - Name of feature to check on guild
-///
-/// # Errors
-/// * `DatabaseError::UnknownFeature` - Feature is not found in the database
-/// * `DatabaseError::Query` - The query to the database failed
-pub fn batch_check_guild_feature(
-    conn: &PgConnection,
-    guild_ids: &[i64],
-    feature: &str,
-) -> DbResult<Vec<bool>> {
-    let feature_id = get_feature_id(conn, feature)?;
-
-    let result = schema::tb_guild_features::table
-        .filter(schema::tb_guild_features::feature_id.eq(feature_id))
-        // Note: uses PG-specific feature
-        .filter(schema::tb_guild_features::guild_id.eq(any(guild_ids)))
-        .load::<(i64, i32)>(conn);
-
-    match result {
-        Ok(v) => {
-            // Create set of guilds with the feature enabled
-            let mut with_feature_set = HashSet::<i64>::with_capacity(v.len());
-            for (guild_id, _) in v {
-                with_feature_set.insert(guild_id);
-            }
-
-            // Create an ordered result
-            let mut results = Vec::with_capacity(guild_ids.len());
-            for guild_id in guild_ids {
-                results.push(with_feature_set.contains(guild_id));
-            }
-
-            Ok(results)
         }
         Err(_) => Err(DatabaseError::Query),
     }
