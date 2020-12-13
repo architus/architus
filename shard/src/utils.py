@@ -104,6 +104,8 @@ def user_to_dict(user: discord.User) -> dict:
     params = ('id', 'name', 'avatar', 'discriminator')
     data = {p: getattr(user, p) for p in params}
     data['id'] = str(data['id'])
+    data['username'] = data['name']
+    del data['name']
     return data
 
 

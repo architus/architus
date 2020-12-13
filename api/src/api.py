@@ -163,7 +163,8 @@ class Stats(CustomResource):
 class Music(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int, jwt: JWT):
-        return self.shard.get_playlist(guild_id, routing_guild=guild_id)
+        resp, sc = self.shard.get_playlist(guild_id, routing_guild=guild_id)
+        return camelcase_keys(resp), sc
 
     @reqparams(song=str)
     @authenticated()
