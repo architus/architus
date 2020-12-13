@@ -39,6 +39,17 @@ impl LoadedState {
         }
     }
 
+    fn update_connection(&mut self, connection: GuildConnection) -> Option<ActiveEdge> {
+        let active_before = self.active();
+        self.connection = connection;
+        let active_after = self.active();
+        match (active_before, active_after) {
+            (true, false) => Some(ActiveEdge::Falling),
+            (false, true) => Some(ActiveEdge::Rising),
+            _ => None,
+        }
+    }
+
     fn update_with_connection(
         &mut self,
         active: bool,
@@ -95,7 +106,9 @@ struct LoadingNotifier {
 
 impl LoadingNotifier {
     fn new() -> Self {
-        let (loading_tx, loading_rx) = broadcast::channel(32);
+        // Note: we need the limit to be 2 in case a processed upstream uptime event and eager load
+        // both operate on the same guild
+        let (loading_tx, loading_rx) = broadcast::channel(2);
         Self {
             inner: loading_tx,
             _receiver: loading_rx,
@@ -354,12 +367,65 @@ impl ActiveGuilds {
                         );
                     }
                     UptimeEvent::Offline { guilds, timestamp } => {
-                        // TODO fix
-                        self.emit_uptime(UptimeEvent::Offline { guilds, timestamp });
+                        let mut guilds_write =
+                            self.guilds.write().expect("active guilds lock poisoned");
+                        let mut rising_edge_guilds = Vec::<u64>::new();
+                        let mut falling_edge_guilds = Vec::<u64>::new();
+
+                        // Update each guild status
+                        for guild_id in guilds {
+                            guilds_write
+                                .entry(guild_id)
+                                .and_modify(|status| match status {
+                                    GuildStatus::Loaded(state) => {
+                                        // Note the result of the update,
+                                        // and prepare to send guild online/offline messages if the edge changes
+                                        match state.update_connection(
+                                            GuildConnection::offline(),
+                                        ) {
+                                            Some(ActiveEdge::Rising) => {
+                                                rising_edge_guilds.push(guild_id)
+                                            }
+                                            Some(ActiveEdge::Falling) => {
+                                                falling_edge_guilds.push(guild_id)
+                                            }
+                                            None => {}
+                                        }
+                                    }
+                                    GuildStatus::Loading(_) => {
+                                        log::warn!("UptimeEvent::Offline event processed for guild that was marked as loading: {}. Ignoring", guild_id);
+                                    }
+                                })
+                                .or_insert_with(|| {
+                                    log::warn!("UptimeEvent::Offline event processed for guild that was not loaded: {}", guild_id);
+                                    GuildStatus::Loaded(LoadedState {
+                                        is_active: false,
+                                        connection: GuildConnection::offline(),
+                                    })
+                                });
+                        }
+
+                        // Emit the edge events to the uptime channel
+                        self.source_uptime_events(
+                            timestamp,
+                            rising_edge_guilds,
+                            falling_edge_guilds,
+                        );
                     }
                     UptimeEvent::Heartbeat { guilds, timestamp } => {
-                        // TODO fix
-                        self.emit_uptime(UptimeEvent::Heartbeat { guilds, timestamp });
+                        let guilds_read =
+                            self.guilds.read().expect("active guilds lock poisoned");
+                        let uptime_guilds = guilds.iter().filter(|guild_id| {
+                            if guilds_read.contains_key(guild_id) {
+                                true
+                            } else {
+                                log::warn!("UptimeEvent::Heartbeat event processed for guild that was not loaded: {}", guild_id);
+                                false
+                            }
+                        }).cloned().collect::<Vec<_>>();
+                        drop(guilds_read);
+
+                        self.emit_uptime(UptimeEvent::Heartbeat { guilds: uptime_guilds, timestamp });
                     }
                 }
             })
