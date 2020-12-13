@@ -12,9 +12,15 @@ mod feature_gate {
     tonic::include_proto!("featuregate");
 }
 
+mod uptime {
+    #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
+    tonic::include_proto!("logs.uptime");
+}
+
 use crate::active_guilds::{ActiveGuilds, FeatureGateClient};
 use crate::config::Configuration;
 use crate::connection::{Tracker, UpdateMessage};
+use crate::uptime::{GatewaySubmitRequest, GatewaySubmitType};
 use anyhow::{anyhow, Context, Result};
 use architus_id::{time, HoarFrost, IdProvisioner};
 use backoff::future::FutureOperation as _;
@@ -101,7 +107,8 @@ async fn main() -> Result<()> {
     let unfiltered_uptime_pipe = active_guilds.pipe_uptime_events(uptime_events_stream);
 
     // Sink all uptime events to the uptime tracking service
-    let uptime_events_sink = sink_uptime_events(uptime_service_client, uptime_rx);
+    let uptime_events_sink =
+        sink_uptime_events(Arc::clone(&config), uptime_service_client, uptime_rx);
 
     // Continuously poll the set of active guilds
     let active_guilds_poll = active_guilds.go_poll();
@@ -124,6 +131,28 @@ pub enum UptimeEvent {
     Online { guilds: Vec<u64>, timestamp: u64 },
     Offline { guilds: Vec<u64>, timestamp: u64 },
     Heartbeat { guilds: Vec<u64>, timestamp: u64 },
+}
+
+impl Into<GatewaySubmitRequest> for UptimeEvent {
+    fn into(self) -> GatewaySubmitRequest {
+        match self {
+            Self::Online { guilds, timestamp } => GatewaySubmitRequest {
+                r#type: GatewaySubmitType::Online as i32,
+                guilds,
+                timestamp,
+            },
+            Self::Offline { guilds, timestamp } => GatewaySubmitRequest {
+                r#type: GatewaySubmitType::Offline as i32,
+                guilds,
+                timestamp,
+            },
+            Self::Heartbeat { guilds, timestamp } => GatewaySubmitRequest {
+                r#type: GatewaySubmitType::Heartbeat as i32,
+                guilds,
+                timestamp,
+            },
+        }
+    }
 }
 
 /// Attempts to initialize a gateway connection
@@ -196,10 +225,31 @@ async fn connect_to_feature_gate(config: Arc<Configuration>) -> Result<FeatureGa
     Ok(connection)
 }
 
-/// Creates a new connection to the uptime service
-/// TODO implement and change return type
-async fn connect_to_uptime_service(_config: Arc<Configuration>) -> Result<()> {
-    Ok(())
+type LogsUptimeClient =
+    crate::uptime::uptime_service_client::UptimeServiceClient<tonic::transport::Channel>;
+
+/// Creates a new connection to the logs/uptime service
+async fn connect_to_uptime_service(config: Arc<Configuration>) -> Result<LogsUptimeClient> {
+    let initialization_backoff = config.initialization_backoff.build();
+    let uptime_url = config.services.logs_uptime.clone();
+    let connect = || async {
+        let conn = LogsUptimeClient::connect(uptime_url.clone())
+            .await
+            .map_err(|err| {
+                log::warn!(
+                    "Couldn't connect to logs/uptime, retrying after backoff: {:?}",
+                    err
+                );
+                err
+            })?;
+        Ok(conn)
+    };
+    let connection = connect
+        .retry(initialization_backoff)
+        .await
+        .context("Could not connect to logs/uptime")?;
+    log::info!("Connected to logs/uptime at {}", uptime_url);
+    Ok(connection)
 }
 
 /// Listens for lifecycle events from the Gateway and sends corresponding update messages
@@ -500,15 +550,32 @@ fn try_extract_guild_id(
 /// Acts as a stream sink for uptime events,
 /// sending them to the uptime service
 async fn sink_uptime_events(
-    _uptime_service_client: (),
+    config: Arc<Configuration>,
+    uptime_service_client: LogsUptimeClient,
     in_stream: impl Stream<Item = UptimeEvent>,
 ) -> Result<()> {
+    let uptime_service_client = Arc::new(uptime_service_client);
+
     // Note: we don't exit the service if this part fails;
     // this is an acceptable degradation
     in_stream
-        .for_each_concurrent(None, move |event| async move {
-            // TODO implement sending to service
-            log::info!("Sending UptimeEvent: {:?}", event);
+        .for_each_concurrent(None, move |event| {
+            let uptime_service_client = Arc::clone(&uptime_service_client);
+            let config = Arc::clone(&config);
+            async move {
+                log::debug!("Sending UptimeEvent to logs/uptime: {:?}", event);
+                let send = || async {
+                    let mut uptime_service_client = (*uptime_service_client).clone();
+                    let response = uptime_service_client
+                        .gateway_submit(Into::<GatewaySubmitRequest>::into(event.clone()))
+                        .await?
+                        .into_inner();
+                    Ok(response)
+                };
+                if let Err(err) = send.retry(config.rpc_backoff.build()).await {
+                    log::warn!("Submitting UptimeEvent to logs/uptime failed: {:?}", err);
+                }
+            }
         })
         .await;
 

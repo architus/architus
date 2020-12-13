@@ -18,6 +18,8 @@ active_guilds_poll_interval = "1m"
 gateway_queue = "amqp://127.0.0.1:5672/%2f"
 # Combined host/port of the feature-gate service
 feature_gate = "[::1]:50555"
+# Combined host/port of the logs/uptime service
+logs_uptime = "[::1]:50556"
 
 # Config options related to the Gateway Queue
 [gateway_queue]
