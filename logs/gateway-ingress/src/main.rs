@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
     let feature_gate_client = connect_to_feature_gate(Arc::clone(&config))
         .await
         .context("Could not connect to the active guild service")?;
-    let active_guilds = ActiveGuilds::new(feature_gate_client, Arc::clone(&config));
+    let (active_guilds, uptime_rx) = ActiveGuilds::new(feature_gate_client, Arc::clone(&config));
 
     // Connect to the uptime service to ensure that it has a healthy connection
     let uptime_service_client = connect_to_uptime_service(Arc::clone(&config))
@@ -98,11 +98,10 @@ async fn main() -> Result<()> {
 
     // Pipe the uptime events from the tracker into the active guild handler
     let uptime_events_stream = tracker.stream_events();
-    let active_filtered_events_stream = active_guilds.pipe_uptime_events(uptime_events_stream);
+    let unfiltered_uptime_pipe = active_guilds.pipe_uptime_events(uptime_events_stream);
 
     // Sink all uptime events to the uptime tracking service
-    let uptime_events_sink =
-        sink_uptime_events(uptime_service_client, active_filtered_events_stream);
+    let uptime_events_sink = sink_uptime_events(uptime_service_client, uptime_rx);
 
     // Continuously poll the set of active guilds
     let active_guilds_poll = active_guilds.go_poll();
@@ -110,6 +109,7 @@ async fn main() -> Result<()> {
     // Run all futures until an error is encountered
     try_join!(
         lifecycle_event_listener,
+        unfiltered_uptime_pipe,
         uptime_events_sink,
         publish_sink,
         active_guilds_poll,
