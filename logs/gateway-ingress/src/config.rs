@@ -51,6 +51,8 @@ pub struct Services {
     pub gateway_queue: String,
     /// Combined host/port of the feature-gate service
     pub feature_gate: String,
+    /// Combined host/port of the logs/uptime
+    pub logs_uptime: String,
 }
 
 /// Config options related to the Gateway Queue
