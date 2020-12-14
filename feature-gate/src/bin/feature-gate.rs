@@ -309,7 +309,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     simple_logger::init_with_level(log::Level::Info).unwrap();
     let db_usr = env::var("db_user").expect("Need to have an architus.env file");
     let db_pass = env::var("db_pass").expect("Need to have an architus.env file");
-    let database_url = format!("postgresql://{}{}@postgres:5432/autbot", db_usr, db_pass);
+    let database_url = format!("postgresql://{}:{}@postgres:5432/autbot", db_usr, db_pass);
 
     let addr = "0.0.0.0:50555".parse()?;
     let manager: ConnectionManager<PgConnection> = ConnectionManager::new(database_url);

@@ -121,6 +121,25 @@ services:
     depends_on:
       - rabbit
       - feature-gate
+      - logs-uptime
+    networks:
+      - webnet
+    env_file:
+      - architus.env
+    environment:
+      RUST_LOG: "info"
+  logs-uptime:
+    image: jazevedo6/logs-uptime:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./logs/uptime/Dockerfile
+    ports:
+      - "50281:50281"
+    command: /opt/config.toml
+    volumes:
+      - type: bind
+        source: ./logs/uptime/config.default.toml
+        target: /opt/config.toml
     networks:
       - webnet
     env_file:
