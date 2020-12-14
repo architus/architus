@@ -53,5 +53,10 @@ RUN cp $REPO_ROOT/$SERVICE/target/release/logs-gateway-ingress /opt/logs-gateway
 
 # Create minimal deployment
 FROM debian:buster-slim as deployment
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -q \
+    && apt-get install -y -q "libssl1.1" "tini" \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /opt/logs-gateway-ingress /usr/bin/logs-gateway-ingress
-ENTRYPOINT ["/usr/bin/logs-gateway-ingress"]
+ENV RUST_BACKTRACE=1
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-gateway-ingress"]

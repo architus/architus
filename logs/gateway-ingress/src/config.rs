@@ -52,9 +52,9 @@ pub struct Secrets {
 pub struct Services {
     /// Full AMQP URL to connect to the gateway queue at
     pub gateway_queue: String,
-    /// Combined host/port of the feature-gate service
+    /// HTTP URL of the feature-gate service
     pub feature_gate: String,
-    /// Combined host/port of the logs/uptime
+    /// HTTP URL of the logs/uptime service
     pub logs_uptime: String,
 }
 
@@ -81,7 +81,7 @@ impl Configuration {
         settings
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
-            // Add in settings from the environment (with a prefix of INGRESS)
+            // Add in settings from the environment (with a prefix of LOGS_GATEWAY_INGRESS)
             // Eg.. `LOGS_GATEWAY_INGRESS_SECRETS__DISCORD_TOKEN=X ./target/logs-gateway-ingress`
             // would set the `secrets.discord_token` key
             .merge(config::Environment::with_prefix("LOGS_GATEWAY_INGRESS").separator("__"))

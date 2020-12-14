@@ -1,0 +1,25 @@
+[package]
+name = "logs-uptime"
+version = "0.1.0"
+authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
+edition = "2018"
+description = """\
+Runs as a gRPC server and takes messages from sharded gateway ingress services\
+to gain information about how long the gateway ingress shards are online\
+"""
+license = "MIT"
+
+[dependencies]
+config = "0.10"
+log = "0.4"
+env_logger = "0.8"
+anyhow = "1.0"
+# Using tokio v2 because tonic uses it
+tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "macros"] }
+serde = { version = "1.0", features = ["derive"] }
+tonic = "0.3"
+prost = "0.6"
+
+[build-dependencies]
+tonic-build = "0.3"
+anyhow = "1.0"

@@ -16,9 +16,9 @@ active_guilds_poll_interval = "1m"
 [services]
 # Full AMQP URL to connect to the gateway queue at
 gateway_queue = "amqp://127.0.0.1:5672/%2f"
-# Combined host/port of the feature-gate service
+# HTTP URL of the feature-gate service
 feature_gate = "[::1]:50555"
-# Combined host/port of the logs/uptime service
+# HTTP URL of the logs/uptime service
 logs_uptime = "[::1]:50556"
 
 # Config options related to the Gateway Queue
@@ -34,7 +34,7 @@ routing_key = "logs/normalize"
 # Max number of active channels on a single AMQP connection
 max_size = 16
 # Timeouts on pool operations that will cause a re-connect if they elapse
-timeouts = { create = "5s" }
+timeouts = { create = { secs = 5, nanos = 0 } }
 
 # Parameters for the backoff used to connect to external services during initialization
 [initialization_backoff]
@@ -54,6 +54,5 @@ multiplier = 2.0
 # For example, to specify `discord_token`,
 # give a value to the `LOGS_GATEWAY_INGRESS_SECRETS__DISCORD_TOKEN` variable
 [secrets]
-# Make sure to replace this with the Discord token
-# from the Discord developers bot page
-discord_token = "<REPLACE_ME>"
+# Discord bot token
+discord_token = ""

@@ -11,5 +11,5 @@ license = "MIT"
 [dependencies]
 lapin = "1.6"
 anyhow = "1.0"
-deadpool = "0.6"
+deadpool = "0.5"
 async-trait = "0.1"
