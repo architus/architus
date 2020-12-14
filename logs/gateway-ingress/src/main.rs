@@ -1,34 +1,24 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 #![allow(clippy::future_not_send)]
 
-mod active_guilds;
-mod amqp_pool;
 mod config;
-mod connection;
-mod debounced_pool;
+mod connect;
+mod rpc;
+mod uptime;
 
-mod feature_gate {
-    #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
-    tonic::include_proto!("featuregate");
-}
-
-mod uptime {
-    #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
-    tonic::include_proto!("logs.uptime");
-}
-
-use crate::active_guilds::{ActiveGuilds, FeatureGateClient};
 use crate::config::Configuration;
-use crate::connection::{Tracker, UpdateMessage};
-use crate::uptime::{GatewaySubmitRequest, GatewaySubmitType};
+use crate::rpc::LogsUptimeClient;
+use crate::uptime::active_guilds::ActiveGuilds;
+use crate::uptime::connection::Tracker;
+use crate::uptime::{Event as UptimeEvent, UpdateMessage};
 use anyhow::{anyhow, Context, Result};
+use architus_amqp_pool::{Manager, Pool, PoolError};
 use architus_id::{time, HoarFrost, IdProvisioner};
 use backoff::future::FutureOperation as _;
-use deadpool::managed::PoolError;
 use futures::{try_join, Stream, StreamExt, TryStreamExt};
 use gateway_queue_lib::GatewayEvent;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
-use lapin::{types::FieldTable, BasicProperties, Connection, ConnectionProperties};
+use lapin::{types::FieldTable, BasicProperties, Connection};
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -37,7 +27,23 @@ use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
 use twilight_model::gateway::event::shard::Payload;
 use twilight_model::gateway::OpCode;
 
-/// Attempts to initialize the bot and listen for gateway events
+lazy_static! {
+    /// Includes all guild-related events to signal to Discord that we intend to
+    /// receive and process them
+    pub static ref INTENTS: Intents = Intents::GUILDS
+        | Intents::GUILD_MEMBERS
+        | Intents::GUILD_BANS
+        | Intents::GUILD_EMOJIS
+        | Intents::GUILD_INTEGRATIONS
+        | Intents::GUILD_WEBHOOKS
+        | Intents::GUILD_INVITES
+        | Intents::GUILD_VOICE_STATES
+        | Intents::GUILD_MEMBERS
+        | Intents::GUILD_MESSAGES
+        | Intents::GUILD_MESSAGE_REACTIONS;
+}
+
+/// Loads the config and bootstraps the service
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
@@ -49,39 +55,31 @@ async fn main() -> Result<()> {
         \nlogs-gateway-ingress [config-path]",
     );
     let config = Arc::new(Configuration::try_load(config_path)?);
+    run(config).await
+}
 
+/// Attempts to initialize the bot and listen for gateway events
+async fn run(config: Arc<Configuration>) -> Result<()> {
     // Create the tracker and its update message channel
-    let (tracker, update_tx) = Tracker::new(Arc::clone(&config));
+    let (connection_tracker, update_tx) = Tracker::new(Arc::clone(&config));
 
-    // Connect to the Discord Gateway and initialize the shard
-    let shard = connect_to_shard(Arc::clone(&config))
-        .await
-        .context("Could not connect to the Discord gateway")?;
-    let shard_shared = Arc::new(shard);
+    // Initialize connections to external services
+    let shard_shared = Arc::new(connect::to_shard(Arc::clone(&config)).await?);
+    let rmq_connection = connect::to_queue(Arc::clone(&config)).await?;
+    let feature_gate_client = connect::to_feature_gate(Arc::clone(&config)).await?;
+    let uptime_service_client = connect::to_uptime_service(Arc::clone(&config)).await?;
+
+    // Notify the connection tracker of the newly connected services
     update_tx
         .send(UpdateMessage::GatewayOnline)
         .context("Could not send gateway online update to uptime tracker")?;
-
-    // Connect to the Rabbit MQ queue once to ensure that it has a healthy connection
-    let rmq_connection = connect_to_queue(Arc::clone(&config))
-        .await
-        .context("Could not connect RabbitMQ")?;
     update_tx
         .send(UpdateMessage::QueueOnline)
         .context("Could not send queue online update to uptime tracker")?;
 
-    // Connect to the feature gate service to ensure that it has a healthy connection
-    let feature_gate_client = connect_to_feature_gate(Arc::clone(&config))
-        .await
-        .context("Could not connect to the active guild service")?;
     let (active_guilds, uptime_rx) = ActiveGuilds::new(feature_gate_client, Arc::clone(&config));
 
-    // Connect to the uptime service to ensure that it has a healthy connection
-    let uptime_service_client = connect_to_uptime_service(Arc::clone(&config))
-        .await
-        .context("Could not connect to the uptime service")?;
-
-    // Connect to RabbitMQ and start re-publishing events on the queue
+    // Listen to incoming gateway events and start re-publishing them on the queue
     // (performing the primary purpose of the service)
     let publish_sink = publish_events(
         rmq_connection,
@@ -103,7 +101,7 @@ async fn main() -> Result<()> {
     );
 
     // Pipe the uptime events from the tracker into the active guild handler
-    let uptime_events_stream = tracker.stream_events();
+    let uptime_events_stream = connection_tracker.stream_events();
     let unfiltered_uptime_pipe = active_guilds.pipe_uptime_events(uptime_events_stream);
 
     // Sink all uptime events to the uptime tracking service
@@ -121,135 +119,8 @@ async fn main() -> Result<()> {
         publish_sink,
         active_guilds_poll,
     )?;
+
     Ok(())
-}
-
-/// Represents a bulk uptime event that is eventually dispatched to the uptime service
-/// in addition to the timestamp that the event happened at
-#[derive(Clone, Debug, PartialEq)]
-pub enum UptimeEvent {
-    Online { guilds: Vec<u64>, timestamp: u64 },
-    Offline { guilds: Vec<u64>, timestamp: u64 },
-    Heartbeat { guilds: Vec<u64>, timestamp: u64 },
-}
-
-impl Into<GatewaySubmitRequest> for UptimeEvent {
-    fn into(self) -> GatewaySubmitRequest {
-        match self {
-            Self::Online { guilds, timestamp } => GatewaySubmitRequest {
-                r#type: GatewaySubmitType::Online as i32,
-                guilds,
-                timestamp,
-            },
-            Self::Offline { guilds, timestamp } => GatewaySubmitRequest {
-                r#type: GatewaySubmitType::Offline as i32,
-                guilds,
-                timestamp,
-            },
-            Self::Heartbeat { guilds, timestamp } => GatewaySubmitRequest {
-                r#type: GatewaySubmitType::Heartbeat as i32,
-                guilds,
-                timestamp,
-            },
-        }
-    }
-}
-
-/// Attempts to initialize a gateway connection
-async fn connect_to_shard(config: Arc<Configuration>) -> Result<Shard> {
-    let initialization_backoff = config.initialization_backoff.build();
-    let shard_connect = || async {
-        let mut shard = Shard::new(config.secrets.discord_token.clone(), *INTENTS);
-        shard.start().await.map_err(|err| {
-            log::warn!(
-                "Couldn't start bot shard, retrying after backoff: {:?}",
-                err
-            );
-            err
-        })?;
-        Ok(shard)
-    };
-    let shard = shard_connect
-        .retry(initialization_backoff)
-        .await
-        .context("Could not start shard")?;
-    log::info!("Created shard and preparing to listen for gateway events");
-    Ok(shard)
-}
-
-/// Creates a new connection to Rabbit MQ
-async fn connect_to_queue(config: Arc<Configuration>) -> Result<Connection> {
-    let initialization_backoff = config.initialization_backoff.build();
-    let rmq_url = config.services.gateway_queue.clone();
-    let rmq_connect = || async {
-        let conn = Connection::connect(&rmq_url, ConnectionProperties::default())
-            .await
-            .map_err(|err| {
-                log::warn!(
-                    "Couldn't connect to RabbitMQ, retrying after backoff: {:?}",
-                    err
-                );
-                err
-            })?;
-        Ok(conn)
-    };
-    let rmq_connection = rmq_connect
-        .retry(initialization_backoff)
-        .await
-        .context("Could not connect to the RabbitMQ gateway queue")?;
-    log::info!("Connected to RabbitMQ at {}", rmq_url);
-    Ok(rmq_connection)
-}
-
-/// Creates a new connection to the feature gate service
-async fn connect_to_feature_gate(config: Arc<Configuration>) -> Result<FeatureGateClient> {
-    let initialization_backoff = config.initialization_backoff.build();
-    let feature_gate_url = config.services.feature_gate.clone();
-    let connect = || async {
-        let conn = FeatureGateClient::connect(feature_gate_url.clone())
-            .await
-            .map_err(|err| {
-                log::warn!(
-                    "Couldn't connect to feature-gate, retrying after backoff: {:?}",
-                    err
-                );
-                err
-            })?;
-        Ok(conn)
-    };
-    let connection = connect
-        .retry(initialization_backoff)
-        .await
-        .context("Could not connect to feature-gate")?;
-    log::info!("Connected to feature-gate at {}", feature_gate_url);
-    Ok(connection)
-}
-
-type LogsUptimeClient =
-    crate::uptime::uptime_service_client::UptimeServiceClient<tonic::transport::Channel>;
-
-/// Creates a new connection to the logs/uptime service
-async fn connect_to_uptime_service(config: Arc<Configuration>) -> Result<LogsUptimeClient> {
-    let initialization_backoff = config.initialization_backoff.build();
-    let uptime_url = config.services.logs_uptime.clone();
-    let connect = || async {
-        let conn = LogsUptimeClient::connect(uptime_url.clone())
-            .await
-            .map_err(|err| {
-                log::warn!(
-                    "Couldn't connect to logs/uptime, retrying after backoff: {:?}",
-                    err
-                );
-                err
-            })?;
-        Ok(conn)
-    };
-    let connection = connect
-        .retry(initialization_backoff)
-        .await
-        .context("Could not connect to logs/uptime")?;
-    log::info!("Connected to logs/uptime at {}", uptime_url);
-    Ok(connection)
 }
 
 /// Listens for lifecycle events from the Gateway and sends corresponding update messages
@@ -288,20 +159,39 @@ async fn process_lifecycle_events(
     Ok(())
 }
 
-lazy_static! {
-    /// Includes all guild-related events to signal to Discord that we intend to
-    /// receive and process them
-    pub static ref INTENTS: Intents = Intents::GUILDS
-        | Intents::GUILD_MEMBERS
-        | Intents::GUILD_BANS
-        | Intents::GUILD_EMOJIS
-        | Intents::GUILD_INTEGRATIONS
-        | Intents::GUILD_WEBHOOKS
-        | Intents::GUILD_INVITES
-        | Intents::GUILD_VOICE_STATES
-        | Intents::GUILD_MEMBERS
-        | Intents::GUILD_MESSAGES
-        | Intents::GUILD_MESSAGE_REACTIONS;
+/// Acts as a stream sink for uptime events,
+/// sending them to the uptime service
+async fn sink_uptime_events(
+    config: Arc<Configuration>,
+    uptime_service_client: LogsUptimeClient,
+    in_stream: impl Stream<Item = UptimeEvent>,
+) -> Result<()> {
+    let uptime_service_client = Arc::new(uptime_service_client);
+
+    // Note: we don't exit the service if this part fails;
+    // this is an acceptable degradation
+    in_stream
+        .for_each_concurrent(None, move |event| {
+            let uptime_service_client = Arc::clone(&uptime_service_client);
+            let config = Arc::clone(&config);
+            async move {
+                log::debug!("Sending UptimeEvent to logs/uptime: {:?}", event);
+                let send = || async {
+                    let mut uptime_service_client = (*uptime_service_client).clone();
+                    let response = uptime_service_client
+                        .gateway_submit(event.clone())
+                        .await?
+                        .into_inner();
+                    Ok(response)
+                };
+                if let Err(err) = send.retry(config.rpc_backoff.build()).await {
+                    log::warn!("Submitting UptimeEvent to logs/uptime failed: {:?}", err);
+                }
+            }
+        })
+        .await;
+
+    Ok(())
 }
 
 /// Manages the lifecycle of the connection to the downstream Rabbit MQ queue
@@ -309,7 +199,7 @@ lazy_static! {
 /// Attempts to re-connect to Rabbit MQ upon lost connection,
 /// and will update the stateful uptime tracker accordingly
 async fn publish_events(
-    rmq_connection: Connection,
+    queue_connection: Connection,
     active_guilds: ActiveGuilds,
     shard: Arc<Shard>,
     config: Arc<Configuration>,
@@ -323,110 +213,54 @@ async fn publish_events(
     // using the same backoff as initialization.
     // If the backoff is exhausted or there is another error, then the entire future exits
     // (and the service will exit accordingly)
-    let mut rmq_connection = Some(rmq_connection);
+    let mut outer_rmq_connection = Some(queue_connection);
     loop {
         let id_provisioner = Arc::clone(&id_provisioner);
         let config = Arc::clone(&config);
         let active_guilds = active_guilds.clone();
 
         // Reconnect to the Rabbit MQ instance if needed
-        let rmq = if let Some(rmq) = rmq_connection.take() {
+        let rmq_connection = if let Some(rmq) = outer_rmq_connection.take() {
             rmq
         } else {
-            let rmq = connect_to_queue(Arc::clone(&config))
-                .await
-                .context("Could not reconnect to RabbitMQ")?;
+            let connection = connect::to_queue(Arc::clone(&config)).await?;
             update_tx
                 .send(UpdateMessage::QueueOnline)
                 .context("Could not send queue online update to uptime tracker")?;
-            rmq
+            connection
         };
 
-        // Declare the RMQ channel to publish incoming events to
-        let rmq_channel = rmq
-            .create_channel()
-            .await
-            .context("Could not create a new RabbitMQ channel")?;
-        let queue_options = QueueDeclareOptions {
-            durable: true,
-            ..QueueDeclareOptions::default()
-        };
-        rmq_channel
-            .queue_declare(
-                &config.gateway_queue.queue_name,
-                queue_options,
-                FieldTable::default(),
-            )
-            .await
-            .context("Could not declare the RabbitMQ queue")?;
-        drop(rmq_channel);
-        log::info!(
-            "Declared RabbitMQ queue {}",
-            config.gateway_queue.queue_name
-        );
+        // Declare the RMQ queue to publish incoming events to
+        declare_event_queue(&rmq_connection, Arc::clone(&config)).await?;
 
         // Create a pool for the RMQ channels
-        let manager = amqp_pool::Manager::new(rmq);
-        let channels =
-            amqp_pool::Pool::from_config(manager, config.gateway_queue.connection_pool.clone());
+        let manager = Manager::new(rmq_connection);
+        let channel_pool = Pool::from_config(manager, config.gateway_queue.connection_pool.clone());
 
         // Start listening to the stream
         // (we have to convert the Stream to a TryStream before using `try_for_each_concurrent`)
         let event_stream = shard.some_events(EventTypeFlags::SHARD_PAYLOAD);
         let event_try_stream = event_stream.map(Ok::<Event, anyhow::Error>);
         let process = event_try_stream.try_for_each_concurrent(None, move |event| {
-            let id_provisioner = Arc::clone(&id_provisioner);
+            // Provision an ID and note the timestamp immediately
+            let timestamp = time::millisecond_ts();
+            let id = id_provisioner.with_ts(timestamp);
+
             let config = Arc::clone(&config);
             let active_guilds = active_guilds.clone();
-            let channels = channels.clone();
-            async move {
-                let timestamp = time::millisecond_ts();
-                let id = id_provisioner.with_ts(timestamp);
+            let channel_pool = channel_pool.clone();
 
-                // Create the `GatewayEvent` from the raw event
-                if let Some(gateway_event) = process_raw_event(event, timestamp, id) {
+            // Create the `GatewayEvent` from the raw event
+            async move {
+                if let Some(gateway_event) = convert_raw_event(event, timestamp, id) {
                     // Make sure the guild is active before forwarding
-                    let should_process = match gateway_event.guild_id {
+                    let should_publish = match gateway_event.guild_id {
                         Some(id) => active_guilds.is_active(id).await,
                         None => true,
                     };
-                    if !should_process {
-                        return Ok(());
+                    if should_publish {
+                        try_publish(gateway_event, channel_pool, config).await?;
                     }
-
-                    // Serialize the event into a binary buffer using MessagePack
-                    let buf = match rmp_serde::to_vec(&gateway_event) {
-                        Ok(buf) => buf,
-                        Err(err) => {
-                            log::warn!(
-                                "An error occurred while serializing event to MessagePack: {:?}",
-                                err
-                            );
-                            return Ok(());
-                        }
-                    };
-
-                    // Asynchronously obtain a channel from the pool
-                    let channel = channels.get().await.map_err(|err| match err {
-                        PoolError::Backend(err) => err,
-                        PoolError::Timeout(timeout) => {
-                            anyhow!("Timeout error from pool: {:?}", timeout)
-                        }
-                    })?;
-
-                    // Finally, publish the event to the durable queue
-                    channel
-                        .basic_publish(
-                            &config.gateway_queue.exchange,
-                            &config.gateway_queue.routing_key,
-                            BasicPublishOptions::default(),
-                            buf,
-                            // 2 = persistent/durable
-                            // `https://www.rabbitmq.com/publishers.html#message-properties`
-                            BasicProperties::default().with_delivery_mode(2),
-                        )
-                        .await
-                        .context("Could not publish gateway event to queue")?;
                 }
 
                 Ok(())
@@ -442,9 +276,35 @@ async fn publish_events(
     }
 }
 
+/// Declares the Rabbit MQ queue, which is done during initialization of the Rabbit MQ connection
+async fn declare_event_queue(
+    rmq_connection: &Connection,
+    config: Arc<Configuration>,
+) -> Result<()> {
+    // Create a temporary channel
+    let rmq_channel = rmq_connection
+        .create_channel()
+        .await
+        .context("Could not create a new RabbitMQ channel")?;
+
+    // Declare the queue
+    let queue_name = &config.gateway_queue.queue_name;
+    let queue_options = QueueDeclareOptions {
+        durable: true,
+        ..QueueDeclareOptions::default()
+    };
+    rmq_channel
+        .queue_declare(queue_name, queue_options, FieldTable::default())
+        .await
+        .context("Could not declare the RabbitMQ queue")?;
+
+    log::info!("Declared RabbitMQ queue {}", queue_name);
+    Ok(())
+}
+
 /// Attempts to synchronously convert a raw gateway event into our struct
 /// that will eventually be published to the gateway queue
-fn process_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<GatewayEvent> {
+fn convert_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<GatewayEvent> {
     if let Event::ShardPayload(Payload { bytes }) = event {
         let json = match std::str::from_utf8(&bytes) {
             Ok(json) => json,
@@ -493,6 +353,49 @@ fn process_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<Gate
     }
 
     None
+}
+
+/// Attempts to publish a single gateway event to the durable queue
+async fn try_publish(
+    gateway_event: GatewayEvent,
+    channel_pool: architus_amqp_pool::Pool,
+    config: Arc<Configuration>,
+) -> Result<()> {
+    // Serialize the event into a binary buffer using MessagePack
+    let buf = match rmp_serde::to_vec(&gateway_event) {
+        Ok(buf) => buf,
+        Err(err) => {
+            log::warn!(
+                "An error occurred while serializing event to MessagePack: {:?}",
+                err
+            );
+            return Ok(());
+        }
+    };
+
+    // Asynchronously obtain a channel from the pool
+    let channel = channel_pool.get().await.map_err(|err| match err {
+        PoolError::Backend(err) => err,
+        PoolError::Timeout(timeout) => {
+            anyhow!("Timeout error from pool: {:?}", timeout)
+        }
+    })?;
+
+    // Finally, publish the event to the durable queue
+    channel
+        .basic_publish(
+            &config.gateway_queue.exchange,
+            &config.gateway_queue.routing_key,
+            BasicPublishOptions::default(),
+            buf,
+            // 2 = persistent/durable
+            // `https://www.rabbitmq.com/publishers.html#message-properties`
+            BasicProperties::default().with_delivery_mode(2),
+        )
+        .await
+        .context("Could not publish gateway event to queue")?;
+
+    Ok(())
 }
 
 /// Determines whether the ingress shard should forward events to the queue
@@ -545,39 +448,4 @@ fn try_extract_guild_id(
         raw_event_type
     );
     None
-}
-
-/// Acts as a stream sink for uptime events,
-/// sending them to the uptime service
-async fn sink_uptime_events(
-    config: Arc<Configuration>,
-    uptime_service_client: LogsUptimeClient,
-    in_stream: impl Stream<Item = UptimeEvent>,
-) -> Result<()> {
-    let uptime_service_client = Arc::new(uptime_service_client);
-
-    // Note: we don't exit the service if this part fails;
-    // this is an acceptable degradation
-    in_stream
-        .for_each_concurrent(None, move |event| {
-            let uptime_service_client = Arc::clone(&uptime_service_client);
-            let config = Arc::clone(&config);
-            async move {
-                log::debug!("Sending UptimeEvent to logs/uptime: {:?}", event);
-                let send = || async {
-                    let mut uptime_service_client = (*uptime_service_client).clone();
-                    let response = uptime_service_client
-                        .gateway_submit(Into::<GatewaySubmitRequest>::into(event.clone()))
-                        .await?
-                        .into_inner();
-                    Ok(response)
-                };
-                if let Err(err) = send.retry(config.rpc_backoff.build()).await {
-                    log::warn!("Submitting UptimeEvent to logs/uptime failed: {:?}", err);
-                }
-            }
-        })
-        .await;
-
-    Ok(())
 }

@@ -1,26 +1,28 @@
 use crate::config::Configuration;
-use crate::feature_gate::{BatchCheck, GuildFeature};
-use crate::UptimeEvent;
+use crate::rpc::feature_gate::{BatchCheck, GuildFeature};
+use crate::rpc::FeatureGateClient;
+use crate::uptime::Event as UptimeEvent;
 use anyhow::Result;
 use backoff::future::FutureOperation;
 use futures::{Stream, StreamExt};
 use static_assertions::assert_impl_all;
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 
-pub type FeatureGateClient =
-    crate::feature_gate::feature_gate_client::FeatureGateClient<tonic::transport::Channel>;
-
-/// Represents the cached online/offline + indexing enabled/disabled status of a single guild
+/// Represents the cached online/offline + indexing enabled/disabled status of a single guild,
+/// or a guild with their indexing enabled/disabled status being loaded
 #[derive(Clone, Debug)]
 enum GuildStatus {
     Loaded(LoadedState),
     Loading(LoadingNotifier),
 }
 
+/// Contains the state of a loaded guild,
+/// including whether it is offline/online and whether it has indexing enabled or disabled
 #[derive(Clone, Debug)]
 struct LoadedState {
     is_active: bool,
@@ -28,37 +30,21 @@ struct LoadedState {
 }
 
 impl LoadedState {
-    fn update(&mut self, active: bool) -> Option<ActiveEdge> {
-        let active_before = self.active();
-        self.is_active = active;
-        let active_after = self.active();
-        match (active_before, active_after) {
-            (true, false) => Some(ActiveEdge::Falling),
-            (false, true) => Some(ActiveEdge::Rising),
-            _ => None,
-        }
-    }
-
-    fn update_connection(&mut self, connection: GuildConnection) -> Option<ActiveEdge> {
-        let active_before = self.active();
-        self.connection = connection;
-        let active_after = self.active();
-        match (active_before, active_after) {
-            (true, false) => Some(ActiveEdge::Falling),
-            (false, true) => Some(ActiveEdge::Rising),
-            _ => None,
-        }
-    }
-
-    fn update_with_connection(
+    fn update(
         &mut self,
-        active: bool,
-        connection: GuildConnection,
+        active: Option<bool>,
+        connection: Option<GuildConnection>,
     ) -> Option<ActiveEdge> {
+        // Update the state and detect a potential edge
         let active_before = self.active();
-        self.is_active = active;
-        self.connection = connection;
+        if let Some(active) = active {
+            self.is_active = active;
+        }
+        if let Some(connection) = connection {
+            self.connection = connection;
+        }
         let active_after = self.active();
+
         match (active_before, active_after) {
             (true, false) => Some(ActiveEdge::Falling),
             (false, true) => Some(ActiveEdge::Rising),
@@ -91,6 +77,28 @@ enum GuildConnection {
 impl GuildConnection {
     fn offline() -> Self {
         Self::Offline(Instant::now())
+    }
+}
+
+struct EdgeDetector {
+    pub rising_edge: Vec<u64>,
+    pub falling_edge: Vec<u64>,
+}
+
+impl EdgeDetector {
+    fn consume(&mut self, guild_id: u64, edge: impl Borrow<Option<ActiveEdge>>) {
+        match edge.borrow() {
+            Some(ActiveEdge::Rising) => self.rising_edge.push(guild_id),
+            Some(ActiveEdge::Falling) => self.falling_edge.push(guild_id),
+            None => {}
+        }
+    }
+
+    const fn new() -> Self {
+        Self {
+            rising_edge: Vec::new(),
+            falling_edge: Vec::new(),
+        }
     }
 }
 
@@ -203,19 +211,12 @@ impl ActiveGuilds {
             // Acquire a write lock and merge the results of the polling into the map
             let mut guilds_write = self.guilds.write().expect("active guilds lock poisoned");
             let timestamp = architus_id::time::millisecond_ts();
-            let mut rising_edge_guilds = Vec::<u64>::new();
-            let mut falling_edge_guilds = Vec::<u64>::new();
+            let mut edges = EdgeDetector::new();
             for (guild_id, is_active) in poll_results {
                 // Only update the status if it is still in the map
                 guilds_write.entry(guild_id).and_modify(|status| {
                     if let GuildStatus::Loaded(state) = status {
-                        // Note the result of the update,
-                        // and prepare to send guild online/offline messages if the edge changes
-                        match state.update(is_active) {
-                            Some(ActiveEdge::Rising) => rising_edge_guilds.push(guild_id),
-                            Some(ActiveEdge::Falling) => falling_edge_guilds.push(guild_id),
-                            None => {}
-                        }
+                        edges.consume(guild_id, state.update(Some(is_active), None));
                     }
 
                     // Do nothing if the guild is loading
@@ -245,7 +246,7 @@ impl ActiveGuilds {
             drop(guilds_write);
 
             // Emit the edge events to the uptime channel
-            self.source_uptime_events(timestamp, rising_edge_guilds, falling_edge_guilds);
+            self.source_uptime_events(timestamp, edges);
         }
     }
 
@@ -315,27 +316,16 @@ impl ActiveGuilds {
                         };
 
                         // Signal all waiting fields
-                        let mut rising_edge_guilds = Vec::<u64>::new();
-                        let mut falling_edge_guilds = Vec::<u64>::new();
+                        let mut edges = EdgeDetector::new();
                         for (guild_id, is_active) in active_values {
                             guilds_write
                                 .entry(guild_id)
                                 .and_modify(|status| match status {
                                     GuildStatus::Loaded(state) => {
-                                        // Note the result of the update,
-                                        // and prepare to send guild online/offline messages if the edge changes
-                                        match state.update_with_connection(
-                                            is_active,
-                                            GuildConnection::Online,
-                                        ) {
-                                            Some(ActiveEdge::Rising) => {
-                                                rising_edge_guilds.push(guild_id)
-                                            }
-                                            Some(ActiveEdge::Falling) => {
-                                                falling_edge_guilds.push(guild_id)
-                                            }
-                                            None => {}
-                                        }
+                                        edges.consume(guild_id, state.update(
+                                            Some(is_active),
+                                            Some(GuildConnection::Online),
+                                        ));
                                     }
                                     GuildStatus::Loading(notifier) => {
                                         notifier.notify(is_active);
@@ -344,13 +334,13 @@ impl ActiveGuilds {
                                             connection: GuildConnection::Online,
                                         };
                                         if state.active() {
-                                            rising_edge_guilds.push(guild_id)
+                                            edges.rising_edge.push(guild_id)
                                         }
                                         *status = GuildStatus::Loaded(state);
                                     }
                                 })
                                 .or_insert_with(|| {
-                                    rising_edge_guilds.push(guild_id);
+                                    edges.rising_edge.push(guild_id);
                                     GuildStatus::Loaded(LoadedState {
                                         is_active,
                                         connection: GuildConnection::Online,
@@ -360,17 +350,12 @@ impl ActiveGuilds {
                         drop(guilds_write);
 
                         // Emit the edge events to the uptime channel
-                        self.source_uptime_events(
-                            timestamp,
-                            rising_edge_guilds,
-                            falling_edge_guilds,
-                        );
+                        self.source_uptime_events(timestamp, edges);
                     }
                     UptimeEvent::Offline { guilds, timestamp } => {
                         let mut guilds_write =
                             self.guilds.write().expect("active guilds lock poisoned");
-                        let mut rising_edge_guilds = Vec::<u64>::new();
-                        let mut falling_edge_guilds = Vec::<u64>::new();
+                        let mut edges = EdgeDetector::new();
 
                         // Update each guild status
                         for guild_id in guilds {
@@ -378,19 +363,10 @@ impl ActiveGuilds {
                                 .entry(guild_id)
                                 .and_modify(|status| match status {
                                     GuildStatus::Loaded(state) => {
-                                        // Note the result of the update,
-                                        // and prepare to send guild online/offline messages if the edge changes
-                                        match state.update_connection(
-                                            GuildConnection::offline(),
-                                        ) {
-                                            Some(ActiveEdge::Rising) => {
-                                                rising_edge_guilds.push(guild_id)
-                                            }
-                                            Some(ActiveEdge::Falling) => {
-                                                falling_edge_guilds.push(guild_id)
-                                            }
-                                            None => {}
-                                        }
+                                        edges.consume(guild_id, state.update(
+                                            None,
+                                            Some(GuildConnection::offline()),
+                                        ));
                                     }
                                     GuildStatus::Loading(_) => {
                                         log::warn!("UptimeEvent::Offline event processed for guild that was marked as loading: {}. Ignoring", guild_id);
@@ -408,8 +384,7 @@ impl ActiveGuilds {
                         // Emit the edge events to the uptime channel
                         self.source_uptime_events(
                             timestamp,
-                            rising_edge_guilds,
-                            falling_edge_guilds,
+                            edges,
                         );
                     }
                     UptimeEvent::Heartbeat { guilds, timestamp } => {
@@ -493,16 +468,16 @@ impl ActiveGuilds {
 
     /// Sends uptime events in the shared channel for guilds that come online/offline
     /// as a result of changes to the status of loaded guilds
-    fn source_uptime_events(&self, timestamp: u64, rising_edge: Vec<u64>, falling_edge: Vec<u64>) {
-        if !rising_edge.is_empty() {
+    fn source_uptime_events(&self, timestamp: u64, edges: EdgeDetector) {
+        if !edges.rising_edge.is_empty() {
             self.emit_uptime(UptimeEvent::Online {
-                guilds: rising_edge,
+                guilds: edges.rising_edge,
                 timestamp,
             });
         }
-        if !falling_edge.is_empty() {
+        if !edges.falling_edge.is_empty() {
             self.emit_uptime(UptimeEvent::Offline {
-                guilds: falling_edge,
+                guilds: edges.falling_edge,
                 timestamp,
             });
         }
@@ -601,20 +576,13 @@ impl ActiveGuilds {
 
         // There is a data race where another load could have been performed,
         // so mutate the entry in-place
-        let mut rising_edge_guilds = Vec::<u64>::new();
-        let mut falling_edge_guilds = Vec::<u64>::new();
+        let mut edges = EdgeDetector::new();
         guilds_write
             .entry(guild_id)
             .and_modify(|status| {
                 match status {
                     GuildStatus::Loaded(state) => {
-                        // Note the result of the update,
-                        // and prepare to send guild online/offline messages if the edge changes
-                        match state.update(is_active) {
-                            Some(ActiveEdge::Rising) => rising_edge_guilds.push(guild_id),
-                            Some(ActiveEdge::Falling) => falling_edge_guilds.push(guild_id),
-                            None => {}
-                        }
+                        edges.consume(guild_id, state.update(Some(is_active), None));
                     }
                     _ => *status = default_status.clone(),
                 };
@@ -622,7 +590,7 @@ impl ActiveGuilds {
             .or_insert(default_status);
 
         // Emit the edge events to the uptime channel
-        self.source_uptime_events(timestamp, rising_edge_guilds, falling_edge_guilds);
+        self.source_uptime_events(timestamp, edges);
 
         is_active
     }

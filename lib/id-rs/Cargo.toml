@@ -3,6 +3,10 @@ name = "architus-id"
 version = "0.1.0"
 authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
+description = """\
+Handles the issuance of Snowflake-formatted IDs and the millisecond needed timestamp generation\
+"""
+license = "MIT"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

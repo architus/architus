@@ -1,5 +1,8 @@
+//! Contains configuration options for the service that control its network topology
+//! and internal behaviors
+
 use anyhow::{Context, Result};
-use backoff::ExponentialBackoff;
+use architus_config_backoff::Backoff;
 use deadpool::managed::PoolConfig;
 use log::{debug, info};
 use serde::Deserialize;
@@ -66,38 +69,6 @@ pub struct GatewayQueue {
     pub routing_key: String,
     /// Configuration for the connection pool that sits in front of a connection to the gateway queue
     pub connection_pool: PoolConfig,
-}
-
-/// Controls an exponential backoff and can be loaded from a config file
-/// TODO move to shared crate
-#[derive(Default, Debug, Deserialize, Clone)]
-pub struct Backoff {
-    #[serde(with = "serde_humantime")]
-    pub initial_interval: Duration,
-    #[serde(with = "serde_humantime")]
-    pub max_interval: Duration,
-    #[serde(with = "serde_humantime")]
-    pub duration: Duration,
-    pub multiplier: f64,
-}
-
-impl Backoff {
-    pub fn build(&self) -> ExponentialBackoff {
-        self.into()
-    }
-}
-
-impl<'a> Into<ExponentialBackoff> for &'a Backoff {
-    fn into(self) -> ExponentialBackoff {
-        ExponentialBackoff {
-            current_interval: self.initial_interval,
-            initial_interval: self.initial_interval,
-            multiplier: self.multiplier,
-            max_interval: self.max_interval,
-            max_elapsed_time: Some(self.duration),
-            ..ExponentialBackoff::default()
-        }
-    }
 }
 
 impl Configuration {

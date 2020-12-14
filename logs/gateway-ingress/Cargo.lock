@@ -77,6 +77,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c0df63cb2955042487fad3aefd2c6e3ae7389ac5dc1beb28921de0b69f779d4"
 
 [[package]]
+name = "architus-amqp-pool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "deadpool",
+ "lapin",
+]
+
+[[package]]
+name = "architus-config-backoff"
+version = "0.1.0"
+dependencies = [
+ "backoff",
+ "serde 1.0.118",
+ "serde-humantime",
+]
+
+[[package]]
 name = "architus-id"
 version = "0.1.0"
 dependencies = [
@@ -951,8 +970,9 @@ name = "logs-gateway-ingress"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "architus-amqp-pool",
+ "architus-config-backoff",
  "architus-id",
- "async-trait",
  "backoff",
  "config",
  "deadpool",
