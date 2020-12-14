@@ -12,6 +12,8 @@ license = "MIT"
 [dependencies]
 gateway-queue-lib = { package = "logs-gateway-queue-lib", path = "../gateway-queue-lib" }
 architus-id = { path = "../../lib/id-rs" }
+architus-amqp-pool = { path = "../../lib/amqp-pool-rs" }
+architus-config-backoff = { path = "../../lib/config-backoff-rs" }
 config = "0.10"
 log = "0.4"
 env_logger = "0.8"
@@ -31,7 +33,6 @@ backoff = { version = "0.2", features = ["tokio"] }
 lapin = "1.6"
 tokio-amqp = "0.2"
 deadpool = "0.6"
-async-trait = "0.1"
 tonic = "0.3"
 prost = "0.6"
 

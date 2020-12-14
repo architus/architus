@@ -1,3 +1,7 @@
+//! Defines a generalized data structure that is a thread-safe set of items
+//! that can be added to or removed from,
+//! and re-emits batch add and delete events after a short debouncing delay.
+
 use log::warn;
 use static_assertions::assert_impl_all;
 use std::collections::HashSet;
@@ -16,59 +20,6 @@ pub struct Update<T> {
     pub removed: Option<Vec<T>>,
 }
 
-#[derive(Debug)]
-struct PoolInner<T: Clone + Eq + Hash> {
-    pool: HashSet<T>,
-    added: HashSet<T>,
-    removed: HashSet<T>,
-    preparing_release_cancel: Option<oneshot::Sender<()>>,
-}
-
-impl<T: Clone + Eq + Hash> PoolInner<T> {
-    fn new() -> Self {
-        Self {
-            pool: HashSet::new(),
-            added: HashSet::new(),
-            removed: HashSet::new(),
-            preparing_release_cancel: None,
-        }
-    }
-
-    fn release(&mut self) -> Option<Update<T>> {
-        // Process added items if there are any
-        let added = if self.added.is_empty() {
-            None
-        } else {
-            let mut added_vec = Vec::with_capacity(self.added.len());
-            for item in self.added.drain() {
-                self.pool.insert(item.clone());
-                added_vec.push(item);
-            }
-            Some(added_vec)
-        };
-
-        // Process removed items if there are any
-        let removed = if self.removed.is_empty() {
-            None
-        } else {
-            let mut removed_vec = Vec::with_capacity(self.removed.len());
-            for item in self.removed.drain() {
-                self.pool.remove(&item);
-                removed_vec.push(item);
-            }
-            Some(removed_vec)
-        };
-
-        // Only return an update if there were any items
-        if added.is_some() || removed.is_some() {
-            Some(Update { added, removed })
-        } else {
-            warn!("a release on a DebouncedPool was performed but no items were updated");
-            None
-        }
-    }
-}
-
 /// Encapsulates a pool of items that can be added to or removed from,
 /// and will emit debounced update events after a short delay
 /// that include all items added to or removed from the pool in that interval.
@@ -81,6 +32,7 @@ pub struct DebouncedPool<T: Clone + Eq + Hash> {
     release_publish: mpsc::UnboundedSender<Update<T>>,
 }
 
+// Make sure a pool of guild ids is sync+send
 assert_impl_all!(DebouncedPool<u64>: Sync, Send);
 
 impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
@@ -172,6 +124,9 @@ impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
         inner_state.pool.iter().cloned().collect::<U>()
     }
 
+    /// Starts a Tokio task for releasing the current pool status,
+    /// returning a oneshot channel that can be used to cancel the release
+    /// (for example, if a manual release was performed early)
     fn start_release_timer(&self) -> oneshot::Sender<()> {
         let (cancel_sender, mut cancel_receiver) = oneshot::channel::<()>();
         let channel = self.release_publish.clone();
@@ -201,5 +156,60 @@ impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
             }
         });
         cancel_sender
+    }
+}
+
+/// Contains the inner mutable state of a pool
+/// (requires synchronization)
+#[derive(Debug)]
+struct PoolInner<T: Clone + Eq + Hash> {
+    pool: HashSet<T>,
+    added: HashSet<T>,
+    removed: HashSet<T>,
+    preparing_release_cancel: Option<oneshot::Sender<()>>,
+}
+
+impl<T: Clone + Eq + Hash> PoolInner<T> {
+    fn new() -> Self {
+        Self {
+            pool: HashSet::new(),
+            added: HashSet::new(),
+            removed: HashSet::new(),
+            preparing_release_cancel: None,
+        }
+    }
+
+    fn release(&mut self) -> Option<Update<T>> {
+        // Process added items if there are any
+        let added = if self.added.is_empty() {
+            None
+        } else {
+            let mut added_vec = Vec::with_capacity(self.added.len());
+            for item in self.added.drain() {
+                self.pool.insert(item.clone());
+                added_vec.push(item);
+            }
+            Some(added_vec)
+        };
+
+        // Process removed items if there are any
+        let removed = if self.removed.is_empty() {
+            None
+        } else {
+            let mut removed_vec = Vec::with_capacity(self.removed.len());
+            for item in self.removed.drain() {
+                self.pool.remove(&item);
+                removed_vec.push(item);
+            }
+            Some(removed_vec)
+        };
+
+        // Only return an update if there were any items
+        if added.is_some() || removed.is_some() {
+            Some(Update { added, removed })
+        } else {
+            warn!("a release on a DebouncedPool was performed but no items were updated");
+            None
+        }
     }
 }

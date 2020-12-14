@@ -2,6 +2,9 @@ use anyhow::{Context, Error};
 use async_trait::async_trait;
 use lapin::{Channel, Connection};
 
+// Re-export error type
+pub use deadpool::managed::PoolError;
+
 /// Provides a channel pool around a single AMQP connection.
 /// This struct can be cloned and transferred across thread boundaries
 /// and uses reference counting for its internal state.
