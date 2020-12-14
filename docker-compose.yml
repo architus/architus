@@ -108,5 +108,24 @@ services:
       - webnet
     env_file:
       - architus.env
+  logs-gateway-ingress:
+    image: jazevedo6/logs-gateway-ingress:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./logs/gateway-ingress/Dockerfile
+    command: /opt/config.toml
+    volumes:
+      - type: bind
+        source: ./logs/gateway-ingress/config.default.toml
+        target: /opt/config.toml
+    depends_on:
+      - rabbit
+      - feature-gate
+    networks:
+      - webnet
+    env_file:
+      - architus.env
+    environment:
+      RUST_LOG: "info"
 networks:
   webnet:
