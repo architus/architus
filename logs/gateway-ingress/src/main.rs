@@ -178,11 +178,8 @@ async fn sink_uptime_events(
                 log::debug!("Sending UptimeEvent to logs/uptime: {:?}", event);
                 let send = || async {
                     let mut uptime_service_client = (*uptime_service_client).clone();
-                    let response = uptime_service_client
-                        .gateway_submit(event.clone())
-                        .await?
-                        .into_inner();
-                    Ok(response)
+                    let response = uptime_service_client.gateway_submit(event.clone()).await;
+                    rpc::into_backoff(response)
                 };
                 if let Err(err) = send.retry(config.rpc_backoff.build()).await {
                     log::warn!("Submitting UptimeEvent to logs/uptime failed: {:?}", err);

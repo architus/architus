@@ -1,4 +1,5 @@
 use crate::config::Configuration;
+use crate::rpc;
 use crate::rpc::feature_gate::{BatchCheck, GuildFeature};
 use crate::rpc::FeatureGateClient;
 use crate::uptime::Event as UptimeEvent;
@@ -80,35 +81,13 @@ impl GuildConnection {
     }
 }
 
-struct EdgeDetector {
-    pub rising_edge: Vec<u64>,
-    pub falling_edge: Vec<u64>,
-}
-
-impl EdgeDetector {
-    fn consume(&mut self, guild_id: u64, edge: impl Borrow<Option<ActiveEdge>>) {
-        match edge.borrow() {
-            Some(ActiveEdge::Rising) => self.rising_edge.push(guild_id),
-            Some(ActiveEdge::Falling) => self.falling_edge.push(guild_id),
-            None => {}
-        }
-    }
-
-    const fn new() -> Self {
-        Self {
-            rising_edge: Vec::new(),
-            falling_edge: Vec::new(),
-        }
-    }
-}
-
 #[derive(Debug)]
 struct LoadingNotifier {
     inner: broadcast::Sender<bool>,
-    // we use an unused variable binding on the receiver
+    // we use an unused struct member on the receiver
     // to ensure that signaling doesn't produce an error
-    // since the RAII receiver in the variable binding is dropped
-    // after loading has completed
+    // since the RAII receiver in the struct is dropped
+    // after loading has completed and been dropped
     _receiver: broadcast::Receiver<bool>,
 }
 
@@ -150,6 +129,30 @@ impl Clone for LoadingNotifier {
     }
 }
 
+/// Implements shared logic to consume an optional edge in a guild's active status
+/// and collect all edges for sourcing uptime events at the end of a batch update
+struct EdgeDetector {
+    pub rising_edge: Vec<u64>,
+    pub falling_edge: Vec<u64>,
+}
+
+impl EdgeDetector {
+    fn consume(&mut self, guild_id: u64, edge: impl Borrow<Option<ActiveEdge>>) {
+        match edge.borrow() {
+            Some(ActiveEdge::Rising) => self.rising_edge.push(guild_id),
+            Some(ActiveEdge::Falling) => self.falling_edge.push(guild_id),
+            None => {}
+        }
+    }
+
+    const fn new() -> Self {
+        Self {
+            rising_edge: Vec::new(),
+            falling_edge: Vec::new(),
+        }
+    }
+}
+
 /// Represents a shared handler that continuously polls the feature service
 /// and sits between the connection tracker and the uptime service
 /// to maintain a pool of the actively listened guilds
@@ -179,6 +182,32 @@ impl ActiveGuilds {
             uptime_event_tx: Arc::new(uptime_event_tx),
         };
         (new_self, uptime_event_rx)
+    }
+
+    /// Filters uptime events to ensure that they only contain active guilds
+    /// that have events that are actually forwarded
+    pub async fn pipe_uptime_events(
+        &self,
+        in_stream: impl Stream<Item = UptimeEvent>,
+    ) -> Result<()> {
+        // Process each item in order and do not shut down the service if it fails
+        in_stream
+            .for_each(|event| async {
+                match event {
+                    UptimeEvent::Online { guilds, timestamp } => {
+                        self.handle_online(&guilds, timestamp).await
+                    }
+                    UptimeEvent::Offline { guilds, timestamp } => {
+                        self.handle_offline(&guilds, timestamp).await
+                    }
+                    UptimeEvent::Heartbeat { guilds, timestamp } => {
+                        self.handle_heartbeat(&guilds, timestamp).await
+                    }
+                }
+            })
+            .await;
+
+        Ok(())
     }
 
     /// Runs a task that continuously polls the feature gate to maintain an active list of guilds
@@ -248,165 +277,6 @@ impl ActiveGuilds {
             // Emit the edge events to the uptime channel
             self.source_uptime_events(timestamp, edges);
         }
-    }
-
-    /// Filters uptime events to ensure that they only contain active guilds
-    /// that have events that are actually forwarded
-    pub async fn pipe_uptime_events(
-        &self,
-        in_stream: impl Stream<Item = UptimeEvent>,
-    ) -> Result<()> {
-        // Process each item in order and do not shut down the service if it fails
-        in_stream
-            .for_each(|event| async {
-                match event {
-                    UptimeEvent::Online { guilds, timestamp } => {
-                        // Grab a write lock for when we insert loading indicators (which is likely)
-                        let mut guilds_write =
-                            self.guilds.write().expect("active guilds lock poisoned");
-
-                        // Load the active values for all currently-loaded guilds
-                        let mut active_values = guilds
-                            .iter()
-                            .filter_map(|id| match guilds_write.get(id) {
-                                Some(GuildStatus::Loaded(LoadedState { is_active, .. })) => {
-                                    Some((*id, *is_active))
-                                }
-                                _ => None,
-                            })
-                            .collect::<HashMap<_, _>>();
-                        // Load guilds that either are unloaded or loading (likely from an eager load)
-                        // this is because including them in the batch is cheap
-                        // and it allows us to not have to wait on the other channels
-                        // Additionally, we return/shadow the write lock guard to only temporarily drop the lock
-                        // if sending a request for loading guilds from the feature-gate service
-                        let to_load = guilds
-                            .iter()
-                            .filter(|id| !active_values.contains_key(id))
-                            .cloned()
-                            .collect::<Vec<_>>();
-                        let mut guilds_write = if to_load.is_empty() {
-                            guilds_write
-                        } else {
-                            // Create loading status for all guilds
-                            for guild_id in &to_load {
-                                // Insert the loading status if it already isn't there
-                                guilds_write.entry(*guild_id).or_insert_with(|| {
-                                    GuildStatus::Loading(LoadingNotifier::new())
-                                });
-                            }
-
-                            // Send a batched request for all guilds
-                            drop(guilds_write);
-                            active_values.extend(
-                                self.poll(&to_load)
-                                    .await
-                                    .unwrap_or_else(|| {
-                                        // Default to true for each guild
-                                        let mut map = HashMap::<u64, bool>::new();
-                                        for id in guilds {
-                                            map.insert(id, true);
-                                        }
-                                        map
-                                    })
-                                    .iter(),
-                            );
-
-                            self.guilds.write().expect("active guilds lock poisoned")
-                        };
-
-                        // Signal all waiting fields
-                        let mut edges = EdgeDetector::new();
-                        for (guild_id, is_active) in active_values {
-                            guilds_write
-                                .entry(guild_id)
-                                .and_modify(|status| match status {
-                                    GuildStatus::Loaded(state) => {
-                                        edges.consume(guild_id, state.update(
-                                            Some(is_active),
-                                            Some(GuildConnection::Online),
-                                        ));
-                                    }
-                                    GuildStatus::Loading(notifier) => {
-                                        notifier.notify(is_active);
-                                        let state = LoadedState {
-                                            is_active,
-                                            connection: GuildConnection::Online,
-                                        };
-                                        if state.active() {
-                                            edges.rising_edge.push(guild_id)
-                                        }
-                                        *status = GuildStatus::Loaded(state);
-                                    }
-                                })
-                                .or_insert_with(|| {
-                                    edges.rising_edge.push(guild_id);
-                                    GuildStatus::Loaded(LoadedState {
-                                        is_active,
-                                        connection: GuildConnection::Online,
-                                    })
-                                });
-                        }
-                        drop(guilds_write);
-
-                        // Emit the edge events to the uptime channel
-                        self.source_uptime_events(timestamp, edges);
-                    }
-                    UptimeEvent::Offline { guilds, timestamp } => {
-                        let mut guilds_write =
-                            self.guilds.write().expect("active guilds lock poisoned");
-                        let mut edges = EdgeDetector::new();
-
-                        // Update each guild status
-                        for guild_id in guilds {
-                            guilds_write
-                                .entry(guild_id)
-                                .and_modify(|status| match status {
-                                    GuildStatus::Loaded(state) => {
-                                        edges.consume(guild_id, state.update(
-                                            None,
-                                            Some(GuildConnection::offline()),
-                                        ));
-                                    }
-                                    GuildStatus::Loading(_) => {
-                                        log::warn!("UptimeEvent::Offline event processed for guild that was marked as loading: {}. Ignoring", guild_id);
-                                    }
-                                })
-                                .or_insert_with(|| {
-                                    log::warn!("UptimeEvent::Offline event processed for guild that was not loaded: {}", guild_id);
-                                    GuildStatus::Loaded(LoadedState {
-                                        is_active: false,
-                                        connection: GuildConnection::offline(),
-                                    })
-                                });
-                        }
-
-                        // Emit the edge events to the uptime channel
-                        self.source_uptime_events(
-                            timestamp,
-                            edges,
-                        );
-                    }
-                    UptimeEvent::Heartbeat { guilds, timestamp } => {
-                        let guilds_read =
-                            self.guilds.read().expect("active guilds lock poisoned");
-                        let uptime_guilds = guilds.iter().filter(|guild_id| {
-                            if guilds_read.contains_key(guild_id) {
-                                true
-                            } else {
-                                log::warn!("UptimeEvent::Heartbeat event processed for guild that was not loaded: {}", guild_id);
-                                false
-                            }
-                        }).cloned().collect::<Vec<_>>();
-                        drop(guilds_read);
-
-                        self.emit_uptime(UptimeEvent::Heartbeat { guilds: uptime_guilds, timestamp });
-                    }
-                }
-            })
-            .await;
-
-        Ok(())
     }
 
     /// Determines whether the given `guild_id` should have events forwarded to the queue
@@ -483,6 +353,16 @@ impl ActiveGuilds {
         }
     }
 
+    /// Sends an uptime event on the shared channel which is forwarded to the uptime service
+    fn emit_uptime(&self, event: UptimeEvent) {
+        if let Err(err) = self.uptime_event_tx.send(event) {
+            log::warn!(
+                "An error occurred while sending uptime event to shared channel: {:?}",
+                err
+            );
+        }
+    }
+
     /// Loads the up-to-date status of all given guilds
     #[allow(clippy::await_holding_lock)]
     async fn poll(&self, guilds: &[u64]) -> Option<HashMap<u64, bool>> {
@@ -497,7 +377,7 @@ impl ActiveGuilds {
                         guild_ids: Vec::from(guild_chunk),
                     })
                     .await;
-                consume_rpc_result(result)
+                rpc::into_backoff(result)
             };
             let result = send.retry(self.config.rpc_backoff.build()).await;
             match result {
@@ -528,16 +408,6 @@ impl ActiveGuilds {
         Some(results)
     }
 
-    /// Sends an uptime event on the shared channel which is forwarded to the uptime service
-    fn emit_uptime(&self, event: UptimeEvent) {
-        if let Err(err) = self.uptime_event_tx.send(event) {
-            log::warn!(
-                "An error occurred while sending uptime event to shared channel: {:?}",
-                err
-            );
-        }
-    }
-
     /// Sends a single-guild request to the feature-gate service and loads the result
     async fn eager_load(&self, guild_id: u64, notifier: LoadingNotifier) -> bool {
         // Fetch the guild from the feature server using a backoff
@@ -549,7 +419,7 @@ impl ActiveGuilds {
                     guild_id,
                 })
                 .await;
-            consume_rpc_result(result)
+            rpc::into_backoff(result)
         };
         let result = send.retry(self.config.rpc_backoff.build()).await;
         let timestamp = architus_id::time::millisecond_ts();
@@ -594,20 +464,172 @@ impl ActiveGuilds {
 
         is_active
     }
-}
 
-/// Transforms an RPC result into a more useful one,
-/// and prepares a backoff error for potentially recoverable tonic Status's
-fn consume_rpc_result<T>(
-    result: Result<tonic::Response<T>, tonic::Status>,
-) -> Result<T, backoff::Error<tonic::Status>> {
-    match result {
-        Ok(response) => Ok(response.into_inner()),
-        Err(status) => match status.code() {
-            tonic::Code::Internal | tonic::Code::Unknown | tonic::Code::Unavailable => {
-                Err(backoff::Error::Permanent(status))
+    /// Handles an unfiltered online event,
+    /// splitting the given guilds up into those that are unloaded/loading and those that are loaded,
+    /// and batch load the unloaded ones.
+    /// Once the authoritative status is known for all guilds,
+    /// update their entries in the inner map to be online and have the correct active status
+    /// Note: clippy lint ignore is due to bug I discovered;
+    /// remove once `https://github.com/rust-lang/rust-clippy/issues/6446` is addressed
+    #[allow(clippy::await_holding_lock)]
+    async fn handle_online(&self, guilds: &[u64], timestamp: u64) {
+        // Grab a write lock for when we insert loading indicators (which is likely)
+        let mut guilds_write = self.guilds.write().expect("active guilds lock poisoned");
+
+        // Load the active values for all currently-loaded guilds
+        let mut active_values = guilds
+            .iter()
+            .filter_map(|id| match guilds_write.get(id) {
+                Some(GuildStatus::Loaded(LoadedState { is_active, .. })) => Some((*id, *is_active)),
+                _ => None,
+            })
+            .collect::<HashMap<_, _>>();
+        // Load guilds that either are unloaded or loading (likely from an eager load)
+        // this is because including them in the batch is cheap
+        // and it allows us to not have to wait on the other channels
+        // Additionally, we return/shadow the write lock guard to only temporarily drop the lock
+        // if sending a request for loading guilds from the feature-gate service
+        let to_load = guilds
+            .iter()
+            .filter(|id| !active_values.contains_key(id))
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut guilds_write = if to_load.is_empty() {
+            // Keep the same lock handle
+            guilds_write
+        } else {
+            // Create loading status for all guilds
+            for guild_id in &to_load {
+                // Insert the loading status if it already isn't there
+                guilds_write
+                    .entry(*guild_id)
+                    .or_insert_with(|| GuildStatus::Loading(LoadingNotifier::new()));
             }
-            _ => Err(backoff::Error::Transient(status)),
-        },
+
+            // Send a batched request for all guilds
+            drop(guilds_write);
+            active_values.extend(
+                self.poll(&to_load)
+                    .await
+                    .unwrap_or_else(|| {
+                        // Default to true for each guild
+                        let mut map = HashMap::<u64, bool>::new();
+                        for id in guilds {
+                            map.insert(*id, true);
+                        }
+                        map
+                    })
+                    .iter(),
+            );
+
+            // Re-acquire the inner lock
+            self.guilds.write().expect("active guilds lock poisoned")
+        };
+
+        // Signal all waiting fields
+        let mut edges = EdgeDetector::new();
+        for (guild_id, is_active) in active_values {
+            let default_state = LoadedState {
+                is_active,
+                connection: GuildConnection::Online,
+            };
+            guilds_write
+                .entry(guild_id)
+                .and_modify(|status| match status {
+                    GuildStatus::Loaded(state) => {
+                        edges.consume(
+                            guild_id,
+                            state.update(Some(is_active), Some(GuildConnection::Online)),
+                        );
+                    }
+                    GuildStatus::Loading(notifier) => {
+                        // Signal the notifier and replace the state with an online one.
+                        // If the guild is fully active, then send a rising edge
+                        notifier.notify(is_active);
+                        if default_state.active() {
+                            edges.rising_edge.push(guild_id)
+                        }
+                        *status = GuildStatus::Loaded(default_state.clone());
+                    }
+                })
+                .or_insert_with(|| {
+                    // If the guild wasn't in the map,
+                    // then send a rising edge if it is fully active
+                    if default_state.active() {
+                        edges.rising_edge.push(guild_id)
+                    }
+                    GuildStatus::Loaded(default_state)
+                });
+        }
+        drop(guilds_write);
+
+        // Emit the edge events to the uptime channel
+        self.source_uptime_events(timestamp, edges);
+    }
+
+    /// Handles an unfiltered offline event,
+    /// updating the inner map and starting eviction timers for each entry.
+    /// Re-emits offline events that cause a falling edge in the combined active status of a guild
+    async fn handle_offline(&self, guilds: &[u64], timestamp: u64) {
+        let mut guilds_write = self.guilds.write().expect("active guilds lock poisoned");
+        let mut edges = EdgeDetector::new();
+
+        // Update each guild status
+        for guild_id in guilds {
+            guilds_write
+                .entry(*guild_id)
+                .and_modify(|status| match status {
+                    GuildStatus::Loaded(state) => {
+                        edges.consume(*guild_id, state.update(
+                            None,
+                            Some(GuildConnection::offline()),
+                        ));
+                    }
+                    GuildStatus::Loading(_) => {
+                        log::warn!("UptimeEvent::Offline event processed for guild that was marked as loading: {}. Ignoring", guild_id);
+                    }
+                })
+                .or_insert_with(|| {
+                    log::warn!("UptimeEvent::Offline event processed for guild that was not loaded: {}", guild_id);
+                    GuildStatus::Loaded(LoadedState {
+                        is_active: false,
+                        connection: GuildConnection::offline(),
+                    })
+                });
+        }
+
+        // Emit the edge events to the uptime channel
+        self.source_uptime_events(timestamp, edges);
+    }
+
+    /// Handles an unfiltered heartbeat event,
+    /// re-emitting it with only the guilds that are currently active
+    /// (or not emitting anything if no guilds are active)
+    async fn handle_heartbeat(&self, guilds: &[u64], timestamp: u64) {
+        let guilds_read = self.guilds.read().expect("active guilds lock poisoned");
+        let uptime_guilds = guilds
+            .iter()
+            .filter(|guild_id| {
+                if guilds_read.contains_key(guild_id) {
+                    true
+                } else {
+                    log::warn!(
+                        "UptimeEvent::Heartbeat event processed for guild that was not loaded: {}",
+                        guild_id
+                    );
+                    false
+                }
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        drop(guilds_read);
+
+        if !uptime_guilds.is_empty() {
+            self.emit_uptime(UptimeEvent::Heartbeat {
+                guilds: uptime_guilds,
+                timestamp,
+            });
+        }
     }
 }
