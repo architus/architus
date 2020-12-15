@@ -50,7 +50,7 @@ class Pools:
         if user is None and fetch:
             with suppress(NotFound):
                 user = await self.bot.fetch_user(int(user_id))
-        return user_to_dict(user) if user else {}
+        return user_to_dict(user)
 
     def get_all_responses(self, guild: Guild):
         try:
