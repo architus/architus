@@ -311,7 +311,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     simple_logger::init_with_level(log::Level::Info).unwrap();
     let db_usr = env::var("db_user").expect("Need to have an architus.env file");
     let db_pass = env::var("db_pass").expect("Need to have an architus.env file");
-    let database_url = format!("postgresql://{}:{}@postgres:5432/autbot", db_usr, db_pass);
+    let db_host = "postgres";
+    let db_port = 5432_u16;
+    let db_name = "autbot";
+    let database_url = format!(
+        "postgresql://{}:{}@{}:{}/{}",
+        db_usr, db_pass, db_host, db_port, db_name
+    );
+
     // First, establish a stable connection with the database before creating the connection pool
     let ping = || async {
         if let Err(err) = PgConnection::establish(&database_url) {
@@ -325,6 +332,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     ping.retry(ExponentialBackoff::default()).await?;
+    log::info!(
+        "Connected to Postgres database at postgresql://***:***@{}:{}/{}",
+        db_host,
+        db_port,
+        db_name
+    );
 
     let addr = "0.0.0.0:50555".parse()?;
     let manager: ConnectionManager<PgConnection> = ConnectionManager::new(database_url);
