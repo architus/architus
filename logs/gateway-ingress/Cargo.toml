@@ -37,6 +37,7 @@ tokio-amqp = "0.2"
 deadpool = "0.5"
 tonic = "0.3"
 prost = "0.6"
+rand = "0.7"
 
 [build-dependencies]
 tonic-build = "0.3"

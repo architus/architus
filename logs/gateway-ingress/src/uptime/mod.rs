@@ -16,7 +16,6 @@ pub mod connection;
 mod debounced_pool;
 
 use crate::rpc::uptime::{GatewaySubmitRequest, GatewaySubmitType};
-use tonic::{IntoRequest, Request};
 
 /// Raw update messages that can come from the rest of the service,
 /// and are used to update the current connections state,
@@ -45,24 +44,28 @@ pub enum Event {
 }
 
 // Provide the ability to convert an uptime event into a gateway submit request
-impl IntoRequest<GatewaySubmitRequest> for Event {
-    fn into_request(self) -> Request<GatewaySubmitRequest> {
-        Request::new(match self {
+impl Event {
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn into_request(self, session: u64) -> GatewaySubmitRequest {
+        match self {
             Self::Online { guilds, timestamp } => GatewaySubmitRequest {
                 r#type: GatewaySubmitType::Online as i32,
                 guilds,
                 timestamp,
+                session,
             },
             Self::Offline { guilds, timestamp } => GatewaySubmitRequest {
                 r#type: GatewaySubmitType::Offline as i32,
                 guilds,
                 timestamp,
+                session,
             },
             Self::Heartbeat { guilds, timestamp } => GatewaySubmitRequest {
                 r#type: GatewaySubmitType::Heartbeat as i32,
                 guilds,
                 timestamp,
+                session,
             },
-        })
+        }
     }
 }

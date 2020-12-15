@@ -995,6 +995,7 @@ dependencies = [
  "log",
  "logs-gateway-queue-lib",
  "prost",
+ "rand",
  "rmp-serde",
  "serde 1.0.118",
  "serde-humantime",
