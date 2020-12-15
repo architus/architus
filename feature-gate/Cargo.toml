@@ -23,7 +23,7 @@ backoff = { version = "0.2", features = ["tokio"] }
 
 [dependencies.diesel]
 version = "1.4"
-features = ["postgres", "r2d2"]
+features = ["postgres"]
 
 [build-dependencies]
 tonic-build = "0.2"
