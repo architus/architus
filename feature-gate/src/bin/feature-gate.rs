@@ -11,13 +11,15 @@
 
 use db::*;
 use diesel::r2d2::ConnectionManager;
-use diesel::PgConnection;
+use diesel::{Connection, PgConnection};
 use log::{info, warn};
 use r2d2::PooledConnection;
 use std::env;
 use tokio::sync::mpsc;
 use tonic::{transport::Server, Request, Response, Status};
 
+use backoff::future::FutureOperation;
+use backoff::ExponentialBackoff;
 use feature_gate::feature_gate_server::{FeatureGate, FeatureGateServer};
 use feature_gate::*;
 
@@ -310,6 +312,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db_usr = env::var("db_user").expect("Need to have an architus.env file");
     let db_pass = env::var("db_pass").expect("Need to have an architus.env file");
     let database_url = format!("postgresql://{}:{}@postgres:5432/autbot", db_usr, db_pass);
+    // First, establish a stable connection with the database before creating the connection pool
+    let ping = || async {
+        if let Err(err) = PgConnection::establish(&database_url) {
+            log::warn!(
+                "Couldn't connect to the Postgres database; retrying after a backoff: {:?}",
+                err
+            );
+            Err(backoff::Error::Transient(err))
+        } else {
+            Ok(())
+        }
+    };
+    ping.retry(ExponentialBackoff::default()).await?;
 
     let addr = "0.0.0.0:50555".parse()?;
     let manager: ConnectionManager<PgConnection> = ConnectionManager::new(database_url);
