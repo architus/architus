@@ -13,6 +13,7 @@ use db::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::{Connection, PgConnection};
 use log::{info, warn};
+use r2d2::PooledConnection;
 use std::env;
 use tokio::sync::mpsc;
 use tonic::{transport::Server, Request, Response, Status};
@@ -28,17 +29,15 @@ pub mod feature_gate {
     include!("../../grpc/featuregate.rs");
 }
 
-/// Structure for handling all of the gRPC requests. Just holds
-/// the address of the postgres database so that it can be used
-/// to connect to the database for each RPC request.
-#[derive(Debug)]
+/// Structure for handling all of the gRPC requests.
+/// Holds a connection pool that can issue RAII connection handles
 pub struct Gate {
-    pub db_addr: String,
+    connection_pool: r2d2::Pool<ConnectionManager<PgConnection>>,
 }
 
 impl Gate {
-    fn get_connection(&self) -> Option<PgConnection> {
-        PgConnection::establish(&self.db_addr).ok()
+    fn get_connection(&self) -> Option<PooledConnection<ConnectionManager<PgConnection>>> {
+        self.connection_pool.get().ok()
     }
 }
 
@@ -176,6 +175,52 @@ impl FeatureGate for Gate {
         }
     }
 
+    /// Checks to see if a list of guilds have a certain feature.
+    ///
+    /// Will return a list of true/false values on successfully querying the database
+    /// in the same order as the provided guild id list.
+    /// If the feature asked about does not exist, then it will return a
+    /// default value of false for each guild.
+    /// If the database is not able to be contacted, then it will return an
+    /// internal server error status code.
+    ///
+    /// The number of supported guilds to check at once is at least 256, but may be more.
+    async fn batch_check_guild_features(
+        &self,
+        request: Request<BatchCheck>,
+    ) -> RpcResponse<BatchCheckResult> {
+        let conn = match self.get_connection() {
+            Some(c) => c,
+            None => return Err(Status::internal("Database connection failed")),
+        };
+        let batch_check = request.into_inner();
+
+        // Limit the number of items supported at once
+        if batch_check.guild_ids.len() > 256 {
+            return Err(Status::invalid_argument(format!(
+                "Batched check operation only supports 256 guild-checks at once (provided {})",
+                batch_check.guild_ids.len()
+            )));
+        }
+
+        let result = batch_check_guild_feature(
+            &conn,
+            &batch_check
+                .guild_ids
+                .iter()
+                .map(|id| *id as i64)
+                .collect::<Vec<_>>(),
+            &batch_check.feature_name,
+        );
+        match result {
+            Ok(list) => Ok(Response::new(BatchCheckResult { has_feature: list })),
+            Err(DatabaseError::UnknownFeature) => Ok(Response::new(BatchCheckResult {
+                has_feature: vec![false; batch_check.guild_ids.len()],
+            })),
+            Err(_) => Err(Status::internal("Database connection failed")),
+        }
+    }
+
     // A type association for doing a streaming response.
     type GetFeaturesStream = mpsc::Receiver<Result<Feature, Status>>;
 
@@ -283,8 +328,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ping.retry(ExponentialBackoff::default()).await?;
 
     let addr = "0.0.0.0:50555".parse()?;
+    let manager: ConnectionManager<PgConnection> = ConnectionManager::new(database_url);
+    let pool = r2d2::Pool::builder()
+        .max_size(16)
+        .build(manager)
+        .expect("Could not build connection pool");
     let gate = Gate {
-        db_addr: database_url,
+        connection_pool: pool,
     };
 
     Server::builder()
