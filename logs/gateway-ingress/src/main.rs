@@ -22,6 +22,7 @@ use lapin::{types::FieldTable, BasicProperties, Connection};
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
+use tonic::Request;
 use twilight_gateway::{Event, EventType, EventTypeFlags, Intents, Shard};
 use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
 use twilight_model::gateway::event::shard::Payload;
@@ -168,6 +169,10 @@ async fn sink_uptime_events(
 ) -> Result<()> {
     let uptime_service_client = Arc::new(uptime_service_client);
 
+    // Generate a unique session ID that is used to detect downtime after a forced shutdown
+    let session: u64 = rand::random();
+    log::info!("Generated random session ID for uptime events: {}", session);
+
     // Note: we don't exit the service if this part fails;
     // this is an acceptable degradation
     in_stream
@@ -175,10 +180,13 @@ async fn sink_uptime_events(
             let uptime_service_client = Arc::clone(&uptime_service_client);
             let config = Arc::clone(&config);
             async move {
-                log::debug!("Sending UptimeEvent to logs/uptime: {:?}", event);
+                let request = event.into_request(session);
+                log::debug!("Sending UptimeEvent to logs/uptime: {:?}", request);
                 let send = || async {
                     let mut uptime_service_client = (*uptime_service_client).clone();
-                    let response = uptime_service_client.gateway_submit(event.clone()).await;
+                    let response = uptime_service_client
+                        .gateway_submit(Request::new(request.clone()))
+                        .await;
                     rpc::into_backoff(response)
                 };
                 if let Err(err) = send.retry(config.rpc_backoff.build()).await {
@@ -422,6 +430,10 @@ const fn should_forward(event_type: Option<EventType>) -> bool {
             | Some(EventType::ShardResuming)
             | Some(EventType::TypingStart)
             | Some(EventType::UnavailableGuild)
+            // Disable forwarding events for guilds coming off/online
+            // Note: that means we'll have to have some other mechanism for logging bot joins/leaves
+            | Some(EventType::GuildCreate)
+            | Some(EventType::GuildDelete)
     )
 }
 

@@ -663,8 +663,8 @@ impl ActiveGuilds {
         let guilds_read = self.guilds.read().expect("active guilds lock poisoned");
         let uptime_guilds = guilds
             .iter()
-            .filter(|guild_id| match guilds_read.get(guild_id) {
-                Some(GuildStatus::Loaded(state)) => {
+            .filter(|guild_id| {
+                if let Some(GuildStatus::Loaded(state)) = guilds_read.get(guild_id) {
                     if matches!(state.connection, GuildConnection::Offline(_)) {
                         log::warn!(
                             "UptimeEvent::Heartbeat event processed for guild that is offline: {}",
@@ -673,8 +673,7 @@ impl ActiveGuilds {
                     }
 
                     state.is_active
-                }
-                _ => {
+                } else {
                     log::warn!(
                         "UptimeEvent::Heartbeat event processed for guild that was not loaded: {}",
                         guild_id
