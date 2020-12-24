@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: architus
+  labels:
+    app: architus
+spec:
+  selector:
+    matchLabels:
+      app: architus
+  template:
+    metadata:
+      labels:
+        app: architus
+    spec:
+      containers:
+        - name: shard
+          image: shard-image
+          envFrom:
+          - secretRef:
+              name: architus-secret
+          ports:
+            - containerPort: 8000
+        - name: postgres
+          image: db-image
+          ports:
+            - containerPort: 5432
+        - name: manager
+          image: manager-image
+          envFrom:
+          - secretRef:
+              name: architus-secret
