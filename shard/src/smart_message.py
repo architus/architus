@@ -1,5 +1,6 @@
 from collections import deque
 from src.list_embed import ListEmbed
+import pytz
 # from pytz import timezone
 
 
@@ -7,7 +8,7 @@ class smart_message:
     def __init__(self, message):
         self.most_recent = message
         self.edits = deque([], maxlen=10)
-        dumb = dumb_message(message.content, message.author, message.id, message.created_at)
+        dumb = dumb_message(message.content, message.author, message.id, pytz.utc.localize(message.created_at))
         self.edits.append(dumb)
         self.ogtime = self.get_datetime(message.created_at)
         self.popup = None

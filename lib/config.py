@@ -44,6 +44,7 @@ try:
     twitter_access_token_key = os.environ['twitter_access_token_key']
     twitter_access_token_secret = os.environ['twitter_access_token_secret']
     scraper_token = os.environ['scraper_bot_token']
+    spotify_client_secret = os.environ['spotify_client_secret']
 except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 
@@ -65,10 +66,10 @@ def get_session():
 
 class AsyncConnWrapper:
     def __init__(self):
-        self.conn = None
+        self.pool = None
 
     async def connect(self):
-        self.conn = await asyncpg.connect(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
+        self.pool = await asyncpg.create_pool(f"postgresql://{db_user}:{db_pass}@{DB_HOST}:{DB_PORT}/autbot")
 
 
 def which_shard(guild_id=None):

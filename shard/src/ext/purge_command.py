@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 from discord.utils import snowflake_time
+from src.utils import doc_url
 
 import re
 from datetime import datetime, timedelta
@@ -12,27 +13,10 @@ MESSAGE_LIMIT = 10000
 
 
 @commands.group()
+@doc_url("https://docs.archit.us/commands/purge/")
 async def purge(ctx):
-    '''
-    Purge a channel of a user's messages
-
-    Usage: {prefix}purge id {message id} [true]
-    or: {prefix}purge time {XXm|XXs}
-    The first will purge all messages sent after the message corresponding to the
-    message id of the user who sent that message. If true is passed, then all messages
-    from now until that message will be deleted.
-
-    Only searches the past 10000 messages sent in a channel for which to delete.
-    If more than 1000 messages have been sent between the given message's id and
-    when this command is run, then all of that user's messages may not get
-    deleted.
-
-    The second usage will delete all messages in the channel in the past number of
-    minutes or seconds.
-
-    NOTE: If the original message is deleted before the bot deletes it, all messages
-    from the target message's author in the channel will be deleted depending on the
-    timing of when the original message was deleted.
+    '''purge <time|id> <timedelta|message id>
+    Purge a channel of a user's messages or all messages.
     '''
     if ctx.invoked_subcommand is None:
         await ctx.send("Need to use command with id or time parameter")

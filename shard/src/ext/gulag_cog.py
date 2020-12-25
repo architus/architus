@@ -4,6 +4,7 @@ from contextlib import suppress
 import time
 import asyncio
 import discord
+from src.utils import doc_url
 
 from lib.config import logger
 
@@ -14,8 +15,9 @@ class Gulag(commands.Cog):
         self.bot = bot
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/gulag/")
     async def gulag(self, ctx, comrade: discord.Member):
-        '''
+        '''gulag <member>
         Starts a vote to move a member to the gulag.
         Each vote over the threshold will add additional time.
         '''

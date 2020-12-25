@@ -18,10 +18,12 @@ prost = "0.6"
 tokio = { version = "0.2", features = ["macros"] }
 log = "0.4"
 simple_logger = "1.6"
+r2d2 = "0.8"
+backoff = { version = "0.2", features = ["tokio"] }
 
 [dependencies.diesel]
 version = "1.4"
-features = ["postgres"]
+features = ["postgres", "r2d2"]
 
 [build-dependencies]
 tonic-build = "0.2"

@@ -4,13 +4,12 @@ from typing import Optional, Tuple
 from random import choice
 import json
 
-from discord import Message, Guild, Member
+from discord import Message, Guild, Member, AllowedMentions
 
 from src.emoji_manager import EmojiManager
 from lib.reggy.reggy import Reggy
 from lib.response_grammar.response import parse as parse_response, NodeType
 from lib.config import logger
-from lib.models import AutoResponse as AutoResponseModel
 from lib.aiomodels import TbAutoResponses
 
 
@@ -178,7 +177,8 @@ class AutoResponse:
             content.append(msg.author.display_name)
         elif (node.type == NodeType.Capture):
             with suppress(IndexError):
-                content.append(match.groups()[node.capture_group])
+                string = match.groups()[node.capture_group]
+                content.append(string if string is not None else "")
 
         elif (node.type == NodeType.Url):
             content.append(node.text)
@@ -203,10 +203,10 @@ class AutoResponse:
 
         self.count += 1
         content, reacts = await self.resolve_resp(self.response_ast, match, msg)
-        content = "".join(content).replace("@everyone", "\\@everyone").replace("@here", "\\@here")
+        content = "".join(content)
 
         if content.strip() != "":
-            resp_msg = await msg.channel.send(content)
+            resp_msg = await msg.channel.send(content, allowed_mentions=AllowedMentions(everyone=False))
         else:
             resp_msg = None
         for emoji in reacts:
@@ -235,46 +235,56 @@ class AutoResponse:
 
 class GuildAutoResponses:
 
-    def __init__(self, bot, guild, no_db=False):
+    def __init__(self, bot, guild, executor, no_db=False):
         self.guild = guild
         self.bot = bot
-        self.session = bot.session
+        self.executor = executor
         self.tb_auto_responses = TbAutoResponses(self.bot.asyncpg_wrapper)
         self.settings = self.bot.settings[guild]
         self.auto_responses = []
         self.word_gen = WordGen()
         self.no_db = no_db
-        self._init_from_db()
+
+    @classmethod
+    async def new(cls, *args, **kwargs):
+        guild_auto_responses = cls(*args, **kwargs)
+        await guild_auto_responses._init_from_db()
+        return guild_auto_responses
 
     @property
     def aiosession(self):
         return self.bot.aiosession
 
-    def _init_from_db(self) -> None:
+    async def _init_from_db(self) -> None:
         if self.no_db:
             return
-        responses = self.session.query(AutoResponseModel).filter_by(guild_id=self.guild.id).all()
-        self.session.commit()
-        self.auto_responses = [AutoResponse(
-            self.bot,
-            r.trigger,
-            r.response,
-            r.author_id if r.author_id != 0 else None,
-            r.guild_id,
-            r.id,
-            r.trigger_regex,
-            r.trigger_punctuation,
-            "",
-            r.mode,
-            r.count,
-            self.word_gen,
-            None)  # TODO
-            for r in responses]
 
-    def _insert_into_db(self, resp: AutoResponse) -> None:
+        for r in await self.tb_auto_responses.select_by_guild(self.guild.id):
+            try:
+                args = (
+                    self.bot,
+                    r['trigger'],
+                    r['response'],
+                    r['author_id'] if r['author_id'] != 0 else None,
+                    r['guild_id'],
+                    r['id'],
+                    r['trigger_regex'],
+                    r['trigger_punctuation'],
+                    "",
+                    r['mode'],
+                    r['count'],
+                    self.word_gen,
+                    None)  # TODO
+                resp = await self.bot.loop.run_in_executor(self.executor, AutoResponse, *args)
+            except Exception:
+                logger.exception("")
+            else:
+                self.auto_responses.append(resp)
+
+    async def _insert_into_db(self, resp: AutoResponse) -> None:
         if self.no_db:
             return
-        row = AutoResponseModel(
+        await self.tb_auto_responses.insert_one((
             resp.id,
             resp.trigger,
             resp.response,
@@ -284,20 +294,13 @@ class GuildAutoResponses:
             resp.trigger_punctuation,
             json.dumps(resp.response_ast.stringify()),
             resp.mode,
-            resp.count)
+            resp.count
+        ))
 
-        try:
-            self.session.add(row)
-        except Exception:
-            self.session.rollback()
-            raise
-        else:
-            self.session.commit()
-
-    def _delete_from_db(self, resp: AutoResponse) -> None:
+    async def _delete_from_db(self, resp: AutoResponse) -> None:
         if self.no_db:
             return
-        self.session.query(AutoResponseModel).filter_by(id=resp.id).delete()
+        await self.tb_auto_responses.delete_by_id(resp.id)
 
     async def _update_resp_db(self, resp: AutoResponse) -> None:
         if self.no_db:
@@ -314,28 +317,34 @@ class GuildAutoResponses:
                 return resp_msg, r
         return None, None
 
-    def new(self, trigger: str, response: str, guild: Guild, author: Member) -> AutoResponse:
+    async def new_response(self, trigger: str, response: str, guild: Guild, author: Member) -> AutoResponse:
         """factory method for creating a guild-specific auto response"""
         if self.no_db:
             manager = None
         else:
             manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
-
-        r = AutoResponse(
+        r = await self.bot.loop.run_in_executor(
+            self.executor, AutoResponse,
             self.bot,
             trigger.strip(),
             response.strip(),
             author.id,
             guild.id,
-            word_gen=self.word_gen,
-            emoji_manager=manager)
+            None,
+            "",
+            (),
+            "",
+            None,
+            0,
+            self.word_gen,
+            manager)
 
         self.validate(r)
         self.auto_responses.append(r)
-        self._insert_into_db(r)
+        await self._insert_into_db(r)
         return r
 
-    def remove(self, trigger: str, author: Member) -> AutoResponse:
+    async def remove(self, trigger: str, author: Member) -> AutoResponse:
         """helper method for removing guild-specific auto response"""
         for r in self.auto_responses:
             if r.trigger == trigger:
@@ -343,7 +352,7 @@ class GuildAutoResponses:
                 if not admin and self.settings.responses_only_author_remove and r.author_id != author.id:
                     raise PermissionException(r.author_id)
                 self.auto_responses.remove(r)
-                self._delete_from_db(r)
+                await self._delete_from_db(r)
                 return r
         raise UnknownResponseException
 
@@ -380,7 +389,6 @@ class GuildAutoResponses:
         for r in self.auto_responses:
             if not r.trigger_reggy.isdisjoint(response.trigger_reggy):
                 conflicts.append(r)
-                logger.debug(f"{response} collides with {r}")
         return conflicts
 
 

@@ -1,12 +1,9 @@
-import youtube_dl
+import youtube_dlc as youtube_dl
 import functools
 import discord
 from collections import deque
 import src.spotify_tools as spotify_tools
-import urllib
 import asyncio
-import aiohttp
-from bs4 import BeautifulSoup
 from src.list_embed import ListEmbed as list_embed
 from lib.config import logger
 
@@ -16,7 +13,7 @@ import subprocess
 
 class GuildPlayer:
     def __init__(self, bot):
-        logger.debug("creating new smart player")
+        logger.debug("creating new guild player")
         self.bot = bot
         self.q = deque()
         self.voice = None
@@ -48,7 +45,7 @@ class GuildPlayer:
         self.stop()
         song = self.q.pop()
         url = song.url
-        self.name = song.title
+        self.name = await song.title()
         logger.debug("starting " + url)
         if ('spotify' in url):
             url = await self.spotify_to_youtube(url)
@@ -71,7 +68,6 @@ class GuildPlayer:
         }
         ffmpeg_options = {
             'options': '-vn -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5'
-
         }
         ydl = youtube_dl.YoutubeDL(opts)
         func = functools.partial(ydl.extract_info, url, download=True)
@@ -121,27 +117,31 @@ class GuildPlayer:
         return info
 
     async def add_url(self, url):
-        song = Song(url)
+        song = Song(self.bot.loop, url)
         self.q.appendleft(song)
-        return song.title
+        return await song.title()
 
     async def add_url_now(self, url):
-        self.q.append(Song(url))
+        self.q.append(Song(self.bot.loop, url))
 
     async def get_youtube_url(self, search):
         '''scrape video url from search paramaters'''
-        async with aiohttp.ClientSession() as session:
-            query = urllib.parse.quote(search)
-            url = "https://www.youtube.com/results?search_query=" + query
-            async with session.get(url) as resp:
-                html = await resp.read()
+        opts = {
+            'format': 'bestaudio/best',
+            'ignoreerrors': False,
+            'logtostderr': False,
+            'quiet': True,
+            'no_warnings': True,
+            'default_search': 'auto',
+            'noplaylist': True
+        }
 
-                soup = BeautifulSoup(html.decode('utf-8'), 'lxml')
-                for video in soup.findAll(attrs={'class': 'yt-uix-tile-link'}):
-                    if ('googleadservices' not in video['href']):
-                        return 'https://www.youtube.com' + video['href']
-
-        return ''
+        ydl = youtube_dl.YoutubeDL(opts)
+        f = functools.partial(ydl.extract_info, search, download=False)
+        data = await self.bot.loop.run_in_executor(None, f)
+        if 'entries' in data:
+            data = data['entries'][0]
+        return data['webpage_url']
 
     def stop(self):
         if self.voice is None:
@@ -167,12 +167,12 @@ class GuildPlayer:
             await self.voice.disconnect()
             return ''
         self.stop()
-        return self.q[-1].title
+        return await self.q[-1].title()
 
     def clearq(self):
         self.q.clear()
 
-    def qembed(self):
+    async def qembed(self):
         name = self.name or "None"
         lem = list_embed("Currently Playing:", "*%s*" % name, self.bot.user)
         lem.color = 0x6600ff
@@ -180,7 +180,7 @@ class GuildPlayer:
         lem.name = "Song Queue"
         for i in range(len(self.q)):
             song = self.q[len(self.q) - i - 1]
-            lem.add("%d. *%s*" % (i + 1, song.title), song.url)
+            lem.add("%d. *%s*" % (i + 1, await song.title()), song.url)
         return lem.get_embed()
 
     def is_connected(self):
@@ -203,25 +203,31 @@ class GuildPlayer:
 
 class Song:
     '''Represents a spotify or youtube url'''
-    def __init__(self, url):
+    def __init__(self, loop, url):
+        self.loop = loop
         self.url = url
         self._title = None
         self.spotify = 'track' in url
 
-    @property
-    def title(self):
+    async def title(self):
         if self._title:
             return self._title
 
-        if self.spotify:
-            data = spotify_tools.generate_metadata(self.url)
-            self._title = data['name'] if 'name' in data else 'n/a'
-        else:
-            ydl = youtube_dl.YoutubeDL({'outtmpl': '%(id)s%(ext)s'})
+        def fetch_title():
+            try:
+                if self.spotify:
+                    data = spotify_tools.generate_metadata(self.url)
+                    return data['name'] if 'name' in data else 'n/a'
+                else:
+                    ydl = youtube_dl.YoutubeDL({'outtmpl': '%(id)s%(ext)s'})
 
-            with ydl:
-                result = ydl.extract_info(self.url, download=False)
-            video = result['entries'][0] if 'entries' in result else result
+                    with ydl:
+                        result = ydl.extract_info(self.url, download=False)
+                    video = result['entries'][0] if 'entries' in result else result
 
-            self._title = video['title'] if 'title' in video else 'n/a'
+                    return video['title'] if 'title' in video else 'n/a'
+            except Exception:
+                logger.exception("error fetching title")
+                return "<error fetching title>"
+        self._title = await self.loop.run_in_executor(None, fetch_title)
         return self._title
