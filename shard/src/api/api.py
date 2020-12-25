@@ -1,5 +1,4 @@
 import secrets
-from datetime import timedelta
 from typing import List
 
 from discord.ext.commands import Cog, Context
@@ -153,14 +152,26 @@ class Api(Cog):
         return {"message": "Reload signal sent"}, sc.OK_200
 
     @fetch_guild
-    async def bin_messages(self, guild):
+    async def bin_messages(self, guild, member_id):
         stats_cog = self.bot.cogs["Server Statistics"]
-        members, channels, times = await stats_cog.bin_messages(guild, timedelta(minutes=5))
+        emoji_manager = self.bot.cogs["Emoji Manager"].managers[guild.id]
+        data = stats_cog.cache.get(guild.id, None)
+        member = guild.get_member(member_id)
+        if data is None or member is None:
+            return {'message': "unknown member or guild"}, sc.NOT_FOUND_404
         return {
-            'total': len(stats_cog.cache[guild.id]),
-            'members': members,
-            'channels': channels,
-            'times': times,
+            'member_count': data.member_count,
+            'architus_count': data.architus_count(member),
+            'message_count': data.message_count(member),
+            'common_words': data.common_words(member),
+            'mention_counts': data.mention_counts(member),
+            'member_counts': data.member_counts(member),
+            'channel_counts': data.channel_counts(member),
+            'time_member_counts': data.times_as_strings(member),
+            'up_to_date': data.up_to_date,
+            'forbidden': data.forbidden,
+            'last_activity': data.last_activity(member).isoformat(),
+            'popular_emojis': [str(e.id) for e in emoji_manager.emojis[:10]],
         }, sc.OK_200
 
     @fetch_guild
@@ -181,7 +192,7 @@ class Api(Cog):
         try:
             all_guilds = [guild for guild in await self.bot.manager_client.all_guilds(message.AllGuildsRequest())]
         except Exception:
-            logger.info(f"Shard {self.bot.shard_id} failed to get guild list from manager")
+            logger.exception(f"Shard {self.bot.shard_id} failed to get guild list from manager")
             return {'guilds': []}, sc.INTERNAL_SERVER_ERROR_500
         for guild_dict in guild_list:
             for guild in all_guilds:

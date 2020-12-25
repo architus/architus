@@ -1,9 +1,11 @@
 import uuid
 import json
+import asyncio
 from functools import partial
 from aio_pika import IncomingMessage, Message
 
 from lib.ipc.util import poll_for_async_connection
+from lib.config import logger
 
 
 class shardRPC:
@@ -27,9 +29,10 @@ class shardRPC:
         return self
 
     def on_response(self, message: IncomingMessage):
-        future = self.futures.pop(message.correlation_id)
-        resp = json.loads(message.body)
-        future.set_result((resp['resp'], resp['sc']))
+        with message.process():
+            future = self.futures.pop(message.correlation_id)
+            resp = json.loads(message.body)
+            future.set_result((resp['resp'], resp['sc']))
 
     def __getattr__(self, name):
         return partial(self.call, name)
@@ -65,5 +68,8 @@ class shardRPC:
             ),
             routing_key=routing_key,
         )
-
-        return await future
+        try:
+            return await asyncio.wait_for(future, timeout=5)
+        except asyncio.TimeoutError as e:
+            logger.exception(f"routing_key: {routing_key}")
+            return f"TimeoutError {e}", 500

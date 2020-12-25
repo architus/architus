@@ -20,7 +20,6 @@ Jinja2
 kiwisolver
 logzero
 lxml
-lyricwikia
 MarkupSafe
 matplotlib
 mccabe
@@ -45,7 +44,6 @@ setuptools
 six
 spotipy
 SQLAlchemy
-titlecase
 typing-extensions
 Unidecode
 urllib3
@@ -53,7 +51,7 @@ uWSGI
 websockets
 Werkzeug
 yarl
-youtube-dl
+youtube-dlc
 pyyaml
 pika
 aio-pika

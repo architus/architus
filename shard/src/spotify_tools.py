@@ -1,16 +1,13 @@
 import spotipy
 import spotipy.oauth2 as oauth2
-import lyricwikia
-
-from titlecase import titlecase
-import sys
+from lib.config import spotify_client_secret
 
 
 def generate_token():
     """ Generate the token. Please respect these credentials :) """
     credentials = oauth2.SpotifyClientCredentials(
-        client_id='4fe3fecfe5334023a1472516cc99d805',
-        client_secret='0f02b7c483c04257984695007a4a8d5c')
+        client_id='1b4fadd2be3b48bda672c6e67caf7957',
+        client_secret=spotify_client_secret)
     token = credentials.get_access_token()
     return token
 
@@ -23,20 +20,11 @@ spotify = spotipy.Spotify(auth=token)
 
 def generate_metadata(raw_song):
     """ Fetch a song's metadata from Spotify. """
-    if True:
-        # internals.is_spotify(raw_song):
-        # fetch track information directly if it is spotify link
-        meta_tags = spotify.track(raw_song)
-    else:
-        # otherwise search on spotify and fetch information from first result
-        try:
-            meta_tags = spotify.search(raw_song, limit=1)['tracks']['items'][0]
-        except IndexError:
-            return None
-    artist = spotify.artist(meta_tags['artists'][0]['id'])
-    album = spotify.album(meta_tags['album']['id'])
+    meta_tags = spotify.track(raw_song)
+    # artist = spotify.artist(meta_tags['artists'][0]['id'])
+    # album = spotify.album(meta_tags['album']['id'])
 
-    try:
+    """     try:
         meta_tags[u'genre'] = titlecase(artist['genres'][0])
     except IndexError:
         meta_tags[u'genre'] = None
@@ -64,7 +52,7 @@ def generate_metadata(raw_song):
     # Remove unwanted parameters
     del meta_tags['duration_ms']
     del meta_tags['available_markets']
-    del meta_tags['album']['available_markets']
+    del meta_tags['album']['available_markets'] """
 
     return meta_tags
 
@@ -75,15 +63,40 @@ def fetch_playlist(playlist):
         username = splits[-3]
     except IndexError:
         # Wrong format, in either case
-        sys.exit(10)
+        raise
     playlist_id = splits[-1]
     try:
         results = spotify.user_playlist(username, playlist_id,
                                         fields='tracks,next,name')
     except spotipy.client.SpotifyException:
-        sys.exit(11)
+        raise
 
     return results
+
+
+def fetch_spotify_playlist_songs(url):
+    urls = []
+    data = fetch_playlist(url)
+    # print(data)
+    # urls.append(data['name'])
+    tracks = data['tracks']
+    for item in tracks['items']:
+        if 'track' in item:
+            track = item['track']
+        else:
+            track = item
+        try:
+            track_url = track['external_urls']['spotify']
+            urls.append(track_url)
+        except KeyError:
+            pass
+
+    return data['name'], urls
+
+
+def spotify_to_str(url: str) -> str:
+    data = generate_metadata(url)
+    return "%s - %s" % (data['name'], data['artists'][0]['name'])
 
 
 def get_splits(url):

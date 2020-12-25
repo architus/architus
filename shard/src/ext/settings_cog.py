@@ -29,6 +29,8 @@ RULER = u"\U0001F4CF"
 TRIAGULAR_RULER = u"\U0001F4D0"
 COLLISION = u"\U0001F4A5"
 CROSS_MARK = u"\U0000274C"
+CONTROL_KNOBS = u"\U0001F39B"
+SPEAKER = u"\U0001F50A"
 
 
 class SettingsElement:
@@ -115,7 +117,7 @@ class UserCommandThreshold(SettingsElement):
             CHAIN,
             "This is the number of custom responses each user can set. Enter a number to modify it:",
             'responses_limit',
-            tags=['general', 'responses'])
+            tags=['responses'])
 
     async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
@@ -312,7 +314,7 @@ class GulagSeverity(SettingsElement):
             'This is the number of minutes a member will be confined to gulag. '
             'Half again per extra vote. Enter a number to modify it:',
             'gulag_severity',
-            tags=['general', 'gulag'])
+            tags=['gulag'])
 
     async def parse(self, ctx, msg, settings):
         return abs(int(msg.clean_content))
@@ -367,8 +369,49 @@ class MusicEnabled(SettingsElement):
         super().__init__(
             "Music Enabled",
             HEADPHONES,
-            "Whether music related features are enabled. Enter `true` or `false` to set.",
-            'music_enabled')
+            "Whether music related features are enabled. Enter `true` or `false` to set:",
+            'music_enabled',
+            tags=('general', 'music'))
+
+
+class MusicVolume(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Music Volume",
+            SPEAKER,
+            "Base volume of the music player. Enter a value between `0` and `100`:",
+            'music_volume',
+            tags=('music',))
+
+    async def formatted_value(self, bot, ctx, settings):
+        return f"{int(settings.music_volume * 100)}%"
+
+    async def parse(self, ctx, msg, settings):
+        return max(min(int(msg.clean_content), 100), 0) / 100
+
+
+class MusicRole(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Music Role",
+            CONTROL_KNOBS,
+            "Only members of this role may use music commands. Enter a role to change:",
+            'music_role',
+            tags=('music',)
+        )
+
+    async def formatted_value(self, bot, ctx, settings):
+        return settings.music_role.mention if settings.music_role else "None"
+
+    def check(self, msg):
+        return not msg.content.endswith('roleids')
+
+    async def parse(self, ctx, msg, settings):
+        role_converter = RoleConverter()
+        try:
+            return await role_converter.convert(ctx, msg.content)
+        except CommandError:
+            raise ValueError
 
 
 class CommandPrefix(SettingsElement):
@@ -464,6 +507,7 @@ class Settings(Cog):
         'gulag': ['gulag', 'ГУЛАГ'],
         'pug': ['p', 'pug', 'pugs', 'pugger'],
         'responses': ['responses', 'auto responses', 'autoresponses', 'r'],
+        'music': ['music', 'm'],
     }
     SETTINGS_MENU_TIMEOUT_SEC = 60 * 60
 
@@ -473,7 +517,8 @@ class Settings(Cog):
 
     @commands.command(hidden=True)
     async def roleids(self, ctx):
-        '''Shows the discord id for every role in your server'''
+        '''roleids
+        Shows the discord id for every role in your server.'''
         lem = ListEmbed(ctx.guild.name, '')
         lem.name = "Role IDs"
         for role in ctx.guild.roles:
@@ -482,12 +527,14 @@ class Settings(Cog):
 
     @commands.command(aliases=['listsettingstags', 'settingstags', 'stags'])
     async def list_settings_tags(self, ctx):
-        '''Get the list of tags for the settings command'''
+        '''listsettingstags
+        Get the list of tags for the settings command.'''
         await ctx.channel.send(f"Tags for settings are: {self.list_tags()}")
 
     @commands.command()
     async def settings(self, ctx, tag="general"):
-        '''Open an interactive settings dialog'''
+        '''settings
+        Open an interactive settings dialog.'''
         settings = self.bot.settings[ctx.guild]
         if ctx.author.id not in settings.admins_ids:
             await ctx.channel.send('nope, sorry, you must be an admin')

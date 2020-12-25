@@ -6,7 +6,7 @@ import re
 from typing import Optional, List
 from io import BytesIO
 
-from src.utils import send_message_webhook
+from src.utils import send_message_webhook, doc_url
 from src.architus_emoji import ArchitusEmoji
 from src.generate.emoji_list import generate
 from lib.config import logger
@@ -38,7 +38,6 @@ class EmojiManager:
                 e['id'],
                 e['discord_id'],
                 e['author_id'],
-                e['url'],
                 e['num_uses'],
                 e['priority'])
             for e in await self.tb_emojis.select_by_guild(self.guild.id)]
@@ -58,8 +57,7 @@ class EmojiManager:
             emoji.name,
             emoji.num_uses,
             emoji.priority,
-            binary,
-            await emoji.url()
+            binary
         ))
 
     async def _update_emojis_db(self, emojis_list: List[ArchitusEmoji]) -> None:
@@ -71,6 +69,7 @@ class EmojiManager:
                 'author_id': e.author_id,
                 'guild_id': self.guild.id,
                 'name': e.name,
+                # 'url': e.url,
                 'num_uses': e.num_uses,
                 'priority': e.priority,
             }, e.id)
@@ -180,6 +179,10 @@ class EmojiManager:
 
     async def cache_emoji(self, emoji: ArchitusEmoji) -> None:
         """remove an emoji from the guild"""
+        if not self.settings.manage_emojis:
+            logger.warning(
+                f"looks like someone tried to cache an emoji ({emoji} from {self.guild.name}) when they shouldn't have")
+            return
         discord_emoji = self.bot.get_emoji(emoji.discord_id)
         if discord_emoji is None:
             return
@@ -190,6 +193,8 @@ class EmojiManager:
         # no need to update the db here cause we're about to trigger the on_emoji_removed event
 
     async def load_emoji(self, emoji: ArchitusEmoji) -> ArchitusEmoji:
+        if not self.settings.manage_emojis:
+            return emoji
         if emoji.loaded:
             logger.debug(f"{emoji} already loaded")
             self.sort()
@@ -248,8 +253,9 @@ class EmojiManager:
         does not check for duplicates
         """
         logger.debug(f"added emoji: {emoji}")
-        while len(self.guild_emojis) >= self.max_emojis:
-            await self.cache_worst_emoji()
+        if self.settings.manage_emojis:
+            while len(self.guild_emojis) >= self.max_emojis:
+                await self.cache_worst_emoji()
 
         self.emojis.append(emoji)
         await self._insert_into_db(emoji)
@@ -374,6 +380,7 @@ class EmojiManagerCog(commands.Cog, name="Emoji Manager"):
         logger.debug("emoji managers ready")
 
     @commands.command(aliases=['emotes', 'emoji', 'emote'])
+    @doc_url("https://docs.archit.us/features/emoji-manager/")
     async def emojis(self, ctx):
         """
         List currently cached emojis.

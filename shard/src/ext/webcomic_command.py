@@ -5,6 +5,7 @@ from discord.ext import commands
 from discord import Embed
 from bs4 import BeautifulSoup as soup
 import aiohttp
+from src.utils import doc_url
 
 
 # Set function up as a bot command with two other aliases.
@@ -14,7 +15,12 @@ import aiohttp
 # function. The supported comics can be listed by the command
 # [prefix]webcomic list
 @commands.command(aliases=['wc', 'comic'])
+@doc_url("https://docs.archit.us/commands/webcomic/")
 async def webcomic(ctx, comic='list'):
+    """webcomic <comic name>
+    The funnies hot off the press! Get the latest comicsfrom the webs hottest
+    comic artists. Currently supported comics are XKCD and SMBC.
+    """
     # list of the supported comics
     comics = ['xkcd', 'smbc']
 
