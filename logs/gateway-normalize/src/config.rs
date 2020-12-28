@@ -29,8 +29,8 @@ pub struct Secrets {}
 pub struct Services {
     /// Full AMQP URL to connect to the gateway queue at
     pub gateway_queue: String,
-    /// HTTP URL of the logs/import service that normalized LogEvents are forwarded to
-    pub logs_import: String,
+    /// HTTP URL of the logs/submission service that normalized LogEvents are forwarded to
+    pub logs_submission: String,
 }
 
 /// Config options related to the Gateway Queue

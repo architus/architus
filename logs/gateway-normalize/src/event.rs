@@ -1,4 +1,4 @@
-use crate::rpc::import::{
+use crate::rpc::submission::{
     Event as LogEvent, EventOrigin, EventSource, EventType, SubmitIdempotentRequest,
 };
 use architus_id::HoarFrost;

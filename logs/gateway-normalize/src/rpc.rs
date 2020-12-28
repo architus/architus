@@ -1,15 +1,15 @@
 //! Contains generated code from the shared service Protobuf RPC definitions
 
-pub mod import {
+pub mod submission {
     // Ignore clippy linting on generated code
     mod generated {
         #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
-        tonic::include_proto!("logs.import");
+        tonic::include_proto!("logs.submission");
     }
 
     pub use generated::*;
     pub type Client =
-        generated::import_service_client::ImportServiceClient<tonic::transport::Channel>;
+        generated::submission_service_client::SubmissionServiceClient<tonic::transport::Channel>;
 }
 
 /// Transforms an RPC result into a more useful one,
