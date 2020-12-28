@@ -1,8 +1,8 @@
 syntax = "proto3";
-package logs.import;
+package logs.submission;
 
-service ImportService {
-  // Submit a single log event to be imported into the Elasticsearch database.
+service SubmissionService {
+  // Submits a single log event to be imported into the Elasticsearch database.
   // If the ID already exists, then no event is imported..
   // Requires a valid ID, Guild ID, and timestamp.
   rpc submit_idempotent(SubmitIdempotentRequest) returns (SubmitIdempotentResponse) {}

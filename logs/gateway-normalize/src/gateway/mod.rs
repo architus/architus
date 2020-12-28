@@ -1,7 +1,7 @@
 pub mod sub_processors;
 
 use crate::event::{NormalizedEvent, Source};
-use crate::rpc::import::EventType;
+use crate::rpc::submission::EventType;
 use architus_id::IdProvisioner;
 use gateway_queue_lib::GatewayEvent;
 use jmespath::Expression;

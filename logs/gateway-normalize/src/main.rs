@@ -9,7 +9,7 @@ mod rpc;
 use crate::config::Configuration;
 use crate::event::NormalizedEvent;
 use crate::gateway::{ProcessingError, Processor};
-use crate::rpc::import::Client as LogsImportClient;
+use crate::rpc::submission::Client as LogsImportClient;
 use anyhow::{Context, Result};
 use backoff::future::FutureOperation as _;
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -42,7 +42,7 @@ async fn main() -> Result<()> {
 /// Runs the main logic of the service,
 /// acting as a consumer for the RabbitMQ gateway-queue messages
 /// and running them through a processing pipeline
-/// before forwarding them to the import service
+/// before forwarding them to the submission service
 async fn run(config: Arc<Configuration>) -> Result<()> {
     // Initialize the gateway event processor
     // and register all known gateway event handlers
@@ -53,13 +53,13 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
 
     // Initialize connections to external services
     let rmq_connection = connect::to_queue(Arc::clone(&config)).await?;
-    let import_client = connect::to_import(Arc::clone(&config)).await?;
+    let submission_client = connect::to_submission(Arc::clone(&config)).await?;
 
     // Consume raw gateway events from the Rabbit MQ queue
     // and normalize them via the fleet of processors
     normalize_gateway_events(
         rmq_connection,
-        import_client,
+        submission_client,
         processor,
         Arc::clone(&config),
     )
@@ -72,7 +72,7 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
 // and normalizes them via the fleet of processors
 async fn normalize_gateway_events(
     queue_connection: Connection,
-    import_client: LogsImportClient,
+    submission_client: LogsImportClient,
     processor: Arc<Processor>,
     config: Arc<Configuration>,
 ) -> Result<()> {
@@ -85,7 +85,7 @@ async fn normalize_gateway_events(
     loop {
         let config = Arc::clone(&config);
         let processor = Arc::clone(&processor);
-        let import_client = import_client.clone();
+        let submission_client = submission_client.clone();
 
         // Reconnect to the Rabbit MQ instance if needed
         let rmq_connection = if let Some(rmq) = outer_rmq_connection.take() {
@@ -114,10 +114,10 @@ async fn normalize_gateway_events(
             move |(_, delivery)| {
                 let config = Arc::clone(&config);
                 let processor = Arc::clone(&processor);
-                let import_client = import_client.clone();
+                let submission_client = submission_client.clone();
                 async move {
                     let result = normalize(&delivery.data, processor)
-                        .and_then(|event| import_event(event, import_client, config))
+                        .and_then(|event| submit_event(event, submission_client, config))
                         .await;
                     // Acknowledge or reject the event based on the result
                     match result {
@@ -202,7 +202,7 @@ struct EventRejection {
 }
 
 /// Attempts to normalize the raw bytes from the queue into a normalized event
-/// ready to be imported
+/// ready to be submitted
 async fn normalize(
     event_bytes: &[u8],
     processor: Arc<Processor>,
@@ -240,9 +240,9 @@ async fn normalize(
     })
 }
 
-/// Sends an event to the logs/import service,
+/// Sends an event to the logs/submission service,
 /// attempting to retry in the case of transient errors
-async fn import_event(
+async fn submit_event(
     event: NormalizedEvent,
     client: LogsImportClient,
     config: Arc<Configuration>,

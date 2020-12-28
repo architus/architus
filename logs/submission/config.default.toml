@@ -1,0 +1,2 @@
+# The port that the gRPC server listens on
+port = 50282

@@ -1,15 +1,11 @@
 # Maximum number of executing futures for gateway event normalization processing
-queue_consumer_concurrency = 32
-
-[services]
-# URL of the logging service that normalized LogEvents are forwarded to
-logging = "http://[::1]:8173"
+queue_consumer_concurrency = 5
 
 [services]
 # Full AMQP URL to connect to the gateway queue at
 gateway_queue = "amqp://127.0.0.1:5672/%2f"
-# HTTP URL of the logs/import service that normalized LogEvents are forwarded to
-logs_import = "[::1]:50557"
+# HTTP URL of the logs/submission service that normalized LogEvents are forwarded to
+logs_submission = "[::1]:50557"
 
 # Config options related to the Gateway Queue
 [gateway_queue]

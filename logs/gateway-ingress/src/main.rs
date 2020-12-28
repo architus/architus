@@ -182,7 +182,7 @@ async fn sink_uptime_events(
                 let request = event.into_request(session);
                 log::debug!("Sending UptimeEvent to logs/uptime: {:?}", request);
                 let send = || async {
-                    let uptime_service_client = uptime_service_client.clone();
+                    let mut uptime_service_client = uptime_service_client.clone();
                     let response = uptime_service_client
                         .gateway_submit(Request::new(request.clone()))
                         .await;

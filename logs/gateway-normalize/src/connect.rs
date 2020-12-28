@@ -2,7 +2,7 @@
 //! used during service initialization and during potential reconnection
 
 use crate::config::Configuration;
-use crate::rpc::import::Client as LogsImportClient;
+use crate::rpc::submission::Client as LogsSubmissionClient;
 use anyhow::{Context, Result};
 use backoff::future::FutureOperation as _;
 use lapin::{Connection, ConnectionProperties};
@@ -32,16 +32,16 @@ pub async fn to_queue(config: Arc<Configuration>) -> Result<Connection> {
     Ok(rmq_connection)
 }
 
-/// Creates a new connection to the logs/import service
-pub async fn to_import(config: Arc<Configuration>) -> Result<LogsImportClient> {
+/// Creates a new connection to the logs/submission service
+pub async fn to_submission(config: Arc<Configuration>) -> Result<LogsSubmissionClient> {
     let initialization_backoff = config.initialization_backoff.build();
-    let import_url = config.services.logs_import.clone();
+    let submission_url = config.services.logs_submission.clone();
     let connect = || async {
-        let conn = LogsImportClient::connect(import_url.clone())
+        let conn = LogsSubmissionClient::connect(submission_url.clone())
             .await
             .map_err(|err| {
                 log::warn!(
-                    "Couldn't connect to logs/import, retrying after backoff: {:?}",
+                    "Couldn't connect to logs/submission, retrying after backoff: {:?}",
                     err
                 );
                 err
@@ -51,7 +51,7 @@ pub async fn to_import(config: Arc<Configuration>) -> Result<LogsImportClient> {
     let connection = connect
         .retry(initialization_backoff)
         .await
-        .context("Could not connect to logs/import")?;
-    log::info!("Connected to logs/import at {}", import_url);
+        .context("Could not connect to logs/submission")?;
+    log::info!("Connected to logs/submission at {}", submission_url);
     Ok(connection)
 }
