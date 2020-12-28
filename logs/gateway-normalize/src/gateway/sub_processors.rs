@@ -1,5 +1,5 @@
 use crate::gateway::{EventProcessor, Path, Processor, TimestampSource};
-use crate::logging::EventType;
+use crate::rpc::import::EventType;
 use twilight_model::gateway::event::EventType as GatewayEventType;
 
 /// Registers all pre-configured processors

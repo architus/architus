@@ -1,26 +1,15 @@
 //! Contains generated code from the shared service Protobuf RPC definitions
 
-pub mod feature_gate {
+pub mod import {
+    // Ignore clippy linting on generated code
     mod generated {
-        // Ignore clippy linting on generated code
         #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
-        tonic::include_proto!("featuregate");
-    }
-
-    pub use generated::*;
-    pub type Client = generated::feature_gate_client::FeatureGateClient<tonic::transport::Channel>;
-}
-
-pub mod uptime {
-    mod generated {
-        // Ignore clippy linting on generated code
-        #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
-        tonic::include_proto!("logs.uptime");
+        tonic::include_proto!("logs.import");
     }
 
     pub use generated::*;
     pub type Client =
-        generated::uptime_service_client::UptimeServiceClient<tonic::transport::Channel>;
+        generated::import_service_client::ImportServiceClient<tonic::transport::Channel>;
 }
 
 /// Transforms an RPC result into a more useful one,

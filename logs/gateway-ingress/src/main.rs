@@ -7,7 +7,7 @@ mod rpc;
 mod uptime;
 
 use crate::config::Configuration;
-use crate::rpc::LogsUptimeClient;
+use crate::rpc::uptime::Client as LogsUptimeClient;
 use crate::uptime::active_guilds::ActiveGuilds;
 use crate::uptime::connection::Tracker;
 use crate::uptime::{Event as UptimeEvent, UpdateMessage};
@@ -16,9 +16,10 @@ use architus_amqp_pool::{Manager, Pool, PoolError};
 use architus_id::{time, HoarFrost, IdProvisioner};
 use backoff::future::FutureOperation as _;
 use futures::{try_join, Stream, StreamExt, TryStreamExt};
-use gateway_queue_lib::GatewayEvent;
+use gateway_queue_lib::GatewayEventOwned;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
-use lapin::{types::FieldTable, BasicProperties, Connection};
+use lapin::types::FieldTable;
+use lapin::{BasicProperties, Channel, Connection};
 use lazy_static::lazy_static;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -167,8 +168,6 @@ async fn sink_uptime_events(
     uptime_service_client: LogsUptimeClient,
     in_stream: impl Stream<Item = UptimeEvent>,
 ) -> Result<()> {
-    let uptime_service_client = Arc::new(uptime_service_client);
-
     // Generate a unique session ID that is used to detect downtime after a forced shutdown
     let session: u64 = rand::random();
     log::info!("Generated random session ID for uptime events: {}", session);
@@ -177,13 +176,13 @@ async fn sink_uptime_events(
     // this is an acceptable degradation
     in_stream
         .for_each_concurrent(None, move |event| {
-            let uptime_service_client = Arc::clone(&uptime_service_client);
+            let uptime_service_client = uptime_service_client.clone();
             let config = Arc::clone(&config);
             async move {
                 let request = event.into_request(session);
                 log::debug!("Sending UptimeEvent to logs/uptime: {:?}", request);
                 let send = || async {
-                    let mut uptime_service_client = (*uptime_service_client).clone();
+                    let uptime_service_client = uptime_service_client.clone();
                     let response = uptime_service_client
                         .gateway_submit(Request::new(request.clone()))
                         .await;
@@ -285,7 +284,7 @@ async fn publish_events(
 async fn declare_event_queue(
     rmq_connection: &Connection,
     config: Arc<Configuration>,
-) -> Result<()> {
+) -> Result<Channel> {
     // Create a temporary channel
     let rmq_channel = rmq_connection
         .create_channel()
@@ -304,12 +303,12 @@ async fn declare_event_queue(
         .context("Could not declare the RabbitMQ queue")?;
 
     log::info!("Declared RabbitMQ queue {}", queue_name);
-    Ok(())
+    Ok(rmq_channel)
 }
 
 /// Attempts to synchronously convert a raw gateway event into our struct
 /// that will eventually be published to the gateway queue
-fn convert_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<GatewayEvent> {
+fn convert_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<GatewayEventOwned> {
     if let Event::ShardPayload(Payload { bytes }) = event {
         let json = match std::str::from_utf8(&bytes) {
             Ok(json) => json,
@@ -347,7 +346,7 @@ fn convert_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<Gate
             let mut map = map;
             let inner_json = map.remove("d")?;
             let guild_id = try_extract_guild_id(&inner_json, event_type, event_type_str);
-            return Some(GatewayEvent {
+            return Some(GatewayEventOwned {
                 id,
                 ingress_timestamp: timestamp,
                 inner: inner_json,
@@ -362,7 +361,7 @@ fn convert_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<Gate
 
 /// Attempts to publish a single gateway event to the durable queue
 async fn try_publish(
-    gateway_event: GatewayEvent,
+    gateway_event: GatewayEventOwned,
     channel_pool: architus_amqp_pool::Pool,
     config: Arc<Configuration>,
 ) -> Result<()> {

@@ -26,9 +26,9 @@ logs_uptime = "[::1]:50556"
 # Name of the exchange that events are sent to
 exchange = ""
 # Name of the durable queue that events get published to
-queue_name = "logs/normalize"
+queue_name = "logs/gateway-queue"
 # Routing key for messages
-routing_key = "logs/normalize"
+routing_key = "logs/gateway-queue"
 # Configuration for the connection pool that sits in front of a connection to the gateway queue
 [gateway_queue.connection_pool]
 # Max number of active channels on a single AMQP connection

@@ -1,21 +1,22 @@
 [package]
-name = "ingress-service"
+name = "logs-gateway-normalize"
 version = "0.1.0"
 authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
 description = """\
-Ingress service for the logging component of Architus.\
-Listens for Discord gateway events and forwards them to the logging service\
+Normalizes Gateway events from the RabbitMQ queue and consumes them,\
+submitting them to the import service for insertion into the logs store\
 """
 license = "MIT"
 
 [dependencies]
+gateway-queue-lib = { package = "logs-gateway-queue-lib", path = "../gateway-queue-lib" }
 architus-id = { path = "../../lib/id-rs" }
+architus-config-backoff = { path = "../../lib/config-backoff-rs" }
 config = "0.10"
 log = "0.4"
 env_logger = "0.8"
-lazy_static = "1.4"
-static_assertions = "1.1.0"
+static_assertions = "1.1"
 anyhow = "1.0"
 thiserror = "1.0.22"
 tonic = "0.3"
@@ -26,10 +27,13 @@ tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "macros"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde-humantime = "0.1"
+rmp-serde = "0.15"
 twilight-gateway = "0.2"
 twilight-model = "0.2"
 backoff = { version = "0.2", features = ["tokio"] }
 chrono = "0.4"
+lapin = "1.6"
+tokio-amqp = "0.2"
 
 [dependencies.jmespath]
 git = "https://github.com/jmespath/jmespath.rs"
