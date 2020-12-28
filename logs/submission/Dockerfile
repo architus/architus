@@ -27,6 +27,7 @@ COPY $CONFIG_BACKOFF_LIB/Cargo.toml .
 # Copy protobuf definitions
 WORKDIR $REPO_ROOT/$PROTO
 COPY $PROTO/logs/submission.proto logs/submission.proto
+COPY $PROTO/logs/revision.proto logs/revision.proto
 # Build via Cargo
 WORKDIR $REPO_ROOT/$SERVICE
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
