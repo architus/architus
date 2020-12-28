@@ -1,0 +1,136 @@
+syntax = "proto3";
+package logs.revision;
+
+service RevisionService {
+  rpc submit_revisions(SubmitRevisionsRequest) returns (SubmitRevisionsResponse) {}
+  rpc get_revision(GetRevisionRequest) returns (GetRevisionResponse) {}
+  rpc get_batch_revisions(GetBatchRevisionRequest) returns (GetBatchRevisionResponse) {}
+}
+
+message SubmitRevisionsRequest {
+  uint64 timestamp = 1;
+  repeated RevisionValue values = 2;
+}
+
+message SubmitRevisionsResponse {}
+
+message GetRevisionRequest {
+  uint64 timestamp = 1;
+  RevisionParameters parameters = 2;
+}
+
+message GetRevisionResponse {
+  RevisionValue value = 1;
+}
+
+message GetBatchRevisionRequest {
+  uint64 timestamp = 1;
+  repeated RevisionParameters parameters = 2;
+}
+
+message GetBatchRevisionResponse {
+  // Same length as parameters list in request
+  repeated RevisionValue values = 1;
+}
+
+message None {}
+
+message RevisionValue {
+  oneof value {
+    UserNameValue user_name = 1;
+    UserDiscriminatorValue user_discriminator = 2;
+    MemberNicknameValue member_nickname = 3;
+    MemberColorValue member_color = 4;
+    ChannelNameValue channel_name = 5;
+    RoleNameValue role_name = 6;
+    RoleColorValue role_color = 7;
+  }
+}
+
+message RevisionParameters {
+  oneof parameters {
+    UserNameParameters user_name = 1;
+    UserDiscriminatorParameters user_discriminator = 2;
+    MemberNicknameParameters member_nickname = 3;
+    MemberColorParameters member_color = 4;
+    ChannelNameParameters channel_name = 5;
+    RoleNameParameters role_name = 6;
+    RoleColorParameters role_color = 7;
+  }
+}
+
+message UserNameValue {
+  fixed64 user_id = 1;
+  string user_name = 2;
+}
+
+message UserNameParameters {
+  fixed64 user_id = 1;
+}
+
+message UserDiscriminatorValue {
+  fixed64 user_id = 1;
+  uint32 user_discriminator = 2;
+}
+
+message UserDiscriminatorParameters {
+  fixed64 user_id = 1;
+}
+
+message MemberNicknameValue {
+  fixed64 guild_id = 1;
+  fixed64 user_id = 2;
+  oneof member_nickname {
+    string some = 3;
+    None none = 4;
+  }
+}
+
+message MemberNicknameParameters {
+  fixed64 guild_id = 1;
+  fixed64 user_id = 2;
+}
+
+message MemberColorValue {
+  fixed64 guild_id = 1;
+  fixed64 user_id = 2;
+  oneof member_color {
+    uint32 some = 3;
+    None none = 4;
+  }
+}
+
+message MemberColorParameters {
+  fixed64 guild_id = 1;
+  fixed64 user_id = 2;
+}
+
+message ChannelNameValue {
+  fixed64 channel_id = 1;
+  string channel_name = 2;
+}
+
+message ChannelNameParameters {
+  fixed64 channel_id = 1;
+}
+
+message RoleNameValue {
+  fixed64 role_id = 1;
+  string role_name = 2;
+}
+
+message RoleNameParameters {
+  fixed64 role_id = 1;
+}
+
+message RoleColorValue {
+  fixed64 role_id = 1;
+  oneof role_color {
+    uint32 some = 2;
+    None none = 3;
+  }
+}
+
+message RoleColorParameters {
+  fixed64 role_id = 1;
+}

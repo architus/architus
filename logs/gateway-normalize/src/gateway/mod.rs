@@ -1,24 +1,15 @@
 pub mod sub_processors;
 
 use crate::event::{NormalizedEvent, Source};
-use crate::logging::EventType;
-use anyhow::Result;
+use crate::rpc::import::EventType;
 use architus_id::IdProvisioner;
+use gateway_queue_lib::GatewayEvent;
 use jmespath::Expression;
 use static_assertions::assert_impl_all;
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 use twilight_model::gateway::event::EventType as GatewayEventType;
-
-/// Represents a single gateway event that is ready to be normalized
-#[derive(Clone, Debug)]
-pub struct OriginalEvent {
-    pub seq: Option<u64>,
-    pub event_type: String,
-    pub json: serde_json::Value,
-    pub rx_timestamp: u64,
-}
 
 #[derive(Error, Clone, Debug)]
 pub enum ProcessingError {
@@ -27,6 +18,8 @@ pub enum ProcessingError {
     #[error("no guild id was parsed for event type {0}")]
     NoGuildId(String),
 }
+
+type Result<T> = std::result::Result<T, ProcessingError>;
 
 /// Represents a collection of processors that each have
 /// a corresponding gateway event type
@@ -77,12 +70,14 @@ impl Processor {
     }
 
     /// Applies the main data-oriented workflow to the given JSON
-    pub async fn normalize(&self, event: OriginalEvent) -> Result<NormalizedEvent> {
-        if let Some(sub_processor) = self.sub_processors.get(&event.event_type) {
+    pub async fn normalize(&self, event: GatewayEvent<'_>) -> Result<NormalizedEvent> {
+        if let Some(sub_processor) = self.sub_processors.get(event.event_type) {
             return Ok(sub_processor.apply(event, &self.id_provisioner)?);
         }
 
-        Err(ProcessingError::SubProcessorNotFound(event.event_type).into())
+        Err(ProcessingError::SubProcessorNotFound(String::from(
+            event.event_type,
+        )))
     }
 }
 
@@ -106,7 +101,7 @@ impl EventProcessor {
     /// Applies the event sub-processor to create a normalized event
     pub fn apply(
         &self,
-        event: OriginalEvent,
+        event: GatewayEvent,
         id_provisioner: &IdProvisioner,
     ) -> Result<NormalizedEvent> {
         match self {
@@ -123,36 +118,36 @@ impl EventProcessor {
             } => {
                 // TODO add audit log entry support
                 let audit_log_entry: Option<serde_json::Value> = None;
-                let id = id_provisioner.with_ts(event.rx_timestamp);
+                let id = id_provisioner.with_ts(event.ingress_timestamp);
 
                 // Extract all fields based on the static sub-processor definition
                 let timestamp = match timestamp_src {
-                    TimestampSource::TimeOfIngress => event.rx_timestamp,
+                    TimestampSource::TimeOfIngress => event.ingress_timestamp,
                     TimestampSource::Snowflake(path) => path
-                        .apply_id(Some(&event.json), audit_log_entry.as_ref())
-                        .map_or(event.rx_timestamp, architus_id::extract_timestamp),
+                        .apply_id(Some(&event.inner), audit_log_entry.as_ref())
+                        .map_or(event.ingress_timestamp, architus_id::extract_timestamp),
                 };
                 let reason = reason_src
                     .as_ref()
-                    .and_then(|path| path.apply(Some(&event.json), audit_log_entry.as_ref()))
+                    .and_then(|path| path.apply(Some(&event.inner), audit_log_entry.as_ref()))
                     .and_then(|value| value.as_string().cloned());
                 let subject_id = subject_id_src
                     .as_ref()
-                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
+                    .and_then(|path| path.apply_id(Some(&event.inner), audit_log_entry.as_ref()));
                 let guild_id = guild_id_src
                     .as_ref()
-                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()))
-                    .ok_or_else(|| ProcessingError::NoGuildId(event.event_type.clone()))?;
+                    .and_then(|path| path.apply_id(Some(&event.inner), audit_log_entry.as_ref()))
+                    .ok_or_else(|| ProcessingError::NoGuildId(String::from(event.event_type)))?;
                 let agent_id = agent_id_src
                     .as_ref()
-                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
+                    .and_then(|path| path.apply_id(Some(&event.inner), audit_log_entry.as_ref()));
                 let channel_id = channel_id_src
                     .as_ref()
-                    .and_then(|path| path.apply_id(Some(&event.json), audit_log_entry.as_ref()));
+                    .and_then(|path| path.apply_id(Some(&event.inner), audit_log_entry.as_ref()));
 
                 // Construct the source from the original JSON values
                 let source = Source {
-                    gateway: Some(event.json),
+                    gateway: Some(event.inner),
                     audit_log: audit_log_entry,
                     internal: None,
                 };

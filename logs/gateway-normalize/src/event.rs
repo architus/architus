@@ -1,6 +1,9 @@
-use crate::logging::{Event as LogEvent, EventOrigin, EventSource, EventType};
+use crate::rpc::import::{
+    Event as LogEvent, EventOrigin, EventSource, EventType, SubmitIdempotentRequest,
+};
 use architus_id::HoarFrost;
 use std::convert::Into;
+use tonic::{IntoRequest, Request};
 
 /// Normalized log event to send to log ingestion
 #[derive(Clone, PartialEq, Debug)]
@@ -32,6 +35,14 @@ pub struct NormalizedEvent {
     pub reason: Option<String>,
 }
 
+impl IntoRequest<SubmitIdempotentRequest> for NormalizedEvent {
+    fn into_request(self) -> Request<SubmitIdempotentRequest> {
+        Request::new(SubmitIdempotentRequest {
+            event: Some(self.into()),
+        })
+    }
+}
+
 impl Into<LogEvent> for NormalizedEvent {
     fn into(self) -> LogEvent {
         // Convert the normalized event struct (specific to this service)
@@ -57,13 +68,24 @@ impl Into<LogEvent> for NormalizedEvent {
                     .unwrap_or_else(|| String::from("")),
             }),
             origin: self.origin.into(),
-            event_type: self.event_type.into(),
+            r#type: self.event_type.into(),
             guild_id: self.guild_id,
             agent_id: self.agent_id.unwrap_or(0),
+            // TODO implement
+            agent_type: 0,
+            agent_metadata: None,
             subject_id: self.subject_id.unwrap_or(0),
+            subject_type: 0,
+            subject_metadata: 0,
+            auxiliary_id: 0,
+            auxiliary_type: 0,
+            auxiliary_metadata: 0,
+            content: String::from(""),
             audit_log_id: self.audit_log_id.unwrap_or(0),
             channel_id: self.channel_id.unwrap_or(0),
             reason: self.reason.unwrap_or_else(|| String::from("")),
+            channel_name: String::from(""),
+            content_metadata: None,
         }
     }
 }

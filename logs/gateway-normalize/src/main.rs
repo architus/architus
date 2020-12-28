@@ -1,258 +1,290 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
 mod config;
+mod connect;
 mod event;
 mod gateway;
-
-mod logging {
-    #![allow(clippy::all, clippy::pedantic, clippy::nursery)]
-    tonic::include_proto!("logging");
-}
+mod rpc;
 
 use crate::config::Configuration;
 use crate::event::NormalizedEvent;
-use crate::gateway::OriginalEvent;
+use crate::gateway::{ProcessingError, Processor};
+use crate::rpc::import::Client as LogsImportClient;
 use anyhow::{Context, Result};
-use architus_id::time;
-use backoff::{future::FutureOperation as _, ExponentialBackoff};
+use backoff::future::FutureOperation as _;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use futures::{Stream, StreamExt};
-use lazy_static::lazy_static;
-use log::{debug, error, info, warn};
-use logging::logging_client::LoggingClient;
-use logging::SubmitRequest;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use gateway_queue_lib::GatewayEvent;
+use lapin::options::{
+    BasicAckOptions, BasicConsumeOptions, BasicQosOptions, BasicRejectOptions, QueueDeclareOptions,
+};
+use lapin::types::FieldTable;
+use lapin::{Channel, Connection};
 use std::convert::{Into, TryFrom};
-use std::future::Future;
-use std::ops::Deref;
 use std::sync::Arc;
-use thiserror::Error;
-use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
-use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
-use twilight_model::gateway::event::shard::Payload;
-use twilight_model::gateway::OpCode;
+use tonic::IntoRequest;
 
-lazy_static! {
-    /// Includes all guild-related events to signal to Discord that we intend to
-    /// receive and process them
-    pub static ref INTENTS: Intents = Intents::GUILDS
-        | Intents::GUILD_MEMBERS
-        | Intents::GUILD_BANS
-        | Intents::GUILD_EMOJIS
-        | Intents::GUILD_INTEGRATIONS
-        | Intents::GUILD_WEBHOOKS
-        | Intents::GUILD_INVITES
-        | Intents::GUILD_VOICE_STATES
-        | Intents::GUILD_MEMBERS
-        | Intents::GUILD_MESSAGES
-        | Intents::GUILD_MESSAGE_REACTIONS;
-}
-
-/// Attempts to initialize the bot and listen for gateway events
+/// Loads the config and bootstraps the service
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
+
+    // Parse the config
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
         \nUsage: \
-        \ningress-service [config-path]",
+        \nlogs-gateway-normalize [config-path]",
     );
+    let config = Arc::new(Configuration::try_load(config_path)?);
+    run(config).await
+}
 
-    // Parse the config from the path and use it to initialize the event stream
-    let config = Configuration::try_load(config_path)?;
-    let event_types = EventTypeFlags::SHARD_PAYLOAD;
-    let mut shard = Shard::new(config.secrets.discord_token.clone(), *INTENTS);
-    let events = shard.some_events(event_types);
-
+/// Runs the main logic of the service,
+/// acting as a consumer for the RabbitMQ gateway-queue messages
+/// and running them through a processing pipeline
+/// before forwarding them to the import service
+async fn run(config: Arc<Configuration>) -> Result<()> {
     // Initialize the gateway event processor
     // and register all known gateway event handlers
     // (see gateway/processors.rs)
-    let processor = Arc::new(gateway::sub_processors::register_all(
-        gateway::Processor::new(),
-    ));
+    // TODO connect to Discord API
+    let processor_inner = gateway::Processor::new();
+    let processor = Arc::new(gateway::sub_processors::register_all(processor_inner));
 
-    // Connect to the logging service to sink normalized events into
-    let client = LoggingClient::connect(config.services.logging.clone())
-        .await
-        .context("Could not connect to logging service")?;
+    // Initialize connections to external services
+    let rmq_connection = connect::to_queue(Arc::clone(&config)).await?;
+    let import_client = connect::to_import(Arc::clone(&config)).await?;
 
-    shard.start().await.context("Could not start shard")?;
-    info!("Created shard and preparing to listen for gateway events");
-
-    // Listen for all raw gateway events and process them,
-    // re-emitting half-processed gateway events to be consumed by the processor
-    let gateway_event_stream = pipe_gateway_events(events, Arc::clone(&processor));
-
-    // Normalize each event coming from the gateway into a NormalizedEvent,
-    // and process them in parallel where possible via buffer_unordered
-    let normalized_event_stream =
-        pipe_normalized_events(gateway_event_stream, Arc::clone(&processor))
-            .buffer_unordered(config.normalization_stream_concurrency)
-            .filter_map(|event_option| async move { event_option });
-
-    // Send each log event to the logging import service,
-    // acting as a sink for this stream
-    import_log_events(
-        normalized_event_stream,
-        &Arc::new(client),
-        &Arc::new(config),
+    // Consume raw gateway events from the Rabbit MQ queue
+    // and normalize them via the fleet of processors
+    normalize_gateway_events(
+        rmq_connection,
+        import_client,
+        processor,
+        Arc::clone(&config),
     )
-    .await;
+    .await?;
 
     Ok(())
 }
 
-/// Stream processor function that takes in a raw stream of gateway events
-/// and uses twilight's fast pre-deserializer to validate that
-/// they are valid and usable events before parsing and re-emitting them
-fn pipe_gateway_events(
-    in_stream: impl Stream<Item = Event>,
-    processor: Arc<gateway::Processor>,
-) -> impl Stream<Item = OriginalEvent> {
-    // Get the opcode byte number for `OpCode::Event` packets
-    let event_opcode: u8 =
-        match serde_json::to_value(OpCode::Event).expect("Couldn't turn OpCode::Event into json") {
-            serde_json::Value::Number(n) => n
-                .as_u64()
-                .and_then(|i| TryFrom::try_from(i).ok())
-                .expect("Couldn't turn OpCode::Event into u8"),
-            _ => panic!("serialization from OpCode produced non-u8"),
+// Consumes raw gateway events from the Rabbit MQ queue
+// and normalizes them via the fleet of processors
+async fn normalize_gateway_events(
+    queue_connection: Connection,
+    import_client: LogsImportClient,
+    processor: Arc<Processor>,
+    config: Arc<Configuration>,
+) -> Result<()> {
+    // Keep looping over the lifecycle,
+    // allowing for the state to be eagerly restored after a disconnection
+    // using the same backoff as initialization.
+    // If the backoff is exhausted or there is another error, then the entire future exits
+    // (and the service will exit accordingly)
+    let mut outer_rmq_connection = Some(queue_connection);
+    loop {
+        let config = Arc::clone(&config);
+        let processor = Arc::clone(&processor);
+        let import_client = import_client.clone();
+
+        // Reconnect to the Rabbit MQ instance if needed
+        let rmq_connection = if let Some(rmq) = outer_rmq_connection.take() {
+            rmq
+        } else {
+            connect::to_queue(Arc::clone(&config)).await?
         };
 
-    in_stream.filter_map(move |event| {
-        let processor_copy = Arc::clone(&processor);
-        async move {
-            if let Event::ShardPayload(Payload { bytes }) = event {
-                let json = std::str::from_utf8(&bytes).ok()?;
-                // Use twilight's fast pre-deserializer to determine the op type,
-                // and only deserialize it if it:
-                // - is a proper Gateway dispatch event
-                // - has a matching processor
-                let deserializer = GatewayEventDeserializer::from_json(json)?;
-                let (op, seq, event_type) = deserializer.into_parts();
-                if op != event_opcode {
-                    return None;
-                }
+        // Declare the RMQ queue to consume incoming events from
+        // and re-use the channel created to do so
+        let channel = declare_event_queue(&rmq_connection, Arc::clone(&config)).await?;
 
-                // Make sure we can process the event
-                let event_type = event_type.as_deref()?;
-                if !processor_copy.can_process(event_type) {
-                    return None;
-                }
-
-                let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
-                if let serde_json::Value::Object(map) = value {
-                    // Attempt to find the ".d" value (contains the Gateway message payload)
-                    // https://discord.com/developers/docs/topics/gateway#payloads-gateway-payload-structure
-                    let mut map = map;
-                    let inner_json = map.remove("d")?;
-                    return Some(OriginalEvent {
-                        seq,
-                        event_type: event_type.to_owned(),
-                        json: inner_json,
-                        rx_timestamp: time::millisecond_ts(),
-                    });
-                }
-            }
-
-            None
-        }
-    })
-}
-
-/// Stream processor function that invokes the core event processing logic
-/// on each incoming original gateway event,
-/// attempting to asynchronously convert them into `NormalizedEvent`s
-fn pipe_normalized_events(
-    in_stream: impl Stream<Item = OriginalEvent>,
-    processor: Arc<gateway::Processor>,
-) -> impl Stream<Item = impl Future<Output = Option<NormalizedEvent>>> {
-    in_stream.map(move |event| {
-        let processor = Arc::clone(&processor);
-        async move {
-            match processor.normalize(event).await {
-                Ok(normalized_event) => Some(normalized_event),
-                Err(err) => {
-                    warn!("Event normalization failed for event: {:?}", err);
-                    None
-                }
-            }
-        }
-    })
-}
-
-#[derive(Error, Clone, Debug)]
-enum SubmissionError {
-    #[error("gRPC call failed to import log event: {0}")]
-    GrpcFailure(tonic::Status),
-}
-
-/// Stream sink that takes in each normalized event and sends them to the logging service
-/// for importing, retrying with an exponential backoff if the calls fail
-#[allow(clippy::future_not_send)]
-fn import_log_events(
-    in_stream: impl Stream<Item = NormalizedEvent>,
-    client: &Arc<LoggingClient<tonic::transport::Channel>>,
-    config: &Arc<Configuration>,
-) -> impl Future<Output = ()> {
-    let config = Arc::clone(config);
-    let client = Arc::clone(client);
-    in_stream.for_each_concurrent(Some(config.import_stream_concurrency), move |event| {
-        let client = Arc::clone(&client);
-        let config = Arc::clone(&config);
-        async move {
-            let payload = SubmitRequest{
-                event: Some(event.into()),
-            };
-
-            let original_payload = payload.clone();
-            let submit = move || {
-                let mut client = Deref::deref(&client).clone();
-                // Note: we have to clone the payload for each retry,
-                // which isn't ideal but required since Tonic moves it
-                let payload = payload.clone();
+        // Start listening to the queue by creating a consumer
+        // (we have to convert the Stream to a TryStream before using `try_for_each_concurrent`)
+        let consumer = channel
+            .basic_consume(
+                &config.gateway_queue.queue_name,
+                &config.gateway_queue.consumer_tag,
+                BasicConsumeOptions::default(),
+                FieldTable::default(),
+            )
+            .await?;
+        let event_try_stream = consumer.map(|result| result.map_err(anyhow::Error::new));
+        let consume = event_try_stream.try_for_each_concurrent(
+            Some(usize::from(config.queue_consumer_concurrency)),
+            move |(_, delivery)| {
+                let config = Arc::clone(&config);
+                let processor = Arc::clone(&processor);
+                let import_client = import_client.clone();
                 async move {
-                    // Send the gRPC response and get the reply
-                    Ok(client
-                        .submit(payload)
-                        .await
-                        .map_err(|err| {
-                            warn!("Log event submission failed; retrying after an exponential backoff: \
-                            \n{:?}", err);
-                            SubmissionError::GrpcFailure(err)
-                        })?
-                        .into_inner())
-                }
-            };
-
-            // Attempt the submission with an exponential backoff loop
-            let backoff = ExponentialBackoff {
-                max_interval: config.import_backoff_max_interval,
-                max_elapsed_time: Some(config.import_backoff_duration),
-                multiplier: config.import_backoff_multiplier,
-                initial_interval: config.import_backoff_initial_interval,
-                ..ExponentialBackoff::default()
-            };
-
-            match submit.retry(backoff).await {
-                Ok(result) => {
-                    match readable_timestamp(result.actual_timestamp) {
-                        Ok(timestamp) => {
-                            info!("Submitted log event '{}' at {}", result.actual_id, timestamp);
-                            debug!("Actual event: {:?}", original_payload);
-                        },
-                        Err(err) => {
-                            warn!("Submitted log event '{}' at invalid time ({}): {:?}",
-                                result.actual_id, result.actual_timestamp, err);
-                            info!("Actual event: {:?}", original_payload);
+                    let result = normalize(&delivery.data, processor)
+                        .and_then(|event| import_event(event, import_client, config))
+                        .await;
+                    // Acknowledge or reject the event based on the result
+                    match result {
+                        Ok(_) => {
+                            delivery.ack(BasicAckOptions::default()).await?;
+                            Ok(())
+                        }
+                        Err(rejection) => {
+                            let requeue_msg = if rejection.should_requeue {
+                                "requeuing"
+                            } else {
+                                "not requeuing"
+                            };
+                            log::debug!(
+                                "Rejecting message due to error ({}): {:?}",
+                                requeue_msg,
+                                rejection.inner
+                            );
+                            delivery
+                                .reject(BasicRejectOptions {
+                                    requeue: rejection.should_requeue,
+                                    ..BasicRejectOptions::default()
+                                })
+                                .await?;
+                            Ok(())
                         }
                     }
-                },
-                Err(err) => info!("Failed to submit log event: {:?}", err),
-            }
+                }
+            },
+        );
+
+        if let Err(err) = consume.await {
+            log::error!(
+                "Could not consume event due to queue error; attempting to reconnect: `{:?}`",
+                err
+            );
+        }
+    }
+}
+
+/// Declares the Rabbit MQ queue, which is done during initialization of the Rabbit MQ connection
+async fn declare_event_queue(
+    rmq_connection: &Connection,
+    config: Arc<Configuration>,
+) -> Result<Channel> {
+    // Create a temporary channel
+    let rmq_channel = rmq_connection
+        .create_channel()
+        .await
+        .context("Could not create a new RabbitMQ channel")?;
+
+    // Set the channel QOS appropriately
+    rmq_channel
+        .basic_qos(
+            config.queue_consumer_concurrency.saturating_mul(2),
+            BasicQosOptions { global: false },
+        )
+        .await
+        .context("Could not set the QoS level on the RabbitMQ queue")?;
+
+    // Declare the queue
+    let queue_name = &config.gateway_queue.queue_name;
+    let queue_options = QueueDeclareOptions {
+        durable: true,
+        ..QueueDeclareOptions::default()
+    };
+    rmq_channel
+        .queue_declare(queue_name, queue_options, FieldTable::default())
+        .await
+        .context("Could not declare the RabbitMQ queue")?;
+
+    log::info!("Declared RabbitMQ queue {}", queue_name);
+    Ok(rmq_channel)
+}
+
+/// Error value created while consumption fails for a gateway event
+/// and includes whether the gateway event should be requeued or not
+#[derive(Debug)]
+struct EventRejection {
+    should_requeue: bool,
+    inner: anyhow::Error,
+}
+
+/// Attempts to normalize the raw bytes from the queue into a normalized event
+/// ready to be imported
+async fn normalize(
+    event_bytes: &[u8],
+    processor: Arc<Processor>,
+) -> Result<NormalizedEvent, EventRejection> {
+    let event: GatewayEvent = match rmp_serde::from_read_ref(event_bytes) {
+        Ok(event) => event,
+        Err(err) => {
+            log::warn!(
+                "An error occurred while deserializing event from MessagePack: {:?}",
+                err
+            );
+
+            // Reject the message without requeuing
+            return Err(EventRejection {
+                should_requeue: false,
+                inner: err.into(),
+            });
+        }
+    };
+
+    // Run the processor fleet on the event to obtain a normalized event
+    processor.normalize(event).await.map_err(|err| {
+        log::warn!("Event normalization failed for event: {:?}", err);
+        // Reject the message with/without requeuing depending on the error
+        // (poison messages will be handled by max retry policy for quorum queue)
+        let should_requeue = match err {
+            ProcessingError::SubProcessorNotFound(_) => false,
+            ProcessingError::NoGuildId(_) => false,
+            _ => true,
+        };
+        EventRejection {
+            should_requeue,
+            inner: err.into(),
         }
     })
 }
 
+/// Sends an event to the logs/import service,
+/// attempting to retry in the case of transient errors
+async fn import_event(
+    event: NormalizedEvent,
+    client: LogsImportClient,
+    config: Arc<Configuration>,
+) -> Result<(), EventRejection> {
+    let timestamp = event.timestamp;
+    let id = event.id;
+    let send = || async {
+        let mut client = client.clone();
+        let response = client.submit_idempotent(event.clone().into_request()).await;
+        rpc::into_backoff(response)
+    };
+
+    match send.retry(config.rpc_backoff.build()).await {
+        Ok(_) => {
+            match readable_timestamp(timestamp) {
+                Ok(timestamp) => {
+                    log::info!("Submitted log event '{}' at {}", id, timestamp);
+                    log::debug!("Actual event: {:?}", event);
+                }
+                Err(err) => {
+                    log::warn!(
+                        "Submitted log event '{}' at invalid time ({}): {:?}",
+                        id,
+                        timestamp,
+                        err
+                    );
+                    log::info!("Actual event: {:?}", event);
+                }
+            };
+            Ok(())
+        }
+        Err(err) => {
+            log::warn!("Failed to submit log event: {:?}", err);
+            Err(EventRejection {
+                should_requeue: true,
+                inner: err.into(),
+            })
+        }
+    }
+}
+
+/// Attempts to create a readable timestamp string from the given Unix ms epoch
 fn readable_timestamp(timestamp: u64) -> Result<String> {
     let sec =
         i64::try_from(timestamp / 1_000).context("Could not convert timestamp seconds to i64")?;
@@ -260,6 +292,6 @@ fn readable_timestamp(timestamp: u64) -> Result<String> {
         .context("Could not convert timestamp nanoseconds to u32")?;
     let naive_datetime = NaiveDateTime::from_timestamp_opt(sec, nsec)
         .context("Could not convert timestamp to Naive DateTime")?;
-    let datetime: DateTime<Utc> = DateTime::from_utc(nai    ve_datetime, Utc);
+    let datetime: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
     Ok(datetime.format("%Y-%m-%d %H:%M:%S").to_string())
 }

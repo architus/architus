@@ -1,7 +1,6 @@
 use crate::config::Configuration;
 use crate::rpc;
-use crate::rpc::feature_gate::{BatchCheck, GuildFeature};
-use crate::rpc::FeatureGateClient;
+use crate::rpc::feature_gate::{BatchCheck, Client as FeatureGateClient, GuildFeature};
 use crate::uptime::Event as UptimeEvent;
 use anyhow::Result;
 use backoff::future::FutureOperation;

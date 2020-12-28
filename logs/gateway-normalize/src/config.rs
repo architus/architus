@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
+use architus_config_backoff::Backoff;
 use log::{debug, info};
 use serde::Deserialize;
-use std::time::Duration;
 
 /// Configuration object loaded upon startup
 #[derive(Debug, Deserialize, Clone)]
@@ -10,35 +10,36 @@ pub struct Configuration {
     pub secrets: Secrets,
     /// Collection of external services that this service connects to
     pub services: Services,
+    /// Parameters for the backoff used to connect to external services during initialization
+    pub initialization_backoff: Backoff,
+    /// Parameters for the backoff used to send RPC calls to other services
+    pub rpc_backoff: Backoff,
     /// Maximum number of executing futures for gateway event normalization processing
-    pub normalization_stream_concurrency: usize,
-    /// Maximum number of executing futures for normalized event importing
-    pub import_stream_concurrency: usize,
-    /// Max interval to use between import retries
-    #[serde(with = "serde_humantime")]
-    pub import_backoff_max_interval: Duration,
-    /// Overall duration of import retries (exceeding this causes the operation to give up)
-    #[serde(with = "serde_humantime")]
-    pub import_backoff_duration: Duration,
-    /// Multiplier between consecutive backoff intervals to use between import retries
-    pub import_backoff_multiplier: f64,
-    /// Initial backoff interval to use between import retries
-    #[serde(with = "serde_humantime")]
-    pub import_backoff_initial_interval: Duration,
+    pub queue_consumer_concurrency: u16,
+    /// Config options related to the Gateway Queue
+    pub gateway_queue: GatewayQueue,
 }
 
 /// Collection of secret values used to connect to services
 #[derive(Debug, Deserialize, Clone)]
-pub struct Secrets {
-    /// Discord bot token used to authenticate with the Gateway API
-    pub discord_token: String,
-}
+pub struct Secrets {}
 
 /// Collection of external services that this service connects to
 #[derive(Debug, Deserialize, Clone)]
 pub struct Services {
-    /// URL of the logging service that normalized LogEvents are forwarded to
-    pub logging: String,
+    /// Full AMQP URL to connect to the gateway queue at
+    pub gateway_queue: String,
+    /// HTTP URL of the logs/import service that normalized LogEvents are forwarded to
+    pub logs_import: String,
+}
+
+/// Config options related to the Gateway Queue
+#[derive(Default, Debug, Deserialize, Clone)]
+pub struct GatewayQueue {
+    /// Name of the durable queue that events get published to
+    pub queue_name: String,
+    /// Consumer tag used for the main event consumer
+    pub consumer_tag: String,
 }
 
 impl Configuration {
@@ -51,10 +52,10 @@ impl Configuration {
         settings
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
-            // Add in settings from the environment (with a prefix of INGRESS)
-            // Eg.. `INGRESS_SECRETS__DISCORD_TOKEN=X ./target/ingress-service`
-            // would set the `secrets.discord_token` key
-            .merge(config::Environment::with_prefix("INGRESS").separator("__"))
+            // Add in settings from the environment (with a prefix of LOGS_GATEWAY_NORMALIZE)
+            // Eg.. `LOGS_GATEWAY_NORMALIZE_SERVICES__LOGS_IMPORT=X ./target/logs-gateway-normalize`
+            // would set the `services.logs_import` key
+            .merge(config::Environment::with_prefix("LOGS_GATEWAY_NORMALIZE").separator("__"))
             .context("Could not merge in values from the environment")?;
         let config = settings
             .try_into()

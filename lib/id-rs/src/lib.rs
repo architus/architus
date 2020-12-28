@@ -1,8 +1,8 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
 use serde::{Deserialize, Serialize};
-use std::process;
 use std::fmt;
+use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Difference between Unix epoch and Discord epoch
@@ -87,7 +87,7 @@ pub const fn extract_timestamp(snowflake: u64) -> u64 {
 }
 
 // Architus-style ID
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Copy, Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct HoarFrost(pub u64);
 
 impl HoarFrost {
@@ -151,4 +151,3 @@ pub mod time {
         }
     }
 }
-
