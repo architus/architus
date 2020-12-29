@@ -95,7 +95,7 @@ impl HoarFrost {
     ///
     /// See <https://discord.com/developers/docs/reference#snowflakes>
     #[must_use]
-    pub const fn extract_timestamp(&self) -> u64 {
+    pub const fn extract_timestamp(self) -> u64 {
         extract_timestamp(self.0)
     }
 }
