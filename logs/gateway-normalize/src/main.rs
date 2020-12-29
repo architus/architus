@@ -8,7 +8,7 @@ mod rpc;
 
 use crate::config::Configuration;
 use crate::event::NormalizedEvent;
-use crate::gateway::{ProcessingError, Processor};
+use crate::gateway::{ProcessingError, ProcessorFleet};
 use crate::rpc::submission::Client as LogsImportClient;
 use anyhow::{Context, Result};
 use backoff::future::FutureOperation as _;
@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
 }
 
 /// Runs the main logic of the service,
-/// acting as a consumer for the RabbitMQ gateway-queue messages
+/// acting as a consumer for the Rabbit MQ gateway-queue messages
 /// and running them through a processing pipeline
 /// before forwarding them to the submission service
 async fn run(config: Arc<Configuration>) -> Result<()> {
@@ -48,8 +48,8 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
     // and register all known gateway event handlers
     // (see gateway/processors.rs)
     // TODO connect to Discord API
-    let processor_inner = gateway::Processor::new();
-    let processor = Arc::new(gateway::sub_processors::register_all(processor_inner));
+    let processor_inner = gateway::ProcessorFleet::new();
+    let processor = Arc::new(gateway::processors::register_all(processor_inner));
 
     // Initialize connections to external services
     let rmq_connection = connect::to_queue(Arc::clone(&config)).await?;
@@ -73,7 +73,7 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
 async fn normalize_gateway_events(
     queue_connection: Connection,
     submission_client: LogsImportClient,
-    processor: Arc<Processor>,
+    processor: Arc<ProcessorFleet>,
     config: Arc<Configuration>,
 ) -> Result<()> {
     // Keep looping over the lifecycle,
@@ -134,12 +134,11 @@ async fn normalize_gateway_events(
                             log::debug!(
                                 "Rejecting message due to error ({}): {:?}",
                                 requeue_msg,
-                                rejection.inner
+                                rejection.source
                             );
                             delivery
                                 .reject(BasicRejectOptions {
                                     requeue: rejection.should_requeue,
-                                    ..BasicRejectOptions::default()
                                 })
                                 .await?;
                             Ok(())
@@ -198,14 +197,14 @@ async fn declare_event_queue(
 #[derive(Debug)]
 struct EventRejection {
     should_requeue: bool,
-    inner: anyhow::Error,
+    source: anyhow::Error,
 }
 
 /// Attempts to normalize the raw bytes from the queue into a normalized event
 /// ready to be submitted
 async fn normalize(
     event_bytes: &[u8],
-    processor: Arc<Processor>,
+    processor: Arc<ProcessorFleet>,
 ) -> Result<NormalizedEvent, EventRejection> {
     let event: GatewayEvent = match rmp_serde::from_read_ref(event_bytes) {
         Ok(event) => event,
@@ -218,7 +217,7 @@ async fn normalize(
             // Reject the message without requeuing
             return Err(EventRejection {
                 should_requeue: false,
-                inner: err.into(),
+                source: err.into(),
             });
         }
     };
@@ -228,14 +227,11 @@ async fn normalize(
         log::warn!("Event normalization failed for event: {:?}", err);
         // Reject the message with/without requeuing depending on the error
         // (poison messages will be handled by max retry policy for quorum queue)
-        let should_requeue = match err {
-            ProcessingError::SubProcessorNotFound(_) => false,
-            ProcessingError::NoGuildId(_) => false,
-            _ => true,
-        };
+        let should_requeue =
+            matches!(err, ProcessingError::SubProcessorNotFound(_) | ProcessingError::FatalSourceError(_) | ProcessingError::NoAuditLogEntry(_));
         EventRejection {
             should_requeue,
-            inner: err.into(),
+            source: err.into(),
         }
     })
 }
@@ -278,7 +274,7 @@ async fn submit_event(
             log::warn!("Failed to submit log event: {:?}", err);
             Err(EventRejection {
                 should_requeue: true,
-                inner: err.into(),
+                source: err.into(),
             })
         }
     }
@@ -288,9 +284,9 @@ async fn submit_event(
 fn readable_timestamp(timestamp: u64) -> Result<String> {
     let sec =
         i64::try_from(timestamp / 1_000).context("Could not convert timestamp seconds to i64")?;
-    let nsec = u32::try_from((timestamp % 1_000).saturating_mul(1_000_000))
+    let nano_sec = u32::try_from((timestamp % 1_000).saturating_mul(1_000_000))
         .context("Could not convert timestamp nanoseconds to u32")?;
-    let naive_datetime = NaiveDateTime::from_timestamp_opt(sec, nsec)
+    let naive_datetime = NaiveDateTime::from_timestamp_opt(sec, nano_sec)
         .context("Could not convert timestamp to Naive DateTime")?;
     let datetime: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
     Ok(datetime.format("%Y-%m-%d %H:%M:%S").to_string())

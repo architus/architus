@@ -1,51 +1,61 @@
-pub mod sub_processors;
+pub mod path;
+pub mod processors;
+pub mod source;
 
-use crate::event::{NormalizedEvent, Source};
+use crate::event::{Agent, Channel, Content, Entity, NormalizedEvent, Source as EventSource};
+use crate::gateway::source::{AuditLogSource, Source};
 use crate::rpc::submission::EventType;
+use anyhow::Context as _;
 use architus_id::IdProvisioner;
+use futures::try_join;
 use gateway_queue_lib::GatewayEvent;
-use jmespath::Expression;
 use static_assertions::assert_impl_all;
 use std::collections::HashMap;
-use std::sync::Arc;
 use thiserror::Error;
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use twilight_model::gateway::event::EventType as GatewayEventType;
+use twilight_model::guild::audit_log::AuditLogEntry;
 
-#[derive(Error, Clone, Debug)]
+/// Enumerates the various errors that can occur during event processing
+/// that cause it to halt
+#[derive(Error, Debug)]
 pub enum ProcessingError {
     #[error("no sub-processor found for event type {0}")]
     SubProcessorNotFound(String),
     #[error("no guild id was parsed for event type {0}")]
     NoGuildId(String),
+    #[error("fatal sourcing error encountered: {0}")]
+    FatalSourceError(anyhow::Error),
+    #[error("no audit log entry for event type {0} was sourced, but it is used to source a required field")]
+    NoAuditLogEntry(String),
 }
 
-type Result<T> = std::result::Result<T, ProcessingError>;
+type ProcessingResult<T> = std::result::Result<T, ProcessingError>;
 
 /// Represents a collection of processors that each have
 /// a corresponding gateway event type
 /// and are capable of normalizing raw JSON of that type
 /// into `NormalizedEvent`s
-#[derive(Debug)]
-pub struct Processor {
-    sub_processors: HashMap<String, EventProcessor>,
+pub struct ProcessorFleet {
+    processors: HashMap<String, Processor>,
     id_provisioner: IdProvisioner,
 }
 
 // Processor needs to be safe to share
-assert_impl_all!(Processor: Sync);
+assert_impl_all!(ProcessorFleet: Sync);
 
-impl Default for Processor {
+impl Default for ProcessorFleet {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Processor {
+impl ProcessorFleet {
     /// Creates a processor with an empty set of sub-processors
     #[must_use]
     pub fn new() -> Self {
         Self {
-            sub_processors: HashMap::new(),
+            processors: HashMap::new(),
             id_provisioner: IdProvisioner::new(),
         }
     }
@@ -54,187 +64,189 @@ impl Processor {
     /// acting as a builder. Works by serializing the event type into a string
     /// and adding it to the internal map
     #[must_use]
-    fn register(mut self, event_type: GatewayEventType, sub_processor: EventProcessor) -> Self {
+    fn register(mut self, event_type: GatewayEventType, processor: Processor) -> Self {
         let pattern: &[_] = &['\'', '"'];
         let event_type_str =
             serde_json::to_string(&event_type).expect("GatewayEventType was not serializable");
         let trimmed = String::from(event_type_str.trim_matches(pattern));
-        self.sub_processors.insert(trimmed, sub_processor);
+        self.processors.insert(trimmed, processor);
         self
     }
 
-    /// Returns whether the processor can consume the given event type
-    #[must_use]
-    pub fn can_process(&self, event_type: &str) -> bool {
-        self.sub_processors.contains_key(event_type)
-    }
-
     /// Applies the main data-oriented workflow to the given JSON
-    pub async fn normalize(&self, event: GatewayEvent<'_>) -> Result<NormalizedEvent> {
-        if let Some(sub_processor) = self.sub_processors.get(event.event_type) {
-            return Ok(sub_processor.apply(event, &self.id_provisioner)?);
+    pub async fn normalize(
+        &self,
+        event: GatewayEvent<'_>,
+    ) -> Result<NormalizedEvent, ProcessingError> {
+        if let Some(processor) = self.processors.get(event.event_type) {
+            processor.apply(event, &self.id_provisioner).await
+        } else {
+            Err(ProcessingError::SubProcessorNotFound(String::from(
+                event.event_type,
+            )))
         }
-
-        Err(ProcessingError::SubProcessorNotFound(String::from(
-            event.event_type,
-        )))
     }
 }
 
-/// Represents a shareable static configuration that describes
-/// how to translate a single gateway event into a normalized event
-#[derive(Clone, Debug)]
-pub enum EventProcessor {
-    Static {
-        event_type: EventType,
-        timestamp_src: TimestampSource,
-        subject_id_src: Option<Path>,
-        agent_id_src: Option<Path>,
-        audit_log_src: Option<AuditLogSource>,
-        guild_id_src: Option<Path>,
-        channel_id_src: Option<Path>,
-        reason_src: Option<Path>,
-    },
+pub struct Processor {
+    audit_log: Option<AuditLogSource>,
+    event_type: Source<EventType>,
+    timestamp: Source<u64>,
+    guild_id: Source<u64>,
+    reason: Source<Option<String>>,
+    channel: Source<Option<Channel>>,
+    agent: Source<Option<Agent>>,
+    subject: Source<Option<Entity>>,
+    auxiliary: Source<Option<Entity>>,
+    content: Source<Content>,
 }
 
-impl EventProcessor {
-    /// Applies the event sub-processor to create a normalized event
-    pub fn apply(
+impl Processor {
+    /// Runs a single processor, attempting to create a Normalized Event as a result
+    pub async fn apply<'a>(
         &self,
-        event: GatewayEvent,
-        id_provisioner: &IdProvisioner,
-    ) -> Result<NormalizedEvent> {
-        match self {
-            Self::Static {
-                event_type,
-                timestamp_src,
-                subject_id_src,
-                agent_id_src,
-                // TODO use audit log source
-                audit_log_src: _audit_log_src,
-                guild_id_src,
-                channel_id_src,
-                reason_src,
-            } => {
-                // TODO add audit log entry support
-                let audit_log_entry: Option<serde_json::Value> = None;
-                let id = id_provisioner.with_ts(event.ingress_timestamp);
+        event: GatewayEvent<'a>,
+        id_provisioner: &'a IdProvisioner,
+    ) -> Result<NormalizedEvent, ProcessingError> {
+        // Create a RwLock that source objects can wait on if needed
+        let audit_log_lock: RwLock<Option<CombinedAuditLogEntry>> = RwLock::new(None);
+        let ctx = Context {
+            event: &event,
+            id_provisioner,
+            audit_log_entry: LockReader::new(&audit_log_lock),
+        };
 
-                // Extract all fields based on the static sub-processor definition
-                let timestamp = match timestamp_src {
-                    TimestampSource::TimeOfIngress => event.ingress_timestamp,
-                    TimestampSource::Snowflake(path) => path
-                        .apply_id(Some(&event.inner), audit_log_entry.as_ref())
-                        .map_or(event.ingress_timestamp, architus_id::extract_timestamp),
-                };
-                let reason = reason_src
-                    .as_ref()
-                    .and_then(|path| path.apply(Some(&event.inner), audit_log_entry.as_ref()))
-                    .and_then(|value| value.as_string().cloned());
-                let subject_id = subject_id_src
-                    .as_ref()
-                    .and_then(|path| path.apply_id(Some(&event.inner), audit_log_entry.as_ref()));
-                let guild_id = guild_id_src
-                    .as_ref()
-                    .and_then(|path| path.apply_id(Some(&event.inner), audit_log_entry.as_ref()))
-                    .ok_or_else(|| ProcessingError::NoGuildId(String::from(event.event_type)))?;
-                let agent_id = agent_id_src
-                    .as_ref()
-                    .and_then(|path| path.apply_id(Some(&event.inner), audit_log_entry.as_ref()));
-                let channel_id = channel_id_src
-                    .as_ref()
-                    .and_then(|path| path.apply_id(Some(&event.inner), audit_log_entry.as_ref()));
+        let write_lock = if self.audit_log.is_some() {
+            // Acquire a write lock and then move it into a future,
+            // so that any readers will always block when entering their futures
+            Some(audit_log_lock.write().await)
+        } else {
+            None
+        };
 
-                // Construct the source from the original JSON values
-                let source = Source {
-                    gateway: Some(event.inner),
-                    audit_log: audit_log_entry,
-                    internal: None,
-                };
-                let origin = source.origin();
+        // Run each source in parallel
+        let (
+            _,
+            event_type,
+            timestamp,
+            guild_id,
+            reason,
+            channel,
+            agent,
+            subject,
+            auxiliary,
+            content,
+        ) = try_join!(
+            self.load_audit_log(write_lock, ctx.clone()),
+            self.event_type.consume(ctx.clone()),
+            self.timestamp.consume(ctx.clone()),
+            self.guild_id.consume(ctx.clone()),
+            self.reason.consume(ctx.clone()),
+            self.channel.consume(ctx.clone()),
+            self.agent.consume(ctx.clone()),
+            self.subject.consume(ctx.clone()),
+            self.auxiliary.consume(ctx.clone()),
+            self.content.consume(ctx.clone()),
+        )?;
 
-                Ok(NormalizedEvent {
-                    id,
-                    timestamp,
-                    source,
-                    origin,
-                    event_type: *event_type,
-                    reason,
-                    guild_id,
-                    agent_id,
-                    subject_id,
-                    channel_id,
-                    audit_log_id: None,
-                })
+        drop(ctx);
+        let id = event.id;
+        let audit_log_entry = audit_log_lock.into_inner();
+        let audit_log_id = audit_log_entry.as_ref().map(|combined| combined.entry.id.0);
+        let audit_log_json = audit_log_entry.map(|combined| combined.json);
+        let source = EventSource {
+            gateway: Some(event.inner),
+            audit_log: audit_log_json,
+            ..EventSource::default()
+        };
+        let origin = source.origin();
+
+        Ok(NormalizedEvent {
+            id,
+            timestamp,
+            source,
+            origin,
+            event_type,
+            guild_id,
+            reason,
+            audit_log_id,
+            channel,
+            agent,
+            subject,
+            auxiliary,
+            content,
+        })
+    }
+
+    /// Asynchronously loads an audit log entry,
+    /// taking in a write lock at the beginning to ensure that any readers
+    /// are blocked until loading is complete (if performed)
+    async fn load_audit_log(
+        &self,
+        write_lock: Option<RwLockWriteGuard<'_, Option<CombinedAuditLogEntry>>>,
+        context: Context<'_>,
+    ) -> Result<(), ProcessingError> {
+        if let Some(audit_log_source) = &self.audit_log {
+            // Invariant: if audit_log_source is non-none, then write_lock is too
+            let mut write_lock = write_lock.unwrap();
+            match audit_log_source.consume(context).await {
+                // Lock is released upon returning
+                Err(err) => Err(err),
+                Ok(None) => Ok(()),
+                Ok(Some(audit_log_entry)) => {
+                    let audit_log_json = serde_json::to_value(&audit_log_entry)
+                        .with_context(|| {
+                            format!(
+                                "could not serialize audit log entry to JSON: {:?}",
+                                audit_log_entry
+                            )
+                        })
+                        .map_err(ProcessingError::FatalSourceError)?;
+                    *write_lock = Some(CombinedAuditLogEntry {
+                        entry: audit_log_entry,
+                        json: audit_log_json,
+                    });
+                    Ok(())
+                }
             }
+        } else {
+            Ok(())
         }
     }
 }
 
+/// Represents a sourced audit log entry
+/// that has been pre-serialized to JSON
+/// to use with path-based field sources
 #[derive(Clone, Debug)]
-pub enum TimestampSource {
-    /// Naively sources the timestamp from the time of ingress
-    TimeOfIngress,
-    /// Uses a JSON query path to extract a timestamp from a Snowflake-formatted ID
-    Snowflake(Path),
+pub struct CombinedAuditLogEntry {
+    entry: AuditLogEntry,
+    json: serde_json::Value,
 }
 
-// TODO implement
+/// Struct of borrows/references to various values
+/// that might be useful when normalizing an incoming event,
+/// including the source data.
+/// Can be cheaply cloned.
 #[derive(Clone, Debug)]
-pub struct AuditLogSource {}
-
-/// Represents a wrapper around `JMESPath` values to scope a path
-/// to the gateway and/or audit log JSON objects
-#[derive(Clone, Debug)]
-pub enum Path {
-    Gateway(Expression<'static>),
-    AuditLog(Expression<'static>),
+pub struct Context<'a> {
+    event: &'a GatewayEvent<'a>,
+    id_provisioner: &'a IdProvisioner,
+    audit_log_entry: LockReader<'a, Option<CombinedAuditLogEntry>>,
 }
 
-impl Path {
-    /// Creates a gateway path from the given string,
-    /// panicking if there was a parsing error.
-    /// Only use in initialization pathways that will fail-fast
-    #[must_use]
-    pub fn gateway(query: &str) -> Self {
-        Self::Gateway(jmespath::compile(query).unwrap())
+#[derive(Clone, Debug)]
+pub struct LockReader<'a, T> {
+    inner: &'a RwLock<T>,
+}
+
+impl<'a, T> LockReader<'a, T> {
+    /// Asynchronously obtains a read-only handle to the inner lock
+    pub async fn read(&self) -> RwLockReadGuard<'_, T> {
+        self.inner.read().await
     }
 
-    /// Creates an audit log path from the given string,
-    /// panicking if there was a parsing error.
-    /// Only use in initialization pathways that will fail-fast
-    #[must_use]
-    pub fn audit_log(query: &str) -> Self {
-        Self::AuditLog(jmespath::compile(query).unwrap())
-    }
-
-    /// Attempts to resolve the path to a JSON value,
-    /// using both the gateway and audit log JSON as potential sources
-    pub fn apply(
-        &self,
-        gateway: Option<&serde_json::Value>,
-        audit_log: Option<&serde_json::Value>,
-    ) -> Option<Arc<jmespath::Variable>> {
-        match self {
-            Self::Gateway(expr) => match gateway {
-                Some(gateway) => expr.search(gateway).ok(),
-                None => None,
-            },
-            Self::AuditLog(expr) => match audit_log {
-                Some(audit_log) => expr.search(audit_log).ok(),
-                None => None,
-            },
-        }
-    }
-
-    /// Attempts to resolve the path to a u64 value from a string,
-    /// using both the gateway and audit log JSON as potential sources
-    pub fn apply_id(
-        &self,
-        gateway: Option<&serde_json::Value>,
-        audit_log: Option<&serde_json::Value>,
-    ) -> Option<u64> {
-        self.apply(gateway, audit_log)
-            .and_then(|value| value.as_string().and_then(|s| s.parse::<u64>().ok()))
+    const fn new(lock: &'a RwLock<T>) -> Self {
+        Self { inner: lock }
     }
 }

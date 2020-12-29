@@ -18,14 +18,12 @@ message SubmitIdempotentResponse {}
 message Event {
   // Id using snowflake format;
   // using the *time that the event was received by wherever it's ingested*
-  // Will be generated if not provided
   fixed64 id = 1;
   // Unix timestamp of the *time of the underlying event* (if available),
   // else some meaningful timestamp describing when the event was ingested
-  // Will be generated if not provided
   uint64 timestamp = 2;
   // The source data; including the original gateway/audit log entries
-  // Not indexed in ES
+  // Not indexed but still stored in ES
   EventSource source = 3;
   // The origin type of the event
   EventOrigin origin = 4;
@@ -42,43 +40,44 @@ message Event {
   fixed64 channel_id = 9;
   // Name of the channel that the event occurred in (used in the frontend).
   // Providing it will automatically update the revision cache in etcd,
-  // and this value will not be stored or indexed in ES
+  // Not indexed or stored in ES
   string channel_name = 10;
   // Id of the entity that caused the event to occur, if applicable
   fixed64 agent_id = 11;
-  // Type of the entity with the id in `agent_id`
+  // Type of the entity that caused the event to occur, if applicable
   EntityType agent_type = 12;
+  // Display type of the entity that caused the event to occur, if applicable
+  AgentSpecialType agent_special_type = 13;
   // Display-oriented metadata about the agent entity
-  // Not indexed in ES
-  EntityMetadata agent_metadata = 13;
+  // Not indexed or stored in ES
+  EntityRevisionMetadata agent_metadata = 14;
   // Id of the entity that the event is about/affects, if applicable
-  fixed64 subject_id = 14;
-  // Type of the entity with the id in `subject_id`
-  EntityType subject_type = 15;
+  fixed64 subject_id = 15;
+  // Type of the entity wi1th the id in `subject_id`
+  EntityType subject_type = 16;
   // Display-oriented metadata about the subject entity
-  // Not indexed in ES
-  fixed64 subject_metadata = 16;
+  // Not indexed or stored in ES
+  EntityRevisionMetadata subject_metadata = 17;
   // Id of some other related entity involved in the event, if applicable
-  fixed64 auxiliary_id = 17;
+  fixed64 auxiliary_id = 18;
   // Type of the entity with the id in `auxiliary_id`
-  fixed64 auxiliary_type = 18;
+  EntityType auxiliary_type = 19;
   // Display-oriented metadata about the auxiliary entity
-  // Not indexed in ES
-  fixed64 auxiliary_metadata = 19;
+  // Not indexed or stored in ES
+  EntityRevisionMetadata auxiliary_metadata = 20;
   // Rich-formatted content that includes markdown and mention-syntax,
   // also includes color-embed extension support.
   // Used in the frontend as the primary textual display of the event
   // Indexed in ES as text using the standard analyzer
-  string content = 20;
+  string content = 21;
   // Additional metadata about the content that is indexed in ES
   // and is used to display and index the more structured components of the content
-  ContentMetadata content_metadata = 21;
+  ContentMetadata content_metadata = 22;
 }
 
 // Represents a switchable enum for variably-typed fields in the Event struct
 enum EntityType {
-  // Default entity type; prefer adding a new option
-  EntityTypeOther = 0;
+  EntityTypeNone = 0;
   // User-like entity that has a concrete user/member object,
   // and a username, nickname, and color that is stored in the revision cache
   EntityTypeUserLike = 1;
@@ -88,35 +87,45 @@ enum EntityType {
   EntityTypeRole = 3;
   // Channel entity, has a name that is stored in the revision cache
   EntityTypeChannel = 4;
-  // TODO add additional values as needed
 }
 
-// Used to control display-oriented data or update revision cache
+// Used to control display-oriented data and update revision cache
 // If provided and the type is a channel, role, or user-like,
 // then the data is used to update the revision cache and removed before storing in ES.
-// If provided and the type is anything else,
-// then the values will be stored in the "override" fields in ES
-message EntityMetadata {
+// On other entity types, the data is ignored.
+// Fully default-values for all fields represents no metadata provided
+message EntityRevisionMetadata {
+  // If empty, then ignored
   string name = 1;
-  // Only required when the entity type is user-like
-  string nickname = 2;
-  // Only required when the entity type is a role or a user-like
-  string color = 3;
+  // Only used when the entity type is a role or a user-like.
+  // If 0 (full black), then ignored
+  // Note that this is the same way Discord handles null color values
+  uint32 color = 6;
+
+  // The next group of fields are only used when the entity type is user-like
+  bool has_nickname = 2;
+  // If has_nickname is set, then this field has the following behavior:
+  // - empty nickname represents no nickname,
+  //   but still an authoritative statement that the user-like *has* no nickname
+  // - non-empty nickname represents an authoritative statement that the user-like has that nickname
+  string nickname = 3;
+  bool has_discriminator = 4;
+  uint32 discriminator = 5;
 }
 
 // The type of agent that caused the original event to occur.
 // Results in small badges next to agents in the UI and adds a filterable option
-enum AgentVariant {
+enum AgentSpecialType {
   // No special display (used for normal users)
-  AgentVariantNone = 0;
+  AgentSpecialTypeDefault = 0;
   // Adds a "bot" badge next to the agent in the frontend
-  AgentVariantBot = 1;
+  AgentSpecialTypeBot = 1;
   // Adds a "webhook" badge next to the agent in the frontend
-  AgentVariantWebhook = 2;
+  AgentSpecialTypeWebhook = 2;
   // Adds a "system" badge next to the agent in the frontend, used for Discord messages
-  AgentVariantSystem = 3;
+  AgentSpecialTypeSystem = 3;
   // Adds a special display that overrides the normal display
-  AgentVariantArchitus = 4;
+  AgentSpecialTypeArchitus = 4;
 }
 
 // Additional metadata about the content that is indexed in ES
