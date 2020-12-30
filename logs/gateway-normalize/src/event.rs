@@ -1,3 +1,4 @@
+use crate::config::Configuration;
 use crate::rpc::submission::{
     AgentSpecialType, ContentMetadata, EntityRevisionMetadata, EntityType, Event as LogEvent,
     EventOrigin, EventSource, EventType, SubmitIdempotentRequest,
@@ -108,7 +109,7 @@ impl Into<LogEvent> for NormalizedEvent {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct Channel {
     pub id: u64,
     // This field are optional
@@ -117,36 +118,57 @@ pub struct Channel {
     pub name: Option<String>,
 }
 
+#[derive(Clone, PartialEq, Debug, Default)]
+pub struct UserLike {
+    pub id: u64,
+    // These fields are optional
+    // and if provided, control the display behavior
+    // for the user with the id (used in mentions)
+    pub name: Option<String>,
+    pub nickname: Option<Nickname>,
+    pub discriminator: Option<u16>,
+    pub color: Option<u32>,
+}
+
+#[derive(Clone, PartialEq, Debug, Default)]
+pub struct Role {
+    pub id: u64,
+    // These fields are optional
+    // and if provided, control the display behavior
+    // for the role with the id (used in mentions)
+    pub name: Option<String>,
+    pub color: Option<u32>,
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Message {
+    pub id: u64,
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct Agent {
     pub entity: Entity,
     pub special_type: AgentSpecialType,
 }
 
+impl Agent {
+    /// Attempts to resolve the special type of the agent based on their ID.
+    /// Checks to see if the user is the same as Architus
+    pub fn type_from_id(id: u64, config: &Configuration) -> AgentSpecialType {
+        if id == config.bot_user_id {
+            AgentSpecialType::Architus
+        } else {
+            AgentSpecialType::Default
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum Entity {
-    UserLike {
-        id: u64,
-        // These fields are optional
-        // and if provided, control the display behavior
-        // for the user with the id (used in mentions)
-        name: Option<String>,
-        nickname: Option<Nickname>,
-        discriminator: Option<u16>,
-        color: Option<u32>,
-    },
-    Role {
-        id: u64,
-        // These fields are optional
-        // and if provided, control the display behavior
-        // for the role with the id (used in mentions)
-        name: Option<String>,
-        color: Option<u32>,
-    },
+    UserLike(UserLike),
+    Role(Role),
     Channel(Channel),
-    Message {
-        id: u64,
-    },
+    Message(Message),
 }
 
 /// Represents an authoritative nickname value set
@@ -168,10 +190,10 @@ impl Into<Option<String>> for Nickname {
 impl Entity {
     pub const fn id(&self) -> Option<u64> {
         match self {
-            Self::UserLike { id, .. }
-            | Self::Role { id, .. }
+            Self::UserLike(UserLike { id, .. })
+            | Self::Role(Role { id, .. })
             | Self::Channel(Channel { id, .. })
-            | Self::Message { id, .. } => Some(*id),
+            | Self::Message(Message { id, .. }) => Some(*id),
         }
     }
 
@@ -186,13 +208,13 @@ impl Entity {
 
     pub fn into_revision_metadata(self) -> Option<EntityRevisionMetadata> {
         match self {
-            Self::UserLike {
+            Self::UserLike(UserLike {
                 name,
                 discriminator,
                 nickname,
                 color,
                 ..
-            } => Some(EntityRevisionMetadata {
+            }) => Some(EntityRevisionMetadata {
                 name: name.unwrap_or_else(|| String::from("")),
                 color: color.unwrap_or(0_u32),
                 has_nickname: nickname.is_some(),
@@ -202,7 +224,7 @@ impl Entity {
                 has_discriminator: discriminator.is_some(),
                 discriminator: discriminator.map_or(0_u32, u32::from),
             }),
-            Self::Role { name, color, .. } => Some(EntityRevisionMetadata {
+            Self::Role(Role { name, color, .. }) => Some(EntityRevisionMetadata {
                 name: name.unwrap_or_else(|| String::from("")),
                 color: color.unwrap_or(0_u32),
                 ..EntityRevisionMetadata::default()
@@ -211,12 +233,12 @@ impl Entity {
                 name: name.unwrap_or_else(|| String::from("")),
                 ..EntityRevisionMetadata::default()
             }),
-            Self::Message { .. } => None,
+            Self::Message(_) => None,
         }
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub struct Content {
     pub inner: String,
     pub users_mentioned: Vec<u64>,

@@ -2,6 +2,8 @@
 queue_consumer_concurrency = 5
 # The duration of successful runtime after which to reset the reconnection backoff
 reconnection_backoff_reset_threshold = "1m"
+# User ID of the bot user, used to match when normalizing agents
+bot_user_id = 448546825532866560
 
 [services]
 # Full AMQP URL to connect to the gateway queue at
@@ -39,5 +41,7 @@ multiplier = 2.0
 
 # Note: these should be specified using environment variables in production
 # For example, to specify `discord_token`,
-# give a value to the `INGRESS_SECRETS__DISCORD_TOKEN` variable
+# give a value to the `LOGS_GATEWAY_NORMALIZE_SECRETS__DISCORD_TOKEN` variable
 [secrets]
+# Discord API bot token
+discord_token = "REPLACE_ME"

@@ -24,11 +24,16 @@ pub struct Configuration {
     pub queue_consumer_concurrency: u16,
     /// Config options related to the Gateway Queue
     pub gateway_queue: GatewayQueue,
+    /// User ID of the bot user, used to match when normalizing agents
+    pub bot_user_id: u64,
 }
 
 /// Collection of secret values used to connect to services
 #[derive(Debug, Deserialize, Clone)]
-pub struct Secrets {}
+pub struct Secrets {
+    /// Discord API bot token
+    pub discord_token: String,
+}
 
 /// Collection of external services that this service connects to
 #[derive(Debug, Deserialize, Clone)]

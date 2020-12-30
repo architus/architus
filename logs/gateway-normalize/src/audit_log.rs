@@ -1,21 +1,15 @@
-use backoff;
 use backoff::backoff::Backoff;
-use logs_lib::id;
-use logs_lib::{time, AuditLogEntryType};
-use reqwest::StatusCode;
-use serenity;
-use serenity::http::error::ErrorResponse;
-use serenity::http::Http;
-use serenity::model::guild::AuditLogEntry;
-use serenity::model::id::{AuditLogEntryId, GuildId, UserId};
-use std::sync::Arc;
+use backoff::ExponentialBackoff;
 use std::time::Duration;
+use twilight_http::Client;
+use twilight_model::guild::audit_log::{AuditLog, AuditLogEntry, AuditLogEvent};
+use twilight_model::id::{AuditLogEntryId, GuildId, UserId};
 
 /// Aggregate options struct for performing a resilient search
 /// on the audit logs of a guild
 pub struct SearchQuery<P: Fn(&AuditLogEntry) -> bool> {
-    pub guild_id: GuildId,
-    pub entry_type: Option<AuditLogEntryType>,
+    pub guild_id: u64,
+    pub entry_type: Option<AuditLogEvent>,
     pub target_timestamp: Option<u64>,
     pub strategy: Strategy,
     pub matches: P,
@@ -25,12 +19,12 @@ pub struct SearchQuery<P: Fn(&AuditLogEntry) -> bool> {
     pub max_search_duration: Option<Duration>,
     pub chunk_size: Option<u8>,
     pub timestamp_ignore_threshold: Option<Duration>,
-    pub user_id: Option<UserId>,
+    pub user_id: Option<u64>,
 }
 
 impl<P: Fn(&AuditLogEntry) -> bool> SearchQuery<P> {
     #[must_use]
-    pub fn new(guild_id: GuildId, matches: P) -> Self {
+    pub fn new(guild_id: u64, matches: P) -> Self {
         Self {
             guild_id,
             matches,
@@ -52,26 +46,35 @@ impl<P: Fn(&AuditLogEntry) -> bool> SearchQuery<P> {
     }
 
     #[must_use]
-    fn make_backoff(&self) -> backoff::ExponentialBackoff {
+    fn make_backoff(&self) -> ExponentialBackoff {
         let initial_interval = self
             .initial_retry_interval
             .unwrap_or(Duration::from_millis(400));
-        backoff::ExponentialBackoff {
+        ExponentialBackoff {
             max_elapsed_time: Some(self.max_duration()),
             current_interval: initial_interval,
-            initial_interval: initial_interval,
+            initial_interval,
             max_interval: self.max_retry_interval.unwrap_or(Duration::from_secs(4)),
-            ..Default::default()
+            ..ExponentialBackoff::default()
         }
     }
 }
 
+type TwilightError = twilight_http::Error;
+
 /// Possible errors while attempting to search for audit log entries
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
-    SerenityError(serenity::Error),
-    Unauthorized(ErrorResponse),
+    #[error("an error occurred while using the Discord API")]
+    TwilightError(#[source] TwilightError),
+    #[error("the bot does not have access to the audit log")]
+    Unauthorized,
+    #[error("no audit log entry could be found during the search")]
     SearchExhausted,
+    #[error("the search could not be completed in the allotted interval")]
     TimedOut,
+    #[error("the limit provided was invalid")]
+    LimitInvalid(#[source] twilight_http::request::guild::get_audit_log::GetAuditLogError),
 }
 
 type BackoffError<T> = backoff::Error<T>;
@@ -83,7 +86,7 @@ struct SearchTiming {
     target: u64,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Strategy {
     /// Uses the first audit log entry that is within the absolute bounds
     /// and matches the supplied match function
@@ -106,7 +109,7 @@ impl Strategy {
         match self {
             Self::First => true,
             Self::GrowingInterval { max } => {
-                let timestamp = time::millisecond_ts();
+                let timestamp = architus_id::time::millisecond_ts();
                 // Construct the interval based on how much time has elapsed
                 // since the start
                 let ratio: f64 = max.as_secs_f64() / search.max_duration().as_secs_f64();
@@ -117,24 +120,11 @@ impl Strategy {
                 let upper = timing.target.saturating_add(interval_width);
 
                 // Only match if the entry's timestamp is inside the interval
-                let entry_ts = id::extract_timestamp(entry.id.0);
+                let entry_ts = architus_id::extract_timestamp(entry.id.0);
                 entry_ts > lower && entry_ts < upper
             }
         }
     }
-}
-
-/// Determines if the given serenity error is an HTTP unauthorized
-fn unauthorized_response(err: &serenity::Error) -> Option<ErrorResponse> {
-    if let serenity::Error::Http(boxed_err) = err {
-        if let serenity::http::HttpError::UnsuccessfulRequest(response) = &**boxed_err {
-            if response.status_code == StatusCode::UNAUTHORIZED {
-                return Some(response.clone());
-            }
-        }
-    };
-
-    None
 }
 
 /// Attempts to get an audit log entry corresponding to some other target action,
@@ -142,19 +132,19 @@ fn unauthorized_response(err: &serenity::Error) -> Option<ErrorResponse> {
 /// entry.
 ///
 /// Times out after 15 minutes
-pub async fn get_entry<P>(http: Arc<Http>, search: SearchQuery<P>) -> Result<AuditLogEntry>
+pub async fn get_entry<P>(client: &Client, search: SearchQuery<P>) -> Result<AuditLogEntry>
 where
     P: Fn(&AuditLogEntry) -> bool,
 {
     let mut backoff = search.make_backoff();
-    let start = time::millisecond_ts();
+    let start = architus_id::time::millisecond_ts();
     let timing = SearchTiming {
         start,
         target: search.target_timestamp.unwrap_or(start),
     };
 
     loop {
-        let result = try_get_entry(Arc::clone(&http), &search, timing).await;
+        let result = try_get_entry(client, &search, timing).await;
         let err = match result {
             Ok(v) => return Ok(v),
             Err(err) => err,
@@ -162,13 +152,10 @@ where
 
         match err {
             BackoffError::Permanent(err) => return Err(err),
-            BackoffError::Transient(err) => {
-                if let Error::SerenityError(serenity_err) = &err {
-                    if let Some(response) = unauthorized_response(&serenity_err) {
-                        return Err(Error::Unauthorized(response));
-                    }
-                }
+            BackoffError::Transient(Error::TwilightError(TwilightError::Unauthorized)) => {
+                return Err(Error::Unauthorized);
             }
+            _ => {}
         };
 
         let next = match backoff.next_backoff() {
@@ -182,7 +169,7 @@ where
 
 /// Attempts to get a single audit log entry during a backoff loop
 async fn try_get_entry<P>(
-    http: Arc<Http>,
+    client: &Client,
     search: &SearchQuery<P>,
     timing: SearchTiming,
 ) -> std::result::Result<AuditLogEntry, BackoffError<Error>>
@@ -203,42 +190,54 @@ where
     let mut before: Option<AuditLogEntryId> = None;
     // traverse the audit log history
     loop {
-        let entries = search
-            .guild_id
-            .audit_logs(
-                Arc::clone(&http),
-                search.entry_type.map(|t| t as u8),
-                search.user_id,
-                before,
-                Some(limit),
-            )
+        let mut get_audit_log = client
+            .audit_log(GuildId(search.guild_id))
+            .limit(u64::from(limit))
+            .map_err(Error::LimitInvalid)?;
+        if let Some(before) = before {
+            get_audit_log = get_audit_log.before(before.0);
+        }
+        if let Some(action_type) = search.entry_type {
+            get_audit_log = get_audit_log.action_type(action_type);
+        }
+        if let Some(user_id) = search.user_id {
+            get_audit_log = get_audit_log.user_id(UserId(user_id));
+        }
+        let entries_option = get_audit_log
             .await
-            .map_err(|err| Error::SerenityError(err))?
-            .entries;
+            .map_err(|err| Error::TwilightError(err))?;
 
-        if entries.len() == 0 {
-            break;
-        }
+        match entries_option {
+            None => break,
+            Some(AuditLog {
+                audit_log_entries, ..
+            }) if audit_log_entries.len() == 0 => break,
+            Some(AuditLog {
+                audit_log_entries, ..
+            }) => {
+                // attempt to find the desired matching entry
+                let mut oldest: Option<AuditLogEntryId> = None;
+                for entry in audit_log_entries {
+                    if (search.matches)(&entry) && search.strategy.matches(timing, &entry, search) {
+                        return Ok(entry);
+                    }
+                    // update oldest entry if older then oldest
+                    if oldest.map(|id| id > entry.id).unwrap_or(true) {
+                        oldest = Some(entry.id);
+                    }
+                }
 
-        // attempt to find the desired matching entry
-        let mut oldest: Option<AuditLogEntryId> = None;
-        for (key, value) in entries {
-            if (search.matches)(&value) && search.strategy.matches(timing, &value, search) {
-                return Ok(value);
+                // determine whether to continue
+                let oldest_timestamp = oldest
+                    .map(|i| architus_id::extract_timestamp(i.0))
+                    .unwrap_or(0);
+                if (timing.target - oldest_timestamp) > time_threshold {
+                    break;
+                }
+
+                before = oldest;
             }
-            // update oldest entry if older then oldest
-            if oldest.map(|id| id > key).unwrap_or(true) {
-                oldest = Some(key);
-            }
         }
-
-        // determine whether to continue
-        let oldest_timestamp = oldest.map(|i| id::extract_timestamp(i.0)).unwrap_or(0);
-        if (timing.target - oldest_timestamp) > time_threshold {
-            break;
-        }
-
-        before = oldest;
     }
 
     // Search was either exhausted or stopped early due to passing the threshold;

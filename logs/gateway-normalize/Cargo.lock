@@ -944,6 +944,7 @@ dependencies = [
  "futures",
  "jmespath",
  "lapin",
+ "lazy_static",
  "log",
  "logs-gateway-queue-lib",
  "prost",
@@ -957,7 +958,9 @@ dependencies = [
  "tokio-amqp",
  "tonic",
  "tonic-build",
+ "twilight-cache-inmemory",
  "twilight-gateway",
+ "twilight-http",
  "twilight-model",
 ]
 
@@ -2387,10 +2390,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "twilight-cache-inmemory"
+version = "0.2.5"
+source = "git+https://github.com/jazevedo620/twilight?branch=combined-temp#7f674f75345fb896400f3b35bd9c270834cc8c23"
+dependencies = [
+ "bitflags",
+ "dashmap",
+ "serde 1.0.118",
+ "tracing",
+ "twilight-model",
+]
+
+[[package]]
 name = "twilight-gateway"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0bf2e1fa6e6ad8f1128eaa08d7c89fbd5b28cea9acd75db877b7a358d05aaa6"
+version = "0.2.6"
+source = "git+https://github.com/jazevedo620/twilight?branch=combined-temp#7f674f75345fb896400f3b35bd9c270834cc8c23"
 dependencies = [
  "async-tungstenite",
  "bitflags",
@@ -2412,8 +2426,7 @@ dependencies = [
 [[package]]
 name = "twilight-gateway-queue"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c117423a2de1df3daf876e3edad92b33ade210b5f0f621f1f53951b45573d9c3"
+source = "git+https://github.com/jazevedo620/twilight?branch=combined-temp#7f674f75345fb896400f3b35bd9c270834cc8c23"
 dependencies = [
  "futures-channel",
  "futures-util",
@@ -2424,9 +2437,8 @@ dependencies = [
 
 [[package]]
 name = "twilight-http"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21046840ce9f3100861d5d0ac6f0a9b8a43de766b60bd46bd60204c0ddf83b28"
+version = "0.2.7"
+source = "git+https://github.com/jazevedo620/twilight?branch=combined-temp#7f674f75345fb896400f3b35bd9c270834cc8c23"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -2444,9 +2456,8 @@ dependencies = [
 
 [[package]]
 name = "twilight-model"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ba5ff4c1b1dfe2596d1f74740fd43bb1b127abbc4c30a162c85c454f2556bd1"
+version = "0.2.7"
+source = "git+https://github.com/jazevedo620/twilight?branch=combined-temp#7f674f75345fb896400f3b35bd9c270834cc8c23"
 dependencies = [
  "bitflags",
  "serde 1.0.118",
