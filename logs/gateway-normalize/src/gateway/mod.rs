@@ -2,19 +2,27 @@ pub mod path;
 pub mod processors;
 pub mod source;
 
+use crate::audit_log;
+use crate::audit_log::SearchQuery;
+use crate::config::Configuration;
 use crate::event::{Agent, Channel, Content, Entity, NormalizedEvent, Source as EventSource};
+use crate::gateway::path::Path;
 use crate::gateway::source::{AuditLogSource, Source};
 use crate::rpc::submission::EventType;
 use anyhow::Context as _;
 use architus_id::IdProvisioner;
 use futures::try_join;
 use gateway_queue_lib::GatewayEvent;
+use jmespath::Variable;
 use static_assertions::assert_impl_all;
 use std::collections::HashMap;
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use twilight_http::Client;
 use twilight_model::gateway::event::EventType as GatewayEventType;
 use twilight_model::guild::audit_log::AuditLogEntry;
+use twilight_model::guild::Permissions;
 
 /// Enumerates the various errors that can occur during event processing
 /// that cause it to halt
@@ -35,24 +43,22 @@ pub enum ProcessingError {
 pub struct ProcessorFleet {
     processors: HashMap<String, Processor>,
     id_provisioner: IdProvisioner,
+    client: Client,
+    config: Arc<Configuration>,
 }
 
 // Processor needs to be safe to share
 assert_impl_all!(ProcessorFleet: Sync);
 
-impl Default for ProcessorFleet {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ProcessorFleet {
     /// Creates a processor with an empty set of sub-processors
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(client: Client, config: Arc<Configuration>) -> Self {
         Self {
             processors: HashMap::new(),
             id_provisioner: IdProvisioner::new(),
+            client,
+            config,
         }
     }
 
@@ -75,7 +81,9 @@ impl ProcessorFleet {
         event: GatewayEvent<'_>,
     ) -> Result<NormalizedEvent, ProcessingError> {
         if let Some(processor) = self.processors.get(event.event_type) {
-            processor.apply(event, &self.id_provisioner).await
+            processor
+                .apply(event, &self.id_provisioner, &self.client, &self.config)
+                .await
         } else {
             Err(ProcessingError::SubProcessorNotFound(String::from(
                 event.event_type,
@@ -102,6 +110,8 @@ impl Processor {
         &self,
         event: GatewayEvent<'a>,
         id_provisioner: &'a IdProvisioner,
+        client: &'a Client,
+        config: &'a Configuration,
     ) -> Result<NormalizedEvent, ProcessingError> {
         // Create a RwLock that source objects can wait on if needed
         let audit_log_lock: RwLock<Option<CombinedAuditLogEntry>> = RwLock::new(None);
@@ -109,6 +119,8 @@ impl Processor {
             event: &event,
             id_provisioner,
             audit_log_entry: LockReader::new(&audit_log_lock),
+            client,
+            config,
         };
 
         let write_lock = if self.audit_log.is_some() {
@@ -217,6 +229,57 @@ pub struct Context<'a> {
     event: &'a GatewayEvent<'a>,
     id_provisioner: &'a IdProvisioner,
     audit_log_entry: LockReader<'a, Option<CombinedAuditLogEntry>>,
+    client: &'a Client,
+    config: &'a Configuration,
+}
+
+impl Context<'_> {
+    /// Attempts to extract a gateway value
+    pub fn gateway<T>(
+        &self,
+        path: &Path,
+        extractor: fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
+    ) -> Result<T, anyhow::Error> {
+        path.extract(&self.event.inner, extractor, self.clone())
+    }
+
+    /// Attempts to extract an audit log value
+    pub async fn audit_log<T>(
+        &self,
+        path: &Path,
+        extractor: fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
+    ) -> Result<T, anyhow::Error> {
+        let audit_log_read = self.audit_log_entry.read().await;
+        let audit_log_entry = audit_log_read.as_ref().ok_or(anyhow::anyhow!(
+            "no audit log entry was parsed for event type {}",
+            self.event.event_type
+        ))?;
+        path.extract(&audit_log_entry.json, extractor, self.clone())
+    }
+
+    /// Determines whether the Architus user has permissions in the guild for this event's context
+    pub async fn has_perms(&self, _permissions: Permissions) -> Result<bool, anyhow::Error> {
+        // TODO implement
+        Ok(true)
+    }
+
+    /// Runs an audit log search on the guild for this event's context
+    pub async fn get_audit_log_entry<P>(
+        &self,
+        search: SearchQuery<P>,
+    ) -> Result<AuditLogEntry, anyhow::Error>
+    where
+        P: Fn(&AuditLogEntry) -> bool,
+    {
+        audit_log::get_entry(self.client, search)
+            .await
+            .with_context(|| {
+                format!(
+                    "audit log search failed for event type {}",
+                    self.event.event_type
+                )
+            })
+    }
 }
 
 #[derive(Clone, Debug)]

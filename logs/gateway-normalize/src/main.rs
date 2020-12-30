@@ -1,5 +1,6 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
+mod audit_log;
 mod config;
 mod connect;
 mod event;
@@ -24,6 +25,7 @@ use std::convert::{Into, TryFrom};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tonic::IntoRequest;
+use twilight_http::Client;
 
 /// Loads the config and bootstraps the service
 #[tokio::main]
@@ -45,11 +47,13 @@ async fn main() -> Result<()> {
 /// and running them through a processing pipeline
 /// before forwarding them to the submission service
 async fn run(config: Arc<Configuration>) -> Result<()> {
+    // Create a Discord API client
+    let client = Client::new(&config.secrets.discord_token);
+
     // Initialize the gateway event processor
     // and register all known gateway event handlers
     // (see gateway/processors.rs)
-    // TODO connect to Discord API
-    let processor_inner = gateway::ProcessorFleet::new();
+    let processor_inner = gateway::ProcessorFleet::new(client, Arc::clone(&config));
     let processor = Arc::new(gateway::processors::register_all(processor_inner));
 
     // Initialize connections to external services
@@ -312,12 +316,18 @@ async fn submit_event(
         Ok(_) => {
             match readable_timestamp(timestamp) {
                 Ok(timestamp) => {
-                    log::info!("Submitted log event '{}' at {}", id, timestamp);
+                    log::info!(
+                        "Submitted log event type {:?} '{}' at {}",
+                        event.event_type,
+                        id,
+                        timestamp
+                    );
                     log::debug!("Actual event: {:?}", event);
                 }
                 Err(err) => {
                     log::warn!(
-                        "Submitted log event '{}' at invalid time ({}): {:?}",
+                        "Submitted log event type {:?} '{}' at invalid time ({}): {:?}",
+                        event.event_type,
                         id,
                         timestamp,
                         err

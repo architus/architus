@@ -3,9 +3,10 @@ use crate::gateway::{CombinedAuditLogEntry, Context, ProcessingError};
 use jmespath::Variable;
 use static_assertions::assert_impl_all;
 use std::future::Future;
+use std::pin::Pin;
 use twilight_model::guild::audit_log::AuditLogEntry;
 
-mod inner {
+pub mod inner {
     use crate::gateway::path::Path;
     use crate::gateway::source::OnFailure;
     use crate::gateway::{Context, ProcessingError};
@@ -86,8 +87,6 @@ mod inner {
         }
     }
 
-    type BoxedFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
-
     /// Runs an arbitrary asynchronous, potentially fallible function that produces a value
     /// given an event normalization context
     /// (that provides access to the raw JSON, Discord API, timestamp, and other metadata)
@@ -95,7 +94,14 @@ mod inner {
     where
         T: Clone + Send + Sync,
     {
-        pub f: Box<dyn (Fn(Context<'_>) -> BoxedFuture<Result<T, anyhow::Error>>) + Send + Sync>,
+        pub f: Box<
+            dyn (for<'a> Fn(
+                    Context<'a>,
+                )
+                    -> Pin<Box<dyn Future<Output = Result<T, anyhow::Error>> + Send + 'a>>)
+                + Send
+                + Sync,
+        >,
         pub on_failure: OnFailure<T>,
     }
 
@@ -184,13 +190,15 @@ where
 
     /// Utility constructor for a `Source::AsyncFn` that takes in a static closure
     /// and a failure policy without requiring an explicit boxing on the closure
-    pub fn async_fn<F, Fut>(f: F, on_failure: OnFailure<T>) -> Self
+    pub fn async_fn<F>(f: F, on_failure: OnFailure<T>) -> Self
     where
-        F: Fn(Context<'_>) -> Fut + Sync + Send + 'static,
-        Fut: Future<Output = Result<T, anyhow::Error>> + Send + 'static,
+        for<'a> F: Fn(Context<'a>) -> Pin<Box<dyn Future<Output = Result<T, anyhow::Error>> + Send + 'a>>
+            + Sync
+            + Send
+            + 'static,
     {
         Self::AsyncFn(inner::AsyncFnSource {
-            f: Box::new(move |ctx| Box::pin(f(ctx))),
+            f: Box::new(f),
             on_failure,
         })
     }
@@ -264,13 +272,18 @@ impl AuditLogSource {
     /// Utility constructor for the audit log source
     /// that takes in an async closure that is run when sourcing,
     /// in addition to the failure recovery policy
-    pub fn new<F, Fut>(f: F, on_failure: OnFailure<Option<AuditLogEntry>>) -> Self
+    pub fn new<F>(f: F, on_failure: OnFailure<Option<AuditLogEntry>>) -> Self
     where
-        F: Fn(Context<'_>) -> Fut + Sync + Send + 'static,
-        Fut: Future<Output = Result<Option<AuditLogEntry>, anyhow::Error>> + Send + 'static,
+        for<'a> F: Fn(
+                Context<'a>,
+            ) -> Pin<
+                Box<dyn Future<Output = Result<Option<AuditLogEntry>, anyhow::Error>> + Send + 'a>,
+            > + Sync
+            + Send
+            + 'static,
     {
         Self(inner::AsyncFnSource {
-            f: Box::new(move |ctx| Box::pin(f(ctx))),
+            f: Box::new(f),
             on_failure,
         })
     }
