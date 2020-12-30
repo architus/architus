@@ -1,6 +1,6 @@
 docker_build('shard-image', '.', dockerfile='shard/Dockerfile')
-docker_build('manager-image', '.', dockerfile='manager/Dockerfile')
-docker_build('db-image', '.', dockerfile='db/Dockerfile')
+docker_build('manager-image', '.', dockerfile='manager/Dockerfile', ignore="shard/*")
+docker_build('db-image', '.', dockerfile='db/Dockerfile', ignore="shard/*")
 docker_build('rabbit-image', '.', dockerfile='rabbitmq/Dockerfile')
 docker_build('api-image', '.', dockerfile='api/Dockerfile')
 docker_build('gateway-image', '.', dockerfile='gateway/Dockerfile')
