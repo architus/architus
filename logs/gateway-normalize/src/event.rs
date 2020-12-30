@@ -229,7 +229,8 @@ pub struct Content {
 }
 
 impl Content {
-    pub fn make(inner: String) -> Self {
+    pub fn make<S: Into<String>>(inner: S) -> Self {
+        let inner = inner.into();
         Self {
             inner,
             // TODO parse/extract mentions

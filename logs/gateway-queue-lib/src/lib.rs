@@ -21,8 +21,8 @@ pub struct GatewayEventOwned {
     pub inner: Value,
     /// Event type from the Discord gateway
     pub event_type: String,
-    /// The guild id of the underlying event, if it exists
-    pub guild_id: Option<u64>,
+    /// The guild id of the underlying event
+    pub guild_id: u64,
 }
 
 /// Represents a half-serialized gateway event that exists on the durable RMQ queue
@@ -40,6 +40,6 @@ pub struct GatewayEvent<'d> {
     pub inner: Value,
     /// Event type from the Discord gateway
     pub event_type: &'d str,
-    /// The guild id of the underlying event, if it exists
-    pub guild_id: Option<u64>,
+    /// The guild id of the underlying event
+    pub guild_id: u64,
 }

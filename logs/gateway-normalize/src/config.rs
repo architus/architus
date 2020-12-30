@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use architus_config_backoff::Backoff;
 use log::{debug, info};
 use serde::Deserialize;
+use std::time::Duration;
 
 /// Configuration object loaded upon startup
 #[derive(Debug, Deserialize, Clone)]
@@ -12,6 +13,11 @@ pub struct Configuration {
     pub services: Services,
     /// Parameters for the backoff used to connect to external services during initialization
     pub initialization_backoff: Backoff,
+    /// Parameters for the backoff used to reconnect to the gateway queue
+    pub reconnection_backoff: Backoff,
+    /// The duration of successful runtime after which to reset the reconnection backoff
+    #[serde(with = "serde_humantime")]
+    pub reconnection_backoff_reset_threshold: Duration,
     /// Parameters for the backoff used to send RPC calls to other services
     pub rpc_backoff: Backoff,
     /// Maximum number of executing futures for gateway event normalization processing

@@ -22,15 +22,11 @@ use twilight_model::guild::audit_log::AuditLogEntry;
 pub enum ProcessingError {
     #[error("no sub-processor found for event type {0}")]
     SubProcessorNotFound(String),
-    #[error("no guild id was parsed for event type {0}")]
-    NoGuildId(String),
     #[error("fatal sourcing error encountered: {0}")]
     FatalSourceError(anyhow::Error),
     #[error("no audit log entry for event type {0} was sourced, but it is used to source a required field")]
     NoAuditLogEntry(String),
 }
-
-type ProcessingResult<T> = std::result::Result<T, ProcessingError>;
 
 /// Represents a collection of processors that each have
 /// a corresponding gateway event type
@@ -92,7 +88,6 @@ pub struct Processor {
     audit_log: Option<AuditLogSource>,
     event_type: Source<EventType>,
     timestamp: Source<u64>,
-    guild_id: Source<u64>,
     reason: Source<Option<String>>,
     channel: Source<Option<Channel>>,
     agent: Source<Option<Agent>>,
@@ -125,22 +120,10 @@ impl Processor {
         };
 
         // Run each source in parallel
-        let (
-            _,
-            event_type,
-            timestamp,
-            guild_id,
-            reason,
-            channel,
-            agent,
-            subject,
-            auxiliary,
-            content,
-        ) = try_join!(
+        let (_, event_type, timestamp, reason, channel, agent, subject, auxiliary, content) = try_join!(
             self.load_audit_log(write_lock, ctx.clone()),
             self.event_type.consume(ctx.clone()),
             self.timestamp.consume(ctx.clone()),
-            self.guild_id.consume(ctx.clone()),
             self.reason.consume(ctx.clone()),
             self.channel.consume(ctx.clone()),
             self.agent.consume(ctx.clone()),
@@ -151,6 +134,7 @@ impl Processor {
 
         drop(ctx);
         let id = event.id;
+        let guild_id = event.guild_id;
         let audit_log_entry = audit_log_lock.into_inner();
         let audit_log_id = audit_log_entry.as_ref().map(|combined| combined.entry.id.0);
         let audit_log_json = audit_log_entry.map(|combined| combined.json);
@@ -242,6 +226,7 @@ pub struct LockReader<'a, T> {
 
 impl<'a, T> LockReader<'a, T> {
     /// Asynchronously obtains a read-only handle to the inner lock
+    #[allow(clippy::future_not_send)]
     pub async fn read(&self) -> RwLockReadGuard<'_, T> {
         self.inner.read().await
     }

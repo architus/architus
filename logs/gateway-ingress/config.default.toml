@@ -17,18 +17,29 @@ active_guilds_poll_interval = "1m"
 # Full AMQP URL to connect to the gateway queue at
 gateway_queue = "amqp://127.0.0.1:5672/%2f"
 # HTTP URL of the feature-gate service
-feature_gate = "[::1]:50555"
+feature_gate = "http://[::1]:50555"
 # HTTP URL of the logs/uptime service
-logs_uptime = "[::1]:50556"
+logs_uptime = "http://[::1]:50281"
 
 # Config options related to the Gateway Queue
 [gateway_queue]
 # Name of the exchange that events are sent to
 exchange = ""
-# Name of the durable queue that events get published to
-queue_name = "logs/gateway-queue"
 # Routing key for messages
 routing_key = "logs/gateway-queue"
+# Name of the durable queue that events get published to
+queue_name = "logs/gateway-queue"
+# Whether the queue will retain messages (required when x-queue-type is 'quorum')
+durable = true
+# Parameters to send along with queue declaration
+# (format comes from amq_protocol_types::AMQPValue variants)
+# https://docs.rs/amq-protocol-types/6.0.2/amq_protocol_types/enum.AMQPValue.html
+[gateway_queue.queue_parameters]
+# Use quorum queue with delivery limit
+# https://www.rabbitmq.com/quorum-queues.html
+x-queue-type = { "LongString" = "quorum" }
+x-delivery-limit = { "ShortUInt" = "4" }
+
 # Configuration for the connection pool that sits in front of a connection to the gateway queue
 [gateway_queue.connection_pool]
 # Max number of active channels on a single AMQP connection
