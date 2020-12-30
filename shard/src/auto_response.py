@@ -1,7 +1,7 @@
 import string
 from contextlib import suppress
 from typing import Optional, Tuple
-from random import choice
+from random import choice, randint
 import json
 
 from discord import Message, Guild, Member, AllowedMentions
@@ -182,6 +182,11 @@ class AutoResponse:
 
         elif (node.type == NodeType.Url):
             content.append(node.text)
+        elif (node.type == NodeType.Eval):
+            try:
+                content.append(str(eval(node.text, {'randint': randint, 'groups': match.groups(), 'msg': msg})))
+            except Exception as e:
+                content.append(f"`{e.__class__.__name__}: {e}`")
         else:
             content = []
             reacts = []
