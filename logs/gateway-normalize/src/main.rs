@@ -11,17 +11,18 @@ use crate::event::NormalizedEvent;
 use crate::gateway::{ProcessingError, ProcessorFleet};
 use crate::rpc::submission::Client as LogsImportClient;
 use anyhow::{Context, Result};
+use backoff::backoff::Backoff;
 use backoff::future::FutureOperation as _;
+use backoff::ExponentialBackoff;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use gateway_queue_lib::GatewayEvent;
-use lapin::options::{
-    BasicAckOptions, BasicConsumeOptions, BasicQosOptions, BasicRejectOptions, QueueDeclareOptions,
-};
+use lapin::options::{BasicAckOptions, BasicConsumeOptions, BasicQosOptions, BasicRejectOptions};
 use lapin::types::FieldTable;
 use lapin::{Channel, Connection};
 use std::convert::{Into, TryFrom};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tonic::IntoRequest;
 
 /// Loads the config and bootstraps the service
@@ -82,10 +83,17 @@ async fn normalize_gateway_events(
     // If the backoff is exhausted or there is another error, then the entire future exits
     // (and the service will exit accordingly)
     let mut outer_rmq_connection = Some(queue_connection);
+    let mut reconnection_state = ReconnectionState::new(
+        config.reconnection_backoff.build(),
+        config.reconnection_backoff_reset_threshold,
+    );
     loop {
         let config = Arc::clone(&config);
         let processor = Arc::clone(&processor);
         let submission_client = submission_client.clone();
+
+        // Wait for a backoff if needed
+        reconnection_state.wait().await?;
 
         // Reconnect to the Rabbit MQ instance if needed
         let rmq_connection = if let Some(rmq) = outer_rmq_connection.take() {
@@ -94,22 +102,81 @@ async fn normalize_gateway_events(
             connect::to_queue(Arc::clone(&config)).await?
         };
 
-        // Declare the RMQ queue to consume incoming events from
-        // and re-use the channel created to do so
-        let channel = declare_event_queue(&rmq_connection, Arc::clone(&config)).await?;
+        // Run the consumer until an error occurs
+        let consume = run_consume(rmq_connection, submission_client, processor, config);
+        if let Err(err) = consume.await {
+            log::error!(
+                "Could not consume events due to queue error; attempting to reconnect: `{:?}`",
+                err
+            );
+        }
+    }
+}
 
-        // Start listening to the queue by creating a consumer
-        // (we have to convert the Stream to a TryStream before using `try_for_each_concurrent`)
-        let consumer = channel
-            .basic_consume(
-                &config.gateway_queue.queue_name,
-                &config.gateway_queue.consumer_tag,
-                BasicConsumeOptions::default(),
-                FieldTable::default(),
-            )
-            .await?;
-        let event_try_stream = consumer.map(|result| result.map_err(anyhow::Error::new));
-        let consume = event_try_stream.try_for_each_concurrent(
+/// Represents a reconnection backoff utility wrapper
+/// for a long-running task that should use an exponential backoff
+/// when multiple failures occur in short succession,
+/// but reset the backoff if the task has been running for a long time
+/// (greater than the threshold)
+#[derive(Debug)]
+struct ReconnectionState {
+    current: ExponentialBackoff,
+    last_start: Option<Instant>,
+    threshold: Duration,
+}
+
+impl ReconnectionState {
+    fn new(source: ExponentialBackoff, threshold: Duration) -> Self {
+        Self {
+            current: source,
+            last_start: None,
+            threshold,
+        }
+    }
+
+    async fn wait(&mut self) -> Result<()> {
+        if let Some(last_start) = self.last_start {
+            let running_time = Instant::now().duration_since(last_start);
+            if running_time > self.threshold {
+                // The running time was longer than the threshold to use the old backoff,
+                // so reset it with the source backoff (from the config)
+                self.current.reset();
+            }
+
+            match self.current.next_backoff() {
+                None => return Err(anyhow::anyhow!("reconnection backoff elapsed")),
+                Some(backoff) => tokio::time::delay_for(backoff).await,
+            }
+        }
+
+        // Mark the start of the next iteration
+        self.last_start = Some(Instant::now());
+        Ok(())
+    }
+}
+
+/// Creates and runs a consumer,
+/// stopping if the connection fails or there is a fatal normalization error
+async fn run_consume(
+    rmq_connection: Connection,
+    submission_client: LogsImportClient,
+    processor: Arc<ProcessorFleet>,
+    config: Arc<Configuration>,
+) -> Result<()> {
+    // Start listening to the queue by creating a consumer
+    // (we have to convert the Stream to a TryStream before using `try_for_each_concurrent`)
+    let channel = create_channel(&rmq_connection, Arc::clone(&config)).await?;
+    let consumer = channel
+        .basic_consume(
+            &config.gateway_queue.queue_name,
+            &config.gateway_queue.consumer_tag,
+            BasicConsumeOptions::default(),
+            FieldTable::default(),
+        )
+        .await?;
+    let event_try_stream = consumer.map(|result| result.map_err(anyhow::Error::new));
+    event_try_stream
+        .try_for_each_concurrent(
             Some(usize::from(config.queue_consumer_concurrency)),
             move |(_, delivery)| {
                 let config = Arc::clone(&config);
@@ -146,19 +213,14 @@ async fn normalize_gateway_events(
                     }
                 }
             },
-        );
+        )
+        .await?;
 
-        if let Err(err) = consume.await {
-            log::error!(
-                "Could not consume event due to queue error; attempting to reconnect: `{:?}`",
-                err
-            );
-        }
-    }
+    Ok(())
 }
 
-/// Declares the Rabbit MQ queue, which is done during initialization of the Rabbit MQ connection
-async fn declare_event_queue(
+/// Creates a channel to the message queue and sets the QoS appropriately
+async fn create_channel(
     rmq_connection: &Connection,
     config: Arc<Configuration>,
 ) -> Result<Channel> {
@@ -177,18 +239,6 @@ async fn declare_event_queue(
         .await
         .context("Could not set the QoS level on the RabbitMQ queue")?;
 
-    // Declare the queue
-    let queue_name = &config.gateway_queue.queue_name;
-    let queue_options = QueueDeclareOptions {
-        durable: true,
-        ..QueueDeclareOptions::default()
-    };
-    rmq_channel
-        .queue_declare(queue_name, queue_options, FieldTable::default())
-        .await
-        .context("Could not declare the RabbitMQ queue")?;
-
-    log::info!("Declared RabbitMQ queue {}", queue_name);
     Ok(rmq_channel)
 }
 
@@ -222,13 +272,20 @@ async fn normalize(
         }
     };
 
+    log::info!(
+        "{}",
+        serde_json::to_string(&event)
+            .ok()
+            .unwrap_or_else(|| String::from(""))
+    );
+
     // Run the processor fleet on the event to obtain a normalized event
     processor.normalize(event).await.map_err(|err| {
         log::warn!("Event normalization failed for event: {:?}", err);
         // Reject the message with/without requeuing depending on the error
         // (poison messages will be handled by max retry policy for quorum queue)
         let should_requeue =
-            matches!(err, ProcessingError::SubProcessorNotFound(_) | ProcessingError::FatalSourceError(_) | ProcessingError::NoAuditLogEntry(_));
+            matches!(err, ProcessingError::FatalSourceError(_) | ProcessingError::NoAuditLogEntry(_));
         EventRejection {
             should_requeue,
             source: err.into(),

@@ -18,9 +18,11 @@ use backoff::future::FutureOperation as _;
 use futures::{try_join, Stream, StreamExt, TryStreamExt};
 use gateway_queue_lib::GatewayEventOwned;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
-use lapin::types::FieldTable;
+use lapin::types::{AMQPType, AMQPValue, FieldTable};
 use lapin::{BasicProperties, Channel, Connection};
 use lazy_static::lazy_static;
+use serde_json::Value;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::Request;
@@ -49,6 +51,9 @@ lazy_static! {
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
+    let value = AMQPValue::try_from(&Value::String("test".to_string()), AMQPType::LongString)
+        .context("")?;
+    log::info!("{:?}", serde_json::to_string(&value)?);
 
     // Parse the config
     let config_path = std::env::args().nth(1).expect(
@@ -258,10 +263,7 @@ async fn publish_events(
             async move {
                 if let Some(gateway_event) = convert_raw_event(event, timestamp, id) {
                     // Make sure the guild is active before forwarding
-                    let should_publish = match gateway_event.guild_id {
-                        Some(id) => active_guilds.is_active(id).await,
-                        None => true,
-                    };
+                    let should_publish = active_guilds.is_active(gateway_event.guild_id).await;
                     if should_publish {
                         try_publish(gateway_event, channel_pool, config).await?;
                     }
@@ -294,11 +296,24 @@ async fn declare_event_queue(
     // Declare the queue
     let queue_name = &config.gateway_queue.queue_name;
     let queue_options = QueueDeclareOptions {
-        durable: true,
+        durable: config.gateway_queue.durable,
         ..QueueDeclareOptions::default()
     };
+    let arguments = config
+        .gateway_queue
+        .queue_parameters
+        .as_ref()
+        .cloned()
+        .map(|map| {
+            FieldTable::from(
+                map.into_iter()
+                    .map(|(key, value)| (lapin::types::ShortString::from(key), value))
+                    .collect::<BTreeMap<_, _>>(),
+            )
+        })
+        .unwrap_or_else(FieldTable::default);
     rmq_channel
-        .queue_declare(queue_name, queue_options, FieldTable::default())
+        .queue_declare(queue_name, queue_options, arguments)
         .await
         .context("Could not declare the RabbitMQ queue")?;
 
@@ -345,7 +360,20 @@ fn convert_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<Gate
             // https://discord.com/developers/docs/topics/gateway#payloads-gateway-payload-structure
             let mut map = map;
             let inner_json = map.remove("d")?;
-            let guild_id = try_extract_guild_id(&inner_json, event_type, event_type_str);
+
+            // Make sure the guild id can be extracted before forwarding
+            let guild_id_option = try_extract_guild_id(&inner_json, event_type, event_type_str);
+            let guild_id = if let Some(guild_id) = guild_id_option {
+                guild_id
+            } else {
+                log::warn!(
+                    "No guild id was extracted for event of type '{}': {:?}",
+                    event_type_str,
+                    inner_json
+                );
+                return None;
+            };
+
             return Some(GatewayEventOwned {
                 id,
                 ingress_timestamp: timestamp,

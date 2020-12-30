@@ -4,8 +4,10 @@
 use anyhow::{Context, Result};
 use architus_config_backoff::Backoff;
 use deadpool::managed::PoolConfig;
+use lapin::types::AMQPValue;
 use log::{debug, info};
 use serde::Deserialize;
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 /// Configuration object loaded upon startup
@@ -63,12 +65,16 @@ pub struct Services {
 pub struct GatewayQueue {
     /// Name of the exchange that events are sent to
     pub exchange: String,
-    /// Name of the durable queue that events get published to
-    pub queue_name: String,
     /// Routing key for messages
     pub routing_key: String,
     /// Configuration for the connection pool that sits in front of a connection to the gateway queue
     pub connection_pool: PoolConfig,
+    /// Name of the durable queue that events get published to
+    pub queue_name: String,
+    /// Whether the queue will retain messages (required when x-queue-type is 'quorum')
+    pub durable: bool,
+    /// Parameters to send along with queue declaration
+    pub queue_parameters: Option<BTreeMap<String, AMQPValue>>,
 }
 
 impl Configuration {

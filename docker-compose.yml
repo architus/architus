@@ -169,8 +169,6 @@ services:
     build:
       context: ./
       dockerfile: ./logs/uptime/Dockerfile
-    ports:
-      - "50281:50281"
     command: /opt/config.toml
     volumes:
       - type: bind

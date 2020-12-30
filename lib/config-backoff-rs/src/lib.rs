@@ -1,3 +1,4 @@
+use backoff::backoff::Backoff as _;
 use backoff::ExponentialBackoff;
 use serde::Deserialize;
 use std::time::Duration;
@@ -22,13 +23,15 @@ impl Backoff {
 
 impl<'a> Into<ExponentialBackoff> for &'a Backoff {
     fn into(self) -> ExponentialBackoff {
-        ExponentialBackoff {
+        let mut eb = ExponentialBackoff {
             current_interval: self.initial_interval,
             initial_interval: self.initial_interval,
             multiplier: self.multiplier,
             max_interval: self.max_interval,
             max_elapsed_time: Some(self.duration),
             ..ExponentialBackoff::default()
-        }
+        };
+        eb.reset();
+        eb
     }
 }
