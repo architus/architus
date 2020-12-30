@@ -1,4 +1,4 @@
-FROM rabbitmq:3.7.17-management-alpine
+FROM rabbitmq:3.8.9-management-alpine
 
 ENV RABBITMQ_USER hello
 ENV RABBITMQ_PASSWORD hello
