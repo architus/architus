@@ -47,7 +47,7 @@ pub struct ProcessorFleet {
     config: Arc<Configuration>,
 }
 
-// Processor needs to be safe to share
+// ProcessorFleet needs to be safe to share
 assert_impl_all!(ProcessorFleet: Sync);
 
 impl ProcessorFleet {
@@ -93,8 +93,8 @@ impl ProcessorFleet {
 }
 
 pub struct Processor {
-    audit_log: Option<AuditLogSource>,
     event_type: Source<EventType>,
+    audit_log: Option<AuditLogSource>,
     timestamp: Source<u64>,
     reason: Source<Option<String>>,
     channel: Source<Option<Channel>>,
@@ -103,6 +103,9 @@ pub struct Processor {
     auxiliary: Source<Option<Entity>>,
     content: Source<Content>,
 }
+
+// ProcessorFleet needs to be safe to share
+assert_impl_all!(Processor: Sync);
 
 impl Processor {
     /// Runs a single processor, attempting to create a Normalized Event as a result
@@ -235,26 +238,24 @@ pub struct Context<'a> {
 
 impl Context<'_> {
     /// Attempts to extract a gateway value
-    pub fn gateway<T>(
-        &self,
-        path: &Path,
-        extractor: fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
-    ) -> Result<T, anyhow::Error> {
-        path.extract(&self.event.inner, extractor, self.clone())
+    pub fn gateway<T, F>(&self, path: &Path, extractor: F) -> Result<T, anyhow::Error>
+    where
+        F: (Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync + 'static,
+    {
+        path.extract(&self.event.inner, &extractor, self.clone())
     }
 
     /// Attempts to extract an audit log value
-    pub async fn audit_log<T>(
-        &self,
-        path: &Path,
-        extractor: fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
-    ) -> Result<T, anyhow::Error> {
+    pub async fn audit_log<T, F>(&self, path: &Path, extractor: F) -> Result<T, anyhow::Error>
+    where
+        F: (Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync + 'static,
+    {
         let audit_log_read = self.audit_log_entry.read().await;
         let audit_log_entry = audit_log_read.as_ref().ok_or(anyhow::anyhow!(
             "no audit log entry was parsed for event type {}",
             self.event.event_type
         ))?;
-        path.extract(&audit_log_entry.json, extractor, self.clone())
+        path.extract(&audit_log_entry.json, &extractor, self.clone())
     }
 
     /// Determines whether the Architus user has permissions in the guild for this event's context

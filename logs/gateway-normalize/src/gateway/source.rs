@@ -21,7 +21,8 @@ pub mod inner {
         T: Clone + Sync,
     {
         pub path: Path,
-        pub extractor: fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
+        pub extractor:
+            Box<dyn (Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync>,
         pub on_failure: OnFailure<T>,
     }
 
@@ -35,7 +36,7 @@ pub mod inner {
             json: &serde_json::Value,
         ) -> Result<T, ProcessingError> {
             match (
-                self.path.extract(json, self.extractor, context.clone()),
+                self.path.extract(json, &self.extractor, context.clone()),
                 &self.on_failure,
             ) {
                 (Ok(t), _) => Ok(t),
@@ -61,7 +62,7 @@ pub mod inner {
     where
         T: Clone + Sync,
     {
-        pub f: fn(Context<'_>) -> Result<T, anyhow::Error>,
+        pub f: Box<dyn (Fn(Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync>,
         pub on_failure: OnFailure<T>,
     }
 
@@ -70,7 +71,8 @@ pub mod inner {
         T: Clone + Sync,
     {
         pub fn consume(&self, context: Context<'_>) -> Result<T, ProcessingError> {
-            match ((self.f)(context.clone()), &self.on_failure) {
+            let result = (self.f)(context.clone());
+            match (result, &self.on_failure) {
                 (Ok(t), _) => Ok(t),
                 (Err(err), OnFailure::Abort) => Err(ProcessingError::FatalSourceError(err)),
                 (Err(ref err), OnFailure::Or(t)) => {
@@ -181,11 +183,14 @@ where
 {
     /// Utility constructor for a `Source::SyncFn` that takes in a static closure
     /// and a failure policy without requiring an explicit boxing on the closure
-    pub fn sync_fn(
-        f: fn(Context<'_>) -> Result<T, anyhow::Error>,
-        on_failure: OnFailure<T>,
-    ) -> Self {
-        Self::SyncFn(inner::SyncFnSource { f, on_failure })
+    pub fn sync_fn<F>(f: F, on_failure: OnFailure<T>) -> Self
+    where
+        F: (Fn(Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync + 'static,
+    {
+        Self::SyncFn(inner::SyncFnSource {
+            f: Box::new(f),
+            on_failure,
+        })
     }
 
     /// Utility constructor for a `Source::AsyncFn` that takes in a static closure
@@ -205,28 +210,26 @@ where
 
     /// Utility constructor for a `Source::Gateway` that takes in a static closure
     /// and a path/failure policy without requiring an explicit boxing on the closure
-    pub fn gateway(
-        path: Path,
-        extractor: fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
-        on_failure: OnFailure<T>,
-    ) -> Self {
+    pub fn gateway<F>(path: Path, extractor: F, on_failure: OnFailure<T>) -> Self
+    where
+        F: (Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync + 'static,
+    {
         Self::Gateway(inner::JsonSource {
             path,
-            extractor,
+            extractor: Box::new(extractor),
             on_failure,
         })
     }
 
     /// Utility constructor for a `Source::AuditLog` that takes in a static closure
     /// and a path/failure policy without requiring an explicit boxing on the closure
-    pub fn audit_log(
-        path: Path,
-        extractor: fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
-        on_failure: OnFailure<T>,
-    ) -> Self {
+    pub fn audit_log<F>(path: Path, extractor: F, on_failure: OnFailure<T>) -> Self
+    where
+        F: (Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync + 'static,
+    {
         Self::AuditLog(inner::JsonSource {
             path,
-            extractor,
+            extractor: Box::new(extractor),
             on_failure,
         })
     }

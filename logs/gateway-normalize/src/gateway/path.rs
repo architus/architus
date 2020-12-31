@@ -28,7 +28,7 @@ impl Path {
     pub fn extract<'a, 'b, T>(
         &self,
         value: &'a serde_json::Value,
-        extractor: fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
+        extractor: &'a dyn Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
         ctx: Context<'b>,
     ) -> Result<T, anyhow::Error> {
         self.search(value).and_then(|rc_var| {
