@@ -1,302 +1,181 @@
-use crate::audit_log;
-use crate::event::{Agent, Channel, Content, Entity, UserLike};
-use crate::gateway::path::Path;
-use crate::gateway::source::{AuditLogSource, OnFailure, Source};
-use crate::gateway::{Context, Processor, ProcessorFleet};
-use crate::rpc::submission::EventType;
+use crate::gateway::{Context, ProcessorFleet};
 use anyhow::Context as _;
 use jmespath::Variable;
-use lazy_static::lazy_static;
 use serde::de::DeserializeOwned;
-use std::time::Duration;
-use twilight_model::channel::ChannelType;
-use twilight_model::gateway::event::EventType as GatewayEventType;
-use twilight_model::guild::audit_log::{AuditLogEntry, AuditLogEvent};
-use twilight_model::guild::Permissions;
 
 /// Registers all pre-configured processors
-/// to handle as many gateway events as possible
-pub fn register_all(fleet: ProcessorFleet) -> ProcessorFleet {
-    fleet
-        .register(
-            GatewayEventType::ChannelCreate,
+/// to handle all gateway-originating events
+pub fn register_all(fleet: &mut ProcessorFleet) {
+    member::register_all(fleet);
+    message::register_all(fleet);
+    reaction::register_all(fleet);
+    interaction::register_all(fleet);
+}
+
+/// Defines processors for `MemberJoin` and `MemberLeave` events
+mod member {
+    use super::{chain, extract, extract_id};
+    use crate::event::{Content, Entity, Nickname, UserLike};
+    use crate::gateway::path::Path;
+    use crate::gateway::source::{OnFailure, Source};
+    use crate::gateway::{Processor, ProcessorFleet};
+    use crate::rpc::submission::EventType;
+    use chrono::DateTime;
+    use lazy_static::lazy_static;
+    use std::convert::TryFrom;
+    use std::fmt;
+    use twilight_model::gateway::event::EventType as GatewayEventType;
+
+    lazy_static! {
+        static ref ID_PATH: Path = Path::from("user.id");
+        static ref USERNAME_PATH: Path = Path::from("user.username");
+        static ref DISCRIMINATOR_PATH: Path = Path::from("user.discriminator");
+        static ref NICKNAME_PATH: Path = Path::from("nick");
+    }
+
+    pub fn register_all(fleet: &mut ProcessorFleet) {
+        fleet.register(
+            GatewayEventType::MemberAdd,
             Processor {
-                event_type: Source::Constant(EventType::ChannelCreate),
-                audit_log: Some(AuditLogSource::new(
-                    |ctx| {
-                        Box::pin(async move {
-                            // Make sure that the bot has permissions first
-                            if !ctx.has_perms(Permissions::VIEW_AUDIT_LOG).await? {
-                                return Ok(None);
-                            }
-
-                            lazy_static! {
-                                static ref ID_PATH: Path = Path::from("id");
-                            }
-                            let guild_id = ctx.event.guild_id;
-                            let channel_id = ctx.gateway(&ID_PATH, extract_id)?;
-                            let channel_id_str = channel_id.to_string();
-
-                            // Run an audit log search to find the corresponding entry
-                            let search = audit_log::SearchQuery {
-                                entry_type: Some(AuditLogEvent::ChannelCreate),
-                                // Use the timestamp of channel ID provisioning as its creation timestamp
-                                target_timestamp: Some(architus_id::extract_timestamp(channel_id)),
-                                // Channel create events are unique for the matching channel id
-                                strategy: audit_log::Strategy::First,
-                                ..audit_log::SearchQuery::new(guild_id, |entry: &AuditLogEntry| {
-                                    entry.target_id.as_ref() == Some(&channel_id_str)
-                                })
-                            };
-                            Ok(ctx.get_audit_log_entry(search).await.ok())
-                        })
-                    },
-                    OnFailure::Or(None),
-                )),
+                event_type: Source::Constant(EventType::MemberJoin),
+                audit_log: None,
                 timestamp: Source::gateway(
-                    Path::from("id"),
-                    chain(extract_id, timestamp_from_id),
+                    Path::from("joined_at"),
+                    chain(extract::<String>, |s, _ctx| {
+                        let date = DateTime::parse_from_rfc3339(&s)?;
+                        Ok(u64::try_from(date.timestamp_millis()).unwrap_or(0))
+                    }),
                     OnFailure::Abort,
                 ),
-                reason: Source::audit_log(
-                    Path::from("reason"),
-                    extract::<Option<String>>,
-                    OnFailure::Or(None),
-                ),
+                reason: Source::Constant(None),
                 channel: Source::Constant(None),
-                agent: Source::audit_log(
-                    Path::from("user_id"),
-                    chain(extract_id, |id, ctx| {
-                        Ok(Some(Agent {
-                            special_type: Agent::type_from_id(id, &ctx.config),
-                            entity: Entity::UserLike(UserLike {
-                                id,
-                                ..UserLike::default()
-                            }),
-                        }))
-                    }),
-                    OnFailure::Or(None),
-                ),
+                agent: Source::Constant(None),
                 subject: Source::sync_fn(
                     |ctx| {
-                        lazy_static! {
-                            static ref ID_PATH: Path = Path::from("id");
-                            static ref NAME_PATH: Path = Path::from("name");
-                        }
-                        // Extract the id and name of the channel
                         let id = ctx.gateway(&ID_PATH, extract_id)?;
-                        let name = ctx
-                            .gateway(&NAME_PATH, extract::<Option<String>>)
+                        let username = ctx.gateway(&USERNAME_PATH, extract::<String>).ok();
+                        let discriminator = ctx
+                            .gateway(
+                                &DISCRIMINATOR_PATH,
+                                chain(extract::<String>, |s, _ctx| Ok(s.parse::<u16>()?)),
+                            )
+                            .ok();
+                        let nickname = ctx
+                            .gateway(&NICKNAME_PATH, extract::<Option<String>>)
                             .ok()
-                            .flatten();
-                        Ok(Some(Entity::Channel(Channel { id, name })))
+                            .map(Nickname::from);
+                        Ok(Some(Entity::UserLike(UserLike {
+                            id,
+                            name: username,
+                            nickname,
+                            discriminator,
+                            ..UserLike::default()
+                        })))
                     },
                     OnFailure::Abort,
                 ),
                 auxiliary: Source::Constant(None),
                 content: Source::sync_fn(
                     |ctx| {
-                        lazy_static! {
-                            static ref ID_PATH: Path = Path::from("id");
-                            static ref TYPE_PATH: Path = Path::from("type");
-                        }
-                        let channel_type = ctx.gateway(&TYPE_PATH, extract::<ChannelType>)?;
-                        let channel_type_str = channel_type_to_string(channel_type);
                         let id = ctx.gateway(&ID_PATH, extract_id)?;
-                        let mention = channel_mention(id, channel_type);
+                        let mut content = String::from("");
+                        write_mention(&mut content, id)?;
+                        content.push_str(" joined");
                         Ok(Content {
-                            inner: format!("created {} ({})", mention, channel_type_str),
-                            channels_mentioned: vec![id],
+                            inner: content,
+                            users_mentioned: vec![id],
                             ..Content::default()
                         })
                     },
                     OnFailure::Abort,
                 ),
             },
-        )
-        .register(
-            GatewayEventType::ChannelDelete,
+        );
+        fleet.register(
+            GatewayEventType::MemberRemove,
             Processor {
-                event_type: Source::Constant(EventType::ChannelDelete),
-                audit_log: Some(AuditLogSource::new(
-                    |ctx| {
-                        Box::pin(async move {
-                            // Make sure that the bot has permissions first
-                            if !ctx.has_perms(Permissions::VIEW_AUDIT_LOG).await? {
-                                return Ok(None);
-                            }
-
-                            lazy_static! {
-                                static ref ID_PATH: Path = Path::from("id");
-                            }
-                            let guild_id = ctx.event.guild_id;
-                            let channel_id = ctx.gateway(&ID_PATH, extract_id)?;
-                            let channel_id_str = channel_id.to_string();
-
-                            // Run an audit log search to find the corresponding entry
-                            let search = audit_log::SearchQuery {
-                                entry_type: Some(AuditLogEvent::ChannelDelete),
-                                // Channel delete events are unique for the matching channel id
-                                strategy: audit_log::Strategy::First,
-                                ..audit_log::SearchQuery::new(guild_id, |entry: &AuditLogEntry| {
-                                    entry.target_id.as_ref() == Some(&channel_id_str)
-                                })
-                            };
-                            Ok(ctx.get_audit_log_entry(search).await.ok())
-                        })
-                    },
-                    OnFailure::Or(None),
-                )),
+                event_type: Source::Constant(EventType::MemberLeave),
+                audit_log: None,
                 timestamp: Source::sync_fn(|ctx| Ok(ctx.event.ingress_timestamp), OnFailure::Abort),
-                reason: Source::audit_log(
-                    Path::from("reason"),
-                    extract::<Option<String>>,
-                    OnFailure::Or(None),
-                ),
+                reason: Source::Constant(None),
                 channel: Source::Constant(None),
-                agent: Source::audit_log(
-                    Path::from("user_id"),
-                    chain(extract_id, |id, ctx| {
-                        Ok(Some(Agent {
-                            special_type: Agent::type_from_id(id, &ctx.config),
-                            entity: Entity::UserLike(UserLike {
-                                id,
-                                ..UserLike::default()
-                            }),
-                        }))
-                    }),
-                    OnFailure::Or(None),
-                ),
+                agent: Source::Constant(None),
                 subject: Source::sync_fn(
                     |ctx| {
-                        lazy_static! {
-                            static ref ID_PATH: Path = Path::from("id");
-                            static ref NAME_PATH: Path = Path::from("name");
-                        }
-                        // Extract the id and name of the channel
                         let id = ctx.gateway(&ID_PATH, extract_id)?;
-                        let name = ctx
-                            .gateway(&NAME_PATH, extract::<Option<String>>)
-                            .ok()
-                            .flatten();
-                        Ok(Some(Entity::Channel(Channel { id, name })))
-                    },
-                    OnFailure::Abort,
-                ),
-                auxiliary: Source::Constant(None),
-
-                content: Source::sync_fn(
-                    |ctx| {
-                        lazy_static! {
-                            static ref ID_PATH: Path = Path::from("id");
-                            static ref TYPE_PATH: Path = Path::from("type");
-                        }
-                        let channel_type = ctx.gateway(&TYPE_PATH, extract::<ChannelType>)?;
-                        let channel_type_str = channel_type_to_string(channel_type);
-                        let id = ctx.gateway(&ID_PATH, extract_id)?;
-                        let mention = channel_mention(id, channel_type);
-                        Ok(Content {
-                            inner: format!("deleted {} ({})", mention, channel_type_str),
-                            channels_mentioned: vec![id],
-                            ..Content::default()
-                        })
-                    },
-                    OnFailure::Abort,
-                ),
-            },
-        )
-        .register(
-            GatewayEventType::ChannelUpdate,
-            Processor {
-                event_type: Source::Constant(EventType::ChannelUpdate),
-                audit_log: Some(AuditLogSource::new(
-                    |ctx| {
-                        Box::pin(async move {
-                            // Make sure that the bot has permissions first
-                            if !ctx.has_perms(Permissions::VIEW_AUDIT_LOG).await? {
-                                return Ok(None);
-                            }
-
-                            lazy_static! {
-                                static ref ID_PATH: Path = Path::from("id");
-                            }
-                            let guild_id = ctx.event.guild_id;
-                            let channel_id = ctx.gateway(&ID_PATH, extract_id)?;
-                            let channel_id_str = channel_id.to_string();
-
-                            // Run an audit log search to find the corresponding entry
-                            let search = audit_log::SearchQuery {
-                                entry_type: Some(AuditLogEvent::ChannelUpdate),
-                                strategy: audit_log::Strategy::GrowingInterval {
-                                    max: Duration::from_secs(3),
-                                },
-                                ..audit_log::SearchQuery::new(guild_id, |entry: &AuditLogEntry| {
-                                    entry.target_id.as_ref() == Some(&channel_id_str)
-                                })
-                            };
-                            Ok(ctx.get_audit_log_entry(search).await.ok())
-                        })
-                    },
-                    OnFailure::Or(None),
-                )),
-                timestamp: Source::sync_fn(|ctx| Ok(ctx.event.ingress_timestamp), OnFailure::Abort),
-                reason: Source::audit_log(
-                    Path::from("reason"),
-                    extract::<Option<String>>,
-                    OnFailure::Or(None),
-                ),
-                channel: Source::Constant(None),
-                agent: Source::audit_log(
-                    Path::from("user_id"),
-                    chain(extract_id, |id, ctx| {
-                        Ok(Some(Agent {
-                            special_type: Agent::type_from_id(id, &ctx.config),
-                            entity: Entity::UserLike(UserLike {
-                                id,
-                                ..UserLike::default()
-                            }),
-                        }))
-                    }),
-                    OnFailure::Or(None),
-                ),
-                subject: Source::sync_fn(
-                    |ctx| {
-                        lazy_static! {
-                            static ref ID_PATH: Path = Path::from("id");
-                            static ref NAME_PATH: Path = Path::from("name");
-                        }
-                        // Extract the id and name of the channel
-                        let id = ctx.gateway(&ID_PATH, extract_id)?;
-                        let name = ctx
-                            .gateway(&NAME_PATH, extract::<Option<String>>)
-                            .ok()
-                            .flatten();
-                        Ok(Some(Entity::Channel(Channel { id, name })))
+                        let username = ctx.gateway(&USERNAME_PATH, extract::<String>).ok();
+                        let discriminator = ctx
+                            .gateway(
+                                &DISCRIMINATOR_PATH,
+                                chain(extract::<String>, |s, _ctx| Ok(s.parse::<u16>()?)),
+                            )
+                            .ok();
+                        Ok(Some(Entity::UserLike(UserLike {
+                            id,
+                            name: username,
+                            discriminator,
+                            ..UserLike::default()
+                        })))
                     },
                     OnFailure::Abort,
                 ),
                 auxiliary: Source::Constant(None),
                 content: Source::sync_fn(
                     |ctx| {
-                        lazy_static! {
-                            static ref ID_PATH: Path = Path::from("id");
-                            static ref TYPE_PATH: Path = Path::from("type");
-                        }
-                        // TODO update
-                        let channel_type = ctx.gateway(&TYPE_PATH, extract::<ChannelType>)?;
-                        let channel_type_str = channel_type_to_string(channel_type);
                         let id = ctx.gateway(&ID_PATH, extract_id)?;
-                        let mention = channel_mention(id, channel_type);
+                        let mut content = String::from("");
+                        write_mention(&mut content, id)?;
+                        content.push_str(" left");
                         Ok(Content {
-                            inner: format!("deleted {} ({})", mention, channel_type_str),
-                            channels_mentioned: vec![id],
+                            inner: content,
+                            users_mentioned: vec![id],
                             ..Content::default()
                         })
                     },
                     OnFailure::Abort,
                 ),
             },
-        )
+        );
+    }
+
+    /// Writes a user mention that will be displayed using rich formatting
+    pub fn write_mention(writer: &mut impl fmt::Write, id: u64) -> Result<(), fmt::Error> {
+        write!(writer, "<@{}>", id)
+    }
+}
+
+/// Defines processors for `MessageSend`, `MessageReply`, `MessageEdit`,
+/// `MessageDelete` (hybrid), and `MessageBulkDelete` (hybrid) events
+mod message {
+    use crate::gateway::ProcessorFleet;
+
+    pub fn register_all(_fleet: &mut ProcessorFleet) {
+        // TODO implement MessageSend processor
+        // TODO implement MessageReply processor
+        // TODO implement MessageEdit processor
+        // TODO implement MessageDelete processor
+        // TODO implement MessageBulkDelete processor
+    }
+}
+
+/// Defines processors for `ReactionAdd`, `ReactionRemove`, and `ReactionBulkRemove` events
+mod reaction {
+    use crate::gateway::ProcessorFleet;
+
+    pub fn register_all(_fleet: &mut ProcessorFleet) {
+        // TODO implement ReactionAdd processor
+        // TODO implement ReactionRemove processor
+        // TODO implement ReactionBulkRemove processor
+    }
+}
+
+/// Defines processors for `InteractionCreate` events
+mod interaction {
+    use crate::gateway::ProcessorFleet;
+
+    pub fn register_all(_fleet: &mut ProcessorFleet) {
+        // TODO implement InteractionCreate processor
+    }
 }
 
 /// Chains two extractor functions together
@@ -313,7 +192,7 @@ where
 }
 
 /// u64 extractor that returns the underlying timestamp for a snowflake-encoded ID
-fn timestamp_from_id(id: u64, _ctx: Context<'_>) -> Result<u64, anyhow::Error> {
+const fn timestamp_from_id(id: u64, _ctx: Context<'_>) -> Result<u64, anyhow::Error> {
     Ok(architus_id::extract_timestamp(id))
 }
 
@@ -338,26 +217,4 @@ where
     let value = serde_json::to_value(variable)?;
     let t = serde_json::from_value::<T>(value)?;
     Ok(t)
-}
-
-/// Provides a human-readable version of a channel type
-fn channel_type_to_string(channel_type: ChannelType) -> &'static str {
-    match channel_type {
-        ChannelType::Group => "group chat",
-        ChannelType::GuildCategory => "channel category",
-        ChannelType::GuildNews => "announcement channel",
-        ChannelType::GuildStore => "store channel",
-        ChannelType::GuildText => "text channel",
-        ChannelType::GuildVoice => "voice channel",
-        ChannelType::Private => "direct message channel",
-    }
-}
-
-/// Formats a rich content channel mention
-fn channel_mention(id: u64, channel_type: ChannelType) -> String {
-    match channel_type {
-        ChannelType::GuildVoice => format!("<#v{}", id),
-        ChannelType::GuildCategory => format!("<#c{}>", id),
-        _ => format!("<#{}>", id),
-    }
 }

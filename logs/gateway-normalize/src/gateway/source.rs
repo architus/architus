@@ -41,6 +41,7 @@ pub mod inner {
             ) {
                 (Ok(t), _) => Ok(t),
                 (Err(err), OnFailure::Abort) => Err(ProcessingError::FatalSourceError(err)),
+                (Err(_), OnFailure::Drop) => Err(ProcessingError::Drop),
                 (Err(ref err), OnFailure::Or(t)) => {
                     log::debug!("A failure occurred with running a JSON processor fragment for event '{:?}': {:?}, falling back to default value", context.event.event_type, err);
                     log::trace!("Context = {:?}", context);
@@ -75,6 +76,7 @@ pub mod inner {
             match (result, &self.on_failure) {
                 (Ok(t), _) => Ok(t),
                 (Err(err), OnFailure::Abort) => Err(ProcessingError::FatalSourceError(err)),
+                (Err(_), OnFailure::Drop) => Err(ProcessingError::Drop),
                 (Err(ref err), OnFailure::Or(t)) => {
                     log::debug!("A failure occurred with running a sync processor fragment for event '{:?}': {:?}, falling back to default value", context.event.event_type, err);
                     log::trace!("Context = {:?}", context);
@@ -115,6 +117,7 @@ pub mod inner {
             match ((*self.f)(context.clone()).await, &self.on_failure) {
                 (Ok(t), _) => Ok(t),
                 (Err(err), OnFailure::Abort) => Err(ProcessingError::FatalSourceError(err)),
+                (Err(_), OnFailure::Drop) => Err(ProcessingError::Drop),
                 (Err(ref err), OnFailure::Or(t)) => {
                     log::debug!("A failure occurred with running an async processor fragment for event '{:?}': {:?}, falling back to default value", context.event.event_type, err);
                     log::trace!("Context = {:?}", context);
@@ -161,8 +164,11 @@ where
 
 /// Specifies the desired behavior when an operation fails to source a value
 pub enum OnFailure<T> {
-    /// Causes the entire event normalization to fail (no events will be submitted)
+    /// Unexpected scenario that causes the entire event normalization to fail
+    /// (no events will be submitted, and the original event will be re-queued)
     Abort,
+    /// Expected scenario that results in the original event being dropped and not re-queued
+    Drop,
     /// Falls back to some default value
     Or(T),
     /// Falls back to the execution of some infallible synchronous function
@@ -254,6 +260,7 @@ where
                     (None, OnFailure::Abort) => Err(ProcessingError::NoAuditLogEntry(
                         String::from(context.event.event_type),
                     )),
+                    (None, OnFailure::Drop) => Err(ProcessingError::Drop),
                     (None, OnFailure::Or(t)) => Ok(t.clone()),
                     (None, OnFailure::OrElse(func_t)) => Ok(func_t(context_copy)),
                 }

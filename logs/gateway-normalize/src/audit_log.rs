@@ -1,5 +1,6 @@
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
+use std::convert::TryFrom;
 use std::time::Duration;
 use twilight_http::Client;
 use twilight_model::guild::audit_log::{AuditLog, AuditLogEntry, AuditLogEvent};
@@ -42,19 +43,22 @@ impl<P: Fn(&AuditLogEntry) -> bool> SearchQuery<P> {
 
     #[must_use]
     fn max_duration(&self) -> Duration {
-        self.max_search_duration.unwrap_or(Duration::from_secs(15))
+        self.max_search_duration
+            .unwrap_or_else(|| Duration::from_secs(15))
     }
 
     #[must_use]
     fn make_backoff(&self) -> ExponentialBackoff {
         let initial_interval = self
             .initial_retry_interval
-            .unwrap_or(Duration::from_millis(400));
+            .unwrap_or_else(|| Duration::from_millis(400));
         ExponentialBackoff {
             max_elapsed_time: Some(self.max_duration()),
             current_interval: initial_interval,
             initial_interval,
-            max_interval: self.max_retry_interval.unwrap_or(Duration::from_secs(4)),
+            max_interval: self
+                .max_retry_interval
+                .unwrap_or_else(|| Duration::from_secs(4)),
             ..ExponentialBackoff::default()
         }
     }
@@ -66,7 +70,7 @@ type TwilightError = twilight_http::Error;
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("an error occurred while using the Discord API")]
-    TwilightError(#[source] TwilightError),
+    Twilight(#[source] TwilightError),
     #[error("the bot does not have access to the audit log")]
     Unauthorized,
     #[error("no audit log entry could be found during the search")]
@@ -96,6 +100,11 @@ pub enum Strategy {
 }
 
 impl Strategy {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
     #[must_use]
     fn matches<P>(
         &self,
@@ -115,7 +124,7 @@ impl Strategy {
                 let ratio: f64 = max.as_secs_f64() / search.max_duration().as_secs_f64();
                 // use saturating overflows to prevent overflows
                 let ms_passed = timestamp.saturating_sub(timing.start);
-                let interval_width = ((ms_passed as f64) * ratio) as u64;
+                let interval_width = ((ms_passed as f64) * ratio).round() as u64;
                 let lower = timing.target.saturating_sub(interval_width);
                 let upper = timing.target.saturating_add(interval_width);
 
@@ -152,7 +161,7 @@ where
 
         match err {
             BackoffError::Permanent(err) => return Err(err),
-            BackoffError::Transient(Error::TwilightError(TwilightError::Unauthorized)) => {
+            BackoffError::Transient(Error::Twilight(TwilightError::Unauthorized)) => {
                 return Err(Error::Unauthorized);
             }
             _ => {}
@@ -184,7 +193,9 @@ where
     // audit log for an entry since the target timestamp
     let time_threshold = search
         .timestamp_ignore_threshold
-        .map(|dur| dur.as_millis() as u64)
+        .as_ref()
+        .map(Duration::as_millis)
+        .and_then(|u| u64::try_from(u).ok())
         .unwrap_or(60_000);
 
     let mut before: Option<AuditLogEntryId> = None;
@@ -203,15 +214,13 @@ where
         if let Some(user_id) = search.user_id {
             get_audit_log = get_audit_log.user_id(UserId(user_id));
         }
-        let entries_option = get_audit_log
-            .await
-            .map_err(|err| Error::TwilightError(err))?;
+        let entries_option = get_audit_log.await.map_err(Error::Twilight)?;
 
         match entries_option {
             None => break,
             Some(AuditLog {
                 audit_log_entries, ..
-            }) if audit_log_entries.len() == 0 => break,
+            }) if audit_log_entries.is_empty() => break,
             Some(AuditLog {
                 audit_log_entries, ..
             }) => {
@@ -222,15 +231,13 @@ where
                         return Ok(entry);
                     }
                     // update oldest entry if older then oldest
-                    if oldest.map(|id| id > entry.id).unwrap_or(true) {
+                    if oldest.map_or(true, |id| id > entry.id) {
                         oldest = Some(entry.id);
                     }
                 }
 
                 // determine whether to continue
-                let oldest_timestamp = oldest
-                    .map(|i| architus_id::extract_timestamp(i.0))
-                    .unwrap_or(0);
+                let oldest_timestamp = oldest.map_or(0, |i| architus_id::extract_timestamp(i.0));
                 if (timing.target - oldest_timestamp) > time_threshold {
                     break;
                 }

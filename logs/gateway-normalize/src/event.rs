@@ -154,7 +154,7 @@ pub struct Agent {
 impl Agent {
     /// Attempts to resolve the special type of the agent based on their ID.
     /// Checks to see if the user is the same as Architus
-    pub fn type_from_id(id: u64, config: &Configuration) -> AgentSpecialType {
+    pub const fn type_from_id(id: u64, config: &Configuration) -> AgentSpecialType {
         if id == config.bot_user_id {
             AgentSpecialType::Architus
         } else {
@@ -176,6 +176,15 @@ pub enum Entity {
 pub enum Nickname {
     Name,
     Custom(String),
+}
+
+impl From<Option<String>> for Nickname {
+    fn from(s: Option<String>) -> Self {
+        match s {
+            Some(n) => Self::Custom(n),
+            None => Self::Name,
+        }
+    }
 }
 
 impl Into<Option<String>> for Nickname {
