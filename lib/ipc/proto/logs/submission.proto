@@ -183,6 +183,25 @@ enum EventOrigin {
 enum EventType {
   EventTypeUnknown = 0;
 
+  // Special (ScheduledRecovery) Events
+  EventTypeGuildCreate = 2000;
+
+  // Gateway Events
+  EventTypeMemberJoin = 2001;
+  EventTypeMemberLeave = 2002;
+  EventTypeMessageSend = 2003;
+  EventTypeMessageReply = 2004;
+  EventTypeMessageEdit = 2005;
+  EventTypeReactionAdd = 2006;
+  EventTypeReactionRemove = 2007;
+  EventTypeReactionBulkRemove = 2008;
+  EventTypeInteractionCreate = 2009;
+
+  // Hybrid Events
+  EventTypeMessageDelete = 72;
+  EventTypeMessageBulkDelete = 73;
+
+  // Audit Log Events
   EventTypeGuildUpdate = 1;
   EventTypeChannelCreate = 10;
   EventTypeChannelUpdate = 11;
@@ -196,8 +215,8 @@ enum EventType {
   EventTypeMemberBanRemove = 23;
   EventTypeMemberUpdate = 24;
   EventTypeMemberRoleUpdate = 25;
-  EventTypeMemberMove = 26;
-  EventTypeMemberDisconnect = 27;
+  EventTypeMemberVoiceMove = 26;
+  EventTypeMemberVoiceKick = 27;
   EventTypeBotAdd = 28;
   EventTypeRoleCreate = 30;
   EventTypeRoleUpdate = 31;
@@ -211,43 +230,24 @@ enum EventType {
   EventTypeEmojiCreate = 60;
   EventTypeEmojiUpdate = 61;
   EventTypeEmojiDelete = 62;
-  EventTypeMessageDelete = 72;
-  EventTypeMessageBulkDelete = 73;
   EventTypeMessagePin = 74;
   EventTypeMessageUnpin = 75;
   EventTypeIntegrationCreate = 80;
   EventTypeIntegrationUpdate = 81;
   EventTypeIntegrationDelete = 82;
 
-  EventTypeMessageSend = 3001;
-  EventTypeMessageEdit = 3002;
-  EventTypeReactionAdd = 3003;
-  EventTypeReactionRemove = 3004;
-  EventTypeReactionRemoveAll = 3005;
-  EventTypeMemberJoin = 3006;
-  EventTypeMemberLeave = 3007;
-  EventTypeGuildUnavailable = 3008;
-  EventTypeVoiceStateUpdate = 3009;
-  EventTypeVoiceServerUpdate = 3010;
-
+  // Internal Events
   EventTypeAutoResponseCreate = 3100;
   EventTypeAutoResponseUpdate = 3101;
   EventTypeAutoResponseDelete = 3102;
   EventTypeAutoResponseTrigger = 3103;
-
-  EventTypeLogRevert = 3200;
-  EventTypeLogRollback = 3201;
-  EventTypeLogRecoveryRun = 3202;
-
   EventTypeCustomEmojiCreate = 3300;
   EventTypeCustomEmojiUpdate = 3301;
   EventTypeCustomEmojiDelete = 3302;
   EventTypeCustomEmojiUse = 3303;
   EventTypeCustomEmojiCache = 3304;
   EventTypeCustomEmojiLoad = 3305;
-
   EventTypeSettingsUpdate = 3400;
-
   EventTypeArchitusJoin = 4000;
   EventTypeArchitusLeave = 4001;
   EventTypeUserPrivacyUpdate = 4002;

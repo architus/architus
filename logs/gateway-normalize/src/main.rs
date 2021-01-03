@@ -1,4 +1,5 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+#![allow(clippy::future_not_send)]
 
 mod audit_log;
 mod config;
@@ -6,6 +7,7 @@ mod connect;
 mod event;
 mod gateway;
 mod rpc;
+mod util;
 
 use crate::config::Configuration;
 use crate::event::NormalizedEvent;
@@ -53,8 +55,11 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
     // Initialize the gateway event processor
     // and register all known gateway event handlers
     // (see gateway/processors.rs)
-    let processor_inner = gateway::ProcessorFleet::new(client, Arc::clone(&config));
-    let processor = Arc::new(gateway::processors::register_all(processor_inner));
+    let processor = {
+        let mut inner = gateway::ProcessorFleet::new(client, Arc::clone(&config));
+        gateway::processors::register_all(&mut inner);
+        Arc::new(inner)
+    };
 
     // Initialize connections to external services
     let rmq_connection = connect::to_queue(Arc::clone(&config)).await?;
@@ -130,7 +135,7 @@ struct ReconnectionState {
 }
 
 impl ReconnectionState {
-    fn new(source: ExponentialBackoff, threshold: Duration) -> Self {
+    const fn new(source: ExponentialBackoff, threshold: Duration) -> Self {
         Self {
             current: source,
             last_start: None,
@@ -223,7 +228,7 @@ async fn run_consume(
     Ok(())
 }
 
-/// Creates a channel to the message queue and sets the QoS appropriately
+/// Creates a channel to the message queue and sets the `QoS` appropriately
 async fn create_channel(
     rmq_connection: &Connection,
     config: Arc<Configuration>,
@@ -285,7 +290,9 @@ async fn normalize(
 
     // Run the processor fleet on the event to obtain a normalized event
     processor.normalize(event).await.map_err(|err| {
-        log::warn!("Event normalization failed for event: {:?}", err);
+        if err.is_unexpected() {
+            log::warn!("Event normalization failed for event: {:?}", err);
+        }
         // Reject the message with/without requeuing depending on the error
         // (poison messages will be handled by max retry policy for quorum queue)
         let should_requeue =

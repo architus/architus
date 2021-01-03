@@ -443,6 +443,7 @@ const fn should_forward(event_type: Option<EventType>) -> bool {
             | Some(EventType::GatewayHello)
             | Some(EventType::GatewayInvalidateSession)
             | Some(EventType::GatewayReconnect)
+            | Some(EventType::GiftCodeUpdate)
             | Some(EventType::MemberChunk)
             | Some(EventType::PresenceUpdate)
             | Some(EventType::PresencesReplace)
@@ -457,10 +458,30 @@ const fn should_forward(event_type: Option<EventType>) -> bool {
             | Some(EventType::ShardResuming)
             | Some(EventType::TypingStart)
             | Some(EventType::UnavailableGuild)
+            | Some(EventType::VoiceServerUpdate)
             // Disable forwarding events for guilds coming off/online
             // Note: that means we'll have to have some other mechanism for logging bot joins/leaves
             | Some(EventType::GuildCreate)
             | Some(EventType::GuildDelete)
+            // Disable forwarding events for those that are handled via the audit log
+            | Some(EventType::BanAdd)
+            | Some(EventType::BanRemove)
+            | Some(EventType::ChannelCreate)
+            | Some(EventType::ChannelDelete)
+            | Some(EventType::ChannelPinsUpdate)
+            | Some(EventType::ChannelUpdate)
+            | Some(EventType::GuildEmojisUpdate)
+            | Some(EventType::GuildIntegrationsUpdate)
+            | Some(EventType::GuildUpdate)
+            | Some(EventType::InviteCreate)
+            | Some(EventType::InviteDelete)
+            | Some(EventType::MemberUpdate)
+            | Some(EventType::RoleCreate)
+            | Some(EventType::RoleDelete)
+            | Some(EventType::RoleUpdate)
+            | Some(EventType::UserUpdate)
+            | Some(EventType::VoiceStateUpdate)
+            | Some(EventType::WebhooksUpdate)
     )
 }
 

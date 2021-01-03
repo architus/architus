@@ -2,13 +2,13 @@ pub mod path;
 pub mod processors;
 pub mod source;
 
-use crate::audit_log;
 use crate::audit_log::SearchQuery;
 use crate::config::Configuration;
 use crate::event::{Agent, Channel, Content, Entity, NormalizedEvent, Source as EventSource};
 use crate::gateway::path::Path;
 use crate::gateway::source::{AuditLogSource, Source};
 use crate::rpc::submission::EventType;
+use crate::{audit_log, util};
 use anyhow::Context as _;
 use architus_id::IdProvisioner;
 use futures::try_join;
@@ -32,8 +32,17 @@ pub enum ProcessingError {
     SubProcessorNotFound(String),
     #[error("fatal sourcing error encountered: {0}")]
     FatalSourceError(anyhow::Error),
+    #[error("dropping original gateway event")]
+    Drop,
     #[error("no audit log entry for event type {0} was sourced, but it is used to source a required field")]
     NoAuditLogEntry(String),
+}
+
+impl ProcessingError {
+    /// Whether the error occurs in a non-nominal case that should be logged
+    pub fn is_unexpected(&self) -> bool {
+        !matches!(self, Self::Drop)
+    }
 }
 
 /// Represents a collection of processors that each have
@@ -62,17 +71,12 @@ impl ProcessorFleet {
         }
     }
 
-    /// Adds a new sub-processor to this aggregate processor and returns itself,
-    /// acting as a builder. Works by serializing the event type into a string
+    /// Adds a new sub-processor to this aggregate processor,
+    /// working by serializing the event type into a string
     /// and adding it to the internal map
-    #[must_use]
-    fn register(mut self, event_type: GatewayEventType, processor: Processor) -> Self {
-        let pattern: &[_] = &['\'', '"'];
-        let event_type_str =
-            serde_json::to_string(&event_type).expect("GatewayEventType was not serializable");
-        let trimmed = String::from(event_type_str.trim_matches(pattern));
-        self.processors.insert(trimmed, processor);
-        self
+    fn register(&mut self, event_type: GatewayEventType, processor: Processor) {
+        let event_key = util::value_to_string(&event_type).unwrap();
+        self.processors.insert(event_key, processor);
     }
 
     /// Applies the main data-oriented workflow to the given JSON
@@ -251,10 +255,12 @@ impl Context<'_> {
         F: (Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync + 'static,
     {
         let audit_log_read = self.audit_log_entry.read().await;
-        let audit_log_entry = audit_log_read.as_ref().ok_or(anyhow::anyhow!(
-            "no audit log entry was parsed for event type {}",
-            self.event.event_type
-        ))?;
+        let audit_log_entry = audit_log_read.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "no audit log entry was parsed for event type {}",
+                self.event.event_type
+            )
+        })?;
         path.extract(&audit_log_entry.json, &extractor, self.clone())
     }
 
