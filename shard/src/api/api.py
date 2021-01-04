@@ -70,6 +70,11 @@ class Api(Cog):
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
 
+    @fetch_guild
+    async def get_playlist(self, guild):
+        voice = self.bot.cogs['Voice'].voice_managers[guild.id]
+        return voice.q.as_dict(), sc.OK_200
+
     async def users_guilds(self, user_id):
         users_guilds = []
         for guild in self.bot.guilds:
@@ -204,18 +209,21 @@ class Api(Cog):
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
         return {'guilds': guild_list}, sc.OK_200
 
-    async def pool_request(self, guild_id, pool_type: str, entity_id, fetch=False):
+    async def pool_request(self, guild_id, pool_type: str, entity_ids, fetch=False):
         guild = self.bot.get_guild(int(guild_id)) if guild_id else None
-        try:
-            if pool_type == PoolType.MEMBER:
-                return {'data': await self.pools.get_member(guild, entity_id, fetch)}, 200
-            elif pool_type == PoolType.USER:
-                return {'data': await self.pools.get_user(entity_id, fetch)}, 200
-            elif pool_type == PoolType.EMOJI:
-                return {'data': await self.pools.get_emoji(guild, entity_id, fetch)}, 200
-        except Exception:
-            logger.exception('')
-            return {'data': {}}, sc.NOT_FOUND_404
+        resp = {'data': [], 'nonexistant': []}
+        for entity_id in entity_ids:
+            try:
+                if pool_type == PoolType.MEMBER:
+                    resp['data'].append(await self.pools.get_member(guild, entity_id, fetch))
+                elif pool_type == PoolType.USER:
+                    resp['data'].append(await self.pools.get_user(entity_id, fetch))
+                elif pool_type == PoolType.EMOJI:
+                    resp['data'].append(await self.pools.get_emoji(guild, entity_id, fetch))
+            except Exception:
+                logger.exception('')
+                resp['nonexistant'].append(entity_id)
+        return resp, sc.OK_200
 
     @fetch_guild
     async def pool_all_request(self, guild, pool_type: str):
