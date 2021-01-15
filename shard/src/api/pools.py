@@ -3,7 +3,7 @@ from discord.errors import NotFound
 
 from contextlib import suppress
 
-from src.utils import channel_to_dict, member_to_dict, role_to_dict, user_to_dict
+from src.utils import channel_to_dict, member_to_dict, role_to_dict, user_to_dict, guild_to_dict
 
 
 class Pools:
@@ -58,3 +58,10 @@ class Pools:
         except KeyError:
             return []
         return [r.as_dict() for r in auto_responses.auto_responses]
+
+    async def get_guild(self, guild_id: int, fetch=False):
+        guild = self.bot.get_guild(int(guild_id))
+        if guild is None and fetch:
+            with suppress(NotFound):
+                guild = await self.bot.fetch_member(int(guild_id))
+        return guild_to_dict(guild)

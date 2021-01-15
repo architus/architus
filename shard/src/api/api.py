@@ -252,6 +252,10 @@ class Api(Cog):
             tasks = {eid: create_task(self.pools.get_user(eid, fetch)) for eid in entity_ids}
         elif pool_type == PoolType.EMOJI:
             tasks = {eid: create_task(self.pools.get_emoji(guild, eid, fetch)) for eid in entity_ids}
+        elif pool_type == PoolType.GUILD:
+            tasks = {eid: create_task(self.pools.get_guild(eid, fetch)) for eid in entity_ids}
+        else:
+            raise Exception(f"unknown pool type: {pool_type}")
 
         for entity_id, task in tasks.items():
             try:
