@@ -108,5 +108,16 @@ services:
       - webnet
     env_file:
       - architus.env
+  sandbox:
+    image: johnyburd/feature-gate:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./sandbox/Dockerfile
+    ports:
+      - "1337:1337"
+    networks:
+      - webnet
+    env_file:
+      - architus.env
 networks:
   webnet:

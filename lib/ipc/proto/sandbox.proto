@@ -1,0 +1,21 @@
+syntax = "proto3";
+package sandbox;
+
+service Sandbox {
+    rpc RunStarlarkScript (StarlarkScript) returns (ScriptOutput) {}
+}
+
+message StarlarkScript {
+    string script = 1;
+    string trigger_message = 2;
+    string author = 3;
+    uint64 count = 4;
+    repeated string captures = 5;
+    repeated string arguments = 6;
+}
+
+message ScriptOutput {
+    string output = 1;
+    string error = 2;
+    uint64 errno = 3;
+}

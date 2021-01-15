@@ -10,7 +10,7 @@ from lib.config import get_session, secret_token, logger, AsyncConnWrapper
 from lib.ipc import async_rpc_server
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
-from lib.ipc import grpc_client, manager_pb2 as message
+from lib.ipc import grpc_client, manager_pb2_grpc manager_pb2 as message
 
 
 class Architus(Bot):
@@ -23,7 +23,7 @@ class Architus(Bot):
         self.hoarfrost_gen = HoarFrostGenerator()
 
         logger.debug("registering with manager...")
-        manager_client = grpc_client.get_blocking_client('manager:50051')
+        manager_client = grpc_client.get_blocking_client('manager:50051', manager_pb2_grpc.ManagerStub)
         while True:
             try:
                 shard_info = manager_client.register(message.RegisterRequest())
@@ -50,7 +50,7 @@ class Architus(Bot):
             )
         )
 
-        self.manager_client = grpc_client.get_async_client('manager:50051')
+        self.manager_client = grpc_client.get_async_client('manager:50051', manager_pb2_grpc.ManagerStub)
 
         self.loop.create_task(self.emitter.connect())
 
