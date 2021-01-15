@@ -1,5 +1,6 @@
 import secrets
 from typing import List
+from asyncio import create_task
 
 from discord.ext.commands import Cog, Context
 import discord
@@ -244,16 +245,19 @@ class Api(Cog):
     async def pool_request(self, guild_id, pool_type: str, entity_ids, fetch=False):
         guild = self.bot.get_guild(int(guild_id)) if guild_id else None
         resp = {'data': [], 'nonexistant': []}
-        for entity_id in entity_ids:
+
+        if pool_type == PoolType.MEMBER:
+            tasks = {eid: create_task(self.pools.get_member(guild, eid, fetch)) for eid in entity_ids}
+        elif pool_type == PoolType.USER:
+            tasks = {eid: create_task(self.pools.get_user(eid, fetch)) for eid in entity_ids}
+        elif pool_type == PoolType.EMOJI:
+            tasks = {eid: create_task(self.pools.get_emoji(guild, eid, fetch)) for eid in entity_ids}
+
+        for entity_id, task in tasks.items():
             try:
-                if pool_type == PoolType.MEMBER:
-                    resp['data'].append(await self.pools.get_member(guild, entity_id, fetch))
-                elif pool_type == PoolType.USER:
-                    resp['data'].append(await self.pools.get_user(entity_id, fetch))
-                elif pool_type == PoolType.EMOJI:
-                    resp['data'].append(await self.pools.get_emoji(guild, entity_id, fetch))
-            except Exception:
-                logger.exception('')
+                resp['data'].append(await task)
+            except Exception as e:
+                logger.debug(e)
                 resp['nonexistant'].append(entity_id)
         return resp, sc.OK_200
 
