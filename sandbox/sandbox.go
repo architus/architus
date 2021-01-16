@@ -25,7 +25,13 @@ type Sandbox struct {
 func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
     const functions = `
 p = print
-    `;
+def choice(iterable):
+    n = len(iterable)
+    if n == 0:
+        return None
+    i = randint(0, n)
+    return iterable[i]
+`;
     script_uuid := uuid.NewV4();
 
     script_name := script_uuid.String();
@@ -163,7 +169,7 @@ p = print
     var runtime_err error;
     select {
     case runtime_err = <- starChan:
-        log.Print("Successfully completed a script");
+        log.Print("Something happened");
     case <- time.After(time.Second):
         log.Print("Script timed out");
         return &rpc.ScriptOutput{
@@ -177,7 +183,7 @@ p = print
         log.Print("Script failed to run");
         return &rpc.ScriptOutput{
             Output: "",
-            Error: runtime_err.Error(),
+            Error: runtime_err.(*starlark.EvalError).Backtrace(),
             Errno: 4,
         }, nil;
     }
