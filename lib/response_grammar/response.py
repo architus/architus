@@ -8,6 +8,7 @@ unicode_react = re.compile(r"\[ ?([^\x00-\x7F]+) ?\]")
 animated = re.compile(r"\[ ?<a:(\w+):(\d+)> ?\]")
 capture = re.compile("\[(\\d+)\]")
 url = re.compile("(https?://[\\w\\.-]{2,})")
+eval_token = re.compile(r"\A\[(?:eval|e) (.*)\]")
 
 
 class ParseError(Exception):
@@ -29,7 +30,8 @@ class NodeType(Enum):
     Member = auto(),
     Author = auto(),
     Capture = auto(),
-    Url = auto()
+    Url = auto(),
+    Eval = auto()
 
 
 def serialize(obj):
@@ -116,6 +118,9 @@ def tree_string(node, tree=[]):
         return tree
     elif (node.type == NodeType.Url):
         tree.append(("url", node.text))
+        return tree
+    elif (node.type == NodeType.Eval):
+        tree.append(("eval", node.text))
         return tree
     else:
         tree = []
@@ -243,6 +248,13 @@ def parse(string):
                 node.parent = curr
                 curr.children.append(node)
                 i += 9
+            elif m := eval_token.search(string[i:]):
+                node = Node()
+                node.type = NodeType.Eval
+                node.text = m.group(1)
+                node.parent = curr
+                curr.children.append(node)
+                i += m.end()
             else:
                 node = Node()
                 node.type = NodeType.List

@@ -11,6 +11,7 @@ from lib.reggy.reggy import Reggy
 from lib.response_grammar.response import parse as parse_response, NodeType
 from lib.config import logger
 from lib.aiomodels import TbAutoResponses
+from lib.ipc import sandbox_pb2 as message
 
 
 class WordGen:
@@ -182,6 +183,20 @@ class AutoResponse:
 
         elif (node.type == NodeType.Url):
             content.append(node.text)
+        elif (node.type == NodeType.Eval):
+            output = await self.bot.sandbox_client.RunStarlarkScript(
+                message.StarlarkScript(
+                    script=node.text,
+                    trigger_message=msg.clean_content,
+                    author=f"{msg.author.name}#{msg.author.discriminator}",
+                    count=self.count,
+                    captures=list(match.groups()),
+                    arguments=[]
+            ))
+            if output.errno != 0:
+                content.append(f"{output.errno} : {output.error}")
+            else:
+                content.append(output.output)
         else:
             content = []
             reacts = []

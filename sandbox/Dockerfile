@@ -1,4 +1,4 @@
-FROM goland:1.15
+FROM golang:1.15
 
 WORKDIR /app
 COPY ./sandbox /app
