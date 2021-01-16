@@ -192,7 +192,7 @@ class AutoResponse:
                     count=self.count,
                     captures=list(match.groups()),
                     arguments=[]
-            ))
+                ))
             if output.errno != 0:
                 content.append(f"{output.errno} : {output.error}")
             else:
