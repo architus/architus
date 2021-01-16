@@ -127,8 +127,24 @@ p = print
         return starlark.Float(rand.Float64()), nil;
     }
 
+    randint := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+        var low int = 0;
+        var high int = 1;
+        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "low", &low, "high", &high); err != nil {
+            return nil, err;
+        }
+
+        r := rand.Float64();
+        var v float64 = float64(high - low);
+        v *= r;
+        v += float64(low);
+
+        return starlark.MakeInt(int(v)), nil;
+    }
+
     predeclared := starlark.StringDict{
         "random": starlark.NewBuiltin("random", random),
+        "randint": starlark.NewBuiltin("randint", randint),
     };
 
     var messages []string;
@@ -140,7 +156,7 @@ p = print
     starChan := make(chan error, 1);
     // _, runtime_err := starlark.ExecFile(thread, script_name, nil, nil);
     go func() {
-        _, tmpE := starlark.ExecFile(thread, script_name, data, predeclared);
+        _, tmpE := starlark.ExecFile(thread, script_name, functions, predeclared);
         starChan <- tmpE;
     }();
 
