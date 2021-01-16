@@ -8,6 +8,7 @@ import (
     "strings";
     "net";
     "time";
+    "math/rand";
 
     context "context";
     grpc "google.golang.org/grpc";
@@ -22,18 +23,10 @@ type Sandbox struct {
 }
 
 func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
+    const functions = `
+p = print
+    `;
     script_uuid := uuid.NewV4();
-
-    /*
-    if err != nil {
-        log.Print("Failed to generate filename");
-        return rpc.ScriptOutput{
-            Output: "",
-            Error: "Failed to generate unique filename",
-            Errno: 1,
-        }, nil;
-    }
-    */
 
     script_name := script_uuid.String();
     f, file_err := os.Create(script_name);
@@ -130,6 +123,14 @@ func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript)
         }, nil;
     }
 
+    random := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+        return starlark.Float(rand.Float64()), nil;
+    }
+
+    predeclared := starlark.StringDict{
+        "random": starlark.NewBuiltin("random", random),
+    };
+
     var messages []string;
     thread := &starlark.Thread{
         Name: script_name,
@@ -139,7 +140,7 @@ func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript)
     starChan := make(chan error, 1);
     // _, runtime_err := starlark.ExecFile(thread, script_name, nil, nil);
     go func() {
-        _, tmpE := starlark.ExecFile(thread, script_name, nil, nil);
+        _, tmpE := starlark.ExecFile(thread, script_name, data, predeclared);
         starChan <- tmpE;
     }();
 
