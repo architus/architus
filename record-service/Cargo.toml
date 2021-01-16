@@ -17,5 +17,13 @@ prost = "0.6"
 tokio = { version = "0.2", features = ["macros"] }
 futures = "0.3"
 
+[dependencies.serenity]
+default-features = false
+features = ["builder", "cache", "client", "framework", "gateway", "voice", "rustls_backend"]
+version = "0.10"
+
+[dependencies.songbird]
+version = "0.1"
+
 [build-dependencies]
 tonic-build = "0.2"

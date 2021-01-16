@@ -5,9 +5,30 @@ mod manager;
 mod zipper;
 
 use std::env::args;
-use std::net::TcpListener;
 use std::thread::{sleep, spawn};
 use std::time::Duration;
+
+use serenity::{
+    async_trait,
+    client::{Client, Context, EventHandler},
+    framework::{
+        StandardFramework,
+        standard::{
+            macros::{command, group},
+            Args, CommandResult,
+        },
+    },
+    model::{
+        channel::Message,
+        gateway::Ready,
+        id::ChannelId,
+        misc::Mentionable,
+    },
+    Result as SerenityResult,
+};
+
+use songbird::{
+    driver::{Config as DriverConfig, DecodeMode},
 
 fn main() {
     sleep(Duration::from_secs(10));
