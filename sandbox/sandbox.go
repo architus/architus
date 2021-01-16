@@ -11,6 +11,7 @@ import (
 
     context "context";
     grpc "google.golang.org/grpc";
+    keepalive "google.golang.org/grpc/keepalive";
     uuid "github.com/satori/go.uuid";
 
     rpc "archit.us/sandbox";
@@ -159,7 +160,7 @@ func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript)
         log.Print("Script failed to run");
         return &rpc.ScriptOutput{
             Output: "",
-            Error: "Script failed to run",
+            Error: runtime_err.Error(),
             Errno: 4,
         }, nil;
     }
@@ -181,7 +182,20 @@ func main() {
         log.Fatal("Failed to connect to socket");
     }
 
-    grpcServer := grpc.NewServer();
+    grpcServer := grpc.NewServer(
+        grpc.KeepaliveParams(
+            keepalive.ServerParameters{
+                Time:       (time.Duration(20) * time.Second),
+                Timeout:    (time.Duration(5)  * time.Second),
+            },
+        ),
+        grpc.KeepaliveEnforcementPolicy(
+            keepalive.EnforcementPolicy{
+                MinTime:                (time.Duration(15) * time.Second),
+                PermitWithoutStream:    true,
+            },
+        ),
+    );
     rpc.RegisterSandboxServer(grpcServer, newServer());
     fmt.Println("Starting server");
     grpcServer.Serve(lis);

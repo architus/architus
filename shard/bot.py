@@ -10,7 +10,7 @@ from lib.config import get_session, secret_token, logger, AsyncConnWrapper
 from lib.ipc import async_rpc_server
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
-from lib.ipc import grpc_client, manager_pb2_grpc manager_pb2 as message
+from lib.ipc import grpc_client, manager_pb2_grpc, manager_pb2 as message
 
 
 class Architus(Bot):
