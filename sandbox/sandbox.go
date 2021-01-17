@@ -9,6 +9,7 @@ import (
     "net";
     "time";
     "math/rand";
+    "math";
     "strconv";
 
     context "context";
@@ -57,6 +58,17 @@ def choice(iterable):
     script += in.Script;
     script += "\nmain()";
 
+    sin := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+        var rad float64 = 0.0;
+        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "rad", &rad); err != nil {
+            return nil, err;
+        }
+
+        var s float64 = math.Sin(rad);
+
+        return starlark.Float(s), nil;
+    }
+
     random := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
         return starlark.Float(rand.Float64()), nil;
     }
@@ -79,6 +91,7 @@ def choice(iterable):
     predeclared := starlark.StringDict{
         "random": starlark.NewBuiltin("random", random),
         "randint": starlark.NewBuiltin("randint", randint),
+        "sin": starlark.NewBuiltin("sin", sin),
     };
 
     var messages []string;
