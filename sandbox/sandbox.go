@@ -31,6 +31,7 @@ def choice(iterable):
         return None
     i = randint(0, n)
     return iterable[i]
+
 `;
     script_uuid := uuid.NewV4();
 
@@ -181,6 +182,7 @@ def choice(iterable):
 
     if runtime_err != nil {
         log.Print("Script failed to run");
+        log.Print(runtime_err.(*starlark.EvalError).Backtrace());
         return &rpc.ScriptOutput{
             Output: "",
             Error: runtime_err.(*starlark.EvalError).Backtrace(),
