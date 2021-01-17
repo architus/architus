@@ -3,17 +3,18 @@ package main;
 import (
     "fmt";
     "go.starlark.net/starlark";
-    "os";
+    // "os";
     "log";
     "strings";
     "net";
     "time";
     "math/rand";
+    "strconv";
 
     context "context";
     grpc "google.golang.org/grpc";
     keepalive "google.golang.org/grpc/keepalive";
-    uuid "github.com/satori/go.uuid";
+    // uuid "github.com/satori/go.uuid";
 
     rpc "archit.us/sandbox";
 )
@@ -33,102 +34,25 @@ def choice(iterable):
     return iterable[i]
 
 `;
-    script_uuid := uuid.NewV4();
+    // script_uuid := uuid.NewV4();
 
-    script_name := script_uuid.String();
-    f, file_err := os.Create(script_name);
+    var script string = functions;
 
-    if file_err != nil {
-        log.Print("Failed to create temporary file for script");
-        return &rpc.ScriptOutput{
-            Output: "",
-            Error: "Failed to create temporary file for script",
-            Errno: 2,
-        }, nil;
-    }
-
-    // Need to be in this order because defer adds to a stack => LIFO
-    defer os.Remove(script_name);
-    defer f.Close();
-
-    _, w1err := fmt.Fprintf(f, "message = \"%s\"; author = \"%s\"; count = %d;\n", in.TriggerMessage, in.Author, in.Count);
-
-    if w1err != nil {
-        log.Print("Failed to write to script file");
-        return &rpc.ScriptOutput{
-            Output: "",
-            Error: "Failed to write to script file",
-            Errno: 3,
-        }, nil;
-    }
-
-    _, w2err := fmt.Fprintf(f, "caps = [");
-
-    if w2err != nil {
-        log.Print("Failed to write to script file");
-        return &rpc.ScriptOutput{
-            Output: "",
-            Error: "Failed to write to script file",
-            Errno: 3,
-        }, nil;
-    }
+    script += "message = \"" + in.TriggerMessage + "\"; author = \"" + in.Author + "\"; count = " + strconv.FormatUint(in.Count, 10) + "\n";
+    script += "caps = [";
 
     for _, c := range in.Captures {
-        _, w3err := fmt.Fprintf(f, "\"%s\", ", c);
-        if w3err != nil {
-            log.Print("Failed to write to script file");
-            return &rpc.ScriptOutput{
-                Output: "",
-                Error: "Failed to write to script file",
-                Errno: 3,
-            }, nil;
-        }
+        script += "\"" + c + "\", ";
     }
 
-    _, w4err := fmt.Fprintf(f, "]\nargs = [");
-
-    if w4err != nil {
-        log.Print("Failed to write to script file");
-        return &rpc.ScriptOutput{
-            Output: "",
-            Error: "Failed to write to script file",
-            Errno: 3,
-        }, nil;
-    }
+    script += "]\nargs = [";
 
     for _, c := range in.Arguments {
-        _, w5err := fmt.Fprintf(f, "\"%s\", ", c);
-        if w5err != nil {
-            log.Print("Failed to write to script file");
-            return &rpc.ScriptOutput{
-                Output: "",
-                Error: "Failed to write to script file",
-                Errno: 3,
-            }, nil;
-        }
+        script += "\"" + c + "\", ";
     }
 
-    _, w6err := fmt.Fprintf(f, "]\n");
-
-    if w6err != nil {
-        log.Print("Failed to write to script file");
-        return &rpc.ScriptOutput{
-            Output: "",
-            Error: "Failed to write to script file",
-            Errno: 3,
-        }, nil;
-    }
-
-    _, w7err := fmt.Fprintf(f, in.Script);
-
-    if w7err != nil {
-        log.Print("Failed to write to script file");
-        return &rpc.ScriptOutput{
-            Output: "",
-            Error: "Failed to write to script file",
-            Errno: 3,
-        }, nil;
-    }
+    script += "]\n"
+    script += in.Script;
 
     random := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
         return starlark.Float(rand.Float64()), nil;
@@ -156,14 +80,14 @@ def choice(iterable):
 
     var messages []string;
     thread := &starlark.Thread{
-        Name: script_name,
+        Name: "sandbox_thread",
         Print: func(_ *starlark.Thread, msg string) { messages = append(messages, msg); },
     };
 
     starChan := make(chan error, 1);
     // _, runtime_err := starlark.ExecFile(thread, script_name, nil, nil);
     go func() {
-        _, tmpE := starlark.ExecFile(thread, script_name, functions, predeclared);
+        _, tmpE := starlark.ExecFile(thread, "sandbox_script.star", script, predeclared);
         starChan <- tmpE;
     }();
 
