@@ -34,6 +34,11 @@ def choice(iterable):
         return None
     i = randint(0, n)
     return iterable[i]
+def sum(iterable):
+    s = 0
+    for i in iterable:
+        s += i
+    return s
 
 `;
     // script_uuid := uuid.NewV4();
@@ -59,14 +64,15 @@ def choice(iterable):
     script += "\nmain()";
 
     sin := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-        var rad float64 = 0.0;
+        var rad string = "0.0";
         if err := starlark.UnpackArgs(b.Name(), args, kwargs, "rad", &rad); err != nil {
             return nil, err;
         }
+        if s, err := strconv.ParseFloat(rad, 64); err == nil {
+            return starlark.Float(math.Sin(s)), err;
+        }
 
-        var s float64 = math.Sin(rad);
-
-        return starlark.Float(s), nil;
+        return starlark.Float(-1.0), nil;
     }
 
     random := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
