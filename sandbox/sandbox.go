@@ -24,6 +24,7 @@ type Sandbox struct {
 }
 
 func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
+    // TODO(jjohnsonjj1251@gmail.com): Move user script into a main function
     const functions = `
 p = print
 def choice(iterable):
@@ -52,7 +53,9 @@ def choice(iterable):
     }
 
     script += "]\n"
+    script += "def main():\n\t"
     script += in.Script;
+    script += "\nmain()";
 
     random := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
         return starlark.Float(rand.Float64()), nil;
