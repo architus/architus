@@ -106,10 +106,10 @@ def choice(iterable):
 
     if runtime_err != nil {
         log.Print("Script failed to run");
-        log.Print(runtime_err.(*starlark.EvalError).Backtrace());
+        log.Print(runtime_err.Error());
         return &rpc.ScriptOutput{
             Output: "",
-            Error: runtime_err.(*starlark.EvalError).Backtrace(),
+            Error: runtime_err.Error(),
             Errno: 4,
         }, nil;
     }
