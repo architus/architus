@@ -2,7 +2,7 @@ package main;
 
 import (
     "fmt";
-    "go.starlark.net/starlark";
+    "github.com/jammiess/starlark-go/starlark";
     // "os";
     "log";
     "strings";
@@ -42,6 +42,12 @@ def sum(iterable):
 
 `;
     // script_uuid := uuid.NewV4();
+
+    /*
+    resolve.AllowRecursion = true;
+    resolve.AllowNestedDef = true;
+    resolve.AllowLambda = true;
+    */
 
     var script string = functions;
 
