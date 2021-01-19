@@ -194,10 +194,10 @@ class AutoResponse:
                     ),
                     author=message.Author(
                         id=msg.author.id,
-                        avatar_url=msg.author.author_url,
-                        color=msg.author.color,
-                        discriminator=msg.author.discriminator,
-                        roles=msg.author.roles,
+                        avatar_url=str(msg.author.avatar_url),
+                        color=str(msg.author.color),
+                        discriminator=int(msg.author.discriminator),
+                        roles=[r.id for r in msg.author.roles],
                         name=msg.author.name,
                         nick="" if msg.author.nick is None else msg.author.nick,
                         disp_name=msg.author.display_name
