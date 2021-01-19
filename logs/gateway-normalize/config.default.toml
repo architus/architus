@@ -4,6 +4,8 @@ queue_consumer_concurrency = 5
 reconnection_backoff_reset_threshold = "1m"
 # User ID of the bot user, used to match when normalizing agents
 bot_user_id = 448546825532866560
+# URL of a JSON document containing shortcode->emoji mappings compatible with Discord
+emoji_db_url = "https://raw.githubusercontent.com/devcat/discord.emojis/master/dist/kv.json"
 
 [services]
 # Full AMQP URL to connect to the gateway queue at

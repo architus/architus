@@ -26,6 +26,8 @@ pub struct Configuration {
     pub gateway_queue: GatewayQueue,
     /// User ID of the bot user, used to match when normalizing agents
     pub bot_user_id: u64,
+    /// URL of a JSON document containing shortcode->emoji mappings compatible with Discord
+    pub emoji_db_url: String,
 }
 
 /// Collection of secret values used to connect to services

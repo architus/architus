@@ -146,6 +146,11 @@ pub struct Message {
 }
 
 #[derive(Clone, PartialEq, Debug)]
+pub struct Emoji {
+    pub id: u64,
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub struct Agent {
     pub entity: Entity,
     pub special_type: AgentSpecialType,
@@ -169,6 +174,7 @@ pub enum Entity {
     Role(Role),
     Channel(Channel),
     Message(Message),
+    Emoji(Emoji),
 }
 
 /// Represents an authoritative nickname value set
@@ -202,7 +208,8 @@ impl Entity {
             Self::UserLike(UserLike { id, .. })
             | Self::Role(Role { id, .. })
             | Self::Channel(Channel { id, .. })
-            | Self::Message(Message { id, .. }) => Some(*id),
+            | Self::Message(Message { id, .. })
+            | Self::Emoji(Emoji { id, .. }) => Some(*id),
         }
     }
 
@@ -212,6 +219,7 @@ impl Entity {
             Self::Role { .. } => EntityType::Role,
             Self::Channel(_) => EntityType::Channel,
             Self::Message { .. } => EntityType::Message,
+            Self::Emoji { .. } => EntityType::Emoji,
         }
     }
 
@@ -242,7 +250,7 @@ impl Entity {
                 name: name.unwrap_or_else(|| String::from("")),
                 ..EntityRevisionMetadata::default()
             }),
-            Self::Message(_) => None,
+            _ => None,
         }
     }
 }
