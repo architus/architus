@@ -94,15 +94,12 @@ def sum(iterable):
 
     // These next few functions are go defined builtins. What they do should be fairly self explanatory.
     sin := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-        var rad string = "0.0";
+        var rad float64 = 0.0;
         if err := starlark.UnpackArgs(b.Name(), args, kwargs, "rad", &rad); err != nil {
             return nil, err;
         }
-        if s, err := strconv.ParseFloat(rad, 64); err == nil {
-            return starlark.Float(math.Sin(s)), err;
-        }
 
-        return starlark.Float(-1.0), nil;
+        return starlark.Float(math.Sin(rad)), nil;
     }
 
     random := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
