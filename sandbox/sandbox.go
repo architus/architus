@@ -65,7 +65,7 @@ def sum(iterable):
     // and I don't know how to make a list within a call to sprintf.
     script += "author_roles = [";
     for _, r := range in.Author.Roles {
-        script += strconv.FormatUint(r, 10);
+        script += strconv.FormatUint(r, 10), ", ";
     }
     script += "]\n";
 
@@ -73,9 +73,9 @@ def sum(iterable):
     // `struct` is a builtin that is defined later in the program. It comes from the starlark-go repository.
     script += fmt.Sprintf("message = struct(id=%d, content=\"%s\", clean=\"%s\"\n)",
                           in.TriggerMessage.Id, in.TriggerMessage.Content, in.TriggerMessage.Clean);
-    script += fmt.Sprintf("author = struct(id=%d, avatar_url=\"%s\", color=\"%s\", discrim=%d, roles=author_roles, name=\"%s\", nick=\"%s\", disp=\"%s\")",
+    script += fmt.Sprintf("author = struct(id=%d, avatar_url=\"%s\", color=\"%s\", discrim=%d, roles=author_roles, name=\"%s\", nick=\"%s\", disp=\"%s\")\n",
                           in.Author.Id, in.Author.AvatarUrl, in.Author.Color, in.Author.Discriminator, in.Author.Name, in.Author.Nick, in.Author.DispName);
-    script += fmt.Sprintf("channel = struct(id=%d, name=\"%s\")",
+    script += fmt.Sprintf("channel = struct(id=%d, name=\"%s\")\n",
                           in.Channel.Id, in.Channel.Name);
     script += "caps = [";
     for _, c := range in.Captures {
