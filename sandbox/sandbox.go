@@ -2,9 +2,9 @@ package main;
 
 import (
     "fmt";
-    "github.com/jammiess/starlark-go/starlark";
-    "github.com/jammiess/starlark-go/resolve";
-    "github.com/jammiess/starlark-go/starlarkstruct";
+    "go.starlark.net/starlark";
+    "go.starlark.net/resolve";
+    "go.starlark.net/starlarkstruct";
     // "os";
     "log";
     "strings";
