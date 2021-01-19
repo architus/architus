@@ -65,7 +65,7 @@ def sum(iterable):
     // and I don't know how to make a list within a call to sprintf.
     script += "author_roles = [";
     for _, r := range in.Author.Roles {
-        script += strconv.FormatUint(r, 10), ", ";
+        script += strconv.FormatUint(r, 10) + ", ";
     }
     script += "]\n";
 
