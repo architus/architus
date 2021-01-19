@@ -77,6 +77,7 @@ def sum(iterable):
                           in.Author.Id, in.Author.AvatarUrl, in.Author.Color, in.Author.Discriminator, in.Author.Name, in.Author.Nick, in.Author.DispName);
     script += fmt.Sprintf("channel = struct(id=%d, name=\"%s\")\n",
                           in.Channel.Id, in.Channel.Name);
+    script += "msg = message; a = author; ch = channel;\n";
     script += "caps = [";
     for _, c := range in.Captures {
         script += "\"" + c + "\", ";
