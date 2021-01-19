@@ -22,7 +22,7 @@ class GuildData:
 
     def __init__(self, bot, guild, dictionary, time_granularity=timedelta(days=1)):
         self.bot = bot
-        self._up_to_date_after = pytz.utc.localize(datetime.now())
+        self._up_to_date_after = pytz.utc.localize(datetime.utcnow())
         self.guild = guild
         self.dictionary, self.stops = dictionary
         self.forbidden = False
@@ -131,7 +131,7 @@ class GuildData:
         for ch_id in self._allowed_channels(self.times.keys(), member):
             for date, members in self.times[ch_id].items():
                 if date < datetime.now() - timedelta(days=90):
-                    break
+                    continue
                 if date in combined:
                     for member, count in members.items():
                         if member in combined[date]:

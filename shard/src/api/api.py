@@ -242,7 +242,7 @@ class Api(Cog):
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
         return {'guilds': guild_list}, sc.OK_200
 
-    async def pool_request(self, guild_id, pool_type: str, entity_ids, fetch=False):
+    async def pool_request(self, user_id, guild_id, pool_type: str, entity_ids, fetch=False):
         guild = self.bot.get_guild(int(guild_id)) if guild_id else None
         resp = {'data': [], 'nonexistant': []}
 
@@ -253,7 +253,7 @@ class Api(Cog):
         elif pool_type == PoolType.EMOJI:
             tasks = {eid: create_task(self.pools.get_emoji(guild, eid, fetch)) for eid in entity_ids}
         elif pool_type == PoolType.GUILD:
-            tasks = {eid: create_task(self.pools.get_guild(eid, fetch)) for eid in entity_ids}
+            tasks = {eid: create_task(self.pools.get_guild(user_id, eid, fetch)) for eid in entity_ids}
         else:
             raise Exception(f"unknown pool type: {pool_type}")
 

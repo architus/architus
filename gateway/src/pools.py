@@ -80,7 +80,7 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
 
 async def pool_response(shard_client, guild_id, pool_type, ids, partial_event, partial_error, payload, jwt):
     resp, sc = await shard_client.pool_request(
-        guild_id, pool_type, ids, fetch=False, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+        jwt.id, guild_id, pool_type, ids, fetch=False, routing_key=f"shard_rpc_{which_shard(guild_id)}")
     if sc != 200:
         logger.error(f"got bad response from `pool_request` for guild: {guild_id}")
         await partial_error(
@@ -96,7 +96,7 @@ async def pool_response(shard_client, guild_id, pool_type, ids, partial_event, p
         return
 
     resp, sc = await shard_client.pool_request(
-        guild_id, pool_type, resp['nonexistant'], fetch=True, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+        jwt.id, guild_id, pool_type, resp['nonexistant'], fetch=True, routing_key=f"shard_rpc_{which_shard(guild_id)}")
     if sc != 200:
         logger.error(f"got bad response from `pool_request` for guild: {guild_id}")
         await partial_error(
