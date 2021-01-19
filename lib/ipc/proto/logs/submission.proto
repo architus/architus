@@ -87,6 +87,8 @@ enum EntityType {
   EntityTypeRole = 3;
   // Channel entity, has a name that is stored in the revision cache
   EntityTypeChannel = 4;
+  // Emoji entity
+  EntityTypeEmoji = 5;
 }
 
 // Used to control display-oriented data and update revision cache

@@ -37,6 +37,7 @@ backoff = { version = "0.2", features = ["tokio"] }
 chrono = "0.4"
 lapin = "1.6"
 tokio-amqp = "0.2"
+reqwest = { version = "0.10", features = ["json"] }
 
 [dependencies.jmespath]
 git = "https://github.com/jmespath/jmespath.rs"

@@ -4,6 +4,7 @@ pub mod source;
 
 use crate::audit_log::SearchQuery;
 use crate::config::Configuration;
+use crate::emoji::EmojiDb;
 use crate::event::{Agent, Channel, Content, Entity, NormalizedEvent, Source as EventSource};
 use crate::gateway::path::Path;
 use crate::gateway::source::{AuditLogSource, Source};
@@ -54,6 +55,7 @@ pub struct ProcessorFleet {
     id_provisioner: IdProvisioner,
     client: Client,
     config: Arc<Configuration>,
+    emojis: Arc<EmojiDb>,
 }
 
 // ProcessorFleet needs to be safe to share
@@ -62,12 +64,13 @@ assert_impl_all!(ProcessorFleet: Sync);
 impl ProcessorFleet {
     /// Creates a processor with an empty set of sub-processors
     #[must_use]
-    pub fn new(client: Client, config: Arc<Configuration>) -> Self {
+    pub fn new(client: Client, config: Arc<Configuration>, emojis: Arc<EmojiDb>) -> Self {
         Self {
             processors: HashMap::new(),
             id_provisioner: IdProvisioner::new(),
             client,
             config,
+            emojis,
         }
     }
 
@@ -86,7 +89,13 @@ impl ProcessorFleet {
     ) -> Result<NormalizedEvent, ProcessingError> {
         if let Some(processor) = self.processors.get(event.event_type) {
             processor
-                .apply(event, &self.id_provisioner, &self.client, &self.config)
+                .apply(
+                    event,
+                    &self.id_provisioner,
+                    &self.client,
+                    &self.config,
+                    &self.emojis,
+                )
                 .await
         } else {
             Err(ProcessingError::SubProcessorNotFound(String::from(
@@ -119,6 +128,7 @@ impl Processor {
         id_provisioner: &'a IdProvisioner,
         client: &'a Client,
         config: &'a Configuration,
+        emojis: &'a EmojiDb,
     ) -> Result<NormalizedEvent, ProcessingError> {
         // Create a RwLock that source objects can wait on if needed
         let audit_log_lock: RwLock<Option<CombinedAuditLogEntry>> = RwLock::new(None);
@@ -128,6 +138,7 @@ impl Processor {
             audit_log_entry: LockReader::new(&audit_log_lock),
             client,
             config,
+            emojis,
         };
 
         let write_lock = if self.audit_log.is_some() {
@@ -231,13 +242,14 @@ pub struct CombinedAuditLogEntry {
 /// that might be useful when normalizing an incoming event,
 /// including the source data.
 /// Can be cheaply cloned.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Context<'a> {
     event: &'a GatewayEvent<'a>,
     id_provisioner: &'a IdProvisioner,
     audit_log_entry: LockReader<'a, Option<CombinedAuditLogEntry>>,
     client: &'a Client,
     config: &'a Configuration,
+    emojis: &'a EmojiDb,
 }
 
 impl Context<'_> {

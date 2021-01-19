@@ -4,12 +4,14 @@
 mod audit_log;
 mod config;
 mod connect;
+mod emoji;
 mod event;
 mod gateway;
 mod rpc;
 mod util;
 
 use crate::config::Configuration;
+use crate::emoji::EmojiDb;
 use crate::event::NormalizedEvent;
 use crate::gateway::{ProcessingError, ProcessorFleet};
 use crate::rpc::submission::Client as LogsImportClient;
@@ -52,11 +54,18 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
     // Create a Discord API client
     let client = Client::new(&config.secrets.discord_token);
 
+    // Load the emoji database
+    let emojis = Arc::new(EmojiDb::load(&config.emoji_db_url).await?);
+    log::info!(
+        "Downloaded emoji shortcode mappings from {}",
+        config.emoji_db_url
+    );
+
     // Initialize the gateway event processor
     // and register all known gateway event handlers
     // (see gateway/processors.rs)
     let processor = {
-        let mut inner = gateway::ProcessorFleet::new(client, Arc::clone(&config));
+        let mut inner = gateway::ProcessorFleet::new(client, Arc::clone(&config), emojis);
         gateway::processors::register_all(&mut inner);
         Arc::new(inner)
     };
