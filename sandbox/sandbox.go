@@ -92,6 +92,8 @@ def sum(iterable):
     // of allowing users to put newlines in their scripts and not having to do some fancy logic to account for that.
     script += in.Script;
 
+    log.Print(script);
+
     // These next few functions are go defined builtins. What they do should be fairly self explanatory.
     sin := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
         var rad string = "0.0";
