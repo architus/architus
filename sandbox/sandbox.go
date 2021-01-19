@@ -3,6 +3,8 @@ package main;
 import (
     "fmt";
     "github.com/jammiess/starlark-go/starlark";
+    "github.com/jammiess/starlark-go/resolve";
+    "github.com/jammiess/starlark-go/starlarkstruct";
     // "os";
     "log";
     "strings";
@@ -25,7 +27,13 @@ type Sandbox struct {
 }
 
 func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
-    // TODO(jjohnsonjj1251@gmail.com): Move user script into a main function
+    /*
+    These are some of the builtin things that are there for the user's convenience.
+    Currently included in this part of the code is:
+    - Choice
+    - Sum
+    - print alias
+    */
     const functions = `
 p = print
 def choice(iterable):
@@ -41,34 +49,50 @@ def sum(iterable):
     return s
 
 `;
-    // script_uuid := uuid.NewV4();
 
-    /*
+    // These turn on some extra functionality within the interpreter that allow for some useful things
+    // such as while loops, doing things outside of a function, and mutating global values.
     resolve.AllowRecursion = true;
     resolve.AllowNestedDef = true;
     resolve.AllowLambda = true;
-    */
+    resolve.AllowSet = true;
+    resolve.AllowGlobalReassign = true;
 
+    // This is starting to set up the actual script that will be passed to the interpreter.
     var script string = functions;
 
-    script += "message = \"" + in.TriggerMessage + "\"; author = \"" + in.Author + "\"; count = " + strconv.FormatUint(in.Count, 10) + "\n";
-    script += "caps = [";
+    // Need to set up a global variable for this before putting it into a struct because it's a list
+    // and I don't know how to make a list within a call to sprintf.
+    script += "author_roles = [";
+    for _, r := range in.Author.Roles {
+        script += strconv.FormatUint(r, 10);
+    }
+    script += "]\n";
 
+    // Various useful structs that represent aspects of the message that triggered the autoresponse.
+    // `struct` is a builtin that is defined later in the program. It comes from the starlark-go repository.
+    script += fmt.Sprintf("message = struct(id=%d, content=\"%s\", clean=\"%s\"\n)",
+                          in.TriggerMessage.Id, in.TriggerMessage.Content, in.TriggerMessage.Clean);
+    script += fmt.Sprintf("author = struct(id=%d, avatar_url=\"%s\", color=\"%s\", discrim=%d, roles=author_roles, name=\"%s\", nick=\"%s\", disp=\"%s\")",
+                          in.Author.Id, in.Author.AvatarUrl, in.Author.Color, in.Author.Discriminator, in.Author.Name, in.Author.Nick, in.Author.DispName);
+    script += fmt.Sprintf("channel = struct(id=%d, name=\"%s\")",
+                          in.Channel.Id, in.Channel.Name);
+    script += "caps = [";
     for _, c := range in.Captures {
         script += "\"" + c + "\", ";
     }
-
     script += "]\nargs = [";
-
     for _, c := range in.Arguments {
         script += "\"" + c + "\", ";
     }
-
     script += "]\n"
-    script += "def main():\n\t"
-    script += in.Script;
-    script += "\nmain()";
 
+    // The actual script is no longer put in a main function anymore because with the flags set above in `resolve`
+    // we can now get the full functionality of the language outside of a function. This gives the added benefit
+    // of allowing users to put newlines in their scripts and not having to do some fancy logic to account for that.
+    script += in.Script;
+
+    // These next few functions are go defined builtins. What they do should be fairly self explanatory.
     sin := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
         var rad string = "0.0";
         if err := starlark.UnpackArgs(b.Name(), args, kwargs, "rad", &rad); err != nil {
@@ -100,10 +124,13 @@ def sum(iterable):
         return starlark.MakeInt(int(v)), nil;
     }
 
+    // This tells the interpreter what all of our builtins are. Struct is a starlark-go specific functionality that
+    // allows for creating a struct from kwarg values.
     predeclared := starlark.StringDict{
         "random": starlark.NewBuiltin("random", random),
         "randint": starlark.NewBuiltin("randint", randint),
         "sin": starlark.NewBuiltin("sin", sin),
+        "struct": starlark.NewBuiltin("struct", starlarkstruct.Make),
     };
 
     var messages []string;
