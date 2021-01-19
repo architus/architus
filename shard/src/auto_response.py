@@ -187,11 +187,28 @@ class AutoResponse:
             output = await self.bot.sandbox_client.RunStarlarkScript(
                 message.StarlarkScript(
                     script=node.text,
-                    trigger_message=msg.clean_content,
-                    author=f"{msg.author.name}#{msg.author.discriminator}",
+                    trigger_message=message.Message(
+                        clean=msg.clean_content,
+                        content=msg.content,
+                        id=msg.id
+                    ),
+                    author=message.Author(
+                        id=msg.author.id,
+                        avatar_url=msg.author.author_url,
+                        color=msg.author.color,
+                        discriminator=msg.author.discriminator,
+                        roles=msg.author.roles,
+                        name=msg.author.name,
+                        nick="" if msg.author.nick is None else msg.author.nick,
+                        disp_name=msg.author.display_name
+                    ),
                     count=self.count,
                     captures=list(match.groups()),
-                    arguments=[]
+                    arguments=[],
+                    channel=message.Channel(
+                        id=msg.channel.id,
+                        name=msg.channel.name
+                    )
                 ))
             if output.errno != 0:
                 content.append(f"{output.errno} : {output.error}")
