@@ -1,5 +1,4 @@
 import grpc
-from lib.ipc import manager_pb2_grpc
 
 from lib.config import logger
 import asyncio
