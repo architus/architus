@@ -108,5 +108,12 @@ services:
       - webnet
     env_file:
       - architus.env
+  sandbox:
+    image: johnyburd/sandbox:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./sandbox/Dockerfile
+    networks:
+      - webnet
 networks:
   webnet:

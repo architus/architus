@@ -1,0 +1,44 @@
+syntax = "proto3";
+package sandbox;
+
+service Sandbox {
+    rpc RunStarlarkScript (StarlarkScript) returns (ScriptOutput) {}
+}
+
+message StarlarkScript {
+    string script = 1;
+    Message trigger_message = 2;
+    Author author = 3;
+    uint64 count = 4;
+    repeated string captures = 5;
+    repeated string arguments = 6;
+    Channel channel = 7;
+}
+
+message ScriptOutput {
+    string output = 1;
+    string error = 2;
+    uint64 errno = 3;
+}
+
+message Channel {
+    uint64 id = 1;
+    string name = 2;
+}
+
+message Author {
+    uint64 id = 1;
+    string avatar_url = 2;
+    string color = 3;
+    uint32 discriminator = 4;
+    repeated uint64 roles = 5;
+    string name = 6;
+    string nick = 7;
+    string disp_name = 8;
+}
+
+message Message {
+    uint64 id = 1;
+    string content = 2;
+    string clean = 3;
+}

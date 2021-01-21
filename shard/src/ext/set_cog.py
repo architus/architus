@@ -93,7 +93,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     @commands.command()
     @bot_commands_only
     @doc_url("https://docs.archit.us/features/auto-responses/#setting-auto-responses")
-    async def set(self, ctx, *args):
+    async def set(self, ctx):
         """set <trigger>::<response>
         Sets an auto response.
         """
