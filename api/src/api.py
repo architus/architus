@@ -1,12 +1,14 @@
 import json
+from io import BytesIO
 
-from flask import Flask, redirect, request, g
+from flask import Flask, redirect, request, g, Response
 from flask_restful import Api, Resource
 from flask_cors import CORS
+from werkzeug.wsgi import FileWrapper
 
 from lib.status_codes import StatusCodes
 from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod
-from lib.models import Log
+# from lib.models import Log # , Emojis
 from lib.auth import JWT, flask_authenticated as authenticated
 from lib.discord_requests import list_guilds_request
 from lib.pool_types import PoolType
@@ -78,10 +80,20 @@ class GuildCounter(CustomResource):
         return guild_count, sc
 
 
+class AllGuilds(CustomResource):
+    @authenticated()
+    def get(self, jwt: JWT):
+        if jwt.id != 214037134477230080:  # johnyburd
+            return {"message": "unauthorized"}, StatusCodes.UNAUTHORIZED_401
+        return self.shard.all_guilds()
+
+
 class Logs(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int):
-        rows = self.session.query(Log).filter(Log.guild_id == guild_id).order_by(Log.timestamp.desc()).limit(400).all()
+        # rows = self.session.query(Log).filter(Log.guild_id == guild_id)
+        # .order_by(Log.timestamp.desc()).limit(400).all()
+        rows = []
         self.session.commit()
         logs = []
         for log in rows:
@@ -132,42 +144,53 @@ class Settings(CustomResource):
 
 class Coggers(CustomResource):
     '''provide an endpoint to reload cogs in the bot'''
-    @authenticated()
-    def get(self, extension: str = None, jwt: JWT = None):
-        if jwt.id == 214037134477230080:  # johnyburd
-            return self.shard.get_extensions()
-        return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
+    def get(self, extension: str = None):
+        return self.shard.get_extensions()
 
-    @authenticated()
-    def post(self, extension: str, jwt: JWT):
-        if jwt.id == 214037134477230080:  # johnyburd
-            return self.shard.reload_extension(extension)
-        return {"message": "401: not johnyburd"}, StatusCodes.UNAUTHORIZED_401
+    def post(self, extension: str):
+        return self.shard.reload_extension(extension, routing_guild="all")
 
 
 class Stats(CustomResource):
     @authenticated(member=True)
     def get(self, guild_id: int, jwt: JWT):
         '''Request message count statistics from shard and return'''
-        msg_data, _ = self.shard.bin_messages(guild_id, routing_guild=guild_id)
-        guild_data, _ = self.shard.get_guild_data(guild_id, routing_guild=guild_id)
-        return {
-            'members': {
-                'count': guild_data['member_count'],
-            },
-            'messages': {
-                'count': msg_data['total'],
-                'channels': msg_data['channels'],
-                'members': msg_data['members'],
-                'times': msg_data['times'],
-            }
-        }, StatusCodes.OK_200
+        data, sc = self.shard.bin_messages(guild_id, jwt.id, routing_guild=guild_id)
+        camelcase_keys(data)
+        return data, sc
 
 
-class Emojis(CustomResource):
+class Music(CustomResource):
+    @authenticated(member=True)
+    def get(self, guild_id: int, jwt: JWT):
+        resp, sc = self.shard.get_playlist(guild_id, routing_guild=guild_id)
+        return camelcase_keys(resp), sc
 
-    def get(self, guild_id: int):
-        return self.shard.get_guild_emojis(guild_id, routing_guild=guild_id)
+    @reqparams(song=str)
+    @authenticated()
+    def post(self, guild_id: int, jwt: JWT):
+        return self.shard.queue_song(guild_id, jwt.id, routing_guild=guild_id)
+
+
+class Emoji(CustomResource):
+
+    def get(self, emoji_id: int):
+        result = self.session.execute('''SELECT img FROM tb_emojis WHERE id = :id''', {'id': emoji_id}).fetchone()
+        if result is None:
+            return "emoji not found", StatusCodes.NOT_FOUND_404
+        return Response(FileWrapper(BytesIO(result['img'])), mimetype="text/plain", direct_passthrough=True)
+
+    @authenticated(member=True)
+    def post(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.load_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+
+    @authenticated(member=True)
+    def patch(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.cache_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+
+    @authenticated(member=True)
+    def delete(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.delete_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
 
 
 class ListGuilds(CustomResource):
@@ -193,15 +216,18 @@ def app_factory():
     api.add_resource(End, "/session/end")
     api.add_resource(TokenExchange, "/session/token-exchange")
 
+    api.add_resource(AllGuilds, "/admin/guilds")
     api.add_resource(User, "/user/<string:name>")
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Stats, "/stats/<int:guild_id>")
-    api.add_resource(Emojis, "/emojis/<int:guild_id>")
+    api.add_resource(Music, "/music/<int:guild_id>")
+    api.add_resource(Emoji, "/emojis/<int:emoji_id>", "/emojis/<int:guild_id>/<int:emoji_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")
     api.add_resource(GuildCounter, "/guild-count")
     api.add_resource(Invite, "/invite/<int:guild_id>")
-    api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
+    if not is_prod:
+        api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
     return app

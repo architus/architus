@@ -55,10 +55,11 @@ WORKDIR /app
 
 RUN mkdir -p /etc/cron.d
 RUN touch /var/log/cron.log
-RUN echo "@hourly root python3.8 -m pip install youtube-dl --upgrade > /var/log/cron.log 2>&1\n# Empty line for syntax" >> /etc/cron.d/youtube-dl_update
+RUN echo "@hourly root python3.8 -m pip install --upgrade youtube-dlc > /var/log/cron.log 2>&1\n# Empty line for syntax" >> /etc/cron.d/youtube-dl_update
 RUN chmod 0744 /etc/cron.d/youtube-dl_update
 RUN crontab /etc/cron.d/youtube-dl_update
 RUN cron
+RUN python3.8 -m pip install --upgrade youtube-dlc
 
 ENV PYTHONIOENCODING UTF-8
 

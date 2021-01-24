@@ -9,14 +9,6 @@ services:
       - architus.env
     environment:
       NUM_SHARDS: "${NUM_SHARDS:-1}"
-    deploy:
-      replicas: "${NUM_SHARDS:-1}"
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          cpus: "1"
-          memory: 500M
     depends_on:
       - manager
       - postgres
@@ -31,14 +23,6 @@ services:
       - architus.env
     environment:
       NUM_SHARDS: "${NUM_SHARDS:-1}"
-    deploy:
-      replicas: 4
-      restart_policy:
-        condition: on-failure
-      resources:
-        limits:
-          cpus: "1"
-          memory: 500M
     ports:
       - "5000:5000"
     depends_on:
@@ -69,9 +53,6 @@ services:
       POSTGRES_DB: autbot
     ports:
       - "5432:5432"
-    deploy:
-      placement:
-        constraints: [node.role == manager]
     networks:
       - webnet
   dbmanager:
@@ -92,16 +73,10 @@ services:
       - architus.env
     environment:
       NUM_SHARDS: "${NUM_SHARDS:-1}"
-    deploy:
-      restart_policy:
-        condition: on-failure
     ports:
       - "5300:5300"
     volumes:
       - "./www:/var/www"
-    deploy:
-      placement:
-        constraints: [node.role == manager]
     networks:
       - webnet
   visualizer:
@@ -110,9 +85,6 @@ services:
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-    deploy:
-      placement:
-        constraints: [node.role == manager]
     networks:
       - webnet
   rabbit:
@@ -136,5 +108,12 @@ services:
       - webnet
     env_file:
       - architus.env
+  sandbox:
+    image: johnyburd/sandbox:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./sandbox/Dockerfile
+    networks:
+      - webnet
 networks:
   webnet:

@@ -1,8 +1,10 @@
 from src.list_embed import ListEmbed
 from discord.ext import commands
 import discord
+from contextlib import suppress
 
 from lib.config import logger
+from src.utils import doc_url
 
 
 class Roles(commands.Cog):
@@ -21,8 +23,10 @@ class Roles(commands.Cog):
             logger.exception("could not add %s to %s" % (member.display_name, 'default role'))
 
     @commands.command(aliases=['rank', 'join', 'roles'])
+    @doc_url("https://docs.archit.us/features/role-manager")
     async def role(self, ctx, *arg):
-        '''Assign yourself a role `!roles` to see joinable roles'''
+        '''role [role to join]
+        List available roles to join or join a role.'''
         settings = self.bot.settings[ctx.guild]
         roles_dict = settings.roles_dict
         member = ctx.author
@@ -35,7 +39,8 @@ class Roles(commands.Cog):
             lembed = ListEmbed('Available Roles', '`!role [role]`', self.bot.user)
             for nick, channelid in roles_dict.items():
                 role = discord.utils.get(ctx.guild.roles, id=channelid)
-                lembed.add(nick, role.mention)
+                with suppress(AttributeError):
+                    lembed.add(nick, role.mention)
             await ctx.channel.send(embed=lembed.get_embed())
 
         elif requested_role in roles_dict:

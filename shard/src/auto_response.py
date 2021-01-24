@@ -4,13 +4,14 @@ from typing import Optional, Tuple
 from random import choice
 import json
 
-from discord import Message, Guild, Member
+from discord import Message, Guild, Member, AllowedMentions
 
 from src.emoji_manager import EmojiManager
 from lib.reggy.reggy import Reggy
 from lib.response_grammar.response import parse as parse_response, NodeType
 from lib.config import logger
 from lib.aiomodels import TbAutoResponses
+from lib.ipc import sandbox_pb2 as message
 
 
 class WordGen:
@@ -177,10 +178,42 @@ class AutoResponse:
             content.append(msg.author.display_name)
         elif (node.type == NodeType.Capture):
             with suppress(IndexError):
-                content.append(match.groups()[node.capture_group])
+                string = match.groups()[node.capture_group]
+                content.append(string if string is not None else "")
 
         elif (node.type == NodeType.Url):
             content.append(node.text)
+        elif (node.type == NodeType.Eval):
+            output = await self.bot.sandbox_client.RunStarlarkScript(
+                message.StarlarkScript(
+                    script=node.text,
+                    trigger_message=message.Message(
+                        clean=msg.clean_content,
+                        content=msg.content,
+                        id=msg.id
+                    ),
+                    author=message.Author(
+                        id=msg.author.id,
+                        avatar_url=str(msg.author.avatar_url),
+                        color=str(msg.author.color),
+                        discriminator=int(msg.author.discriminator),
+                        roles=[r.id for r in msg.author.roles],
+                        name=msg.author.name,
+                        nick="" if msg.author.nick is None else msg.author.nick,
+                        disp_name=msg.author.display_name
+                    ),
+                    count=self.count,
+                    captures=list(match.groups()),
+                    arguments=[],
+                    channel=message.Channel(
+                        id=msg.channel.id,
+                        name=msg.channel.name
+                    )
+                ))
+            if output.errno != 0:
+                content.append(f"{output.errno} : {output.error}")
+            else:
+                content.append(output.output)
         else:
             content = []
             reacts = []
@@ -202,10 +235,10 @@ class AutoResponse:
 
         self.count += 1
         content, reacts = await self.resolve_resp(self.response_ast, match, msg)
-        content = "".join(content).replace("@everyone", "\\@everyone").replace("@here", "\\@here")
+        content = "".join(content)
 
         if content.strip() != "":
-            resp_msg = await msg.channel.send(content)
+            resp_msg = await msg.channel.send(content, allowed_mentions=AllowedMentions(everyone=False))
         else:
             resp_msg = None
         for emoji in reacts:
@@ -258,24 +291,27 @@ class GuildAutoResponses:
         if self.no_db:
             return
 
-        self.auto_responses = [
-            await self.bot.loop.run_in_executor(
-                self.executor,
-                AutoResponse,
-                self.bot,
-                r['trigger'],
-                r['response'],
-                r['author_id'] if r['author_id'] != 0 else None,
-                r['guild_id'],
-                r['id'],
-                r['trigger_regex'],
-                r['trigger_punctuation'],
-                "",
-                r['mode'],
-                r['count'],
-                self.word_gen,
-                None)  # TODO
-            for r in await self.tb_auto_responses.select_all()]
+        for r in await self.tb_auto_responses.select_by_guild(self.guild.id):
+            try:
+                args = (
+                    self.bot,
+                    r['trigger'],
+                    r['response'],
+                    r['author_id'] if r['author_id'] != 0 else None,
+                    r['guild_id'],
+                    r['id'],
+                    r['trigger_regex'],
+                    r['trigger_punctuation'],
+                    "",
+                    r['mode'],
+                    r['count'],
+                    self.word_gen,
+                    None)  # TODO
+                resp = await self.bot.loop.run_in_executor(self.executor, AutoResponse, *args)
+            except Exception:
+                logger.exception("")
+            else:
+                self.auto_responses.append(resp)
 
     async def _insert_into_db(self, resp: AutoResponse) -> None:
         if self.no_db:
@@ -319,7 +355,6 @@ class GuildAutoResponses:
             manager = None
         else:
             manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
-
         r = await self.bot.loop.run_in_executor(
             self.executor, AutoResponse,
             self.bot,
@@ -386,7 +421,6 @@ class GuildAutoResponses:
         for r in self.auto_responses:
             if not r.trigger_reggy.isdisjoint(response.trigger_reggy):
                 conflicts.append(r)
-                logger.debug(f"{response} collides with {r}")
         return conflicts
 
 

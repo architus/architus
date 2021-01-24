@@ -4,6 +4,7 @@ import aiohttp
 import json
 
 from lib.config import alphavantage_api_key
+from src.utils import doc_url
 
 
 class Stocks(commands.Cog, name="Stock Prices"):
@@ -12,8 +13,10 @@ class Stocks(commands.Cog, name="Stock Prices"):
         self.bot = bot
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/stocks")
     async def price(self, ctx, symbol: str):
-        '''Give some daily stats about a company.'''
+        '''price <ticker>
+        Give some daily stats about a company.'''
         async with aiohttp.ClientSession() as session:
             url = 'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&'
             url += f'symbol={symbol}&apikey={alphavantage_api_key}'

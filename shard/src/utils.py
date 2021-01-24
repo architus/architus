@@ -4,6 +4,7 @@ from aiohttp import ClientSession
 import io
 import functools
 from threading import Lock
+from string import digits
 
 import discord
 
@@ -103,6 +104,8 @@ def user_to_dict(user: discord.User) -> dict:
     params = ('id', 'name', 'avatar', 'discriminator')
     data = {p: getattr(user, p) for p in params}
     data['id'] = str(data['id'])
+    data['username'] = data['name']
+    del data['name']
     return data
 
 
@@ -113,7 +116,7 @@ def member_to_dict(member: discord.Member) -> dict:
     data['roles'] = [str(r.id) for r in member.roles]
     data['color'] = str(member.color)
     data['joined_at'] = member.joined_at.isoformat()
-    logger.debug(data)
+    # logger.debug(data)
     return data
 
 
@@ -124,6 +127,13 @@ def role_to_dict(role: discord.Role) -> dict:
     data['members'] = [str(m.id) for m in role.members]
     data['color'] = str(role.color)
     return data
+
+
+def doc_url(url: str):
+    def wrap(func):
+        func.__doc_url__ = url
+        return func
+    return wrap
 
 
 def bot_commands_only(cmd):
@@ -146,3 +156,31 @@ def bot_commands_only(cmd):
                         return
         return await cmd(self, ctx, *args, **kwargs)
     return bc_cmd
+
+
+def mention_to_name(guild: discord.Guild, mention: str) -> str:
+    if mention[0] != '<':
+        raise ValueError(f"this doesn't look like a mention str: {mention}")
+    id = int("".join([n for n in mention if n in digits]))
+    if mention[1] == '@':
+        member = guild.get_member(id)
+        if member is not None:
+            return f"@{member.display_name}"
+    elif mention[1] == '&':
+        rl = guild.get_role(id)
+        if rl is not None:
+            return f"@{rl.name}"
+    elif mention[1] == '#':
+        ch = guild.get_channel(id)
+        if ch is not None:
+            return f"#{ch.name}"
+    return mention
+
+
+def format_seconds(s: int, hours: bool = False):
+    if hours:
+        hours, remainder = divmod(s, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return '{}:{:02}:{:02}'.format(int(hours), int(minutes), int(seconds))
+    minutes, seconds = divmod(s, 60)
+    return '{}:{:02}'.format(int(minutes), int(seconds))

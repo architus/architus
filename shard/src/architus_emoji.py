@@ -1,13 +1,11 @@
 from typing import Optional
-from io import BytesIO
 
 from PIL import ImageChops, Image
 from discord import Emoji
 
 from lib.hoar_frost import HoarFrostGenerator
 from src.utils import download_emoji
-from lib.config import logger
-from lib.ipc import manager_pb2 as message
+from lib.config import logger, domain_name
 
 
 hoarfrost_gen = HoarFrostGenerator()
@@ -29,7 +27,6 @@ class ArchitusEmoji:
             id: Optional[int] = None,
             discord_id: Optional[int] = None,
             author_id: Optional[int] = None,
-            url: str = "",
             num_uses: int = 0,
             priority: float = 0.0):
 
@@ -46,29 +43,16 @@ class ArchitusEmoji:
         self.discord_id = discord_id
         self.num_uses = num_uses
         self.priority = priority
-        self.str_url = url
 
     @property
     def loaded(self):
         return self.discord_id is not None
 
-    async def url(self):
-        if self.str_url == "":
-            with BytesIO() as buf:
-                self.im.save(buf, format="PNG")
-                binary = buf.getvalue()
-                try:
-                    data = await self.bot.manager_client.publish_file(
-                        iter([
-                            message.File(
-                                location="emojis",
-                                name=f"{self.id}",
-                                file=binary)]))
-                except Exception:
-                    logger.info(f"Shard {self.bot.shard_id} failed to upload emoji")
-                    return None
-                self.str_url = data.url
-        return self.str_url
+    @property
+    def url(self):
+        if self.loaded:
+            return f"https://cdn.discordapp.com/emojis/{self.discord_id}.png"
+        return f"https://cdn.{domain_name}/emojis/{self.id}"
 
     def cache(self) -> None:
         self.discord_id = None
@@ -114,9 +98,10 @@ class ArchitusEmoji:
             'id': str(self.id),
             'name': self.name,
             'authorId': str(self.author_id),
-            'discordId': str(self.discord_id),
+            'discordId': str(self.discord_id) if self.discord_id else None,
             'numUses': self.num_uses,
             'priority': self.priority,
+            'url': self.url,
         }
 
     async def as_dict_url(self):
@@ -124,8 +109,8 @@ class ArchitusEmoji:
             'id': str(self.id),
             'name': self.name,
             'authorId': str(self.author_id),
-            'discordId': str(self.discord_id),
+            'discordId': str(self.discord_id) if self.discord_id else None,
             'numUses': self.num_uses,
             'priority': self.priority,
-            'url': await self.url(),
+            'url': self.url,
         }

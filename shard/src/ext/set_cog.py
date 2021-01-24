@@ -3,7 +3,7 @@ from src.auto_response import GuildAutoResponses, TriggerCollisionException, Lon
     ShortTriggerException, UserLimitException, UnknownResponseException, DisabledException, PermissionException
 from lib.response_grammar.response import ParseError
 from lib.reggy.reggy import NotParseable
-from src.utils import bot_commands_only
+from src.utils import bot_commands_only, doc_url
 from lib.config import logger
 
 from contextlib import suppress
@@ -18,23 +18,25 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         self.responses = {}
         self.response_msgs = {}
         self.react_msgs = {}
-        self.executor = ThreadPoolExecutor(max_workers=10)
+        self.executor = ThreadPoolExecutor(max_workers=5)
 
     @commands.Cog.listener()
     async def on_ready(self):
         self.responses = {g.id: await GuildAutoResponses.new(self.bot, g, self.executor) for g in self.bot.guilds}
+        logger.debug("auto responses initialized")
 
     @commands.Cog.listener()
     async def on_message(self, msg):
         if not self.bot.settings[msg.channel.guild].responses_enabled:
             return
-        resp_msg, response = await self.responses[msg.guild.id].execute(msg)
-        if resp_msg is not None:
-            self.response_msgs[resp_msg.id] = response
+        with suppress(KeyError):
+            resp_msg, response = await self.responses[msg.guild.id].execute(msg)
+            if resp_msg is not None:
+                self.response_msgs[resp_msg.id] = response
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        self.responses[guild.id] = await GuildAutoResponses.new(self.bot, guild)
+        self.responses[guild.id] = await GuildAutoResponses.new(self.bot, guild, self.executor)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, react, user):
@@ -47,7 +49,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
                 react_msg = await msg.channel.send(
                     f"{user.mention}, this message came from `{self.response_msgs[msg.id]}`, "
                     f"created by {author}\n:x: to remove this auto response")
-                await react_msg.add_reaction("❌")
+                # await react_msg.add_reaction("❌")
                 self.react_msgs[react_msg.id] = self.response_msgs[msg.id]
                 del self.response_msgs[msg.id]
         elif not user.bot and str(react.emoji) == "❌":
@@ -68,8 +70,10 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
     @commands.command()
     @bot_commands_only
+    @doc_url("https://docs.archit.us/features/auto-responses/#removing-auto-responses")
     async def remove(self, ctx, trigger):
-        """remove an auto response"""
+        """remove <trigger>::<response>
+        Remove an auto response."""
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)
 
@@ -88,12 +92,10 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
     @commands.command()
     @bot_commands_only
-    async def set(self, ctx, *args):
-        """
-        Sets an auto response
-        use the syntax 'set trigger::response'
-        check out the docs for advanced options:
-        https://docs.archit.us/features/auto-responses/
+    @doc_url("https://docs.archit.us/features/auto-responses/#setting-auto-responses")
+    async def set(self, ctx):
+        """set <trigger>::<response>
+        Sets an auto response.
         """
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)

@@ -1,17 +1,20 @@
 import discord
 from discord.ext import commands
-from pytz import timezone
 
 from lib.config import logger
+from src.utils import doc_url
 
 
 @commands.command()
+@doc_url("https://docs.archit.us/commands/quote")
 async def quote(ctx, message: discord.Message):
-    '''Quotes a previous message in a pretty format. Use url or id.'''
+    '''quote <message url|message id>
+    Quotes a previous message in a pretty format. Use url or id.'''
 
-    utc = message.created_at.replace(tzinfo=timezone('UTC'))
-    est = utc.astimezone(timezone('US/Eastern'))
-    em = discord.Embed(title=est.strftime("%Y-%m-%d %I:%M %p"), description=message.content, colour=0x42f468)
+    em = discord.Embed(
+        description=message.content,
+        timestamp=message.created_at,
+        colour=0x42f468)
     em.set_author(name=message.author.display_name, icon_url=message.author.avatar_url)
     em.set_footer(text='#' + message.channel.name)
     try:

@@ -1,10 +1,14 @@
 import random
 from discord.ext import commands
+from src.utils import doc_url
 
 
 @commands.command(aliases=['8ball', '8-ball', 'eightball'])
+@doc_url("https://docs.archit.us/commands/8ball/")
 async def eight_ball(ctx):
-    '''Answers from the beyond'''
+    '''8ball
+    Answers from the beyond.
+    '''
     possible_responses = [
         'That is a resounding no',
         'It is not looking likely',
