@@ -71,8 +71,8 @@ def sum(iterable):
 
     // Various useful structs that represent aspects of the message that triggered the autoresponse.
     // `struct` is a builtin that is defined later in the program. It comes from the starlark-go repository.
-    script += fmt.Sprintf("message = struct(id=%d, content=\"%s\", clean=\"%s\")\n",
-                          in.TriggerMessage.Id, in.TriggerMessage.Content, in.TriggerMessage.Clean);
+    script += fmt.Sprintf("message = struct(id=%d, content=message_content_full, clean=message_clean_full)\n",
+                          in.TriggerMessage.Id);
     script += fmt.Sprintf("author = struct(id=%d, avatar_url=\"%s\", color=\"%s\", discrim=%d, roles=author_roles, name=\"%s\", nick=\"%s\", disp=\"%s\")\n",
                           in.Author.Id, in.Author.AvatarUrl, in.Author.Color, in.Author.Discriminator, in.Author.Name, in.Author.Nick, in.Author.DispName);
     script += fmt.Sprintf("channel = struct(id=%d, name=\"%s\")\n",
@@ -129,6 +129,8 @@ def sum(iterable):
         "randint": starlark.NewBuiltin("randint", randint),
         "sin": starlark.NewBuiltin("sin", sin),
         "struct": starlark.NewBuiltin("struct", starlarkstruct.Make),
+        "messge_content_full": starlark.String(in.TriggerMessage.Content),
+        "message_clean_full": starlark.String(in.TriggerMessage.Clean),
     };
 
     var messages []string;
