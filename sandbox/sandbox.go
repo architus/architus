@@ -129,7 +129,7 @@ def sum(iterable):
         "randint": starlark.NewBuiltin("randint", randint),
         "sin": starlark.NewBuiltin("sin", sin),
         "struct": starlark.NewBuiltin("struct", starlarkstruct.Make),
-        "messge_content_full": starlark.String(in.TriggerMessage.Content),
+        "message_content_full": starlark.String(in.TriggerMessage.Content),
         "message_clean_full": starlark.String(in.TriggerMessage.Clean),
     };
 
