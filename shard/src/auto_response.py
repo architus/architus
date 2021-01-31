@@ -68,6 +68,7 @@ class AutoResponse:
         self.guild_id = guild_id
         self.count = count
         self.word_gen = word_gen
+        self.settings = self.bot.settings[self.bot.get_guild(guild_id)]
 
         if id is None:
             self.id = bot.hoarfrost_gen.generate()
@@ -182,7 +183,10 @@ class AutoResponse:
                 content.append(string if string is not None else "")
 
         elif (node.type == NodeType.Url):
-            content.append(node.text)
+            if self.settings.responses_allow_embeds:
+                content.append(node.text)
+            else:
+                content.append(f"<{node.text}>")
         elif (node.type == NodeType.Eval):
             output = await self.bot.sandbox_client.RunStarlarkScript(
                 message.StarlarkScript(
@@ -236,6 +240,13 @@ class AutoResponse:
         self.count += 1
         content, reacts = await self.resolve_resp(self.response_ast, match, msg)
         content = "".join(content)
+
+        if not self.settings.responses_allow_newlines:
+            content = content.replace('\r', '').replace('\n', '')
+
+        limit = min(self.settings.responses_response_length, 2000)
+        if len(content) > limit:
+            content = f"*content of response was over{' discord' if limit > 2000 else ''} character limit ({limit})*"
 
         if content.strip() != "":
             resp_msg = await msg.channel.send(content, allowed_mentions=AllowedMentions(everyone=False))

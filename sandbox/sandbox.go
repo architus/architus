@@ -71,22 +71,33 @@ def sum(iterable):
 
     // Various useful structs that represent aspects of the message that triggered the autoresponse.
     // `struct` is a builtin that is defined later in the program. It comes from the starlark-go repository.
-    script += fmt.Sprintf("message = struct(id=%d, content=\"%s\", clean=\"%s\")\n",
-                          in.TriggerMessage.Id, in.TriggerMessage.Content, in.TriggerMessage.Clean);
-    script += fmt.Sprintf("author = struct(id=%d, avatar_url=\"%s\", color=\"%s\", discrim=%d, roles=author_roles, name=\"%s\", nick=\"%s\", disp=\"%s\")\n",
-                          in.Author.Id, in.Author.AvatarUrl, in.Author.Color, in.Author.Discriminator, in.Author.Name, in.Author.Nick, in.Author.DispName);
-    script += fmt.Sprintf("channel = struct(id=%d, name=\"%s\")\n",
-                          in.Channel.Id, in.Channel.Name);
+    // For all strings, the variables need to be made in go and then passed into the interpreter so that
+    // random special characters don't break everything.
+    script += fmt.Sprintf("message = struct(id=%d, content=message_content_full, clean=message_clean_full)\n",
+                          in.TriggerMessage.Id);
+    script += fmt.Sprintf("author = struct(id=%d, avatar_url=\"%s\", color=\"%s\", discrim=%d, roles=author_roles, name=auth_list[0], nick=auth_list[1], disp=auth_list[2])\n",
+                          in.Author.Id, in.Author.AvatarUrl, in.Author.Color, in.Author.Discriminator);
+    script += fmt.Sprintf("channel = struct(id=%d, name=channel_name)\n",
+                          in.Channel.Id);
+    script += fmt.Sprintf("count = %d\n", in.Count);
     script += "msg = message; a = author; ch = channel;\n";
-    script += "caps = [";
-    for _, c := range in.Captures {
-        script += "\"" + c + "\", ";
+
+    var author = make([]starlark.Value, 3);
+    author[0] = starlark.String(in.Author.Name);
+    author[1] = starlark.String(in.Author.Nick);
+    author[2] = starlark.String(in.Author.DispName);
+
+    channel_name := starlark.String(in.Channel.Name);
+
+    var caps = make([]starlark.Value, len(in.Captures));
+    for i, c := range in.Captures {
+        caps[i] = starlark.String(c);
     }
-    script += "]\nargs = [";
-    for _, c := range in.Arguments {
-        script += "\"" + c + "\", ";
+
+    var args = make([]starlark.Value, len(in.Arguments));
+    for i, c := range in.Arguments {
+        args[i] = starlark.String(c);
     }
-    script += "]\n"
 
     // The actual script is no longer put in a main function anymore because with the flags set above in `resolve`
     // we can now get the full functionality of the language outside of a function. This gives the added benefit
@@ -129,6 +140,12 @@ def sum(iterable):
         "randint": starlark.NewBuiltin("randint", randint),
         "sin": starlark.NewBuiltin("sin", sin),
         "struct": starlark.NewBuiltin("struct", starlarkstruct.Make),
+        "message_content_full": starlark.String(in.TriggerMessage.Content),
+        "message_clean_full": starlark.String(in.TriggerMessage.Clean),
+        "caps": starlark.NewList(caps),
+        "args": starlark.NewList(args),
+        "auth_list": starlark.NewList(author),
+        "channel_name": channel_name,
     };
 
     var messages []string;

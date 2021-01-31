@@ -31,6 +31,8 @@ COLLISION = u"\U0001F4A5"
 CROSS_MARK = u"\U0000274C"
 CONTROL_KNOBS = u"\U0001F39B"
 SPEAKER = u"\U0001F50A"
+BOOKMARK = u"\U0001F4D1"
+WINDOW = u"\U0001FA9F"
 
 
 class SettingsElement:
@@ -485,6 +487,26 @@ class ResponsesAllowCollisions(SettingsElement):
             COLLISION,
             "Whether users are allowed to set triggers that overlap. Enter `true` or `false`.",
             'responses_allow_collision',
+            tags=['responses'])
+
+
+class ResponsesAllowNewlines(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Allow Newlines in Response",
+            BOOKMARK,
+            "Whether newlines will be stripped or allowed in auto response outputs. Enter `true` or `false`.",
+            'responses_allow_newlines',
+            tags=['responses'])
+
+
+class ResponsesAllowEmbeds(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Expand Links into Embeds",
+            WINDOW,
+            "If false, architus will escape links in responses so discord won't embed them. Enter `true` or `false`",
+            'responses_allow_embeds',
             tags=['responses'])
 
 
