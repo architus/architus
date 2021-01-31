@@ -79,6 +79,7 @@ def sum(iterable):
                           in.Author.Id, in.Author.AvatarUrl, in.Author.Color, in.Author.Discriminator);
     script += fmt.Sprintf("channel = struct(id=%d, name=channel_name)\n",
                           in.Channel.Id);
+    script += fmt.Sprintf("count = %d\n", in.Count);
     script += "msg = message; a = author; ch = channel;\n";
 
     var author = make([]starlark.Value, 3);
