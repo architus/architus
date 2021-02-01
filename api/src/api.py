@@ -160,6 +160,18 @@ class Stats(CustomResource):
         return data, sc
 
 
+class Music(CustomResource):
+    @authenticated(member=True)
+    def get(self, guild_id: int, jwt: JWT):
+        resp, sc = self.shard.get_playlist(guild_id, routing_guild=guild_id)
+        return camelcase_keys(resp), sc
+
+    @reqparams(song=str)
+    @authenticated()
+    def post(self, guild_id: int, jwt: JWT):
+        return self.shard.queue_song(guild_id, jwt.id, routing_guild=guild_id)
+
+
 class Emoji(CustomResource):
 
     def get(self, emoji_id: int):
@@ -167,6 +179,18 @@ class Emoji(CustomResource):
         if result is None:
             return "emoji not found", StatusCodes.NOT_FOUND_404
         return Response(FileWrapper(BytesIO(result['img'])), mimetype="text/plain", direct_passthrough=True)
+
+    @authenticated(member=True)
+    def post(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.load_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+
+    @authenticated(member=True)
+    def patch(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.cache_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+
+    @authenticated(member=True)
+    def delete(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.delete_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
 
 
 class ListGuilds(CustomResource):
@@ -197,7 +221,8 @@ def app_factory():
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Stats, "/stats/<int:guild_id>")
-    api.add_resource(Emoji, "/emojis/<int:emoji_id>")
+    api.add_resource(Music, "/music/<int:guild_id>")
+    api.add_resource(Emoji, "/emojis/<int:emoji_id>", "/emojis/<int:guild_id>/<int:emoji_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")

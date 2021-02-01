@@ -104,6 +104,8 @@ def user_to_dict(user: discord.User) -> dict:
     params = ('id', 'name', 'avatar', 'discriminator')
     data = {p: getattr(user, p) for p in params}
     data['id'] = str(data['id'])
+    data['username'] = data['name']
+    del data['name']
     return data
 
 
@@ -114,7 +116,7 @@ def member_to_dict(member: discord.Member) -> dict:
     data['roles'] = [str(r.id) for r in member.roles]
     data['color'] = str(member.color)
     data['joined_at'] = member.joined_at.isoformat()
-    logger.debug(data)
+    # logger.debug(data)
     return data
 
 

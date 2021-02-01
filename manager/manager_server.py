@@ -46,6 +46,8 @@ class Manager(manager_grpc.ManagerServicer):
         i = next(i for i in range(self.total_shards) if not self.registered[i])
         logger.info(f"Shard requested id, assigning {i + 1}/{self.total_shards}...")
         self.registered[i] = True
+        # Give the bot some seconds to get set up before expecting heartbeats.
+        self.last_checkin[i] = datetime.now() + timedelta(seconds=20)
         return message.ShardInfo(shard_id=i, shard_count=self.total_shards)
 
     def guild_count(self, request, context):

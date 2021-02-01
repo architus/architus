@@ -1,5 +1,6 @@
 import secrets
 from typing import List
+from asyncio import create_task
 
 from discord.ext.commands import Cog, Context
 import discord
@@ -69,6 +70,11 @@ class Api(Cog):
 
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
+
+    @fetch_guild
+    async def get_playlist(self, guild):
+        voice = self.bot.cogs['Voice'].voice_managers[guild.id]
+        return voice.q.as_dict(), sc.OK_200
 
     async def users_guilds(self, user_id):
         users_guilds = []
@@ -182,6 +188,38 @@ class Api(Cog):
         }, sc.OK_200
 
     @fetch_guild
+    async def load_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if emoji is None:
+            return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
+        await emoji_manager.load_emoji(emoji)
+        return {'message': "successfully loaded"}, sc.OK_200
+
+    @fetch_guild
+    async def cache_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if member_id not in self.bot.settings[guild].admin_ids:
+            return {'message': "only admins may manually cache emoji"}, sc.UNAUTHORIZED_401
+        if emoji is None:
+            return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
+        await emoji_manager.cache_emoji(emoji)
+        return {'message': "successfully cached"}, sc.OK_200
+
+    @fetch_guild
+    async def delete_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
+        member = guild.get_member(member_id)
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if emoji is None:
+            return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
+        if emoji.author_id != member.id and member.id not in self.bot.settings[guild].admin_ids:
+            return {'message': "you must own this emoji or have admin permissions"}, sc.UNAUTHORIZED_401
+        await emoji_manager.delete_emoji(emoji)
+        return {'message': "successfully deleted"}, sc.OK_200
+
+    @fetch_guild
     async def settings_access(self, guild, setting=None, value=None):
         settings = self.bot.settings[guild]
         if hasattr(settings, setting):
@@ -204,18 +242,28 @@ class Api(Cog):
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
         return {'guilds': guild_list}, sc.OK_200
 
-    async def pool_request(self, guild_id, pool_type: str, entity_id, fetch=False):
+    async def pool_request(self, user_id, guild_id, pool_type: str, entity_ids, fetch=False):
         guild = self.bot.get_guild(int(guild_id)) if guild_id else None
-        try:
-            if pool_type == PoolType.MEMBER:
-                return {'data': await self.pools.get_member(guild, entity_id, fetch)}, 200
-            elif pool_type == PoolType.USER:
-                return {'data': await self.pools.get_user(entity_id, fetch)}, 200
-            elif pool_type == PoolType.EMOJI:
-                return {'data': await self.pools.get_emoji(guild, entity_id, fetch)}, 200
-        except Exception:
-            logger.exception('')
-            return {'data': {}}, sc.NOT_FOUND_404
+        resp = {'data': [], 'nonexistant': []}
+
+        if pool_type == PoolType.MEMBER:
+            tasks = {eid: create_task(self.pools.get_member(guild, eid, fetch)) for eid in entity_ids}
+        elif pool_type == PoolType.USER:
+            tasks = {eid: create_task(self.pools.get_user(eid, fetch)) for eid in entity_ids}
+        elif pool_type == PoolType.EMOJI:
+            tasks = {eid: create_task(self.pools.get_emoji(guild, eid, fetch)) for eid in entity_ids}
+        elif pool_type == PoolType.GUILD:
+            tasks = {eid: create_task(self.pools.get_guild(user_id, eid, fetch)) for eid in entity_ids}
+        else:
+            raise Exception(f"unknown pool type: {pool_type}")
+
+        for entity_id, task in tasks.items():
+            try:
+                resp['data'].append(await task)
+            except Exception as e:
+                logger.debug(e)
+                resp['nonexistant'].append(entity_id)
+        return resp, sc.OK_200
 
     @fetch_guild
     async def pool_all_request(self, guild, pool_type: str):

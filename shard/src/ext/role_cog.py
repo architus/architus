@@ -1,6 +1,7 @@
 from src.list_embed import ListEmbed
 from discord.ext import commands
 import discord
+from contextlib import suppress
 
 from lib.config import logger
 from src.utils import doc_url
@@ -38,7 +39,8 @@ class Roles(commands.Cog):
             lembed = ListEmbed('Available Roles', '`!role [role]`', self.bot.user)
             for nick, channelid in roles_dict.items():
                 role = discord.utils.get(ctx.guild.roles, id=channelid)
-                lembed.add(nick, role.mention)
+                with suppress(AttributeError):
+                    lembed.add(nick, role.mention)
             await ctx.channel.send(embed=lembed.get_embed())
 
         elif requested_role in roles_dict:

@@ -7,8 +7,8 @@ shortcode_id = re.compile(r"\[ ?<:(\w+):(\d+)> ?\]")
 unicode_react = re.compile(r"\[ ?([^\x00-\x7F]+) ?\]")
 animated = re.compile(r"\[ ?<a:(\w+):(\d+)> ?\]")
 capture = re.compile("\[(\\d+)\]")
-url = re.compile("(https?://[\\w\\.-]{2,})")
-eval_token = re.compile(r"\A\[eval (.*)\]")
+url = re.compile("(https?://[\\w\\.-]{2,})/?")
+eval_token = re.compile(r"\A\[(?:eval|e) (.*)\]")
 
 
 class ParseError(Exception):
