@@ -41,18 +41,7 @@ RUN python3.8 -m pip install wheel
 RUN python3.8 -m pip install --trusted-host pypi.python.org -r requirements.txt
 #RUN apk del libpng-dev jpeg-dev libffi-dev libxml2-dev python3-dev libxslt-dev freetype-dev
 
-WORKDIR /pyre2
-
-# Install custom discord.py library
 WORKDIR /app
-WORKDIR /
-WORKDIR /app
-RUN git clone --branch master https://github.com/architus/discord.py
-WORKDIR ./discord.py
-RUN python3.8 -m pip install -U .[voice]
-
-WORKDIR /app
-
 RUN mkdir -p /etc/cron.d
 RUN touch /var/log/cron.log
 RUN echo "@hourly root python3.8 -m pip install --upgrade youtube-dlc > /var/log/cron.log 2>&1\n# Empty line for syntax" >> /etc/cron.d/youtube-dl_update
