@@ -1,4 +1,4 @@
-FROM rust:1.43
+FROM rust:1.49
 
 WORKDIR /app
 COPY ./record-service/ /app

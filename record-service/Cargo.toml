@@ -7,23 +7,24 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-audiopus = "0.2"
 log = "0.4"
-simple_logger = "1.6.0"
+simple_logger = "1.11.0"
 tempfile = "3.1"
-rand = "0.7"
-tonic = "0.2"
-prost = "0.6"
-tokio = { version = "0.2", features = ["macros"] }
+rand = "0.8"
+tonic = "0.4"
+prost = "0.7"
+tokio = { version = "1.1", features = ["macros", "rt-multi-thread", "sync"] }
 futures = "0.3"
+discortp = "0.2"
 
 [dependencies.serenity]
 default-features = false
-features = ["builder", "cache", "client", "framework", "gateway", "voice", "rustls_backend"]
+features = ["client", "standard_framework", "voice", "rustls_backend", "cache"]
 version = "0.10"
 
 [dependencies.songbird]
 version = "0.1"
+features = ["driver", "serenity", "rustls"]
 
 [build-dependencies]
-tonic-build = "0.2"
+tonic-build = "0.4"

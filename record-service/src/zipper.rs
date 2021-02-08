@@ -1,5 +1,6 @@
 use log::info;
 use std::convert::TryInto;
+use std::fmt;
 use std::fs::File;
 use std::io::{Read, Write};
 use tempfile::{tempdir, TempDir};
@@ -13,7 +14,8 @@ use tokio::runtime::Runtime;
 use tonic::Request;
 
 pub mod manager {
-    include!("/app/src/manager.rs");
+    // include!("/app/src/manager.rs");
+    include!("manager.rs");
 }
 
 const PW_ALPHABET: [char; 62] = [
@@ -35,23 +37,23 @@ pub enum PublishError {
     DirectoryFailure,
 }
 
-impl PublishError {
-    pub fn byte(&self) -> u8 {
-        match self {
-            PublishError::Writing => 0x2,
-            PublishError::Zipping => 0x3,
-            PublishError::TooLarge => 0x4,
-            PublishError::TooManyChannels => 0x5,
-            PublishError::BigByteRate => 0x6,
-            PublishError::Rpc => 0x7,
-            PublishError::Tokio => 0x8,
-            PublishError::DirectoryFailure => 0x9,
+impl fmt::Display for PublishError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            PublishError::Writing => write!(f, "Writing"),
+            PublishError::Zipping => write!(f, "Zipping"),
+            PublishError::TooLarge => write!(f, "Too large"),
+            PublishError::TooManyChannels => write!(f, "Too many channels"),
+            PublishError::BigByteRate => write!(f, "Byte rate would be too large"),
+            PublishError::Rpc => write!(f, "Rpc call failed"),
+            PublishError::Tokio => write!(f, "Tokio failed"),
+            PublishError::DirectoryFailure => write!(f, "Failed to make directory"),
         }
     }
 }
 
 /// This takes care of writing pcm to file, zipping, and sending to cdn.
-pub fn zip(pcm: Vec<Vec<i16>>) -> Result<(String, String), PublishError> {
+pub fn zip(pcm: &Vec<Vec<i16>>) -> Result<(String, String), PublishError> {
     // Get temporary directory to write wav and zip file to.
     let dir = match tempdir() {
         Ok(d) => d,
@@ -86,7 +88,7 @@ pub fn zip(pcm: Vec<Vec<i16>>) -> Result<(String, String), PublishError> {
 
     // Make a tokio runtime to do async stuff and open up a connection
     // to the manager gRPC.
-    let mut rt = match Runtime::new() {
+    let rt = match Runtime::new() {
         Ok(r) => r,
         Err(_) => return Err(PublishError::Tokio),
     };
