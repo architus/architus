@@ -115,5 +115,12 @@ services:
       dockerfile: ./sandbox/Dockerfile
     networks:
       - webnet
+  lavalink:
+      image: johnyburd/lavalink:${TAG:-latest}
+      build:
+        context: ./
+        dockerfile: ./lavalink/Dockerfile
+      networks:
+        - webnet
 networks:
   webnet:
