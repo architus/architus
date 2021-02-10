@@ -113,6 +113,24 @@ class Setting:
         self._update_db()
 
     @property
+    def responses_allow_embeds(self) -> bool:
+        return self._settings_dict.get('responses_allow_embeds', True)
+
+    @responses_allow_embeds.setter
+    def responses_allow_embeds(self, new: bool) -> None:
+        self._settings_dict['responses_allow_embeds'] = bool(new)
+        self._update_db()
+
+    @property
+    def responses_allow_newlines(self) -> bool:
+        return self._settings_dict.get('responses_allow_newlines', False)
+
+    @responses_allow_newlines.setter
+    def responses_allow_newlines(self, new: bool) -> None:
+        self._settings_dict['responses_allow_newlines'] = bool(new)
+        self._update_db()
+
+    @property
     def responses_limit(self) -> int:
         return self._settings_dict['responses_limit'] if 'responses_limit' in self._settings_dict else None
 
@@ -132,7 +150,7 @@ class Setting:
 
     @property
     def responses_response_length(self) -> int:
-        return self._settings_dict.get('responses_response_length', 200)
+        return self._settings_dict.get('responses_response_length', 500)
 
     @responses_response_length.setter
     def responses_response_length(self, new_length: int) -> None:
