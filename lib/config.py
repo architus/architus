@@ -44,7 +44,6 @@ try:
     twitter_access_token_key = os.environ['twitter_access_token_key']
     twitter_access_token_secret = os.environ['twitter_access_token_secret']
     scraper_token = os.environ['scraper_bot_token']
-    spotify_client_secret = os.environ['spotify_client_secret']
 except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 
