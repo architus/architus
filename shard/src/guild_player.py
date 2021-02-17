@@ -2,13 +2,13 @@ import youtube_dlc as youtube_dl
 import functools
 import discord
 from collections import deque
-import src.spotify_tools as spotify_tools
+# import src.spotify_tools as spotify_tools
 import asyncio
 from src.list_embed import ListEmbed as list_embed
 from lib.config import logger
 
 import subprocess
-# spotify_tools = None
+spotify_tools = None
 
 
 class GuildPlayer:

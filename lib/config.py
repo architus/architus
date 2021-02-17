@@ -45,7 +45,7 @@ try:
     twitter_access_token_secret = os.environ['twitter_access_token_secret']
     scraper_token = os.environ['scraper_bot_token']
     twitch_client_id=os.environ['twitch_client_id']
-    twitch_access_token=os.environ['twitch_access_token']
+    twitch_client_secret=os.environ['twitch_client_secret']
 except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 
