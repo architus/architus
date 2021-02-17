@@ -36,7 +36,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        self.responses[guild.id] = await GuildAutoResponses.new(self.bot, guild)
+        self.responses[guild.id] = await GuildAutoResponses.new(self.bot, guild, self.executor)
 
     @commands.Cog.listener()
     async def on_reaction_add(self, react, user):
@@ -93,7 +93,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     @commands.command()
     @bot_commands_only
     @doc_url("https://docs.archit.us/features/auto-responses/#setting-auto-responses")
-    async def set(self, ctx, *args):
+    async def set(self, ctx):
         """set <trigger>::<response>
         Sets an auto response.
         """

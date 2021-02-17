@@ -46,6 +46,7 @@ try:
     scraper_token = os.environ['scraper_bot_token']
     twitch_client_id=os.environ['twitch_client_id']
     twitch_client_secret=os.environ['twitch_client_secret']
+    spotify_client_secret = os.environ['spotify_client_secret']
 except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 

@@ -9,6 +9,7 @@ from jwt.exceptions import InvalidTokenError
 
 from lib.config import which_shard, logger, is_prod, domain_name
 from lib.auth import JWT, gateway_authenticated as authenticated
+from lib.ipc import manager_pb2_grpc
 from lib.ipc.grpc_client import get_async_client
 from lib.ipc.async_rpc_client import shardRPC
 from lib.ipc.async_subscriber import Subscriber
@@ -16,7 +17,7 @@ from lib.ipc.async_rpc_server import start_server
 from lib.status_codes import StatusCodes as s
 from lib.pool_types import PoolType
 
-from src.pools import guild_pool_response
+from src.pools import guild_pool_response, pool_response
 
 
 sio = socketio.AsyncServer(
@@ -29,7 +30,7 @@ sio.attach(app)
 loop = asyncio.get_event_loop()
 shard_client = shardRPC(loop)
 event_subscriber = Subscriber(loop)
-manager_client = get_async_client('manager:50051')
+manager_client = get_async_client('manager:50051', manager_pb2_grpc.ManagerStub)
 
 auth_nonces = {}
 
@@ -98,52 +99,13 @@ class CustomNamespace(socketio.AsyncNamespace):
 
     @authenticated(shard_client)
     async def on_pool_request(self, sid: str, data, jwt):
+        logger.debug(f"pool request for {jwt.id}")
         _id = data['_id']
+        payload = {'_id': _id, 'nonexistant': [], 'finished': False}
+        error = partial(self.error, _id=_id, room=sid)
+        response = partial(sio.emit, 'pool_response', room=f'{sid}_auth')
         guild_id = data.get('guildId', None)
-        type = data['type']
-        return_data = []
-        not_cached = []
-        for entity in data['ids']:
-            resp, sc = await shard_client.pool_request(
-                guild_id, type, entity, routing_key=f"shard_rpc_{which_shard(guild_id)}")
-            if resp['data']:
-                return_data.append(resp['data'])
-            else:
-                not_cached.append(entity)
-
-        finished = len(not_cached) == 0
-        if len(return_data) > 0:
-            await sio.emit(
-                'pool_response',
-                {
-                    '_id': _id,
-                    'finished': finished,
-                    'nonexistant': [],
-                    'data': return_data,
-                },
-                room=f"{sid}_auth"
-            )
-            if finished:
-                return
-        return_data = []
-        nonexistant = []
-        for entity in not_cached:
-            resp, sc = await shard_client.pool_request(
-                guild_id, type, entity, fetch=True, routing_key=f"shard_rpc_{which_shard(guild_id)}")
-            if resp['data']:
-                return_data.append(resp['data'])
-            else:
-                nonexistant.append(entity)
-        await sio.emit(
-            'pool_response',
-            {
-                '_id': _id,
-                'finished': True,
-                'nonexistant': nonexistant,
-                'data': return_data,
-            },
-            room=f"{sid}_auth"
-        )
+        await pool_response(shard_client, guild_id, data['type'], data['ids'], response, error, payload, jwt)
 
     @authenticated(shard_client)
     async def on_pool_all_request(self, sid: str, data, jwt):

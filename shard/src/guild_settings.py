@@ -4,7 +4,7 @@ from lib.config import FAKE_GUILD_IDS
 from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog
 import discord
-from typing import List
+from typing import List, Optional
 
 RYTHMS_ID = 235088799074484224
 
@@ -37,12 +37,31 @@ class Setting:
         self._update_db()
 
     @property
+<<<<<<< HEAD
     def twitch_channel_id(self) -> int:
         return self._settings_dict.get('twitch_channel_id', None)
 
     @twitch_channel_id.setter
     def twitch_channel_id(self, new_twitch_channel_id: int):
         self._settings_dict['twitch_channel_id'] = new_twitch_channel_id
+=======
+    def music_role(self) -> Optional[discord.Role]:
+        role_id = self._settings_dict.get('music_role_id', None)
+        return self.guild.get_role(role_id)
+
+    @music_role.setter
+    def music_role(self, new_music_role: discord.Role):
+        self._settings_dict['music_role_id'] = new_music_role.id
+        self._update_db()
+
+    @property
+    def music_volume(self) -> float:
+        return self._settings_dict.get('music_volume', 0.30)
+
+    @music_volume.setter
+    def music_volume(self, new_music_volume):
+        self._settings_dict['music_volume'] = new_music_volume
+>>>>>>> upstream/develop
         self._update_db()
 
     @property
@@ -103,6 +122,24 @@ class Setting:
         self._update_db()
 
     @property
+    def responses_allow_embeds(self) -> bool:
+        return self._settings_dict.get('responses_allow_embeds', True)
+
+    @responses_allow_embeds.setter
+    def responses_allow_embeds(self, new: bool) -> None:
+        self._settings_dict['responses_allow_embeds'] = bool(new)
+        self._update_db()
+
+    @property
+    def responses_allow_newlines(self) -> bool:
+        return self._settings_dict.get('responses_allow_newlines', False)
+
+    @responses_allow_newlines.setter
+    def responses_allow_newlines(self, new: bool) -> None:
+        self._settings_dict['responses_allow_newlines'] = bool(new)
+        self._update_db()
+
+    @property
     def responses_limit(self) -> int:
         return self._settings_dict['responses_limit'] if 'responses_limit' in self._settings_dict else None
 
@@ -122,7 +159,7 @@ class Setting:
 
     @property
     def responses_response_length(self) -> int:
-        return self._settings_dict.get('responses_response_length', 200)
+        return self._settings_dict.get('responses_response_length', 500)
 
     @responses_response_length.setter
     def responses_response_length(self, new_length: int) -> None:
