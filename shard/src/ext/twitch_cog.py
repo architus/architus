@@ -109,7 +109,7 @@ class Twitch(commands.Cog, name="Twitch Notification"):
         em.set_thumbnail(url="https://cdn.discordapp.com/attachments/715687026195824771/775244694066167818/unknown.png")
 
         streams = await self.twitch_stream.select_by_guild(ctx.guild.id)
-        if streams is None:
+        if len(streams) == 0:
             await ctx.send("Not subscribed to any streams.")
             return
         user_info = await self.get_users([str(row["stream_user_id"]) for row in streams])
@@ -128,6 +128,7 @@ class Twitch(commands.Cog, name="Twitch Notification"):
     async def update(self, stream):
         rows = await self.twitch_stream.select_distinct_by_stream_id(int(stream['user_id']))
         guilds = {self.bot.get_guild(r['guild_id']) for r in rows}
+        users = await self.get_users(int(stream['user_id']))
         for guild in guilds:
             if guild is None:
                 continue
@@ -136,7 +137,7 @@ class Twitch(commands.Cog, name="Twitch Notification"):
             
             if channel is not None:
                 game = await self.get_game(stream["game_id"])
-                await channel.send(embed=self.embed_helper(stream, game))
+                await channel.send(embed=self.embed_helper(stream, game, users[0]))
                 logger.debug(stream["type"])
 
     async def get_users(self, stream_user_ids):
@@ -162,10 +163,10 @@ class Twitch(commands.Cog, name="Twitch Notification"):
                 games = await resp.json()
         return games["data"][0]
 
-    def embed_helper(self, stream, game):
+    def embed_helper(self, stream, game, user):
         timestamp = datetime.fromisoformat(stream["started_at"][:-1])
         em = discord.Embed(title=stream["title"], url=f"https://twitch.tv/{stream['user_name']}", description=f"{stream['user_name']} is playing {game['name']}!", colour=0x6441A4, timestamp=timestamp)
-        em.set_author(name=stream["user_name"], icon_url=stream["thumbnail_url"])
+        em.set_author(name=stream["user_name"], icon_url=user["profile_image_url"])
         em.set_thumbnail(url=game["box_art_url"].format(width=130, height=180))
 
         return em
