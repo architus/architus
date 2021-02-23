@@ -147,6 +147,9 @@ class LavaMusic(commands.Cog):
             track = results['tracks'][0]
             embed.title = 'Tracks enqueued'
             embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
+            if "youtube" in track.uri:
+                yt_id = track.uri.split("=")[1]
+                embed.set_thumbnail(url=f"http://img.youtube.com/vi/{yt_id}/1.jpg")
 
             track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
             player.add(requester=ctx.author.id, track=track)
