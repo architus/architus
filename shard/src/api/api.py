@@ -73,8 +73,18 @@ class Api(Cog):
 
     @fetch_guild
     async def get_playlist(self, guild):
-        voice = self.bot.cogs['Voice'].voice_managers[guild.id]
-        return voice.q.as_dict(), sc.OK_200
+        voice = self.bot.lavalink.player_manager.get(guild)
+        if voice is None:
+            return {}, sc.OK_200
+        else:
+            songs = []
+            for s in voice.queue:
+                songs.append({'title': s.title, 'author': s.author, 'duration': s.duration, 'uri': s.uri})
+            return {'songs': songs}, sc.OK_200
+
+    @fetch_guild
+    async def queue_song(self, guild, song):
+        voice = self.bot.lavalink.player_manager.get(guild)
 
     async def users_guilds(self, user_id):
         users_guilds = []

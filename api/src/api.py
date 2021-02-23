@@ -168,8 +168,8 @@ class Music(CustomResource):
 
     @reqparams(song=str)
     @authenticated()
-    def post(self, guild_id: int, jwt: JWT):
-        return self.shard.queue_song(guild_id, jwt.id, routing_guild=guild_id)
+    def post(self, guild_id: int, song: str, jwt: JWT):
+        return self.shard.queue_song(guild_id, jwt.id, song, routing_guild=guild_id)
 
 
 class Emoji(CustomResource):
