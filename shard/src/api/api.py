@@ -1,6 +1,7 @@
 import secrets
 from typing import List
 from asyncio import create_task
+import re
 
 from discord.ext.commands import Cog, Context
 import discord
@@ -14,6 +15,8 @@ from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 from lib.ipc import manager_pb2 as message
 from src.utils import guild_to_dict
+
+url_rx = re.compile(r'https?://(?:www\.)?.+')
 
 
 class Api(Cog):
@@ -83,8 +86,38 @@ class Api(Cog):
             return {'songs': songs}, sc.OK_200
 
     @fetch_guild
-    async def queue_song(self, guild, song):
+    async def queue_song(self, guild, uid, song):
         voice = self.bot.lavalink.player_manager.get(guild)
+
+        song = song.strip('<>')
+        if not url_rx.match(song):
+            song = f'ytsearch:{song}'
+
+        results = await voice.node..get_tracks(song)
+
+        if not results or not results['tracks']:
+            return [], sc.BAD_REQUEST_400
+
+        songs = []
+        if results['loadType'] == 'PLAYLIST_LOADED':
+            tracks = results['tracks']
+
+            for track in tracks:
+                player.add(requester=uid, track=track)
+                songs.append({'title': track.title, 'author': track.author, 'duration': track.duration, 'uri': track.uri})
+        else:
+            track = results['tracks'][0]
+
+            track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
+            player.add(requester=ctx.author.id, track=track)
+            songs.append({'title': track.title, 'author': track.author, 'duration': track.duration, 'uri': track.uri})
+
+        await ctx.send(embed=embed)
+
+        if not player.is_playing:
+            await player.play()
+
+        return {'songs': songs}, sc.OK_200
 
     async def users_guilds(self, user_id):
         users_guilds = []

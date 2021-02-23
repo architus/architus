@@ -1,11 +1,11 @@
-from lib.config import client_id
-
 import re
 import discord
 import lavalink
 from discord.ext import commands
+from src.utils import format_seconds
 
 url_rx = re.compile(r'https?://(?:www\.)?.+')
+
 
 class LavaMusic(commands.Cog):
     def __init__(self, bot):
@@ -18,7 +18,6 @@ class LavaMusic(commands.Cog):
             self.bot.lavalink.add_node('lavalink', 2333, 'merryandpippinarecute', 'us' 'arch music')
             self.bot.add_listener(self.bot.lavalink.voice_update_handler, 'on_socket_response')
             lavalink.add_event_hook(self.track_hook)
-
 
     def cog_unload(self):
         self.bot.lavalink._event_hooks.clear()
@@ -57,13 +56,13 @@ class LavaMusic(commands.Cog):
         if isinstance(event, lavalink.events.QueueEndEvent):
             guild_id = int(event.player.guild_id)
             guild = self.got.get_build(guild_id)
-            await guilds.change_voice_state(channel=None)
+            await guild.change_voice_state(channel=None)
 
     @commands.command()
     async def skip(self, ctx):
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         await player.skip()
-    
+
     def queue_embed(self, p, q):
         songs = "\n".join(f"**{i+1:>2}.** *{song.title}*" for i, song in enumerate(q[:10]))
         if len(q) > 10:
@@ -72,7 +71,7 @@ class LavaMusic(commands.Cog):
             hour = p.current.duration > 3600
             title = p.current.title
             url = p.current.uri
-            name = f"Now Playing ({format_seconds(p.position, long)}/{format_seconds(p.current.position, long)}):"
+            name = f"Now Playing ({format_seconds(p.position, hour)}/{format_seconds(p.current.position, hour)}):"
         else:
             title = "no songs queued"
             url = None
@@ -173,6 +172,7 @@ class LavaMusic(commands.Cog):
         await player.stop()
         await ctx.guild.change_voice_state(channel=None)
         await ctx.send('*⃣ | Disconnected.')
+
 
 def setup(bot):
     bot.add_cog(LavaMusic(bot))

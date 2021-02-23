@@ -12,29 +12,6 @@ from lib.config import logger
 from lib.ipc import manager_pb2 as message
 
 
-class TCPLock:
-    """
-    A basic thread safe TCP socket.
-    """
-    def __init__(self, s):
-        self.connection = s
-        self.lock = Lock()
-
-    def write(self, b):
-        self.lock.acquire()
-        self.connection.send(b)
-        self.lock.release()
-
-    def send(self, b):
-        self.write(b)
-
-    def recv(self, num_bytes):
-        self.lock.acquire()
-        msg = self.connection.recv(num_bytes)
-        self.lock.release()
-        return msg
-
-
 async def download_emoji(emoji: discord.Emoji) -> io.BytesIO:
     async with ClientSession() as session:
         async with session.get(str(emoji.url)) as resp:
