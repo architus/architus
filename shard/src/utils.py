@@ -3,7 +3,6 @@ from pytz import timezone
 from aiohttp import ClientSession
 import io
 import functools
-from threading import Lock
 from string import digits
 
 import discord

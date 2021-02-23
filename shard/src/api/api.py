@@ -93,7 +93,7 @@ class Api(Cog):
         if not url_rx.match(song):
             song = f'ytsearch:{song}'
 
-        results = await voice.node..get_tracks(song)
+        results = await voice.node.get_tracks(song)
 
         if not results or not results['tracks']:
             return [], sc.BAD_REQUEST_400
@@ -104,7 +104,8 @@ class Api(Cog):
 
             for track in tracks:
                 player.add(requester=uid, track=track)
-                songs.append({'title': track.title, 'author': track.author, 'duration': track.duration, 'uri': track.uri})
+                songs.append({'title': track.title, 'author': track.author,
+                              'duration': track.duration, 'uri': track.uri})
         else:
             track = results['tracks'][0]
 
