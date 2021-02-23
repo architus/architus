@@ -5,6 +5,7 @@ import re
 
 from discord.ext.commands import Cog, Context
 import discord
+import lavalink
 
 from lib.status_codes import StatusCodes as sc
 from lib.pool_types import PoolType
@@ -103,20 +104,18 @@ class Api(Cog):
             tracks = results['tracks']
 
             for track in tracks:
-                player.add(requester=uid, track=track)
+                voice.add(requester=uid, track=track)
                 songs.append({'title': track.title, 'author': track.author,
                               'duration': track.duration, 'uri': track.uri})
         else:
             track = results['tracks'][0]
 
-            track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
-            player.add(requester=ctx.author.id, track=track)
+            track = lavalink.models.AudioTrack(track, uid, recommended=True)
+            voice.add(requester=uid, track=track)
             songs.append({'title': track.title, 'author': track.author, 'duration': track.duration, 'uri': track.uri})
 
-        await ctx.send(embed=embed)
-
-        if not player.is_playing:
-            await player.play()
+        if not voice.is_playing:
+            await voice.play()
 
         return {'songs': songs}, sc.OK_200
 
