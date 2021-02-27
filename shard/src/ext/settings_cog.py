@@ -29,6 +29,7 @@ RULER = u"\U0001F4CF"
 TRIAGULAR_RULER = u"\U0001F4D0"
 COLLISION = u"\U0001F4A5"
 CROSS_MARK = u"\U0000274C"
+MOVIE = u"\U0001F3AC"
 CONTROL_KNOBS = u"\U0001F39B"
 SPEAKER = u"\U0001F50A"
 BOOKMARK = u"\U0001F4D1"
@@ -519,6 +520,25 @@ class ResponsesOnlyAuthorRemove(SettingsElement):
             'responses_only_author_remove',
             tags=['responses'])
 
+class TwitchChannel(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Twitch Updates",
+            MOVIE,
+            "The channel to which Twitch stream updates will be sent. Enter a channel mention.",
+            'twitch_channel_id')
+
+    async def formatted_value(self, bot, ctx, settings):
+        channel = ctx.guild.get_channel(settings.twitch_channel_id)
+        print(channel)
+        return channel.mention if channel else None
+
+    async def parse(self, ctx, msg, settings):
+        try:
+            channel = msg.channel_mentions[0]
+        except IndexError:
+            raise ValueError
+        return channel.id
 
 class Settings(Cog):
     '''

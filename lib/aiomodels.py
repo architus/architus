@@ -101,3 +101,29 @@ class TbEmojis(Base):
         async with (await self.pool()).acquire() as conn:
             return await conn.fetch(
                 f'SELECT * FROM {self.__class__.__tablename__} WHERE guild_id = $1 ORDER BY priority', guild_id)
+
+class TwitchStream(Base):
+    __tablename__ = 'tb_twitch_subs'
+
+    async def select_distinct_by_stream_id(self, stream_user_id):
+        async with (await self.pool()).acquire() as conn:
+            return await conn.fetch(f'SELECT DISTINCT * FROM {self.__class__.__tablename__} WHERE stream_user_id = $1', stream_user_id)
+    
+    async def select_distinct_stream_id(self):
+        async with (await self.pool()).acquire() as conn:
+            return await conn.fetch(f'SELECT DISTINCT stream_user_id FROM {self.__class__.__tablename__}')
+    
+    async def delete_by_stream_id(self, stream_user_id, guild_id):
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(f'DELETE FROM {self.__class__.__tablename__} WHERE stream_user_id = $1 AND guild_id = $2', stream_user_id, guild_id)
+
+
+class Tokens(Base):
+    __tablename__ = 'tb_tokens'
+
+    async def update_tokens(self, client_id, client_token, expires_at):
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(f'INSERT INTO {self.__class__.__tablename__} (client_id, client_token, expires_at) VALUES ($1, $2, $3) ON CONFLICT (client_id)\
+                                     DO UPDATE SET client_token = excluded.client_token, expires_at = excluded.expires_at', client_id, client_token, expires_at)

@@ -37,6 +37,14 @@ class Setting:
         self._update_db()
 
     @property
+    def twitch_channel_id(self) -> int:
+        return self._settings_dict.get('twitch_channel_id', None)
+
+    @twitch_channel_id.setter
+    def twitch_channel_id(self, new_twitch_channel_id: int):
+        self._settings_dict['twitch_channel_id'] = new_twitch_channel_id
+
+    @property
     def music_role(self) -> Optional[discord.Role]:
         role_id = self._settings_dict.get('music_role_id', None)
         return self.guild.get_role(role_id)
