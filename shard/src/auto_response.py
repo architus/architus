@@ -246,7 +246,7 @@ class AutoResponse:
 
         limit = min(self.settings.responses_response_length, 2000)
         if len(content) > limit:
-            content = f"*content of response was over{' discord' if limit > 2000 else ''} character limit ({limit})*"
+            content = f"*content of response was over{' discord' if limit >= 2000 else ''} character limit ({limit})*"
 
         if content.strip() != "":
             resp_msg = await msg.channel.send(content, allowed_mentions=AllowedMentions(everyone=False))
