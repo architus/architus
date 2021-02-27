@@ -26,31 +26,39 @@ class LavaMusic(commands.Cog):
         guild_check = ctx.guild is not None
 
         if guild_check:
-            await self.ensure_voice(ctx)
+            await self.ensure_voice(ctx.author, ctx.guild, ctx.command.name in ('p', 'play'))
 
         return guild_check
 
-    async def ensure_voice(self, ctx):
-        player = self.bot.lavalink.player_manager.create(ctx.guild.id, endpoint=str(ctx.guild.region))
+    async def ensure_voice(self, user, guild, should_connect: bool):
+        settings = self.bot.settings[guild]
+        vol = settings.music_volume
+        vol *= 1000
 
-        should_connect = ctx.command.name in ('p', 'play')
-        if not ctx.author.voice or not ctx.author.voice.channel:
+        if not settings.music_enabled:
+            raise commands.CommandInvokeError('playing music is not enabled on this server')
+
+        if settings.music_role and settings.music_role not in user.roles \
+                and user.id not in settings.admin_ids:
+                    raise commands.CommandInvokeError('must be part of the music role')
+
+        if not user.voice or not user.voice.channel:
             raise commands.CommandInvokeError('need to be in a voice channel to play a song')
 
-        if not player.is_connected:
+        player = self.bot.lavalink.player_manager.create(ctx.guild.id, endpoint=str(guild.region))
+        player.set_volume(vol)
+        if not player.isconnected:
             if not should_connect:
-                raise commands.CommandInvokeError('not connected')
+                raise commands.CommandInvokeError('architus needs to be connected to a voice channel')
 
-            permissions = ctx.author.voice.channel.permissions_for(ctx.me)
-
+            permissions = author.voice.channel.permissions_for(guild.me)
             if not permissions.connect or not permissions.speak:
                 raise commands.CommandInvokeError('architus needs connect and speak permissions')
 
-            player.store('channel', ctx.channel.id)
-            await ctx.guild.change_voice_state(channel=ctx.author.voice.channel)
+            await guild.change_voice_state(channel=user.voice.channel)
         else:
             if int(player.channel_id) != ctx.author.voice.channel.id:
-                raise commands.CommandInvokeError('need to be in my voice channel')
+                raise commands.CommandInvokeError('need to be in the same voice channel first')
 
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.QueueEndEvent):

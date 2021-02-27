@@ -160,3 +160,27 @@ def format_seconds(s: int, hours: bool = False):
         return '{}:{:02}:{:02}'.format(int(hours), int(minutes), int(seconds))
     minutes, seconds = divmod(s, 60)
     return '{}:{:02}'.format(int(minutes), int(seconds))
+
+class Seconds:
+    """
+    Represents a song that can be sent via the api.
+    """
+    def __init__(self, track):
+        self.title = track.title
+        self.author = track.author
+        self.duration = track.duration
+        self.uri = track.uri
+        self.identifier = track.identifier if 'youtube' in self.uri else None
+        if self.identifier is not None:
+            self.thumbnail = f'http://img.youtube.com/vi/{self.identifier}/1.jpg'
+        else:
+            self.thumbnail = None
+    
+    def as_dict(self):
+        return {'title': self.title,
+                'author': self.author,
+                'duration': self.duration,
+                'uri': self.uri,
+                'identifier': self.identifier,
+                'thumbnail': self.thumbnail
+                }
