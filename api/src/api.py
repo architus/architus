@@ -7,7 +7,7 @@ from flask_cors import CORS
 from werkzeug.wsgi import FileWrapper
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod, which_shard
+from lib.config import logger, client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod, which_shard
 # from lib.models import Log # , Emojis
 from lib.auth import JWT, flask_authenticated as authenticated
 from lib.discord_requests import list_guilds_request
@@ -202,10 +202,11 @@ class ListGuilds(CustomResource):
             resp, _ = self.shard.tag_autbot_guilds(resp, jwt.id)
         return resp, status_code
 
+
 class Twitch(CustomResource):
     def get(self):
         challenge = request.args.get("hub.challenge")
-        return make_response(challenge, StatusCodes.OK_200)        
+        return make_response(challenge, StatusCodes.OK_200)
 
     def post(self):
         print(request.json['data'])
@@ -213,12 +214,16 @@ class Twitch(CustomResource):
             return StatusCodes.BAD_REQUEST_400
         for stream in request.json['data']:
             user_id = stream["user_id"]
-            result = self.session.execute('''SELECT guild_id FROM tb_twitch_subs WHERE stream_user_id = :stream_user_id''', {'stream_user_id': int(user_id)}).fetchall()
+            result = self.session.execute(
+                '''SELECT guild_id FROM tb_twitch_subs WHERE stream_user_id = :stream_user_id''',
+                {'stream_user_id': int(user_id)}).fetchall()
             ids = {which_shard(row['guild_id']) for row in result}
 
             for shard_id in ids:
-                self.shard.client.call('twitch_update', stream, routing_key=f'shard_rpc_{shard_id}')
-
+                try:
+                    self.shard.client.call('twitch_update', stream, routing_key=f'shard_rpc_{shard_id}')
+                except Exception:
+                    logger.exception(f"Error forwarding twitch update to shard {shard_id}")
 
 
 @app.route('/status')
@@ -245,7 +250,7 @@ def app_factory():
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")
     api.add_resource(GuildCounter, "/guild-count")
-    api.add_resource(Invite, "/invite/<int:guild_id>") 
+    api.add_resource(Invite, "/invite/<int:guild_id>")
     api.add_resource(Twitch, "/twitch")
     if not is_prod:
         api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
