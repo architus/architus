@@ -2,6 +2,7 @@ import secrets
 from typing import List
 from asyncio import create_task
 import re
+from operator import methodcaller
 
 from discord.ext.commands import Cog, Context
 import discord
@@ -15,7 +16,7 @@ from src.api.util import fetch_guild
 from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 from lib.ipc import manager_pb2 as message
-from src.utils import guild_to_dict
+from src.utils import guild_to_dict, LavaSong
 
 url_rx = re.compile(r'https?://(?:www\.)?.+')
 
@@ -81,43 +82,32 @@ class Api(Cog):
         if voice is None:
             return {}, sc.OK_200
         else:
-            songs = []
-            for s in voice.queue:
-                songs.append({'title': s.title, 'author': s.author, 'duration': s.duration, 'uri': s.uri})
-            return {'songs': songs}, sc.OK_200
+            songs = map(LavaSong, voice.queue)
+            dicts = list(map(methodcaller('as_dict'), songs))
+            return {'songs': dicts}, sc.OK_200
 
     @fetch_guild
-    async def queue_song(self, guild, uid, song):
-        voice = self.bot.lavalink.player_manager.get(guild)
+    async def queue_song(self, guild_id, uid, song):
+        lava_cog = self.bot.cogs['Voice']
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            return {}, sc.BAD_REQUEST_400
+        user = guild.get_user(uid)
+        if user is None:
+            return {}, sc.BAD_REQUEST_400
 
-        song = song.strip('<>')
-        if not url_rx.match(song):
-            song = f'ytsearch:{song}'
+        try:
+            lava_cog.ensure_voice(user, guild, True)
+        except discord.CommandInvokeError:
+            return {}, sc.UNAUTHORIZED_401
 
-        results = await voice.node.get_tracks(song)
-
-        if not results or not results['tracks']:
-            return [], sc.BAD_REQUEST_400
-
-        songs = []
-        if results['loadType'] == 'PLAYLIST_LOADED':
-            tracks = results['tracks']
-
-            for track in tracks:
-                voice.add(requester=uid, track=track)
-                songs.append({'title': track.title, 'author': track.author,
-                              'duration': track.duration, 'uri': track.uri})
+        added_songs = lava_cog.enqueue(song, user, guild)
+        if added_songs == []:
+            return {}, sc.NOT_FOUND_404
+        elif added_songs[0] == 'playlist':
+            return {'playlist': added_songs}, sc.OK_200
         else:
-            track = results['tracks'][0]
-
-            track = lavalink.models.AudioTrack(track, uid, recommended=True)
-            voice.add(requester=uid, track=track)
-            songs.append({'title': track.title, 'author': track.author, 'duration': track.duration, 'uri': track.uri})
-
-        if not voice.is_playing:
-            await voice.play()
-
-        return {'songs': songs}, sc.OK_200
+            return {'song': LavaSong(added_songs[1]).as_dict()}, sc.OK_200
 
     async def users_guilds(self, user_id):
         users_guilds = []

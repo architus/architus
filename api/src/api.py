@@ -167,7 +167,7 @@ class Music(CustomResource):
         return camelcase_keys(resp), sc
 
     @reqparams(song=str)
-    @authenticated()
+    @authenticated(member=True)
     def post(self, guild_id: int, song: str, jwt: JWT):
         return self.shard.queue_song(guild_id, jwt.id, song, routing_guild=guild_id)
 

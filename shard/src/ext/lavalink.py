@@ -7,7 +7,7 @@ from src.utils import format_seconds
 url_rx = re.compile(r'https?://(?:www\.)?.+')
 
 
-class LavaMusic(commands.Cog):
+class LavaMusic(commands.Cog, name="Voice"):
     def __init__(self, bot):
         self.bot = bot
 
@@ -128,45 +128,65 @@ class LavaMusic(commands.Cog):
             p.shuffle = True
             await ctx.send("Shuffle is **on**")
 
-    @commands.command(aliases=['p'])
-    async def play(self, ctx, *, query: str):
-        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+    async def enqueue(self, query, user, guild):
+        """
+        Takes in the query, the user that asked, and which guild and returns a list of the
+        songs that were added to the queue.
+        """
+        player = self.bot.lavalink.player_manager.get(guild.id)
         query = query.strip('<>')
 
         if not url_rx.match(query):
-            query = f'ytsearch:{query}'
+            query = f'tysearch:{query}'
 
         results = await player.node.get_tracks(query)
 
         if not results or not results['tracks']:
-            return await ctx.send('no tracks found')
+            # Return that nothing was found
+            return []
 
-        embed = discord.Embed(color=discord.Color.blurple())
         if results['loadType'] == 'PLAYLIST_LOADED':
             tracks = results['tracks']
 
             for track in tracks:
-                player.add(requester=ctx.author.id, track=track)
+                player.add(requester=user.id, track=track)
 
-            embed.title = 'Playlist Enqueued'
-            embed.description = f'{results["playlistInfo"]["name"]} - {len(tracks)} tracks'
+            if not player.is_playing:
+                await player.play()
+
+            return ['playlist', results['playlistInfo']['name'], len(tracks)]
         else:
-            track = results['tracks'][0]
+            song = results['tracks'][0]
+            track = lavalink.models.AudioTrack(song, user.id, recommended=True)
+            player.add(requester=user.id, track=track)
+
+            if not player.is_playing:
+                await player.play()
+
+            return ['song', song]
+
+    @commands.command(aliases=['p'])
+    async def play(self, ctx, *, query: str):
+        songs = self.enqueue(query, ctx.author, ctx.guild)
+
+        if len(songs) == 0:
+            return await ctx.send('no tracks found')
+
+        embed = discord.Embed(color=discord.Color.blurple())
+        if songs[0] == 'playlist':
+            embed.title = 'Playlist Enqueued'
+            embed.description = f'{songs[1]} - {songs[2]} tracks'
+        else:
+            track = songs[1]
             embed.title = 'Tracks enqueued'
             embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
             if "youtube" in track.uri:
                 yt_id = track.uri.split("=")[1]
                 embed.set_thumbnail(url=f"http://img.youtube.com/vi/{yt_id}/1.jpg")
 
-            track = lavalink.models.AudioTrack(track, ctx.author.id, recommended=True)
-            player.add(requester=ctx.author.id, track=track)
-
         await ctx.send(embed=embed)
 
-        if not player.is_playing:
-            await player.play()
-
-    @commands.command(aliases=['dcv'])
+    @commands.command(aliases=['dc'])
     async def stop_music(self, ctx):
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
 

@@ -161,7 +161,7 @@ def format_seconds(s: int, hours: bool = False):
     minutes, seconds = divmod(s, 60)
     return '{}:{:02}'.format(int(minutes), int(seconds))
 
-class Seconds:
+class LavaSong:
     """
     Represents a song that can be sent via the api.
     """
