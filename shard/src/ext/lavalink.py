@@ -40,24 +40,24 @@ class LavaMusic(commands.Cog, name="Voice"):
 
         if settings.music_role and settings.music_role not in user.roles \
                 and user.id not in settings.admin_ids:
-                    raise commands.CommandInvokeError('must be part of the music role')
+            raise commands.CommandInvokeError('must be part of the music role')
 
         if not user.voice or not user.voice.channel:
             raise commands.CommandInvokeError('need to be in a voice channel to play a song')
 
-        player = self.bot.lavalink.player_manager.create(ctx.guild.id, endpoint=str(guild.region))
+        player = self.bot.lavalink.player_manager.create(guild.id, endpoint=str(guild.region))
         player.set_volume(vol)
         if not player.isconnected:
             if not should_connect:
                 raise commands.CommandInvokeError('architus needs to be connected to a voice channel')
 
-            permissions = author.voice.channel.permissions_for(guild.me)
+            permissions = user.voice.channel.permissions_for(guild.me)
             if not permissions.connect or not permissions.speak:
                 raise commands.CommandInvokeError('architus needs connect and speak permissions')
 
             await guild.change_voice_state(channel=user.voice.channel)
         else:
-            if int(player.channel_id) != ctx.author.voice.channel.id:
+            if int(player.channel_id) != user.voice.channel.id:
                 raise commands.CommandInvokeError('need to be in the same voice channel first')
 
     async def track_hook(self, event):

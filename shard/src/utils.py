@@ -161,6 +161,7 @@ def format_seconds(s: int, hours: bool = False):
     minutes, seconds = divmod(s, 60)
     return '{}:{:02}'.format(int(minutes), int(seconds))
 
+
 class LavaSong:
     """
     Represents a song that can be sent via the api.
@@ -175,7 +176,7 @@ class LavaSong:
             self.thumbnail = f'http://img.youtube.com/vi/{self.identifier}/1.jpg'
         else:
             self.thumbnail = None
-    
+
     def as_dict(self):
         return {'title': self.title,
                 'author': self.author,

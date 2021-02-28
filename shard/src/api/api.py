@@ -6,7 +6,6 @@ from operator import methodcaller
 
 from discord.ext.commands import Cog, Context
 import discord
-import lavalink
 
 from lib.status_codes import StatusCodes as sc
 from lib.pool_types import PoolType
