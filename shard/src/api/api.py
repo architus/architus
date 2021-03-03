@@ -2,7 +2,6 @@ import secrets
 from typing import List
 from asyncio import create_task
 import re
-from operator import methodcaller
 
 from discord.ext.commands import Cog, Context
 import discord
@@ -81,7 +80,7 @@ class Api(Cog):
         if voice is None:
             return {}, sc.OK_200
         else:
-            dicts = [s.as_dict() for s in [Lavasong(s) for s in voice.queue]]
+            dicts = [s.as_dict() for s in [LavaSong(s) for s in voice.queue]]
             return {'songs': dicts}, sc.OK_200
 
     @fetch_guild
