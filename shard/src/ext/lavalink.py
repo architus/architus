@@ -2,7 +2,7 @@ import re
 import discord
 import lavalink
 from discord.ext import commands
-from src.utils import format_seconds
+from src.utils import format_seconds, doc_url
 
 url_rx = re.compile(r'https?://(?:www\.)?.+')
 
@@ -71,6 +71,7 @@ class LavaMusic(commands.Cog, name="Voice"):
             await guild.change_voice_state(channel=None)
 
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/music/#skip")
     async def skip(self, ctx):
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         await player.skip()
@@ -93,16 +94,19 @@ class LavaMusic(commands.Cog, name="Voice"):
         return em
 
     @commands.group(aliases=['q'])
+    @doc_url("https://docs.archit.us/commands/#queue")
     async def queue(self, ctx):
         if ctx.invoked_subcommand is None:
             p = self.bot.lavalink.player_manager.get(ctx.guild.id)
             await ctx.send(self.queue_embed(p, p.queue))
 
     @queue.command(aliases=['a'])
+    @doc_url("https://docs.archit.us/commands/#queue")
     async def add(self, ctx, *query):
         await self.play(ctx, query=query)
 
     @queue.command(aliases=['remove', 'r'])
+    @doc_url("https://docs.archit.us/commands/#queue")
     async def rm(self, ctx, index: int):
         '''queue rm <index>'''
         q = self.bot.lavalink.player_manager.get(ctx.guild.id).queue
@@ -116,6 +120,7 @@ class LavaMusic(commands.Cog, name="Voice"):
             await ctx.send(f"removed *{song.title}*")
 
     @queue.command()
+    @doc_url("https://docs.archit.us/commands/music/#clear")
     async def clear(self, ctx):
         manager = self.bot.lavalink.player_manager.get(ctx.guild.id)
         q = manager.queue
@@ -170,6 +175,7 @@ class LavaMusic(commands.Cog, name="Voice"):
             return ['song', song]
 
     @commands.command(aliases=['p'])
+    @doc_url("https://docs.archit.us/commands/music/#play")
     async def play(self, ctx, *, query: str):
         songs = self.enqueue(query, ctx.author, ctx.guild)
 
