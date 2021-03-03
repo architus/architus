@@ -81,17 +81,15 @@ class Api(Cog):
         if voice is None:
             return {}, sc.OK_200
         else:
-            songs = map(LavaSong, voice.queue)
-            dicts = list(map(methodcaller('as_dict'), songs))
+            dicts = [s.as_dict() for s in [Lavasong(s) for s in voice.queue]]
             return {'songs': dicts}, sc.OK_200
 
     @fetch_guild
-    async def queue_song(self, guild_id, uid, song):
+    async def queue_song(self, guild, uid, song):
         lava_cog = self.bot.cogs['Voice']
-        guild = self.bot.get_guild(guild_id)
         if guild is None:
             return {}, sc.BAD_REQUEST_400
-        user = guild.get_user(uid)
+        user = guild.get_member(uid)
         if user is None:
             return {}, sc.BAD_REQUEST_400
 

@@ -26,7 +26,11 @@ class LavaMusic(commands.Cog, name="Voice"):
         guild_check = ctx.guild is not None
 
         if guild_check:
-            await self.ensure_voice(ctx.author, ctx.guild, ctx.command.name in ('p', 'play'))
+            try:
+                await self.ensure_voice(ctx.author, ctx.guild, ctx.command.name in ('p', 'play'))
+            except commands.CommandInvokeError as e:
+                await ctx.send(e.original)
+                return False
 
         return guild_check
 
