@@ -3,8 +3,27 @@ import discord
 import lavalink
 from discord.ext import commands
 from src.utils import format_seconds, doc_url
+from typing import Optional
 
 url_rx = re.compile(r'https?://(?:www\.)?.+')
+hours = re.compile(r'(\d+):(\d+):(\d+)')
+minutes = re.compile(r'(\d+):(\d+)')
+
+
+def get_millis(time: str) -> Optional[int]:
+    if (m := hours.match(time)) is not None:
+        seconds = int(m.group(3))
+        seconds += int(m.group(2)) * 60
+        seconds += int(m.group(1)) * 3600
+    elif (m := minutes.match(time)) is not None:
+        seconds = int(m.group(2))
+        seconds += int(m.group(1)) * 60
+    else:
+        try:
+            seconds = int(time)
+        except ValueError:
+            return None
+    return seconds * 1000
 
 
 class LavaMusic(commands.Cog, name="Voice"):
@@ -14,7 +33,7 @@ class LavaMusic(commands.Cog, name="Voice"):
     @commands.Cog.listener()
     async def on_ready(self):
         if not hasattr(self.bot, 'lavalink'):
-            self.bot.lavalink = lavalink.Client(self.bot.user.id, shard_count=self.bot.shard_dict['shard_count'])
+            self.bot.lavalink = lavalink.Client(self.bot.user.id)
             self.bot.lavalink.add_node('lavalink', 2333, 'merryandpippinarecute', 'us' 'arch music')
             self.bot.add_listener(self.bot.lavalink.voice_update_handler, 'on_socket_response')
             lavalink.add_event_hook(self.track_hook)
@@ -50,8 +69,8 @@ class LavaMusic(commands.Cog, name="Voice"):
             raise commands.CommandInvokeError('need to be in a voice channel to play a song')
 
         player = self.bot.lavalink.player_manager.create(guild.id, endpoint=str(guild.region))
-        player.set_volume(vol)
-        if not player.isconnected:
+        await player.set_volume(vol)
+        if not player.is_connected:
             if not should_connect:
                 raise commands.CommandInvokeError('architus needs to be connected to a voice channel')
 
@@ -67,7 +86,7 @@ class LavaMusic(commands.Cog, name="Voice"):
     async def track_hook(self, event):
         if isinstance(event, lavalink.events.QueueEndEvent):
             guild_id = int(event.player.guild_id)
-            guild = self.got.get_build(guild_id)
+            guild = self.bot.get_guild(guild_id)
             await guild.change_voice_state(channel=None)
 
     @commands.command()
@@ -75,16 +94,32 @@ class LavaMusic(commands.Cog, name="Voice"):
     async def skip(self, ctx):
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         await player.skip()
+        if player.is_playing:
+            track = player.current
+            embed = discord.Embed(color=discord.Color.blurple())
+            embed.title = 'Current Song'
+            embed.description = f'[{track.title}]({track.uri})'
+            if "youtube" in track.uri:
+                yt_id = track.uri.split("=")[1]
+                embed.set_thumbnail(url=f"http://img.youtube.com/vi/{yt_id}/1.jpg")
+            await ctx.send(embed=embed)
+        else:
+            await player.stop()
+            await ctx.guild.change_voice_state(channel=None)
+            await ctx.send('*⃣ | Disconnected.')
+
 
     def queue_embed(self, p, q):
         songs = "\n".join(f"**{i+1:>2}.** *{song.title}*" for i, song in enumerate(q[:10]))
         if len(q) > 10:
-            songs += "more not shown..."
+            songs += "\nmore not shown..."
         if p.is_playing:
-            hour = p.current.duration > 3600
+            duration = p.current.duration // 1000
+            position = p.position // 1000
+            hour = duration > 3600
             title = p.current.title
             url = p.current.uri
-            name = f"Now Playing ({format_seconds(p.position, hour)}/{format_seconds(p.current.position, hour)}):"
+            name = f"Now Playing ({format_seconds(position, hour)}/{format_seconds(duration, hour)}):"
         else:
             title = "no songs queued"
             url = None
@@ -98,19 +133,20 @@ class LavaMusic(commands.Cog, name="Voice"):
     async def queue(self, ctx):
         if ctx.invoked_subcommand is None:
             p = self.bot.lavalink.player_manager.get(ctx.guild.id)
-            await ctx.send(self.queue_embed(p, p.queue))
+            await ctx.send(embed=self.queue_embed(p, p.queue))
 
     @queue.command(aliases=['a'])
     @doc_url("https://docs.archit.us/commands/#queue")
     async def add(self, ctx, *query):
-        await self.play(ctx, query=query)
+        await self.play(ctx, query=" ".join(query))
 
     @queue.command(aliases=['remove', 'r'])
     @doc_url("https://docs.archit.us/commands/#queue")
     async def rm(self, ctx, index: int):
         '''queue rm <index>'''
         q = self.bot.lavalink.player_manager.get(ctx.guild.id).queue
-        index = len(q) - index
+        # index = len(q) - index - 1
+        index = index - 1
         try:
             song = q[index]
             del q[index]
@@ -137,6 +173,21 @@ class LavaMusic(commands.Cog, name="Voice"):
             p.shuffle = True
             await ctx.send("Shuffle is **on**")
 
+    @commands.command()
+    async def seek(self, ctx, location):
+        player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+        if not player.is_playing:
+            await ctx.send("song needs to be playing for this command")
+            return
+        time = get_millis(location)
+        if time is None:
+            await ctx.send("please send a valid time")
+            return
+        if time > player.current.duration:
+            await ctx.send("time can't be longer than the song duration")
+            return
+        await player.seek(time)
+
     async def enqueue(self, query, user, guild):
         """
         Takes in the query, the user that asked, and which guild and returns a list of the
@@ -146,7 +197,7 @@ class LavaMusic(commands.Cog, name="Voice"):
         query = query.strip('<>')
 
         if not url_rx.match(query):
-            query = f'tysearch:{query}'
+            query = f'ytsearch:{query}'
 
         results = await player.node.get_tracks(query)
 
@@ -172,12 +223,12 @@ class LavaMusic(commands.Cog, name="Voice"):
             if not player.is_playing:
                 await player.play()
 
-            return ['song', song]
+            return ['song', track]
 
     @commands.command(aliases=['p'])
     @doc_url("https://docs.archit.us/commands/music/#play")
     async def play(self, ctx, *, query: str):
-        songs = self.enqueue(query, ctx.author, ctx.guild)
+        songs = await self.enqueue(query, ctx.author, ctx.guild)
 
         if len(songs) == 0:
             return await ctx.send('no tracks found')
@@ -189,7 +240,7 @@ class LavaMusic(commands.Cog, name="Voice"):
         else:
             track = songs[1]
             embed.title = 'Tracks enqueued'
-            embed.description = f'[{track["info"]["title"]}]({track["info"]["uri"]})'
+            embed.description = f'[{track.title}]({track.uri})'
             if "youtube" in track.uri:
                 yt_id = track.uri.split("=")[1]
                 embed.set_thumbnail(url=f"http://img.youtube.com/vi/{yt_id}/1.jpg")
