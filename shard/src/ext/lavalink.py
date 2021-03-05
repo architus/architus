@@ -106,7 +106,7 @@ class LavaMusic(commands.Cog, name="Voice"):
         else:
             await player.stop()
             await ctx.guild.change_voice_state(channel=None)
-            await ctx.send('*⃣ | Disconnected.')
+            await ctx.send('no more songs left, goodbye')
 
     def queue_embed(self, p, q):
         songs = "\n".join(f"**{i+1:>2}.** *{song.title}*" for i, song in enumerate(q[:10]))
