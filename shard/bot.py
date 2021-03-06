@@ -7,6 +7,7 @@ import discord
 
 from src.utils import guild_to_message, guild_to_dict
 from lib.config import get_session, secret_token, logger, AsyncConnWrapper
+from lib.aiomodels import TbUsageAnalytics
 from lib.ipc import async_rpc_server
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
@@ -19,6 +20,7 @@ class Architus(Bot):
         self.session = get_session()
         self.asyncpg_wrapper = AsyncConnWrapper()
         self.deletable_messages = []
+        self.tb_usage_analytics = TbUsageAnalytics(self.asyncpg_wrapper)
 
         self.hoarfrost_gen = HoarFrostGenerator()
 
@@ -68,7 +70,6 @@ class Architus(Bot):
         await self.process_commands(msg)
 
     async def on_ready(self):
-        """pull autoresponses from the db, then set activity"""
         await self.asyncpg_wrapper.connect()
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
@@ -144,6 +145,26 @@ architus = Architus(command_prefix=command_prefix, max_messages=10000, intents=i
 
 # Remove default help command so it doesn't conflict with ours
 architus.help_command = None
+
+
+@architus.check
+async def globally_block_dms(ctx):
+    return ctx.guild is not None
+
+
+@architus.check_once
+def tracker(ctx):
+    async def task():
+        await architus.tb_usage_analytics.insert({
+            'prefix': ctx.prefix,
+            'command': ctx.command.name,
+            'guild_id': ctx.guild.id,
+            'channel_id': ctx.channel.id,
+            'author_id': ctx.author.id,
+        })
+    architus.loop.create_task(task())
+    return True
+
 
 for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
     architus.load_extension(f"src.ext.{ext[:-3]}")
