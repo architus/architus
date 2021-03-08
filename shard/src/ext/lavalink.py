@@ -1,13 +1,24 @@
 import re
+from typing import Optional
+from src.utils import format_seconds, doc_url
+
 import discord
 import lavalink
 from discord.ext import commands
-from src.utils import format_seconds, doc_url
-from typing import Optional
+import spotipy
+import spotipy.oauth2 as oauth2
 
 url_rx = re.compile(r'https?://(?:www\.)?.+')
+spotify_uri = re.compile(r'(?:https://open.spotify.com/(\w+)/([^?]+).*)|(?:spotify:(\w+):(\w+))')
 hours = re.compile(r'(\d+):(\d+):(\d+)')
 minutes = re.compile(r'(\d+):(\d+)')
+
+
+def gen_spotify_token():
+    credentials = oauth2.SpotifyClientCredentials(
+            client_id='1b4fadd2be3b48bda672c6e67caf7957',
+            client_secret='051114b9930f491d86379338185148b5')
+    return credentials.get_access_token()
 
 
 def get_millis(time: str) -> Optional[int]:
@@ -29,6 +40,8 @@ def get_millis(time: str) -> Optional[int]:
 class LavaMusic(commands.Cog, name="Voice"):
     def __init__(self, bot):
         self.bot = bot
+        self.spotify_token = gen_spotify_token()
+        self.spotify_client = spotipy.Spotify(auth=self.spotify_token)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -49,7 +62,7 @@ class LavaMusic(commands.Cog, name="Voice"):
                 await self.ensure_voice(ctx.author, ctx.guild, ctx.command.name in ('p', 'play'))
             except commands.CommandInvokeError as e:
                 await ctx.send(e.original)
-                return False
+                raise e
 
         return guild_check
 
@@ -57,6 +70,7 @@ class LavaMusic(commands.Cog, name="Voice"):
         settings = self.bot.settings[guild]
         vol = settings.music_volume
         vol *= 1000
+        vol = min(1000, max(0, int(vol)))
 
         if not settings.music_enabled:
             raise commands.CommandInvokeError('playing music is not enabled on this server')
@@ -192,9 +206,37 @@ class LavaMusic(commands.Cog, name="Voice"):
         Takes in the query, the user that asked, and which guild and returns a list of the
         songs that were added to the queue.
         """
-        player = self.bot.lavalink.player_manager.get(guild.id)
         query = query.strip('<>')
 
+        if 'spotify' in query:
+            if (match := spotify_uri.match(query)) is None:
+                return []
+            (track_type, uri) = match.group(1, 2) if match.group(1) is not None else match.group(3, 4)
+            print(f"{track_type=}")
+            print(f"{uri=}")
+            try:
+                if track_type == "album":
+                    album = self.spotify_client.album(uri)
+                    artist = album['artists'][0]['name']
+                    for t in album['tracks']['items']:
+                        await self.enqueue(f"{t['name']} by {artist}", user, guild)
+                    return ['album', album['name'], len(album['tracks'])]
+                elif track_type == "playlist":
+                    playlist = self.spotify_client.playlist(uri)
+                    for t in playlist['tracks']['items']:
+                        await self.enqueue(f"{t['track']['name']} by {t['track']['artists'][0]['name']}", user, guild)
+                    return ['playlist', playlist['name'], len(playlist['tracks']['items'])]
+                elif track_type == "track":
+                    track = self.spotify_client.track(uri)
+                    name = track['name']
+                    artist = track['artists'][0]['name']
+                    return await self.enqueue(f"{name} by {artist}", user, guild)
+                else:
+                    return []
+            except spotify.SpotifyException:
+                return ['error', 'spotify api is down']
+
+        player = self.bot.lavalink.player_manager.get(guild.id)
         if not url_rx.match(query):
             query = f'ytsearch:{query}'
 
@@ -230,11 +272,20 @@ class LavaMusic(commands.Cog, name="Voice"):
         songs = await self.enqueue(query, ctx.author, ctx.guild)
 
         if len(songs) == 0:
+            player = self.bot.lavalink.player_manager.get(ctx.guild.id)
+            if not player.is_playing:
+                await ctx.guild.change_voice_state(channel=None)
             return await ctx.send('no tracks found')
+
+        if songs[0] == 'error':
+            return await ctx.send(songs[1])
 
         embed = discord.Embed(color=discord.Color.blurple())
         if songs[0] == 'playlist':
             embed.title = 'Playlist Enqueued'
+            embed.description = f'{songs[1]} - {songs[2]} tracks'
+        elif songs[0] == 'album':
+            embed.title = 'Album Enqueued'
             embed.description = f'{songs[1]} - {songs[2]} tracks'
         else:
             track = songs[1]
