@@ -41,7 +41,7 @@ class Pools:
 
     async def get_member(self, guild: Guild, member_id, fetch=False):
         if member_id in self.nonexistant:
-            raise NotFound(f"unknown member {member_id}")
+            raise Exception(f"unknown member {member_id}")
         member = guild.get_member(int(member_id))
         if member is None and fetch:
             try:
@@ -49,12 +49,12 @@ class Pools:
             except NotFound:
                 self.nonexistant.append(member_id)
         if member is None:
-            raise NotFound(f"unknown member {member_id}")
+            raise Exception(f"unknown member {member_id}")
         return member_to_dict(member)
 
     async def get_user(self, user_id, fetch=False):
         if user_id in self.nonexistant:
-            raise NotFound(f"unknown user {user_id}")
+            raise Exception(f"unknown user {user_id}")
         user = self.bot.get_user(int(user_id))
         if user is None and fetch:
             try:
@@ -62,7 +62,7 @@ class Pools:
             except NotFound:
                 self.nonexistant.append(user_id)
         if user is None:
-            raise NotFound(f"unknown user {user_id}")
+            raise Exception(f"unknown user {user_id}")
         return user_to_dict(user)
 
     def get_all_responses(self, guild: Guild):
@@ -79,7 +79,7 @@ class Pools:
                 guild = await self.bot.fetch_guild(int(guild_id))
 
         if guild is None:
-            raise NotFound(f"unknown guild {guild_id}, attempted fetch: {fetch}")
+            raise Exception(f"unknown guild {guild_id}, attempted fetch: {fetch}")
 
         member = guild.get_member(int(member_id))
         settings = self.bot.settings[guild]

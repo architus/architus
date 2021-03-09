@@ -7,7 +7,7 @@ from flask_cors import CORS
 from werkzeug.wsgi import FileWrapper
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod
+from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod, is_local
 # from lib.models import Log # , Emojis
 from lib.auth import JWT, flask_authenticated as authenticated
 from lib.discord_requests import list_guilds_request
@@ -34,12 +34,13 @@ def teardown_db(arg):
 
 class Invite(Resource):
     def get(self, guild_id: int):
+        domain = DOMAIN + ':5000' if is_local else ''
         response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}'
                             f'&scope=bot&guild_id={guild_id}'
                             '&response_type=code'
                             f'&redirect_uri={REDIRECT_URI}'
                             '&permissions=2134207679')
-        response.set_cookie('next', request.args.get('return', ''), domain=f'api.{DOMAIN}', secure=True, httponly=True)
+        response.set_cookie('next', request.args.get('return', ''), domain=f'api.{domain}', secure=not is_local, httponly=True)
         return response
 
 
@@ -50,7 +51,8 @@ class RedirectCallback(CustomResource):
     '''
     def get(self):
         # TODO validate domain
-        redirect_url = request.cookies.get('next') or f'https://{DOMAIN}/app'
+        domain = 'http' + '://' if is_local else 's://' + DOMAIN + ':8000' if is_local else ''
+        redirect_url = request.cookies.get('next') or f'{domain}/app'
         code = request.args.get('code')
         perms = request.args.get('permissions')
         guild_id = request.args.get('guild_id')

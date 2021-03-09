@@ -116,7 +116,6 @@ def member_to_dict(member: discord.Member) -> dict:
     data['roles'] = [str(r.id) for r in member.roles]
     data['color'] = str(member.color)
     data['joined_at'] = member.joined_at.isoformat()
-    # logger.debug(data)
     return data
 
 

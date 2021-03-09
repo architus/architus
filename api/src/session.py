@@ -5,7 +5,7 @@ from secrets import randbits
 from flask_restful import Resource
 from flask import redirect, request
 
-from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN, is_prod
+from lib.config import REDIRECT_URI, client_id, domain_name as DOMAIN, is_prod, is_local
 from lib.status_codes import StatusCodes as s
 from lib.auth import JWT, flask_authenticated as authenticated
 from lib.discord_requests import identify_request, token_exchange_request, refresh_token_request
@@ -17,8 +17,8 @@ SAFE_REDIRECT_URI = quote_plus(REDIRECT_URI)
 
 def make_token_cookie_header(token: str, max_age: int) -> dict:
     '''creates a set-cookie header for storing the auth token'''
-    cookie = f'token={token}; Max-Age={max_age}; Path=/; Domain={DOMAIN}; Secure; HttpOnly'
-    if not is_prod:
+    cookie = f'token={token}; Max-Age={max_age}; Path=/; Domain={DOMAIN}; {"" if is_local else "Secure; " }HttpOnly'
+    if not is_prod and not is_local:
         cookie += '; SameSite=None'
     return {'Set-Cookie': cookie}
 
@@ -46,7 +46,7 @@ def generate_refresh_response(jwt: JWT) -> tuple:
 class Login(CustomResource):
     def get(self):
         response = redirect(f'https://discordapp.com/api/oauth2/authorize?client_id={client_id}&redirect_uri='
-                            f'{SAFE_REDIRECT_URI}&response_type=code&scope=identify%20guilds')
+                            f'{SAFE_REDIRECT_URI}&response_type=code&scope=identify%20guilds%20connections')
         # TODO check if requested return url is owned by us
         # if not any(re.match(pattern, url) for pattern in (
         #         r'https:\/\/[-A-Za-z0-9]{24}--architus\.netlify\.com\/app',
@@ -61,7 +61,7 @@ class Login(CustomResource):
             'next',
             request.args.get('return') or f'https://{DOMAIN}/app',
             domain=f'api.{DOMAIN}',
-            secure=True, httponly=True
+            secure=not is_local, httponly=True
         )
         return response
 

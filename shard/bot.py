@@ -2,7 +2,7 @@ import asyncio
 import os
 import time
 
-from discord.ext.commands import Bot
+from discord.ext.commands import Bot, when_mentioned_or
 import discord
 
 from src.utils import guild_to_message, guild_to_dict
@@ -98,10 +98,14 @@ class Architus(Bot):
     @property
     def guilds_as_message(self):
         for guild in self.guilds:
-            guild_message = guild_to_message(guild)
-            guild_message.shard_id = self.shard_id
-            guild_message.admin_ids.extend(self.settings[guild].admins_ids)
-            yield guild_message
+            try:
+                guild_message = guild_to_message(guild)
+                guild_message.shard_id = self.shard_id
+                guild_message.admin_ids.extend(self.settings[guild].admins_ids)
+            except Exception:
+                logger.exception(f"Error converting guild {guild.id}({guild.name}) to message")
+            else:
+                yield guild_message
 
     @property
     def guilds_as_dicts(self):
@@ -141,7 +145,7 @@ def command_prefix(bot: Architus, msg: discord.Message):
 intents = discord.Intents.default()
 intents.members = True
 intents.presences = False
-architus = Architus(command_prefix=command_prefix, max_messages=10000, intents=intents)
+architus = Architus(command_prefix=when_mentioned_or(command_prefix), max_messages=10000, intents=intents)
 
 # Remove default help command so it doesn't conflict with ours
 architus.help_command = None

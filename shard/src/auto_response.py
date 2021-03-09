@@ -68,7 +68,6 @@ class AutoResponse:
         self.guild_id = guild_id
         self.count = count
         self.word_gen = word_gen
-        self.settings = self.bot.settings[self.bot.get_guild(guild_id)]
 
         if id is None:
             self.id = bot.hoarfrost_gen.generate()
@@ -98,6 +97,10 @@ class AutoResponse:
         self._emoji_manager = emoji_manager
         self.trigger_reggy = Reggy(self.trigger_regex)
         self.not_trigger_punctuation = "".join([c for c in string.punctuation if c not in self.trigger_punctuation])
+
+    @property
+    def settings(self):
+        return self.bot.settings[self.bot.get_guild(self.guild_id)]
 
     @property
     def emoji_manager(self):

@@ -5,6 +5,7 @@ from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog
 import discord
 from typing import List, Optional
+from src.api.mock_discord import MockGuild
 
 RYTHMS_ID = 235088799074484224
 
@@ -395,7 +396,7 @@ class GuildSettings(Cog):
 
     def get_guild(self, guild):
         if guild is None:
-            return None
+            return Setting(self.session, MockGuild(0))
         try:
             return self.guilds[guild]
         except KeyError:

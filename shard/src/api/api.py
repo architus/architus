@@ -7,7 +7,9 @@ import discord
 
 from lib.status_codes import StatusCodes as sc
 from lib.pool_types import PoolType
+from lib.aiomodels import TbUserConnections
 from lib.config import logger, FAKE_GUILD_IDS
+from lib.discord_requests import get_connections
 from src.auto_response import GuildAutoResponses
 from src.api.util import fetch_guild
 from src.api.pools import Pools
@@ -22,6 +24,7 @@ class Api(Cog):
         self.bot = bot
         self.fake_messages = {}
         self.pools = Pools(bot)
+        self.tb_user_connections = TbUserConnections(bot.asyncpg_wrapper)
 
     async def api_entry(self, method_name, *args, **kwargs):
         """Callback method for the rpc server
@@ -432,6 +435,20 @@ class Api(Cog):
             }
 
         return resp, sc.OK_200
+
+    async def populate_connections(self, jwt):
+        async def inner():
+            connections = await get_connections(jwt)
+            logger.debug(connections)
+            await self.tb_user_connections.insert_many([{
+                'id': int(c['id']),
+                'user_id': int(jwt.id),
+                'username': c['name'],
+                'account_type': c['type'],
+                'visibility': int(c['visibility']),
+                'show_activity': bool(c['show_activity'])
+            } for c in connections])
+        self.bot.loop.create_task(get_connections(jwt))
 
 
 def setup(bot):

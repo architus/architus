@@ -36,6 +36,7 @@ try:
     client_secret = os.environ['client_secret']
     domain_name = os.environ['domain_name']
     is_prod = domain_name == 'archit.us'
+    is_local = domain_name == 'local.archit.us'
     jwt_secret = os.environ['jwt_secret']
     domain_name = os.environ['domain_name']
     alphavantage_api_key = os.environ['alphavantage_api_key']
@@ -44,7 +45,7 @@ except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 
 API_ENDPOINT = 'https://discordapp.com/api/v6'
-REDIRECT_URI = f'https://api.{domain_name}/redirect'
+REDIRECT_URI = f'http{"" if is_local else "s"}://api.{domain_name}{":5000" if is_local else ""}/redirect'
 
 logger.debug("creating db engine...")
 try:

@@ -2,7 +2,7 @@ import jwt as pyjwt
 from flask import request
 from datetime import datetime, timedelta
 from lib.status_codes import StatusCodes
-from lib.config import jwt_secret
+from lib.config import jwt_secret, logger
 
 from functools import wraps
 
@@ -80,7 +80,11 @@ class JWT:
 
     def get_token(self):
         if self._dirty:
-            self._token = self._encode(self._data).decode()
+            try:
+                self._token = self._encode(self._data).decode()
+            except Exception:
+                logger.exception(str(self._token))
+                self._token = self._encode(self._data)
             self._dirty = False
         return self._token
 

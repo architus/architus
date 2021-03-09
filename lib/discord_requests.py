@@ -57,6 +57,17 @@ async def async_list_guilds_request(jwt):
             return await resp.json(), resp.status
 
 
+async def get_connections(jwt):
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': f"Bearer {jwt.access_token}"
+    }
+    async with aiohttp.ClientSession() as session:
+        url = f"{API_ENDPOINT}/users/@me/connections"
+        async with session.get(url, headers=headers) as resp:
+            return await resp.json(), resp.status
+
+
 def refresh_token_request(refresh_token):
     data = template.copy()
     data['grant_type'] = 'refresh_token',

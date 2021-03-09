@@ -12,9 +12,12 @@ class MockMember(object):
         self.mention = "<@%_CLIENT_ID_%>"
         self.name = "<@%_CLIENT_ID_%>"
         self.display_name = "bad guy"
+        self.name = "<@%_CLIENT_ID_%>"
+        self.nick = None
         self.avatar_url = "https://cdn.discordapp.com/embed/avatars/3.png"
         self.color = "#000000"
         self.discriminator = "0000"
+        self.roles = []
         self.bot = False
 
 

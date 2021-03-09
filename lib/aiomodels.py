@@ -1,5 +1,5 @@
 from asyncio import sleep
-
+from lib.config import logger
 
 class Base:
 
@@ -36,6 +36,26 @@ class Base:
                     f'''INSERT INTO {self.__class__.__tablename__}({','.join(columns)})
                     VALUES ({','.join(f'${num}' for num in range(1, len(values) + 1))})
                     ''', *values
+                )
+
+    async def insert_many(self, rows):
+        columns = rows[0].keys()
+        width = len(rows[0])
+        flattened = [v for v in [r.items() for r in rows]]
+        tuples = []
+
+        for count in range(len(rows)):
+            tuples.append('(' + ','.join(f'${num}' for num in range(count * width + 1, count * width + width + 1)) + ')')
+
+        aa = f'''INSERT INTO {self.__class__.__tablename__}({','.join(columns)}) VALUES {','.join(tuples)}'''
+
+        logger.debug(aa)
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    f'''INSERT INTO {self.__class__.__tablename__}({','.join(columns)})
+                    VALUES {','.join(tuples)}
+                    ''', *flattened
                 )
 
     async def update_by_id(self, cols, id):
@@ -105,3 +125,7 @@ class TbEmojis(Base):
 
 class TbUsageAnalytics(Base):
     __tablename__ = 'tb_usage_analytics'
+
+
+class TbUserConnections(Base):
+    __tablename__ = 'tb_user_connections'

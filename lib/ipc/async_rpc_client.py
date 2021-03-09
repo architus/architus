@@ -69,7 +69,7 @@ class shardRPC:
             routing_key=routing_key,
         )
         try:
-            return await asyncio.wait_for(future, timeout=5)
+            return await asyncio.wait_for(future, timeout=30)
         except asyncio.TimeoutError as e:
             logger.exception(f"routing_key: {routing_key}")
             return f"TimeoutError {e}", 500
