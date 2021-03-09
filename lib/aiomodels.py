@@ -1,5 +1,7 @@
 from asyncio import sleep
 from lib.config import logger
+from functools import reduce
+from operator import iconcat
 
 class Base:
 
@@ -41,7 +43,8 @@ class Base:
     async def insert_many(self, rows):
         columns = rows[0].keys()
         width = len(rows[0])
-        flattened = [v for v in [r.items() for r in rows]]
+        flattened = reduce(iconcat, [r.values() for r in rows], [])
+        logger.debug(flattened)
         tuples = []
 
         for count in range(len(rows)):

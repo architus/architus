@@ -436,19 +436,20 @@ class Api(Cog):
 
         return resp, sc.OK_200
 
-    async def populate_connections(self, jwt):
+    async def populate_connections(self, user_id, access_token):
         async def inner():
-            connections = await get_connections(jwt)
+            connections, sc = await get_connections(access_token)
             logger.debug(connections)
             await self.tb_user_connections.insert_many([{
-                'id': int(c['id']),
-                'user_id': int(jwt.id),
+                'account_id': str(c['id']),
+                'user_id': int(user_id),
                 'username': c['name'],
                 'account_type': c['type'],
                 'visibility': int(c['visibility']),
                 'show_activity': bool(c['show_activity'])
             } for c in connections])
-        self.bot.loop.create_task(get_connections(jwt))
+        self.bot.loop.create_task(inner())
+        return {}, 200
 
 
 def setup(bot):

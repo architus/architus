@@ -57,10 +57,10 @@ async def async_list_guilds_request(jwt):
             return await resp.json(), resp.status
 
 
-async def get_connections(jwt):
+async def get_connections(access_token):
     headers = {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': f"Bearer {jwt.access_token}"
+        'Authorization': f"Bearer {access_token}"
     }
     async with aiohttp.ClientSession() as session:
         url = f"{API_ENDPOINT}/users/@me/connections"

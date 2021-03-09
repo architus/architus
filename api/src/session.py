@@ -123,6 +123,7 @@ class TokenExchange(CustomResource):
                     jwt.get_token(),
                     routing_key='gateway_rpc'
                 )
+                self.shard.populate_connections(jwt.id, jwt.access_token)
                 return data, s.OK_200, make_token_cookie_header(jwt.get_token(), expires_in * 2)
 
         return ex_data, status_code
