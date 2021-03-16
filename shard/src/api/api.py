@@ -93,11 +93,11 @@ class Api(Cog):
             return {}, sc.BAD_REQUEST_400
 
         try:
-            lava_cog.ensure_voice(user, guild, True)
+            await lava_cog.ensure_voice(user, guild, True)
         except discord.CommandInvokeError:
             return {}, sc.UNAUTHORIZED_401
 
-        added_songs = lava_cog.enqueue(song, user, guild)
+        added_songs = await lava_cog.enqueue(song, user, guild)
         if added_songs == []:
             return {}, sc.NOT_FOUND_404
         elif added_songs[0] == 'playlist':
