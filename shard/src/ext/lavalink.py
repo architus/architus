@@ -69,7 +69,7 @@ class LavaMusic(commands.Cog, name="Voice"):
     async def ensure_voice(self, user, guild, should_connect: bool):
         settings = self.bot.settings[guild]
         vol = settings.music_volume
-        vol *= 1000
+        vol *= 300
         vol = min(1000, max(0, int(vol)))
 
         if not settings.music_enabled:
