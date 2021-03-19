@@ -7,6 +7,7 @@
 #![deny(clippy::all, clippy::pedantic, clippy::nursery)]
 
 pub mod models;
+pub mod rpc;
 pub mod schema;
 
 #[macro_use]
