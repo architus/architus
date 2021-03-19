@@ -1,3 +1,5 @@
+load('ext://restart_process', 'docker_build_with_restart')
+
 docker_build('shard-image', '.', dockerfile='shard/Dockerfile', ignore=["*", "!shard/**", "!lib/**"])
 docker_build('manager-image', '.', dockerfile='manager/Dockerfile', ignore=["*", "!manager/*", "!lib/**"])
 docker_build('db-image', '.', dockerfile='db/Dockerfile', ignore=["*", "!db/*", "!lib/**"])
@@ -6,7 +8,10 @@ docker_build('rabbit-image', '.', dockerfile='rabbitmq/Dockerfile', ignore=["*",
 docker_build('api-image', '.', dockerfile='api/Dockerfile', ignore=["*", "!api/*", "!lib/**"])
 docker_build('gateway-image', '.', dockerfile='gateway/Dockerfile', ignore=["*", "!gateway/**", "!lib/**"])
 docker_build('dbmanager-image', 'dbmanager', dockerfile='dbmanager/Dockerfile')
-docker_build('feature-gate-image', '.', dockerfile='feature-gate/Dockerfile', ignore=["*", "!feature-gate/**", "!lib/**"])
+local_resource('feature-gate-compile', 'cargo build --manifest-path=feature-gate/Cargo.toml',
+               deps=['feature-gate/Cargo.toml', 'feature-gate/Cargo.lock', 'feature-gate/build.rs', 'feature-gate/src'])
+docker_build_with_restart('feature-gate-image', '.', dockerfile='feature-gate/tilt-build/Dockerfile', only=["feature-gate/target/debug/feature-gate"],
+                          entrypoint='/usr/bin/feature-gate', live_update=[sync('feature-gate/target/debug/feature-gate', '/usr/bin/feature-gate')])
 
 k8s_yaml('secret.yaml')
 k8s_yaml('shard/shard.yaml')
