@@ -22,7 +22,7 @@ RUN cp $REPO_ROOT/$SERVICE/target/release/feature-gate /opt/feature-gate
 FROM debian:buster-slim as deployment
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -q \
-    && apt-get install -y -q "libssl1.1" "tini" \
+    && apt-get install -y -q "libssl1.1" "tini" "libpq-dev" \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /opt/feature-gate /usr/bin/feature-gate
 ENV RUST_BACKTRACE=1
