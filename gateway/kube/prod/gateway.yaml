@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    app: gateway
+spec:
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: "{{prefix}}gateway:{{tag}}"
+          envFrom:
+          - secretRef:
+              name: architus-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: gateway
+  ports:
+  - protocol: TCP
+    port: 6000
+    targetPort: 6000

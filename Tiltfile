@@ -29,12 +29,12 @@ docker_build('rabbit-image', '.', dockerfile='rabbitmq/Dockerfile', ignore=["*",
 docker_build('dbmanager-image', 'dbmanager', dockerfile='dbmanager/Dockerfile')
 
 k8s_yaml('secret.yaml')
-k8s_yaml('shard/shard.yaml')
-k8s_yaml('manager/manager.yaml')
-k8s_yaml('rabbitmq/rabbit.yaml')
-k8s_yaml('db/db.yaml')
-k8s_yaml('sandbox/sandbox.yaml')
-k8s_yaml('dbmanager/dbmanager.yaml')
+k8s_yaml('shard/kube/dev/shard.yaml')
+k8s_yaml('manager/kube/dev/manager.yaml')
+k8s_yaml('rabbitmq/kube/dev/rabbit.yaml')
+k8s_yaml('db/kube/dev/db.yaml')
+k8s_yaml('sandbox/kube/dev/sandbox.yaml')
+k8s_yaml('dbmanager/kube/dev/dbmanager.yaml')
 
 k8s_resource('postgres', port_forwards=5432)
 k8s_resource('dbmanager')
@@ -67,15 +67,15 @@ if 'feature-gate' in enabled:
                                   entrypoint='/usr/bin/feature-gate', live_update=[sync('feature-gate/target/debug/feature-gate', '/usr/bin/feature-gate')])
     else:
         docker_build('feature-gate-image', '.', dockerfile='feature-gate/Dockerfile', ignore=["*", "!feature-gate/**", "!lib/**"])
-    k8s_yaml('feature-gate/feature-gate.yaml')
+    k8s_yaml('feature-gate/kube/dev/feature-gate.yaml')
     k8s_resource('feature-gate')
 
 if 'gateway' in enabled:
     docker_build('gateway-image', '.', dockerfile='gateway/Dockerfile', ignore=["*", "!gateway/**", "!lib/**"])
-    k8s_yaml('gateway/gateway.yaml')
+    k8s_yaml('gateway/kube/dev/gateway.yaml')
     k8s_resource('gateway', port_forwards=6000)
 
 if 'api' in enabled:
     docker_build('api-image', '.', dockerfile='api/Dockerfile', ignore=["*", "!api/*", "!lib/**"])
-    k8s_yaml('api/api.yaml')
+    k8s_yaml('api/kube/dev/api.yaml')
     k8s_resource('api', port_forwards=5000)

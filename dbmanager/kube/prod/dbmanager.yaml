@@ -1,0 +1,14 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dbmanager
+spec:
+  template:
+    spec:
+      containers:
+        - name: dbmanager
+          image: "{{prefix}}dbmanager:{{tag}}"
+          envFrom:
+          - secretRef:
+              name: architus-secret
+      restartPolicy: Never
