@@ -12,7 +12,6 @@
 use db::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::{Connection, PgConnection};
-use log::{info, warn};
 use r2d2::PooledConnection;
 use std::env;
 use tokio::sync::mpsc;
@@ -58,7 +57,7 @@ impl FeatureGate for Gate {
 
         match result {
             Ok(_) => {
-                info!(
+                log::info!(
                     "Added feature {} which is {}",
                     feature.name,
                     if feature.open { "open" } else { "closed" }
@@ -106,9 +105,10 @@ impl FeatureGate for Gate {
         let result = insert_guild_feature(&conn, addition.guild_id as i64, &addition.feature_name);
         match result {
             Ok(()) => {
-                info!(
+                log::info!(
                     "Added feature {} to guild {}",
-                    addition.feature_name, addition.guild_id
+                    addition.feature_name,
+                    addition.guild_id
                 );
                 success
             }
@@ -134,9 +134,10 @@ impl FeatureGate for Gate {
         let result = remove_guild_feature(&conn, removal.guild_id as i64, &removal.feature_name);
         match result {
             Ok(()) => {
-                info!(
+                log::info!(
                     "Removed feature {} from guild {}",
-                    removal.feature_name, removal.guild_id
+                    removal.feature_name,
+                    removal.guild_id
                 );
                 success
             }
@@ -350,6 +351,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .serve(addr)
         .await?;
 
-    warn!("Server exited mainloop");
+    log::warn!("Server exited mainloop");
     Ok(())
 }
