@@ -1,45 +1,45 @@
 version: "3"
 services:
   shard:
-    image: architus/shard:${TAG:-latest}
+    image: ${PREFIX:-}shard:${TAG:-latest}
     build:
       context: ../
       dockerfile: ./shard/Dockerfile
   api:
-    image: architus/api:${TAG:-latest}
+    image: ${PREFIX:-}api:${TAG:-latest}
     build:
       context: ../
       dockerfile: ./api/Dockerfile
   gateway:
-    image: architus/gateway:${TAG:-latest}
+    image: ${PREFIX:-}gateway:${TAG:-latest}
     build:
       context: ../
       dockerfile: ./gateway/Dockerfile
   postgres:
-    image: architus/db:${TAG:-latest}
+    image: ${PREFIX:-}db:${TAG:-latest}
     build:
       context: ../
       dockerfile: ./db/Dockerfile
   dbmanager:
-    image: architus/dbmanager:${TAG:-latest}
+    image: ${PREFIX:-}dbmanager:${TAG:-latest}
     build: ../dbmanager
   manager:
-    image: architus/manager:${TAG:-latest}
+    image: ${PREFIX:-}manager:${TAG:-latest}
     build:
       context: ../
       dockerfile: ./manager/Dockerfile
   rabbit:
-    image: architus/rabbit:${TAG:-latest}
+    image: ${PREFIX:-}rabbit:${TAG:-latest}
     build:
       context: ../
       dockerfile: ./rabbitmq/Dockerfile
   feature-gate:
-    image: architus/feature-gate:${TAG:-latest}
+    image: ${PREFIX:-}feature-gate:${TAG:-latest}
     build:
       context: ../
       dockerfile: ./feature-gate/Dockerfile
   starlark-reactor:
-    image: architus/starlark-reactor:${TAG:-latest}
+    image: ${PREFIX:-}starlark-reactor:${TAG:-latest}
     build:
       context: ../
       dockerfile: ./starlark-reactor/Dockerfile

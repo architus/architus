@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbit
+  labels:
+    app: rabbit
+spec:
+  selector:
+    matchLabels:
+      app: rabbit
+  template:
+    metadata:
+      labels:
+        app: rabbit
+    spec:
+      containers:
+        - name: rabbit
+          image: "{{prefix}}rabbit:{{tag}}"
+          envFrom:
+          - secretRef:
+              name: architus-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbit
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: rabbit
+  ports:
+  - protocol: TCP
+    port: 5672
+    targetPort: 5672
