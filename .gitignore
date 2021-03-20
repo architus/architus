@@ -16,3 +16,4 @@ tags
 .vscode/*
 www
 secret.yaml
+tilt_modules
