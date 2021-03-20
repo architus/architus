@@ -1,28 +1,22 @@
 load('ext://restart_process', 'docker_build_with_restart')
 
-optional_components = ['feature-gate', 'api']
+optional_features = {
+    'feature-gate': ['feature-gate'],
+    'gateway': ['gateway'],
+    'api': ['api'],
+}
+
 config.define_bool("rust-hot-reload")
 config.define_string_list("enable")
-
-# Helper function to validate that components are valid
-def valid_components(components):
-    all = {c: True for c in optional_components}
-    for c in components:
-        if c not in all:
-            return False
-    return True
-
 cfg = config.parse()
 rust_hot_reload = cfg.get('rust-hot-reload', False)
-enable_list = cfg.get('enable', [])
+enabled_features_list = cfg.get('enable', [])
 
 # Use a dict of key: True as a set
-enabled = {c: True for c in enable_list}
-if 'all' in enabled:
-    enabled = {c: True for c in optional_components}
-if not valid_components(enabled):
-    fail("Invalid components specified: " + repr(enable_list)
-         + ".\nValid components: " + repr(optional_components + ['all']))
+enabled_features = {f: True for f in enabled_features_list}
+if any([f != 'all' and f not in optional_features for f in enabled_features]):
+    fail("Invalid components specified: " + repr(enabled_features_list)
+         + ".\nValid components: " + repr([f for f in optional_features] + ['all']))
 
 # Core components
 # ===============
@@ -52,6 +46,16 @@ k8s_resource('rabbit')
 # Optional components
 # ===================
 
+# Use all features if 'all' was specified
+if 'all' in enabled_features:
+    enabled_features = {f: True for f in optional_features}
+
+# Convert the enabled features to components
+enabled = {}
+for f in enabled_features:
+    for component in optional_features[f]:
+        enabled[component] = True
+
 if 'feature-gate' in enabled:
     if rust_hot_reload:
         # Build locally and then use a simplified Dockerfile that just copies the binary into a container
@@ -66,10 +70,12 @@ if 'feature-gate' in enabled:
     k8s_yaml('feature-gate/feature-gate.yaml')
     k8s_resource('feature-gate')
 
+if 'gateway' in enabled:
+    docker_build('gateway-image', '.', dockerfile='gateway/Dockerfile', ignore=["*", "!gateway/**", "!lib/**"])
+    k8s_yaml('gateway/gateway.yaml')
+    k8s_resource('gateway', port_forwards=6000)
+
 if 'api' in enabled:
     docker_build('api-image', '.', dockerfile='api/Dockerfile', ignore=["*", "!api/*", "!lib/**"])
-    docker_build('gateway-image', '.', dockerfile='gateway/Dockerfile', ignore=["*", "!gateway/**", "!lib/**"])
     k8s_yaml('api/api.yaml')
-    k8s_yaml('gateway/gateway.yaml')
     k8s_resource('api', port_forwards=5000)
-    k8s_resource('gateway', port_forwards=6000)
