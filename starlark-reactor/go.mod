@@ -1,11 +1,11 @@
-module sandbox
+module starlarkreactor
 
 go 1.15
 
 require (
-	archit.us/sandbox v0.0.0
+	archit.us/starlarkreactor v0.0.0
 	go.starlark.net v0.0.0-20210119162422-73f535f109ef
 	google.golang.org/grpc v1.34.0
 )
 
-replace archit.us/sandbox => ./rpc
+replace archit.us/starlarkreactor => ./rpc

@@ -1,7 +1,8 @@
 syntax = "proto3";
-package sandbox;
+package starlarkreactor;
+option go_package = "architus/starlarkreactor";
 
-service Sandbox {
+service StarlarkReactor {
     rpc RunStarlarkScript (StarlarkScript) returns (ScriptOutput) {}
 }
 

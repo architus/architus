@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sandbox
+  name: starlark-reactor
   labels:
-    app: sandbox
+    app: starlark-reactor
 spec:
   selector:
     matchLabels:
-      app: sandbox
+      app: starlark-reactor
   template:
     metadata:
       labels:
-        app: sandbox
+        app: starlark-reactor
     spec:
       containers:
-        - name: sandbox
-          image: sandbox-image
+        - name: starlark-reactor
+          image: starlark-reactor-image
           envFrom:
           - secretRef:
               name: architus-secret
@@ -23,12 +23,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: sandbox
+  name: starlark-reactor
   namespace: default
 spec:
   type: ClusterIP
   selector:
-    app: sandbox
+    app: starlark-reactor
   ports:
   - port: 1337
     targetPort: 1337

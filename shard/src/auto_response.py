@@ -11,7 +11,7 @@ from lib.reggy.reggy import Reggy
 from lib.response_grammar.response import parse as parse_response, NodeType
 from lib.config import logger
 from lib.aiomodels import TbAutoResponses
-from lib.ipc import sandbox_pb2 as message
+from lib.ipc import starlark_reactor_pb2 as message
 
 
 class WordGen:
@@ -188,7 +188,7 @@ class AutoResponse:
             else:
                 content.append(f"<{node.text}>")
         elif (node.type == NodeType.Eval):
-            output = await self.bot.sandbox_client.RunStarlarkScript(
+            output = await self.bot.starlark_reactor_client.RunStarlarkScript(
                 message.StarlarkScript(
                     script=node.text,
                     trigger_message=message.Message(

@@ -2,10 +2,10 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import lib.ipc.sandbox_pb2 as sandbox__pb2
+import lib.ipc.starlark_reactor_pb2 as proto_dot_starlark__reactor__pb2
 
 
-class SandboxStub(object):
+class StarlarkReactorStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -15,13 +15,13 @@ class SandboxStub(object):
             channel: A grpc.Channel.
         """
         self.RunStarlarkScript = channel.unary_unary(
-                '/sandbox.Sandbox/RunStarlarkScript',
-                request_serializer=sandbox__pb2.StarlarkScript.SerializeToString,
-                response_deserializer=sandbox__pb2.ScriptOutput.FromString,
+                '/starlarkreactor.StarlarkReactor/RunStarlarkScript',
+                request_serializer=proto_dot_starlark__reactor__pb2.StarlarkScript.SerializeToString,
+                response_deserializer=proto_dot_starlark__reactor__pb2.ScriptOutput.FromString,
                 )
 
 
-class SandboxServicer(object):
+class StarlarkReactorServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def RunStarlarkScript(self, request, context):
@@ -31,21 +31,21 @@ class SandboxServicer(object):
         raise NotImplementedError('Method not implemented!')
 
 
-def add_SandboxServicer_to_server(servicer, server):
+def add_StarlarkReactorServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'RunStarlarkScript': grpc.unary_unary_rpc_method_handler(
                     servicer.RunStarlarkScript,
-                    request_deserializer=sandbox__pb2.StarlarkScript.FromString,
-                    response_serializer=sandbox__pb2.ScriptOutput.SerializeToString,
+                    request_deserializer=proto_dot_starlark__reactor__pb2.StarlarkScript.FromString,
+                    response_serializer=proto_dot_starlark__reactor__pb2.ScriptOutput.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'sandbox.Sandbox', rpc_method_handlers)
+            'starlarkreactor.StarlarkReactor', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
  # This class is part of an EXPERIMENTAL API.
-class Sandbox(object):
+class StarlarkReactor(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
@@ -59,8 +59,8 @@ class Sandbox(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/sandbox.Sandbox/RunStarlarkScript',
-            sandbox__pb2.StarlarkScript.SerializeToString,
-            sandbox__pb2.ScriptOutput.FromString,
+        return grpc.experimental.unary_unary(request, target, '/starlarkreactor.StarlarkReactor/RunStarlarkScript',
+            proto_dot_starlark__reactor__pb2.StarlarkScript.SerializeToString,
+            proto_dot_starlark__reactor__pb2.ScriptOutput.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

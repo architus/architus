@@ -1,4 +1,4 @@
-module archit.us/sandbox
+module archit.us/starlarkreactor
 
 go 1.15
 

@@ -19,14 +19,14 @@ import (
     keepalive "google.golang.org/grpc/keepalive";
     // uuid "github.com/satori/go.uuid";
 
-    rpc "archit.us/sandbox";
+    rpc "archit.us/starlarkreactor";
 )
 
-type Sandbox struct {
-    rpc.SandboxServer;
+type StarlarkReactor struct {
+    rpc.StarlarkReactorServer;
 }
 
-func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
+func (c *StarlarkReactor) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
     /*
     These are some of the builtin things that are there for the user's convenience.
     Currently included in this part of the code is:
@@ -191,8 +191,8 @@ def sum(iterable):
     }, nil;
 }
 
-func newServer() *Sandbox {
-    return &Sandbox{};
+func newServer() *StarlarkReactor {
+    return &StarlarkReactor{};
 }
 
 func main() {
@@ -215,7 +215,7 @@ func main() {
             },
         ),
     );
-    rpc.RegisterSandboxServer(grpcServer, newServer());
+    rpc.RegisterStarlarkReactorServer(grpcServer, newServer());
     fmt.Println("Starting server");
     grpcServer.Serve(lis);
 }
