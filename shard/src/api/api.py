@@ -364,7 +364,10 @@ class Api(Cog):
                     async def ctx_send(content):
                         sends.append(content)
                     ctx.send = ctx_send
-                    await ctx.invoke(triggered_command, *args[1:])
+                    try:
+                        await ctx.invoke(triggered_command, *args[1:])
+                    except TypeError:
+                        await ctx.invoke(triggered_command)
                 else:
                     # no builtin, check for user set commands in this "guild"
                     for resp in responses[guild_id].auto_responses:

@@ -48,7 +48,7 @@ class Setting:
 
     @property
     def music_volume(self) -> float:
-        return self._settings_dict.get('music_volume', 0.30)
+        return self._settings_dict.get('music_volume', 0.10)
 
     @music_volume.setter
     def music_volume(self, new_music_volume):
@@ -265,7 +265,7 @@ class Setting:
 
     @property
     def admins_ids(self) -> List[int]:
-        default_admins = []
+        default_admins = [self.guild.owner.id]
         default_admins += [m.id for role in self.guild.roles for m in role.members if role.permissions.administrator]
 
         return list(set(default_admins + [int(a) for a in self._settings_dict.get('admins', [])]))

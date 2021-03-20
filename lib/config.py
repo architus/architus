@@ -40,7 +40,6 @@ try:
     domain_name = os.environ['domain_name']
     alphavantage_api_key = os.environ['alphavantage_api_key']
     scraper_token = os.environ['scraper_bot_token']
-    spotify_client_secret = os.environ['spotify_client_secret']
 except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 

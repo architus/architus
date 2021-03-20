@@ -2,7 +2,7 @@
 # sent directly to your discord channel.
 
 from discord.ext import commands
-from discord import Embed
+from discord import Embed, AllowedMentions
 from bs4 import BeautifulSoup as soup
 import aiohttp
 from src.utils import doc_url
@@ -32,11 +32,8 @@ async def webcomic(ctx, comic='list'):
 
     # Send an error message if invalid comic request
     if comic.lower() not in comics:
-        # TODO: Used allowed mentions parameter when discord.py finally releases 1.4.0a
-        if '@' in comic:
-            await ctx.channel.send("Architus does not support that webcomic")
-        else:
-            await ctx.channel.send(f"Architus does not support the {comic} webcomic")
+        await ctx.channel.send(f"Architus does not support the {comic} webcomic",
+                               allowed_mentions=AllowedMentions.none())
         return
 
     # Send an XKCD embed to the channel
