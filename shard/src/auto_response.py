@@ -249,7 +249,10 @@ class AutoResponse:
             content = f"*content of response was over{' discord' if limit >= 2000 else ''} character limit ({limit})*"
 
         if content.strip() != "":
-            resp_msg = await msg.channel.send(content, allowed_mentions=AllowedMentions(everyone=False))
+            resp_msg = await msg.reply(
+                content,
+                allowed_mentions=AllowedMentions(everyone=False),
+                mention_author=False)
         else:
             resp_msg = None
         for emoji in reacts:
