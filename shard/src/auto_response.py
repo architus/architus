@@ -247,6 +247,7 @@ class AutoResponse:
         limit = min(self.settings.responses_response_length, 2000)
         if len(content) > limit:
             content = f"*content of response was over{' discord' if limit >= 2000 else ''} character limit ({limit})*"
+        logger.debug("here")
 
         if content.strip() != "":
             resp_msg = await msg.reply(
