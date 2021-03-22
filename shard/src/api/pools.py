@@ -26,7 +26,7 @@ class Pools:
             emoji_manager = self.bot.get_cog("Emoji Manager").managers[guild.id]
         except KeyError:
             raise
-        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        emoji = emoji_manager.find_emoji(a_id=int(emoji_id))
 
         return await emoji.as_dict_url()
 

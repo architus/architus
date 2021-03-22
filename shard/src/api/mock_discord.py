@@ -10,7 +10,11 @@ class MockMember(object):
     def __init__(self, id=0):
         self.id = id
         self.mention = "<@%_CLIENT_ID_%>"
+        self.name = "<@%_CLIENT_ID_%>"
         self.display_name = "bad guy"
+        self.avatar_url = "https://cdn.discordapp.com/embed/avatars/3.png"
+        self.color = "#000000"
+        self.discriminator = "0000"
         self.bot = False
 
 
@@ -24,6 +28,8 @@ class MockChannel(object):
         self.sends = sends
         self.reactions = reactions
         self.resp_id = resp_id
+        self.name = 'archit.us'
+        self.id = 0
 
     async def send(self, *args, **kwargs):
         for thing in args:
@@ -76,6 +82,7 @@ class MockMessage:
         self.author = MockMember()
         self.channel = MockChannel(bot, sends, reaction_sends, resp_id)
         self.content = content
+        self.clean_content = content
         self.reactions = []
 
     async def add_reaction(self, emoji, bot=True):

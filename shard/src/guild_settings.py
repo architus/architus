@@ -265,7 +265,7 @@ class Setting:
 
     @property
     def admins_ids(self) -> List[int]:
-        default_admins = []
+        default_admins = [self.guild.owner.id]
         default_admins += [m.id for role in self.guild.roles for m in role.members if role.permissions.administrator]
         default_admins += [self.guild.owner.id]
 
