@@ -18,8 +18,8 @@ MAX_PLAYLIST_LEN = 200
 
 def gen_spotify_token():
     credentials = oauth2.SpotifyClientCredentials(
-            client_id='1b4fadd2be3b48bda672c6e67caf7957',
-            client_secret='051114b9930f491d86379338185148b5')
+        client_id='1b4fadd2be3b48bda672c6e67caf7957',
+        client_secret='051114b9930f491d86379338185148b5')
     return credentials.get_access_token()
 
 
@@ -271,7 +271,7 @@ class LavaMusic(commands.Cog, name="Voice"):
                     return await self.enqueue(f"{name} by {artist}", user, guild)
                 else:
                     return []
-            except spotify.SpotifyException:
+            except spotipy.SpotifyException:
                 return ['error', 'spotify api is down']
 
         if not url_rx.match(query):
