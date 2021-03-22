@@ -217,10 +217,7 @@ class LavaMusic(commands.Cog, name="Voice"):
     async def seek(self, ctx, location):
         '''seek <time>
         Go to a specific timestamp in a song.
-        Time should be in one of the following formats:
-        1. hh:mm:ss
-        2. mm:ss
-        3. ss
+        Time should be in one of the following formats: hh:mm:ss, mm:ss, ss
         '''
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.is_playing:
