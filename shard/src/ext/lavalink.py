@@ -13,6 +13,8 @@ spotify_uri = re.compile(r'(?:https://open.spotify.com/(\w+)/([^?]+).*)|(?:spoti
 hours = re.compile(r'(\d+):(\d+):(\d+)')
 minutes = re.compile(r'(\d+):(\d+)')
 
+MAX_PLAYLIST_LEN = 200
+
 
 def gen_spotify_token():
     credentials = oauth2.SpotifyClientCredentials(
@@ -106,6 +108,9 @@ class LavaMusic(commands.Cog, name="Voice"):
     @commands.command()
     @doc_url("https://docs.archit.us/commands/music/#skip")
     async def skip(self, ctx):
+        '''skip
+        Skips the current playing song and starts the next song in the queue if any
+        '''
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         await player.skip()
         if player.is_playing:
@@ -144,6 +149,9 @@ class LavaMusic(commands.Cog, name="Voice"):
     @commands.group(aliases=['q'])
     @doc_url("https://docs.archit.us/commands/#queue")
     async def queue(self, ctx):
+        '''queue
+        Show the current queue of songs that is playing
+        '''
         if ctx.invoked_subcommand is None:
             p = self.bot.lavalink.player_manager.get(ctx.guild.id)
             await ctx.send(embed=self.queue_embed(p, p.queue))
@@ -151,12 +159,17 @@ class LavaMusic(commands.Cog, name="Voice"):
     @queue.command(aliases=['a'])
     @doc_url("https://docs.archit.us/commands/#queue")
     async def add(self, ctx, *query):
+        '''queue add <search item|url>
+        Add songs to the queue.
+        See help for the play command for more info.
+        '''
         await self.play(ctx, query=" ".join(query))
 
     @queue.command(aliases=['remove', 'r'])
     @doc_url("https://docs.archit.us/commands/#queue")
     async def rm(self, ctx, index: int):
-        '''queue rm <index>'''
+        '''queue rm <index>
+        Remove some song from the queue.'''
         q = self.bot.lavalink.player_manager.get(ctx.guild.id).queue
         # index = len(q) - index - 1
         index = index - 1
@@ -171,6 +184,9 @@ class LavaMusic(commands.Cog, name="Voice"):
     @queue.command()
     @doc_url("https://docs.archit.us/commands/music/#clear")
     async def clear(self, ctx):
+        '''queue clear
+        Clears the queue of all songs. Will keep playing the current song.
+        '''
         manager = self.bot.lavalink.player_manager.get(ctx.guild.id)
         q = manager.queue
         manager.queue = []
@@ -178,6 +194,9 @@ class LavaMusic(commands.Cog, name="Voice"):
 
     @queue.command()
     async def shuffle(self, ctx):
+        '''shuffle
+        Toggles the current shuffle state. The current shuffle state can be seen by running the `queue` command.
+        '''
         p = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if p.shuffle:
             p.shuffle = False
@@ -186,8 +205,23 @@ class LavaMusic(commands.Cog, name="Voice"):
             p.shuffle = True
             await ctx.send("Shuffle is **on**")
 
+    @queue.command()
+    async def limit(self, ctx):
+        '''limit
+        See the current maximum number of songs that can be in the queue
+        '''
+        await ctx.send(f"{MAX_PLAYLIST_LEN} songs can be in the queue")
+
     @commands.command()
+    @doc_url("https://docs.archit.us/commands/#seek")
     async def seek(self, ctx, location):
+        '''seek <time>
+        Go to a specific timestamp in a song.
+        Time should be in one of the following formats:
+        1. hh:mm:ss
+        2. mm:ss
+        3. ss
+        '''
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
         if not player.is_playing:
             await ctx.send("song needs to be playing for this command")
@@ -207,25 +241,29 @@ class LavaMusic(commands.Cog, name="Voice"):
         songs that were added to the queue.
         """
         query = query.strip('<>')
+        player = self.bot.lavalink.player_manager.get(guild.id)
+        curr_length = len(player.queue)
 
         if 'spotify' in query:
             if (match := spotify_uri.match(query)) is None:
                 return []
             (track_type, uri) = match.group(1, 2) if match.group(1) is not None else match.group(3, 4)
-            print(f"{track_type=}")
-            print(f"{uri=}")
             try:
                 if track_type == "album":
                     album = self.spotify_client.album(uri)
                     artist = album['artists'][0]['name']
-                    for t in album['tracks']['items']:
+                    num_songs = len(album['tracks']['items'])
+                    to_add = MAX_PLAYLIST_LEN - curr_length
+                    for t in album['tracks']['items'][:to_add]:
                         await self.enqueue(f"{t['name']} by {artist}", user, guild)
-                    return ['album', album['name'], len(album['tracks'])]
+                    return ['album', album['name'], min(num_songs, to_add), to_add < num_songs]
                 elif track_type == "playlist":
                     playlist = self.spotify_client.playlist(uri)
-                    for t in playlist['tracks']['items']:
+                    num_songs = len(playlist['tracks']['items'])
+                    to_add = MAX_PLAYLIST_LEN - curr_length
+                    for t in playlist['tracks']['items'][:to_add]:
                         await self.enqueue(f"{t['track']['name']} by {t['track']['artists'][0]['name']}", user, guild)
-                    return ['playlist', playlist['name'], len(playlist['tracks']['items'])]
+                    return ['playlist', playlist['name'], min(num_songs, to_add), to_add < num_songs]
                 elif track_type == "track":
                     track = self.spotify_client.track(uri)
                     name = track['name']
@@ -236,7 +274,6 @@ class LavaMusic(commands.Cog, name="Voice"):
             except spotify.SpotifyException:
                 return ['error', 'spotify api is down']
 
-        player = self.bot.lavalink.player_manager.get(guild.id)
         if not url_rx.match(query):
             query = f'ytsearch:{query}'
 
@@ -249,26 +286,34 @@ class LavaMusic(commands.Cog, name="Voice"):
         if results['loadType'] == 'PLAYLIST_LOADED':
             tracks = results['tracks']
 
-            for track in tracks:
+            to_add = len(tracks)
+            to_add = MAX_PLAYLIST_LEN - len(player.queue)
+            for track in tracks[:to_add]:
                 player.add(requester=user.id, track=track)
 
             if not player.is_playing:
                 await player.play()
 
-            return ['playlist', results['playlistInfo']['name'], len(tracks)]
+            return ['playlist', results['playlistInfo']['name'], min(len(tracks), to_add), len(tracks) > to_add]
         else:
             song = results['tracks'][0]
             track = lavalink.models.AudioTrack(song, user.id, recommended=True)
-            player.add(requester=user.id, track=track)
+            add = len(player.queue) < MAX_PLAYLIST_LEN
+            if add:
+                player.add(requester=user.id, track=track)
 
-            if not player.is_playing:
-                await player.play()
+                if not player.is_playing:
+                    await player.play()
 
-            return ['song', track]
+            return ['song', track, add]
 
     @commands.command(aliases=['p'])
     @doc_url("https://docs.archit.us/commands/music/#play")
     async def play(self, ctx, *, query: str):
+        '''play <search item|url>
+        Start playing a song or add songs to the queue.
+        Supports youtube, spotify, twitch, and soundcloud.
+        '''
         songs = await self.enqueue(query, ctx.author, ctx.guild)
 
         if len(songs) == 0:
@@ -284,21 +329,32 @@ class LavaMusic(commands.Cog, name="Voice"):
         if songs[0] == 'playlist':
             embed.title = 'Playlist Enqueued'
             embed.description = f'{songs[1]} - {songs[2]} tracks'
+            if songs[3]:
+                embed.description += f"\n{MAX_PLAYLIST_LEN} song limit reached"
         elif songs[0] == 'album':
             embed.title = 'Album Enqueued'
             embed.description = f'{songs[1]} - {songs[2]} tracks'
+            if songs[3]:
+                embed.description += f"\n{MAX_PLAYLIST_LEN} song limit reached"
         else:
-            track = songs[1]
-            embed.title = 'Tracks enqueued'
-            embed.description = f'[{track.title}]({track.uri})'
-            if "youtube" in track.uri:
-                yt_id = track.uri.split("=")[1]
-                embed.set_thumbnail(url=f"http://img.youtube.com/vi/{yt_id}/1.jpg")
+            if songs[2]:
+                track = songs[1]
+                embed.title = 'Tracks enqueued'
+                embed.description = f'[{track.title}]({track.uri})'
+                if "youtube" in track.uri:
+                    yt_id = track.uri.split("=")[1]
+                    embed.set_thumbnail(url=f"http://img.youtube.com/vi/{yt_id}/1.jpg")
+            else:
+                embed.title = "Track limit reached"
+                embed.description = f'Max of {MAX_PLAYLIST_LEN} songs can be in the queue'
 
         await ctx.send(embed=embed)
 
     @commands.command(aliases=['dc'])
     async def stop_music(self, ctx):
+        '''stop_music or dc
+        Will clear all music from the queue and disconnect architus from the vc.
+        '''
         player = self.bot.lavalink.player_manager.get(ctx.guild.id)
 
         if not player.is_connected:
