@@ -102,8 +102,6 @@ services:
     build:
       context: ./
       dockerfile: ./feature-gate/Dockerfile
-    ports:
-      - "50555:50555"
     networks:
       - webnet
     env_file:
@@ -115,5 +113,12 @@ services:
       dockerfile: ./sandbox/Dockerfile
     networks:
       - webnet
+  lavalink:
+      image: johnyburd/lavalink:${TAG:-latest}
+      build:
+        context: ./
+        dockerfile: ./lavalink/Dockerfile
+      networks:
+        - webnet
 networks:
   webnet:

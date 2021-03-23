@@ -167,9 +167,9 @@ class Music(CustomResource):
         return camelcase_keys(resp), sc
 
     @reqparams(song=str)
-    @authenticated()
-    def post(self, guild_id: int, jwt: JWT):
-        return self.shard.queue_song(guild_id, jwt.id, routing_guild=guild_id)
+    @authenticated(member=True)
+    def post(self, guild_id: int, song: str, jwt: JWT):
+        return self.shard.queue_song(guild_id, int(jwt.id), song, routing_guild=guild_id)
 
 
 class Emoji(CustomResource):
