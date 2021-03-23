@@ -14,7 +14,7 @@ from src.api.util import fetch_guild
 from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 from lib.ipc import manager_pb2 as message
-from src.utils import guild_to_dict, LavaSong
+from src.utils import guild_to_dict, lavasong_to_dict
 
 url_rx = re.compile(r'https?://(?:www\.)?.+')
 
@@ -74,14 +74,13 @@ class Api(Cog):
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
 
-    @fetch_guild
-    async def get_playlist(self, guild):
-        voice = self.bot.lavalink.player_manager.get(guild)
+    async def get_playlist(self, guild_id):
+        voice = self.bot.lavalink.player_manager.get(guild_id)
         if voice is None:
             return {}, sc.OK_200
         else:
-            dicts = [s.as_dict() for s in [LavaSong(s) for s in voice.queue]]
-            return {'songs': dicts}, sc.OK_200
+            dicts = [lavasong_to_dict(s) for s in voice.queue]
+            return {'playlist': dicts}, sc.OK_200
 
     @fetch_guild
     async def queue_song(self, guild, uid, song):
@@ -103,7 +102,7 @@ class Api(Cog):
         elif added_songs[0] == 'playlist':
             return {'playlist': added_songs}, sc.OK_200
         else:
-            return {'song': LavaSong(added_songs[1]).as_dict()}, sc.OK_200
+            return {lavasong_to_dict(added_songs[1])}, sc.OK_200
 
     async def users_guilds(self, user_id):
         users_guilds = []

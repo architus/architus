@@ -1,5 +1,6 @@
 import re
 from typing import Optional
+from lib.config import logger
 from src.utils import format_seconds, doc_url
 
 import discord
@@ -42,8 +43,11 @@ def get_millis(time: str) -> Optional[int]:
 class LavaMusic(commands.Cog, name="Voice"):
     def __init__(self, bot):
         self.bot = bot
-        self.spotify_token = gen_spotify_token()
-        self.spotify_client = spotipy.Spotify(auth=self.spotify_token)
+        try:
+            self.spotify_client = spotipy.Spotify(auth=gen_spotify_token())
+        except Exception:
+            self.spotify_client = None
+            logger.exception('')
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -75,7 +79,8 @@ class LavaMusic(commands.Cog, name="Voice"):
         vol = min(1000, max(0, int(vol)))
 
         if not settings.music_enabled:
-            raise commands.CommandInvokeError('playing music is not enabled on this server')
+            # no error message cause the only reason to disable music is for another bot
+            raise commands.CommandInvokeError('')
 
         if settings.music_role and settings.music_role not in user.roles \
                 and user.id not in settings.admin_ids:
@@ -120,7 +125,7 @@ class LavaMusic(commands.Cog, name="Voice"):
             embed.description = f'[{track.title}]({track.uri})'
             if "youtube" in track.uri:
                 yt_id = track.uri.split("=")[1]
-                embed.set_thumbnail(url=f"http://img.youtube.com/vi/{yt_id}/1.jpg")
+                embed.set_thumbnail(url=f"https://img.youtube.com/vi/{yt_id}/1.jpg")
             await ctx.send(embed=embed)
         else:
             await player.stop()
@@ -242,6 +247,8 @@ class LavaMusic(commands.Cog, name="Voice"):
         curr_length = len(player.queue)
 
         if 'spotify' in query:
+            if self.spotify_client is None:
+                return ['error', 'error connecting to spotify']
             if (match := spotify_uri.match(query)) is None:
                 return []
             (track_type, uri) = match.group(1, 2) if match.group(1) is not None else match.group(3, 4)
@@ -269,6 +276,7 @@ class LavaMusic(commands.Cog, name="Voice"):
                 else:
                     return []
             except spotipy.SpotifyException:
+                logger.exception('')
                 return ['error', 'spotify api is down']
 
         if not url_rx.match(query):
@@ -340,7 +348,7 @@ class LavaMusic(commands.Cog, name="Voice"):
                 embed.description = f'[{track.title}]({track.uri})'
                 if "youtube" in track.uri:
                     yt_id = track.uri.split("=")[1]
-                    embed.set_thumbnail(url=f"http://img.youtube.com/vi/{yt_id}/1.jpg")
+                    embed.set_thumbnail(url=f"https://img.youtube.com/vi/{yt_id}/1.jpg")
             else:
                 embed.title = "Track limit reached"
                 embed.description = f'Max of {MAX_PLAYLIST_LEN} songs can be in the queue'
@@ -363,7 +371,7 @@ class LavaMusic(commands.Cog, name="Voice"):
         player.queue.clear()
         await player.stop()
         await ctx.guild.change_voice_state(channel=None)
-        await ctx.send('*⃣ | Disconnected.')
+        await ctx.send('goodbye')
 
 
 def setup(bot):
