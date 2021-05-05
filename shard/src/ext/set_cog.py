@@ -8,7 +8,14 @@ from lib.config import logger
 
 from contextlib import suppress
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from collections import defaultdict
 import re
+
+
+@dataclass
+class MsgOvertaken:
+    overtaken: bool = False
 
 
 class AutoResponseCog(commands.Cog, name="Auto Responses"):
@@ -19,6 +26,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         self.response_msgs = {}
         self.react_msgs = {}
         self.executor = ThreadPoolExecutor(max_workers=5)
+        self.last_overtaken_ptrs = defaultdict(MsgOvertaken)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -29,8 +37,10 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     async def on_message(self, msg):
         if not self.bot.settings[msg.channel.guild].responses_enabled:
             return
+        self.last_overtaken_ptrs[msg.guild.id].overtaken = True
         with suppress(KeyError):
-            resp_msg, response = await self.responses[msg.guild.id].execute(msg)
+            self.last_overtaken_ptrs[msg.guild.id] = MsgOvertaken(False)
+            resp_msg, response = await self.responses[msg.guild.id].execute(msg, self.last_overtaken_ptrs[msg.guild.id])
             if resp_msg is not None:
                 self.response_msgs[resp_msg.id] = response
 
@@ -97,10 +107,25 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         """set <trigger>::<response>
         Sets an auto response.
         """
+        await self._set(ctx)
+
+    @commands.command()
+    @bot_commands_only
+    @doc_url("https://docs.archit.us/features/auto-responses/#setting-auto-responses")
+    async def setr(self, ctx):
+        """set <trigger>::<response>
+        Sets a regex auto response.
+        """
+        await self._set(ctx, regex=True)
+
+    async def _set(self, ctx, regex=False):
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)
 
-        match = re.match(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+        if regex:
+            match = re.match(f'{prefix}set \^(.+?)\$::(.+)', ctx.message.content, re.IGNORECASE)
+        else:
+            match = re.match(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
         if match:
             try:
                 resp = await self.responses[ctx.guild.id].new_response(match[1], match[2], ctx.guild, ctx.author)

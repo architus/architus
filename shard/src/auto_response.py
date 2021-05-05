@@ -2,6 +2,7 @@ import string
 from contextlib import suppress
 from typing import Optional, Tuple
 from random import choice
+from asyncio import sleep
 import json
 
 from discord import Message, Guild, Member, AllowedMentions
@@ -225,7 +226,7 @@ class AutoResponse:
                 await self.resolve_resp(c, match, msg, content, reacts)
             return content, reacts
 
-    async def execute(self, msg: Message) -> Optional[Message]:
+    async def execute(self, msg: Message, overtaken) -> Optional[Message]:
         content = msg.content
 
         if self.mode == ResponseMode.REGEX:
@@ -247,13 +248,19 @@ class AutoResponse:
         limit = min(self.settings.responses_response_length, 2000)
         if len(content) > limit:
             content = f"*content of response was over{' discord' if limit >= 2000 else ''} character limit ({limit})*"
-        logger.debug("here")
 
         if content.strip() != "":
-            resp_msg = await msg.reply(
-                content,
-                allowed_mentions=AllowedMentions(everyone=False),
-                mention_author=False)
+            await sleep(0.1)
+            if overtaken.overtaken:
+                resp_msg = await msg.reply(
+                    content,
+                    allowed_mentions=AllowedMentions(everyone=False),
+                    mention_author=False)
+            else:
+                resp_msg = await msg.channel.send(
+                    content,
+                    allowed_mentions=AllowedMentions(everyone=False)
+                )
         else:
             resp_msg = None
         for emoji in reacts:
@@ -354,11 +361,11 @@ class GuildAutoResponses:
             return
         await self.tb_auto_responses.update_by_id({'count': resp.count}, resp.id)
 
-    async def execute(self, msg) -> Tuple[Optional[Message], Optional[AutoResponse]]:
+    async def execute(self, msg, overtaken) -> Tuple[Optional[Message], Optional[AutoResponse]]:
         if msg.author.bot:
             return None, None
         for r in self.auto_responses:
-            resp_msg = await r.execute(msg)
+            resp_msg = await r.execute(msg, overtaken)
             if resp_msg is not None:
                 await self._update_resp_db(r)
                 return resp_msg, r
