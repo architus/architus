@@ -515,7 +515,7 @@ class ResponsesOnlyAuthorRemove(SettingsElement):
         super().__init__(
             "Restrict Remove",
             CROSS_MARK,
-            "When enabled, only the auto response author or an admin may remove it. Enter `true` or `false.",
+            "When enabled, only the auto response author or an admin may remove it. Enter `true` or `false`.",
             'responses_only_author_remove',
             tags=['responses'])
 

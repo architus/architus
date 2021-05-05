@@ -105,3 +105,19 @@ class TbEmojis(Base):
 
 class TbUsageAnalytics(Base):
     __tablename__ = 'tb_usage_analytics'
+
+
+class TbSettings(Base):
+    __tablename__ = 'tb_settings'
+
+    async def update_by_id(self, cols, id):
+        '''this should be removed once col `server_id` is renamed'''
+        assigns = (f"{c} = ${n + 2}" for n, c in enumerate(cols.keys()))
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    f'''UPDATE {self.__class__.__tablename__} SET
+                    {','.join(assigns)}
+                    WHERE server_id = $1
+                    ''', id, *cols.values()
+                )

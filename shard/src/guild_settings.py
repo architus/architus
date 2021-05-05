@@ -1,6 +1,7 @@
 import json
 from lib.models import Settings
-from lib.config import FAKE_GUILD_IDS
+from lib.aiomodels import TbSettings
+from lib.config import logger, FAKE_GUILD_IDS
 from sqlalchemy.orm.exc import NoResultFound
 from discord.ext.commands import Cog
 import discord
@@ -11,11 +12,12 @@ RYTHMS_ID = 235088799074484224
 
 class Setting:
 
-    def __init__(self, session, guild):
-        self.session = session
-        self.guild_id = guild.id
+    def __init__(self, bot, guild):
+        self.tb_settings = TbSettings(bot.asyncpg_wrapper)
+        self.bot = bot
+        self.session = bot.session
         self.guild = guild
-        self._settings_dict = self._load_from_db(self.guild_id)
+        self._settings_dict = {}
 
     @property
     def command_prefix(self) -> str:
@@ -374,22 +376,56 @@ class Setting:
         self.session.commit()
         return json.loads(settings_row.json_blob) if settings_row else {}
 
+    async def _async_load_from_db(self) -> dict:
+        if self.guild.id < FAKE_GUILD_IDS:
+            return
+
+        try:
+            row = await self.tb_settings.select_by_id({'server_id': self.guild.id})
+            if row is None:
+                await self.tb_settings.insert({'server_id': self.guild.id, 'json_blob': '{}'})
+        except Exception:
+            logger.exception(f'error initializing loading guild settings for {self.guild.id}')
+
+        self._settings_dict = json.loads(row['json_blob']) if row else {}
+
     def _update_db(self):
-        if self.guild_id < FAKE_GUILD_IDS:
+        if self.guild.id < FAKE_GUILD_IDS:
             return
         new_data = {
-            'server_id': int(self.guild_id),
             'json_blob': json.dumps(self._settings_dict)
         }
-        self.session.query(Settings).filter_by(server_id=int(self.guild_id)).update(new_data)
-        self.session.commit()
+        try:
+            self.bot.loop.create_task(self.tb_settings.update_by_id(new_data, self.guild.id))
+        except Exception:
+            logger.exception(f'error saving settings for {self.guild.id}')
+
+
+class AsyncSettings:
+    def __init__(self, bot, guilds):
+        self.bot = bot
+        self.guilds = guilds
+
+    def __getitem__(self, key):
+        return self.get(key)
+
+    async def get(self, guild):
+        if guild is None:
+            return None
+        try:
+            return self.guilds[guild]
+        except KeyError:
+            self.guilds[guild] = Setting(self.bot, guild)
+            await self.guilds[guild]._async_load_from_db()
+            return self.guilds[guild]
 
 
 class GuildSettings(Cog):
 
     def __init__(self, bot):
+        self.bot = bot
         self.guilds = {}
-        self.session = bot.session
+        self.aio = AsyncSettings(bot, self.guilds)
 
     def __getitem__(self, key):
         return self.get_guild(key)
@@ -400,7 +436,7 @@ class GuildSettings(Cog):
         try:
             return self.guilds[guild]
         except KeyError:
-            self.guilds[guild] = Setting(self.session, guild)
+            self.guilds[guild] = Setting(self.bot, guild)
             return self.guilds[guild]
 
 

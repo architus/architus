@@ -98,9 +98,12 @@ class Architus(Bot):
     @property
     def guilds_as_message(self):
         for guild in self.guilds:
-            guild_message = guild_to_message(guild)
-            guild_message.shard_id = self.shard_id
-            guild_message.admin_ids.extend(self.settings[guild].admins_ids)
+            try:
+                guild_message = guild_to_message(guild)
+                guild_message.shard_id = self.shard_id
+                guild_message.admin_ids.extend(self.settings[guild].admins_ids)
+            except Exception:
+                logger.exception(f'error converting guild ({guild.id}) to message')
             yield guild_message
 
     @property

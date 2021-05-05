@@ -113,22 +113,30 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     @bot_commands_only
     @doc_url("https://docs.archit.us/features/auto-responses/#setting-auto-responses")
     async def setr(self, ctx):
-        """set <trigger>::<response>
+        """set <regex>::<response>
         Sets a regex auto response.
         """
         await self._set(ctx, regex=True)
 
-    async def _set(self, ctx, regex=False):
+    @commands.command()
+    @bot_commands_only
+    @doc_url("https://docs.archit.us/features/auto-responses/#setting-auto-responses")
+    async def reply(self, ctx):
+        """set <trigger>::<response>
+        Sets an auto response that will reply to the trigger message.
+        """
+        await self._set(ctx, regex=False, reply=True)
+
+    async def _set(self, ctx, regex=False, reply=False):
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)
 
-        if regex:
-            match = re.match(f'{prefix}set \^(.+?)\$::(.+)', ctx.message.content, re.IGNORECASE)
-        else:
-            match = re.match(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+        match = re.match(f'{prefix}\\w+ (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+
         if match:
             try:
-                resp = await self.responses[ctx.guild.id].new_response(match[1], match[2], ctx.guild, ctx.author)
+                trigger = f"^{match[1]}$" if regex else match[1]
+                resp = await self.responses[ctx.guild.id].new_response(trigger, match[2], ctx.guild, ctx.author, reply)
             except TriggerCollisionException as e:
                 msg = "❌ sorry that trigger collides with the following auto responses:\n"
                 msg += '\n'.join([f"`{r}`" for r in e.conflicts[:4]])
@@ -156,7 +164,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             else:
                 await ctx.send(f"✅ `{resp}` _successfully set_")
         else:
-            match = re.match(f'{prefix}set (.+?):(.+)', ctx.message.content, re.IGNORECASE)
+            match = re.match(f'{prefix}\\w+ ([^\\\\]+?):([^\\\\]+)', ctx.message.content, re.IGNORECASE)
             if match:
                 await ctx.send(f"❌ **nice brain** use two `::`\n`{prefix}set {match[1]}::{match[2]}`")
             else:
