@@ -2,9 +2,10 @@ import jwt as pyjwt
 from flask import request
 from datetime import datetime, timedelta
 from lib.status_codes import StatusCodes
-from lib.config import jwt_secret
+from lib.config import jwt_secret, twitch_hub_secret
 
 from functools import wraps
+import hmac
 
 
 def flask_authenticated(member=False):
@@ -63,6 +64,12 @@ def gateway_authenticated(shard, member=False):
                 return await func(self, sid, data, *args, **kwargs, jwt=jwt)
         return wrapper
     return decorator
+
+
+def verify_twitch_hub(msg: str, digestmod: str, signature: str):
+    hm = hmac.new(twitch_hub_secret, msg=msg, digestmod=digestmod)
+    logger.debug(f"ours: {hm.hexdigest()}\ntheirs: {signature}")
+    return hmac.compare_digest(hm.hexdigest(), signature)
 
 
 class JWT:

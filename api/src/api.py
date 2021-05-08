@@ -9,7 +9,7 @@ from werkzeug.wsgi import FileWrapper
 from lib.status_codes import StatusCodes
 from lib.config import logger, client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod, which_shard
 # from lib.models import Log # , Emojis
-from lib.auth import JWT, flask_authenticated as authenticated
+from lib.auth import JWT, flask_authenticated as authenticated, verify_twitch_hub
 from lib.discord_requests import list_guilds_request
 from lib.pool_types import PoolType
 
@@ -210,6 +210,10 @@ class Twitch(CustomResource):
 
     def post(self):
         print(request.json['data'])
+        sig = request.headers['x-hub-signature'].split('=')
+        if not verify_twitch_hub(request.data, sig[0], sig[1]):
+            return make_response("Invalid Signature", StatusCodes.FORBIDDEN_403)
+
         if request.json is None or 'data' not in request.json:
             return StatusCodes.BAD_REQUEST_400
         for stream in request.json['data']:

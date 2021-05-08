@@ -46,7 +46,7 @@ try:
 except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 
-API_ENDPOINT = 'https://discordapp.com/api/v6'
+API_ENDPOINT = 'https://discordapp.com/api/v8'
 REDIRECT_URI = f'https://api.{domain_name}/redirect'
 
 logger.debug("creating db engine...")

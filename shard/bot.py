@@ -57,6 +57,10 @@ class Architus(Bot):
 
         super().run(token)
 
+    async def on_socket_raw_receive(self, msg):
+        if "Slash" in self.cogs:
+            await self.cogs['Slash'].on_socket_raw_receive(msg)
+
     async def on_message(self, msg):
         """Execute commands, then trigger autoresponses"""
         logger.info('Message from {0.author} in {0.guild.name}: {0.content}'.format(msg))
@@ -151,6 +155,7 @@ for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
 architus.load_extension('src.emoji_manager')
 architus.load_extension('src.api.api')
 architus.load_extension('src.guild_settings')
+architus.load_extension('src.slash_commands_cog')
 
 if __name__ == '__main__':
     architus.run(secret_token)

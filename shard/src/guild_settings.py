@@ -369,14 +369,14 @@ class Setting:
         self._settings_dict['emojis'] = new_emojis
         self._update_db()
 
-    def _load_from_db(self, guild_id) -> dict:
-        if self.guild_id < FAKE_GUILD_IDS:
+    def _load_from_db(self) -> dict:
+        if self.guild.id < FAKE_GUILD_IDS:
             return {}
         settings_row = None
         try:
-            settings_row = self.session.query(Settings).filter_by(server_id=int(guild_id)).one()
+            settings_row = self.session.query(Settings).filter_by(server_id=int(self.guild.id)).one()
         except NoResultFound:
-            new_guild = Settings(int(self.guild_id), json.dumps({}))
+            new_guild = Settings(int(self.guild.id), json.dumps({}))
             self.session.add(new_guild)
         self.session.commit()
         return json.loads(settings_row.json_blob) if settings_row else {}
@@ -407,7 +407,8 @@ class GuildSettings(Cog):
         try:
             return self.guilds[guild]
         except KeyError:
-            self.guilds[guild] = Setting(self.session, guild)
+            self.guilds[guild] = Setting(self.bot, guild)
+            self.guilds[guild]._settings_dict = self.guilds[guild]._load_from_db()
             return self.guilds[guild]
 
 
