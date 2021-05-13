@@ -115,5 +115,10 @@ services:
       dockerfile: ./sandbox/Dockerfile
     networks:
       - webnet
+  redis:
+    image: redis:alpine
+    command: redis-server
+    networks:
+      - webnet
 networks:
   webnet:

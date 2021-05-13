@@ -208,14 +208,19 @@ class Twitch(CustomResource):
         challenge = request.args.get("hub.challenge")
         return make_response(challenge, StatusCodes.OK_200)
 
+    @verify_twitch_hub
     def post(self):
-        print(request.json['data'])
-        sig = request.headers['x-hub-signature'].split('=')
-        if not verify_twitch_hub(request.data, sig[0], sig[1]):
-            return make_response("Invalid Signature", StatusCodes.FORBIDDEN_403)
-
         if request.json is None or 'data' not in request.json:
             return StatusCodes.BAD_REQUEST_400
+
+        # twitch can send the same event more than once.
+        id = request.headers['Twitch-Notification-Id']
+        seen_before = self.redis.getset(id, '1') is not None
+        self.redis.expire(id, 60)
+        if seen_before:
+            return StatusCodes.NO_CONTENT_204
+
+        # send update to all the relevant shards
         for stream in request.json['data']:
             user_id = stream["user_id"]
             result = self.session.execute(

@@ -2,10 +2,11 @@ import jwt as pyjwt
 from flask import request
 from datetime import datetime, timedelta
 from lib.status_codes import StatusCodes
-from lib.config import jwt_secret, twitch_hub_secret
+from lib.config import jwt_secret, twitch_hub_secret, logger
 
 from functools import wraps
 import hmac
+import hashlib
 
 
 def flask_authenticated(member=False):
@@ -21,12 +22,19 @@ def flask_authenticated(member=False):
             try:
                 jwt = JWT(token=request.cookies.get('token'))
             except pyjwt.exceptions.InvalidTokenError:
+                try:
+                    bad_jwt = JWT(token=request.cookies.get('token'), verify_signature=False)
+                    logger.info(f'{bad_jwt.id} attempted to access {request.path} with an invalid token')
+                except Exception:
+                    logger.exception("very bad jwt")
                 return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
             if expired(jwt):
+                logger.info(f'{jwt.id} attempted to access {request.path} with an expired token')
                 return ({'message': "Expired"}, StatusCodes.UNAUTHORIZED_401)
             if member:
                 data, sc = self.shard.is_member(jwt.id, kwargs['guild_id'], routing_guild=kwargs['guild_id'])
                 if sc != 200 or not data['member']:
+                    logger.info(f'{jwt.id} attempted to access {request.path} but was not a member')
                     return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
             return func(self, *args, **kwargs, jwt=jwt)
         return wrapper
@@ -66,10 +74,22 @@ def gateway_authenticated(shard, member=False):
     return decorator
 
 
-def verify_twitch_hub(msg: str, digestmod: str, signature: str):
-    hm = hmac.new(twitch_hub_secret, msg=msg, digestmod=digestmod)
-    logger.debug(f"ours: {hm.hexdigest()}\ntheirs: {signature}")
-    return hmac.compare_digest(hm.hexdigest(), signature)
+def verify_twitch_hub(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            signature = request.headers['x-hub-signature'].split('=')
+            digest = hmac.new(twitch_hub_secret.encode(), msg=request.data, digestmod=hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(digest, signature[1]):
+                logger.info("Request had invalid signature")
+                return ({'message': "Invalid Signature"}, StatusCodes.UNAUTHORIZED_401)
+        except KeyError:
+            return ({'message': "Signature Required"}, StatusCodes.UNAUTHORIZED_401)
+        except Exception:
+            logger.exception("error verifying twitch hub request")
+            return ({'message': "Unknown error"}, StatusCodes.INTERNAL_SERVER_ERROR_500)
+        return func(self, *args, **kwargs)
+    return wrapper
 
 
 class JWT:
