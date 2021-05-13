@@ -2,9 +2,11 @@ import jwt as pyjwt
 from flask import request
 from datetime import datetime, timedelta
 from lib.status_codes import StatusCodes
-from lib.config import jwt_secret, logger
+from lib.config import jwt_secret, twitch_hub_secret, logger
 
 from functools import wraps
+import hmac
+import hashlib
 
 
 def flask_authenticated(member=False):
@@ -70,6 +72,24 @@ def gateway_authenticated(shard, member=False):
                 return await func(self, sid, data, *args, **kwargs, jwt=jwt)
         return wrapper
     return decorator
+
+
+def verify_twitch_hub(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            signature = request.headers['x-hub-signature'].split('=')
+            digest = hmac.new(twitch_hub_secret.encode(), msg=request.data, digestmod=hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(digest, signature[1]):
+                logger.info("Request had invalid signature")
+                return ({'message': "Invalid Signature"}, StatusCodes.UNAUTHORIZED_401)
+        except KeyError:
+            return ({'message': "Signature Required"}, StatusCodes.UNAUTHORIZED_401)
+        except Exception:
+            logger.exception("error verifying twitch hub request")
+            return ({'message': "Unknown error"}, StatusCodes.INTERNAL_SERVER_ERROR_500)
+        return func(self, *args, **kwargs)
+    return wrapper
 
 
 class JWT:

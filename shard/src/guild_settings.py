@@ -39,6 +39,14 @@ class Setting:
         self._update_db()
 
     @property
+    def twitch_channel_id(self) -> int:
+        return self._settings_dict.get('twitch_channel_id', None)
+
+    @twitch_channel_id.setter
+    def twitch_channel_id(self, new_twitch_channel_id: int):
+        self._settings_dict['twitch_channel_id'] = new_twitch_channel_id
+
+    @property
     def music_role(self) -> Optional[discord.Role]:
         role_id = self._settings_dict.get('music_role_id', None)
         return self.guild.get_role(role_id)
@@ -364,14 +372,14 @@ class Setting:
         self._settings_dict['emojis'] = new_emojis
         self._update_db()
 
-    def _load_from_db(self, guild_id) -> dict:
-        if self.guild_id < FAKE_GUILD_IDS:
+    def _load_from_db(self) -> dict:
+        if self.guild.id < FAKE_GUILD_IDS:
             return {}
         settings_row = None
         try:
-            settings_row = self.session.query(Settings).filter_by(server_id=int(guild_id)).one()
+            settings_row = self.session.query(Settings).filter_by(server_id=int(self.guild.id)).one()
         except NoResultFound:
-            new_guild = Settings(int(self.guild_id), json.dumps({}))
+            new_guild = Settings(int(self.guild.id), json.dumps({}))
             self.session.add(new_guild)
         self.session.commit()
         return json.loads(settings_row.json_blob) if settings_row else {}
@@ -437,6 +445,7 @@ class GuildSettings(Cog):
             return self.guilds[guild]
         except KeyError:
             self.guilds[guild] = Setting(self.bot, guild)
+            self.guilds[guild]._load_from_db()
             return self.guilds[guild]
 
 
