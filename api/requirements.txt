@@ -9,3 +9,4 @@ psycopg2
 pika
 pyjwt
 redis
+stripe

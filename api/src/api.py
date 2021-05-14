@@ -15,6 +15,7 @@ from lib.pool_types import PoolType
 
 from src.util import CustomResource, reqparams, camelcase_keys
 from src.session import Identify, Login, RefreshToken, TokenExchange, End
+from src.payments import Checkout
 
 
 app = Flask(__name__)
@@ -247,6 +248,8 @@ def app_factory():
     api.add_resource(RefreshToken, "/session/refresh")
     api.add_resource(End, "/session/end")
     api.add_resource(TokenExchange, "/session/token-exchange")
+
+    api.add_resource(Checkout, "/checkout")
 
     api.add_resource(AllGuilds, "/admin/guilds")
     api.add_resource(User, "/user/<string:name>")

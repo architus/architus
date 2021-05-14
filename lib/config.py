@@ -43,6 +43,7 @@ try:
     twitch_client_id = os.environ['twitch_client_id']
     twitch_client_secret = os.environ['twitch_client_secret']
     twitch_hub_secret = os.environ['twitch_hub_secret']
+    stripe_secret_key = os.enviorn['stripe_secret_key']
 except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 
