@@ -24,7 +24,7 @@ class Checkout(CustomResource):
                 'price': 'price_1IqqGiHUEjNeJTDOoSGqvp28',
                 'quantity': 1,
             }],
-            mode='payment',
+            mode='subscription',
             success_url='https://example.com/success?session_id={CHECKOUT_SESSION_ID}',
             cancel_url='https://example.com/cancel',
         )
