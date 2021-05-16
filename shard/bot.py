@@ -179,7 +179,6 @@ for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
 architus.load_extension('src.emoji_manager')
 architus.load_extension('src.api.api')
 architus.load_extension('src.guild_settings')
-architus.load_extension('src.slash_commands_cog')
 
 if __name__ == '__main__':
     architus.run(secret_token)
