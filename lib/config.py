@@ -40,10 +40,13 @@ try:
     domain_name = os.environ['domain_name']
     alphavantage_api_key = os.environ['alphavantage_api_key']
     scraper_token = os.environ['scraper_bot_token']
+    twitch_client_id = os.environ['twitch_client_id']
+    twitch_client_secret = os.environ['twitch_client_secret']
+    twitch_hub_secret = os.environ['twitch_hub_secret']
 except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 
-API_ENDPOINT = 'https://discordapp.com/api/v6'
+API_ENDPOINT = 'https://discordapp.com/api/v8'
 REDIRECT_URI = f'https://api.{domain_name}/redirect'
 
 logger.debug("creating db engine...")

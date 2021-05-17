@@ -2,9 +2,11 @@ import jwt as pyjwt
 from flask import request
 from datetime import datetime, timedelta
 from lib.status_codes import StatusCodes
-from lib.config import jwt_secret
+from lib.config import jwt_secret, twitch_hub_secret, logger
 
 from functools import wraps
+import hmac
+import hashlib
 
 
 def flask_authenticated(member=False):
@@ -20,12 +22,19 @@ def flask_authenticated(member=False):
             try:
                 jwt = JWT(token=request.cookies.get('token'))
             except pyjwt.exceptions.InvalidTokenError:
+                try:
+                    bad_jwt = JWT(token=request.cookies.get('token'), verify_signature=False)
+                    logger.info(f'{bad_jwt.id} attempted to access {request.path} with an invalid token')
+                except Exception:
+                    logger.exception("very bad jwt")
                 return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
             if expired(jwt):
+                logger.info(f'{jwt.id} attempted to access {request.path} with an expired token')
                 return ({'message': "Expired"}, StatusCodes.UNAUTHORIZED_401)
             if member:
                 data, sc = self.shard.is_member(jwt.id, kwargs['guild_id'], routing_guild=kwargs['guild_id'])
                 if sc != 200 or not data['member']:
+                    logger.info(f'{jwt.id} attempted to access {request.path} but was not a member')
                     return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
             return func(self, *args, **kwargs, jwt=jwt)
         return wrapper
@@ -65,8 +74,26 @@ def gateway_authenticated(shard, member=False):
     return decorator
 
 
+def verify_twitch_hub(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        try:
+            signature = request.headers['x-hub-signature'].split('=')
+            digest = hmac.new(twitch_hub_secret.encode(), msg=request.data, digestmod=hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(digest, signature[1]):
+                logger.info("Request had invalid signature")
+                return ({'message': "Invalid Signature"}, StatusCodes.UNAUTHORIZED_401)
+        except KeyError:
+            return ({'message': "Signature Required"}, StatusCodes.UNAUTHORIZED_401)
+        except Exception:
+            logger.exception("error verifying twitch hub request")
+            return ({'message': "Unknown error"}, StatusCodes.INTERNAL_SERVER_ERROR_500)
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
 class JWT:
-    def __init__(self, data=None, token=None):
+    def __init__(self, data=None, token=None, verify_signature=True):
         if data is None and token is None:
             raise pyjwt.exceptions.InvalidTokenError("Token (or data) is empty")
 
@@ -90,8 +117,8 @@ class JWT:
         except KeyError:
             raise AttributeError(f"no such attribute {name}") from None
 
-    def _decode(self, token):
-        return pyjwt.decode(token, jwt_secret, alorgithms='HS256')
+    def _decode(self, token, verify=True):
+        return pyjwt.decode(token, jwt_secret, algorithms=['HS256'], options={'verify_signature': verify})
 
     def _encode(self, payload):
         return pyjwt.encode(payload, jwt_secret, algorithm='HS256')

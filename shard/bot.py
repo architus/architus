@@ -59,6 +59,10 @@ class Architus(Bot):
 
         super().run(token)
 
+    async def on_socket_raw_receive(self, msg):
+        if "Slash" in self.cogs:
+            await self.cogs['Slash'].on_socket_raw_receive(msg)
+
     async def on_message(self, msg):
         """Execute commands, then trigger autoresponses"""
         logger.info('Message from {0.author} in {0.guild.name}: {0.content}'.format(msg))
@@ -98,9 +102,12 @@ class Architus(Bot):
     @property
     def guilds_as_message(self):
         for guild in self.guilds:
-            guild_message = guild_to_message(guild)
-            guild_message.shard_id = self.shard_id
-            guild_message.admin_ids.extend(self.settings[guild].admins_ids)
+            try:
+                guild_message = guild_to_message(guild)
+                guild_message.shard_id = self.shard_id
+                guild_message.admin_ids.extend(self.settings[guild].admins_ids)
+            except Exception:
+                logger.exception(f'error converting guild ({guild.id}) to message')
             yield guild_message
 
     @property

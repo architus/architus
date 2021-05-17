@@ -59,3 +59,4 @@ asyncpg
 grpcio==1.29.0
 protobuf
 discord.py[voice]
+lavalink

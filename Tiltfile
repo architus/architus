@@ -30,6 +30,7 @@ docker_build('dbmanager-image', 'dbmanager', dockerfile='dbmanager/Dockerfile')
 
 k8s_yaml('secret.yaml')
 k8s_yaml('shard/kube/dev/shard.yaml')
+k8s_yaml('lavalink/kube/dev/lavalink.yaml')
 k8s_yaml('manager/kube/dev/manager.yaml')
 k8s_yaml('rabbitmq/kube/dev/rabbit.yaml')
 k8s_yaml('db/kube/dev/db.yaml')
