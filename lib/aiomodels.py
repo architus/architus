@@ -97,11 +97,6 @@ class TbReactEvents(Base):
 class TbEmojis(Base):
     __tablename__ = 'tb_emojis'
 
-    async def select_by_guild(self, guild_id):
-        async with (await self.pool()).acquire() as conn:
-            return await conn.fetch(
-                f'SELECT * FROM {self.__class__.__tablename__} WHERE guild_id = $1 ORDER BY priority', guild_id)
-
 
 class TbUsageAnalytics(Base):
     __tablename__ = 'tb_usage_analytics'

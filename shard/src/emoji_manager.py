@@ -49,16 +49,16 @@ class EmojiManager:
             emoji.im.save(buf, format="PNG")
             binary = buf.getvalue()
 
-        await self.tb_emojis.insert_one((
-            emoji.id,
-            emoji.discord_id,
-            emoji.author_id,
-            self.guild.id,
-            emoji.name,
-            emoji.num_uses,
-            emoji.priority,
-            binary
-        ))
+        await self.tb_emojis.insert({
+            'id': emoji.id,
+            'discord_id': emoji.discord_id,
+            'author_id': emoji.author_id,
+            'guild_id': self.guild.id,
+            'name': emoji.name,
+            'num_uses': emoji.num_uses,
+            'priority': emoji.priority,
+            'img': binary
+        })
 
     async def _update_emojis_db(self, emojis_list: List[ArchitusEmoji]) -> None:
 
@@ -69,7 +69,6 @@ class EmojiManager:
                 'author_id': e.author_id,
                 'guild_id': self.guild.id,
                 'name': e.name,
-                # 'url': e.url,
                 'num_uses': e.num_uses,
                 'priority': e.priority,
             }, e.id)
