@@ -145,7 +145,6 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             else:
                 await ctx.send("❌ use the syntax: `trigger::response`")
 
-
     async def new_response(self, trigger, response, guild, author, reply):
         settings = await self.bot.settings.aio[guild]
         try:
@@ -158,7 +157,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
             return msg
         except LongResponseException:
             return f"❌ that response is too long :confused: max length is " \
-                   f"{settings.responses_response_length} characters")
+                   f"{settings.responses_response_length} characters"
         except ShortTriggerException:
             return f"❌ please make your trigger longer than {settings.responses_trigger_length} characters"
         except UserLimitException:

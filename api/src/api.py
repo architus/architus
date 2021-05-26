@@ -1,6 +1,5 @@
 import json
 from io import BytesIO
-from lib.reggy.reggy import D
 
 from flask import Flask, redirect, request, g, Response, make_response
 from flask_restful import Api, Resource
@@ -253,7 +252,7 @@ def app_factory():
     api.add_resource(TokenExchange, "/session/token-exchange")
 
     # webhooks
-    api.add_resorce(DiscordInteraction, "/discord")
+    api.add_resource(DiscordInteraction, "/discord")
     api.add_resource(Twitch, "/twitch")
 
     api.add_resource(AllGuilds, "/admin/guilds")
