@@ -18,7 +18,7 @@ def init():
     logger.info("Registering slash commands")
     for c in commands:
         logger.debug(register_command(c))
-        logger.debug(register_guild_command(436189230390050826, c))
+        # logger.debug(register_guild_command(436189230390050826, c))
 
 
 class DiscordInteraction(CustomResource):
