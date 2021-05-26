@@ -1,4 +1,5 @@
 from flask import request
+import os
 from json import loads
 from discord_interactions import verify_key_decorator, InteractionType, InteractionResponseType
 
@@ -8,8 +9,9 @@ from src.util import CustomResource
 
 
 commands = []
-with open('./src/slash_commands/set.json') as f:
-    commands.append(loads(f.read()))
+for name in os.listdir('./src/slash_commands/'):
+    with open(name) as f:
+        commands.append(loads(f.read()))
 
 
 def init():
@@ -26,9 +28,14 @@ class DiscordInteraction(CustomResource):
         options = data['data']['options']
         if data['type'] == InteractionType.APPLICATION_COMMAND:
             trigger = next(o['value'] for o in options if o['name'] == 'trigger')
-            response = next(o['value'] for o in options if o['name'] == 'response')
-            reply = next((o['value'] for o in options if o['name'] == 'reply'), False)
-            resp, _ = self.shard.set_response(data['guild_id'], data['member']['id'], trigger, response, reply)
+            if data['data']['name'] == 'set':
+                response = next(o['value'] for o in options if o['name'] == 'response')
+                reply = next((o['value'] for o in options if o['name'] == 'reply'), False)
+                resp, _ = self.shard.set_response(
+                    data['guild_id'], data['member']['user']['id'], trigger, response, reply)
+
+            else:
+                resp, _ = self.shard.remove_response(data['guild_id'], data['member']['user']['id'], trigger)
             return {
                 'type': InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                 'data': {

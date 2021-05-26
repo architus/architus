@@ -89,16 +89,21 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
         match = re.match(f'^{prefix}remove (.+?)(::.+)?$', ctx.message.content.strip(), re.IGNORECASE)
         if match:
-            try:
-                resp = await self.responses[ctx.guild.id].remove(match[1], ctx.author)
-            except PermissionException as e:
-                member = ctx.guild.get_member(e.author_id)
-                whom = f"{member.display_name} or an admin" if member else "an admin"
-                await ctx.send(f"❌ please ask {whom} to remove this response")
-            except UnknownResponseException:
-                await ctx.send("❌ idk what response you want me to remove")
-            else:
-                await ctx.send(f"✅ `{resp}` _successfully removed_")
+            resp = await self._remove(ctx.guild, match[1], ctx.author)
+            if resp:
+                await ctx.send(resp)
+
+    async def _remove(self, guild, trigger, author):
+        try:
+            resp = await self.responses[guild.id].remove(trigger, author)
+        except PermissionException as e:
+            member = guild.get_member(e.author_id)
+            whom = f"{member.display_name} or an admin" if member else "an admin"
+            return f"❌ please ask {whom} to remove this response"
+        except UnknownResponseException:
+            return "❌ idk what response you want me to remove"
+        else:
+            return f"✅ `{resp}` _successfully removed_"
 
     @commands.command()
     @bot_commands_only

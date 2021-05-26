@@ -74,8 +74,16 @@ class Api(Cog):
     @fetch_guild
     async def set_response(self, guild, member_id, trigger, response, reply):
         member = guild.get_member(member_id)
-        responses = self.bot.cogs['Auto Responses'][guild.id]
+        responses = self.bot.cogs['Auto Responses']
         result = await responses.new_response(trigger, response, guild, member, reply)
+
+        return {'content': result}, 200
+
+    @fetch_guild
+    async def remove_response(self, guild, member_id, trigger):
+        member = guild.get_member(member_id)
+        responses = self.bot.cogs['Auto Responses']
+        result = await responses._remove(trigger, member)
 
         return {'content': result}, 200
 
