@@ -1,17 +1,20 @@
 from lib.discord_requests import register_command, register_guild_command
 from lib.auth import verify_discord_interaction
+from lib.config import logger
 from src.util import CustomResource
-
 
 
 commands = []
 with open('./src/slash_commands/set.json') as f:
     commands.append(f.read())
 
+
 def init():
+    logger.info("Registering slash commands")
     for c in commands:
         register_command(c)
-        register_command(436189230390050826, c)
+        register_guild_command(436189230390050826, c)
+
 
 class DiscordInteraction(CustomResource):
     @verify_discord_interaction
@@ -22,6 +25,6 @@ class DiscordInteraction(CustomResource):
                 "tts": False,
                 "content": "Congrats on sending your command!",
                 "embeds": [],
-                "allowed_mentions": { "parse": [] }
+                "allowed_mentions": {"parse": []}
             }
         }

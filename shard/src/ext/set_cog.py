@@ -132,43 +132,49 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         prefix = re.escape(settings.command_prefix)
 
         match = re.match(f'{prefix}\\w+ (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+        trigger = f"^{match[1]}$" if regex else match[1]
 
         if match:
-            try:
-                trigger = f"^{match[1]}$" if regex else match[1]
-                resp = await self.responses[ctx.guild.id].new_response(trigger, match[2], ctx.guild, ctx.author, reply)
-            except TriggerCollisionException as e:
-                msg = "❌ sorry that trigger collides with the following auto responses:\n"
-                msg += '\n'.join([f"`{r}`" for r in e.conflicts[:4]])
-                if len(e.conflicts) > 4:
-                    msg += f"\n_...{len(e.conflicts) - 4} more not shown_"
-                await ctx.send(msg)
-            except LongResponseException:
-                await ctx.send(f"❌ that response is too long :confused: max length is "
-                               f"{settings.responses_response_length} characters")
-            except ShortTriggerException:
-                await ctx.send(
-                    f"❌ please make your trigger longer than {settings.responses_trigger_length} characters")
-            except UserLimitException:
-                await ctx.send(f"❌ looks like you've already used all your auto responses "
-                               f"in this server ({settings.responses_limit}), try deleting some")
-            except ParseError as e:
-                await ctx.send(f"❌ unable to parse that response: `{e}`")
-            except NotParseable as e:
-                await ctx.send(f"❌ unable to parse your trigger: `{e}`")
-            except DisabledException as e:
-                await ctx.send(f"❌ {e} disabled, you can enable in `{settings.command_prefix}settings responses`")
-            except Exception:
-                logger.exception("")
-                await ctx.send("❌ unknown error 😵")
-            else:
-                await ctx.send(f"✅ `{resp}` _successfully set_")
+            result = await self.new_response(trigger, match[2], ctx.guild, ctx.author, reply)
+            if result:
+                await ctx.send(result)
         else:
             match = re.match(f'{prefix}\\w+ ([^\\\\]+?):([^\\\\]+)', ctx.message.content, re.IGNORECASE)
             if match:
                 await ctx.send(f"❌ **nice brain** use two `::`\n`{prefix}set {match[1]}::{match[2]}`")
             else:
                 await ctx.send("❌ use the syntax: `trigger::response`")
+
+
+    async def new_response(self, trigger, response, guild, author, reply):
+        settings = await self.bot.settings.aio[guild]
+        try:
+            resp = await self.responses[guild.id].new_response(trigger, response, guild, author, reply)
+        except TriggerCollisionException as e:
+            msg = "❌ sorry that trigger collides with the following auto responses:\n"
+            msg += '\n'.join([f"`{r}`" for r in e.conflicts[:4]])
+            if len(e.conflicts) > 4:
+                msg += f"\n_...{len(e.conflicts) - 4} more not shown_"
+            return msg
+        except LongResponseException:
+            return f"❌ that response is too long :confused: max length is " \
+                   f"{settings.responses_response_length} characters")
+        except ShortTriggerException:
+            return f"❌ please make your trigger longer than {settings.responses_trigger_length} characters"
+        except UserLimitException:
+            return f"❌ looks like you've already used all your auto responses " \
+                   f"in this server ({settings.responses_limit}), try deleting some"
+        except ParseError as e:
+            return f"❌ unable to parse that response: `{e}`"
+        except NotParseable as e:
+            return f"❌ unable to parse your trigger: `{e}`"
+        except DisabledException as e:
+            return f"❌ {e} disabled, you can enable in `{settings.command_prefix}settings responses`"
+        except Exception:
+            logger.exception("")
+            return "❌ unknown error 😵"
+        else:
+            return f"✅ `{resp}` _successfully set_"
 
 
 def setup(bot):

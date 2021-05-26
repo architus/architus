@@ -8,6 +8,7 @@ COPY ./api/requirements.txt /app
 RUN apk update && apk add linux-headers pcre-dev uwsgi-python3
 RUN apk add build-base musl-dev python3 #zeromq-dev libzmq
 RUN apk add --virtual build-deps gcc python3-dev musl-dev postgresql-dev
+RUN apk add --no-cache --virtual .pynacl_deps libffi-dev
 
 
 # Install any needed packages specified in requirements.txt

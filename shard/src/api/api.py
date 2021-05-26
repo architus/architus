@@ -71,8 +71,13 @@ class Api(Cog):
             })
         return {'guilds': all_guilds}, sc.OK_200
 
-    async def set_response(self, user_id, guild_id, trigger, response):
-        return {'message': 'unimplemented'}, 500
+    @fetch_guild
+    async def set_response(self, guild, member_id, trigger, response, reply):
+        member = guild.get_member(member_id)
+        responses = self.bot.cogs['Auto Responses'][guild.id]
+        result = await responses.new_response(trigger, response, guild, member, reply)
+
+        return {'content': result}, 200
 
     async def get_playlist(self, guild_id):
         voice = self.bot.lavalink.player_manager.get(guild_id)

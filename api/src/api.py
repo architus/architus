@@ -1,5 +1,6 @@
 import json
 from io import BytesIO
+from lib.reggy.reggy import D
 
 from flask import Flask, redirect, request, g, Response, make_response
 from flask_restful import Api, Resource
@@ -15,6 +16,7 @@ from lib.pool_types import PoolType
 
 from src.util import CustomResource, reqparams, camelcase_keys
 from src.session import Identify, Login, RefreshToken, TokenExchange, End
+from src.slash_commands import init as slash_init, DiscordInteraction
 
 
 app = Flask(__name__)
@@ -241,12 +243,18 @@ def status():
 
 
 def app_factory():
+    slash_init()
+
     api = Api(app)
     api.add_resource(Identify, "/session/identify")
     api.add_resource(Login, "/session/login")
     api.add_resource(RefreshToken, "/session/refresh")
     api.add_resource(End, "/session/end")
     api.add_resource(TokenExchange, "/session/token-exchange")
+
+    # webhooks
+    api.add_resorce(DiscordInteraction, "/discord")
+    api.add_resource(Twitch, "/twitch")
 
     api.add_resource(AllGuilds, "/admin/guilds")
     api.add_resource(User, "/user/<string:name>")
@@ -260,7 +268,6 @@ def app_factory():
     api.add_resource(RedirectCallback, "/redirect")
     api.add_resource(GuildCounter, "/guild-count")
     api.add_resource(Invite, "/invite/<int:guild_id>")
-    api.add_resource(Twitch, "/twitch")
     if not is_prod:
         api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
     return app
