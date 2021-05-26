@@ -1,9 +1,9 @@
 from flask import request
-from json import dumps, loads
+from json import loads
+from discord_interactions import verify_key_decorator, InteractionType, InteractionResponseType
 
 from lib.discord_requests import register_command, register_guild_command
-from lib.auth import verify_discord_interaction
-from lib.config import logger
+from lib.config import logger, application_public_key
 from src.util import CustomResource
 
 
@@ -20,18 +20,12 @@ def init():
 
 
 class DiscordInteraction(CustomResource):
-    @verify_discord_interaction
+    @verify_key_decorator(application_public_key)
     def post(self):
-        if request.json["type"] == 1:
-            # ACK the ping
-            return {"type": 1}, 200
-
-        return {
-            "type": 4,
-            "data": {
-                "tts": False,
-                "content": "Congrats on sending your command!",
-                "embeds": [],
-                "allowed_mentions": {"parse": []}
-            }
-        }
+        if request.json['type'] == InteractionType.APPLICATION_COMMAND:
+            return {
+                'type': InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+                'data': {
+                    'content': 'Hello world'
+                }
+            }, 200

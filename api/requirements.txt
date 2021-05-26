@@ -9,4 +9,4 @@ psycopg2
 pika
 pyjwt
 redis
-PyNaCl
+discord-interactions
