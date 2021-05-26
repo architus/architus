@@ -5,7 +5,7 @@ from discord import Emoji
 
 from lib.hoar_frost import HoarFrostGenerator
 from src.utils import download_emoji
-from lib.config import logger, domain_name
+from lib.config import domain_name
 
 
 hoarfrost_gen = HoarFrostGenerator()

@@ -10,7 +10,7 @@ from src.util import CustomResource
 
 commands = []
 for name in os.listdir('./src/slash_commands/'):
-    with open(name) as f:
+    with open('./src/slash_commands/' + name) as f:
         commands.append(loads(f.read()))
 
 
