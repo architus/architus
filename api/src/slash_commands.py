@@ -22,10 +22,16 @@ def init():
 class DiscordInteraction(CustomResource):
     @verify_key_decorator(application_public_key)
     def post(self):
-        if request.json['type'] == InteractionType.APPLICATION_COMMAND:
+        data = request.json
+        options = data['data']['options']
+        if data['type'] == InteractionType.APPLICATION_COMMAND:
+            trigger = next(o['value'] for o in options if o['name'] == 'trigger')
+            response = next(o['value'] for o in options if o['name'] == 'response')
+            reply = next((o['value'] for o in options if o['name'] == 'reply'), False)
+            resp, _ = self.shard.set_response(data['guild_id'], data['member']['id'], trigger, response, reply)
             return {
                 'type': InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                 'data': {
-                    'content': 'Hello world'
+                    'content': resp['content']
                 }
             }, 200
