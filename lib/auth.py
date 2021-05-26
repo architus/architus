@@ -2,11 +2,16 @@ import jwt as pyjwt
 from flask import request
 from datetime import datetime, timedelta
 from lib.status_codes import StatusCodes
-from lib.config import jwt_secret, twitch_hub_secret, logger
+from lib.config import jwt_secret, twitch_hub_secret, logger, client_id
 
 from functools import wraps
 import hmac
 import hashlib
+try:
+    from nacl.signing import VerifyKey
+    from nacl.exceptions import BadSignatureError
+except ImportError:
+    pass
 
 
 def flask_authenticated(member=False):
@@ -90,6 +95,22 @@ def verify_twitch_hub(func):
             return ({'message': "Unknown error"}, StatusCodes.INTERNAL_SERVER_ERROR_500)
         return func(self, *args, **kwargs)
     return wrapper
+
+
+def verify_discord_interaction(func):
+    '''decorator on flask routes to verify webhook request came from discord'''
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        verify_key = VerifyKey(bytes.fromhex(client_id))
+        signature = request.headers["X-Signature-Ed25519"]
+        timestamp = request.headers["X-Signature-Timestamp"]
+
+        try:
+            verify_key.verify(f'{timestamp}{request.data}'.encode(), bytes.fromhex(signature))
+        except BadSignatureError:
+            return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
+        else:
+            return func(self, *args, **kwargs)
 
 
 class JWT:
