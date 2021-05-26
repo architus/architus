@@ -131,7 +131,7 @@ class Twitch(commands.Cog, name="Twitch Notification"):
     async def update(self, stream):
         rows = await self.twitch_stream.select_distinct_by_stream_id(int(stream['user_id']))
         guilds = {self.bot.get_guild(r['guild_id']) for r in rows}
-        users = await self.get_users(int(stream['user_id']))
+        users = await self.get_users((str(stream['user_id']),))
         for guild in guilds:
             if guild is None:
                 continue

@@ -374,7 +374,8 @@ class Setting:
 
     def _load_from_db(self) -> dict:
         if self.guild.id < FAKE_GUILD_IDS:
-            return {}
+            self._settings_dict = {}
+            return
         settings_row = None
         try:
             settings_row = self.session.query(Settings).filter_by(server_id=int(self.guild.id)).one()
@@ -382,10 +383,11 @@ class Setting:
             new_guild = Settings(int(self.guild.id), json.dumps({}))
             self.session.add(new_guild)
         self.session.commit()
-        return json.loads(settings_row.json_blob) if settings_row else {}
+        self._settings_dict = json.loads(settings_row.json_blob) if settings_row else {}
 
     async def _async_load_from_db(self) -> dict:
         if self.guild.id < FAKE_GUILD_IDS:
+            self._settings_dict = {}
             return
 
         try:
@@ -419,7 +421,7 @@ class AsyncSettings:
 
     async def get(self, guild):
         if guild is None:
-            return None
+            return Setting(self.bot, guild)
         try:
             return self.guilds[guild]
         except KeyError:
@@ -440,7 +442,7 @@ class GuildSettings(Cog):
 
     def get_guild(self, guild):
         if guild is None:
-            return None
+            return Setting(self.bot, guild)
         try:
             return self.guilds[guild]
         except KeyError:

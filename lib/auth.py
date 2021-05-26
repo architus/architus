@@ -107,7 +107,10 @@ class JWT:
 
     def get_token(self):
         if self._dirty:
-            self._token = self._encode(self._data).decode()
+            try:
+                self._token = self._encode(self._data).decode()
+            except AttributeError:
+                self._token = self._encode(self._data)
             self._dirty = False
         return self._token
 
