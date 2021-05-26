@@ -34,6 +34,7 @@ try:
     db_pass = os.environ['db_pass']
     client_id = os.environ['client_id']
     client_secret = os.environ['client_secret']
+    application_public_key = os.environ['application_public_key']
     domain_name = os.environ['domain_name']
     is_prod = domain_name == 'archit.us'
     jwt_secret = os.environ['jwt_secret']

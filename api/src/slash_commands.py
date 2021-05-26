@@ -1,4 +1,5 @@
 from flask import request
+from json import dumps, loads
 
 from lib.discord_requests import register_command, register_guild_command
 from lib.auth import verify_discord_interaction
@@ -8,14 +9,14 @@ from src.util import CustomResource
 
 commands = []
 with open('./src/slash_commands/set.json') as f:
-    commands.append(f.read())
+    commands.append(loads(f.read()))
 
 
 def init():
     logger.info("Registering slash commands")
     for c in commands:
-        register_command(c)
-        register_guild_command(436189230390050826, c)
+        logger.debug(register_command(c))
+        logger.debug(register_guild_command(436189230390050826, c))
 
 
 class DiscordInteraction(CustomResource):

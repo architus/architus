@@ -111,6 +111,7 @@ def verify_discord_interaction(func):
             return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
         else:
             return func(self, *args, **kwargs)
+    return wrapper
 
 
 class JWT:
