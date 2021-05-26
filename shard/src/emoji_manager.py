@@ -26,6 +26,7 @@ class EmojiManager:
         self.emojis = []
         self.ignore_add = []
         self.emoji_pattern = re.compile(r'(?:<:(?P<name>\w+):(?P<id>\d+)>)|(?::(?P<nameonly>\w+):)')
+        self.initialized = False
 
     async def _populate_from_db(self) -> None:
         """queries the db for this guild's emojis and populates the list"""
@@ -109,15 +110,20 @@ class EmojiManager:
 
     async def initialize(self) -> None:
         # populate emojis from db here
-        await self._populate_from_db()
-        dupes = await self.synchronize()
-        if self.settings.manage_emojis:
-            for e in dupes:
-                await self.notify_deletion(e)
-                await e.delete(reason="duplicate")
+        try:
+            await self._populate_from_db()
+            dupes = await self.synchronize()
+            if self.settings.manage_emojis:
+                for e in dupes:
+                    await self.notify_deletion(e)
+                    await e.delete(reason="duplicate")
 
-            if len(self.guild_emojis) >= self.max_emojis:
-                await self.cache_worst_emoji()
+                if len(self.guild_emojis) >= self.max_emojis:
+                    await self.cache_worst_emoji()
+        except Exception:
+            logger.exception(f'Error initializing manager for guild: {self.guild.id}')
+        else:
+            self.initialized = True
 
     def sort(self) -> None:
         """sort the list of emojis for the guild by their priority"""
@@ -195,7 +201,6 @@ class EmojiManager:
         if not self.settings.manage_emojis:
             return emoji
         if emoji.loaded:
-            logger.debug(f"{emoji} already loaded")
             self.sort()
             return emoji
         while len(self.guild_emojis) >= self.max_emojis - 1:
@@ -264,13 +269,15 @@ class EmojiManager:
         """flags an emoji as cached
         should be called when an emoji is removed from the guild
         """
+        if not self.initialized:
+            return
         emoji = self.find_emoji(d_id=emoji.id, name=emoji.name)
         if emoji:
             emoji.cache()
             await self._update_emojis_db((emoji,))
 
     async def on_react(self, react: discord.Reaction) -> None:
-        if type(react.emoji) == str:
+        if not self.initialized or type(react.emoji) == str:
             return
         emoji = self.find_emoji(d_id=react.emoji.id, name=react.emoji.name)
         if emoji:
@@ -280,7 +287,7 @@ class EmojiManager:
         """checks if the new emoji is a duplicate and adds it if not. also fetches the uploader
         should be called when an emoji is added to the guild
         """
-        if emoji.animated or emoji.managed:
+        if emoji.animated or emoji.managed or not self.initialized:
             return
 
         a_emoji = await ArchitusEmoji.from_discord(self.bot, emoji)
@@ -311,7 +318,7 @@ class EmojiManager:
 
     async def scan(self, msg):
         """scans a message for cached emoji and, if it finds any, loads the emoji and replaces the message"""
-        if msg.author.bot:
+        if msg.author.bot or not self.initialized:
             return
         content = msg.content
         matches = self.emoji_pattern.finditer(content)

@@ -67,7 +67,8 @@ class LavaMusic(commands.Cog, name="Voice"):
             try:
                 await self.ensure_voice(ctx.author, ctx.guild, ctx.command.name in ('p', 'play'))
             except commands.CommandInvokeError as e:
-                await ctx.send(e.original)
+                if e.original:
+                    await ctx.send(e.original)
                 raise e
 
         return guild_check

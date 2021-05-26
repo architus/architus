@@ -18,7 +18,8 @@ class Roles(commands.Cog):
         settings = self.bot.settings[member.guild]
         try:
             default_role = discord.utils.get(member.guild.roles, id=settings.default_role_id)
-            await member.add_roles(default_role)
+            if default_role is not None:
+                await member.add_roles(default_role)
         except Exception:
             logger.exception("could not add %s to %s" % (member.display_name, 'default role'))
 

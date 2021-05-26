@@ -164,7 +164,7 @@ def sum(iterable):
     var runtime_err error;
     select {
     case runtime_err = <- starChan:
-        log.Print("Something happened");
+        log.Print(runtime_err);
     case <- time.After(time.Second):
         log.Print("Script timed out");
         return &rpc.ScriptOutput{

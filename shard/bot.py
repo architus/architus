@@ -137,7 +137,7 @@ class Architus(Bot):
                     try:
                         await guild.me.edit(nick='architus')
                     except discord.Forbidden:
-                        logger.warning(f"couldn't change nickname in {guild.name}")
+                        pass
             await asyncio.sleep(600)
 
 
