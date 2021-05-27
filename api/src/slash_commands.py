@@ -26,16 +26,17 @@ class DiscordInteraction(CustomResource):
     def post(self):
         data = request.json
         options = data['data']['options']
+        guild_id= data['guild_id']
         if data['type'] == InteractionType.APPLICATION_COMMAND:
             trigger = next(o['value'] for o in options if o['name'] == 'trigger')
             if data['data']['name'] == 'set':
                 response = next(o['value'] for o in options if o['name'] == 'response')
                 reply = next((o['value'] for o in options if o['name'] == 'reply'), False)
                 resp, _ = self.shard.set_response(
-                    data['guild_id'], data['member']['user']['id'], trigger, response, reply)
+                    guild_id, data['member']['user']['id'], trigger, response, reply, routing_guild=guild_id)
 
             else:
-                resp, _ = self.shard.remove_response(data['guild_id'], data['member']['user']['id'], trigger)
+                resp, _ = self.shard.remove_response(guild_id, data['member']['user']['id'], trigger, routing_guild=guild_id)
             return {
                 'type': InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                 'data': {

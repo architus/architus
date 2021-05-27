@@ -417,7 +417,7 @@ class Api(Cog):
                 else:
                     # no builtin, check for user set commands in this "guild"
                     for resp in responses[guild_id].auto_responses:
-                        resp_msg, r = await responses[guild_id].execute(mock_message, False)
+                        resp_msg, r = await responses[guild_id].execute(mock_message)
                         if r is not None:
                             break
 

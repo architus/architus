@@ -253,7 +253,7 @@ class AutoResponse:
 
         if content.strip() != "":
             await sleep(0.1)  # yield event loop so we can process whether we've been 'overtaken'
-            if self.reply or overtaken.overtaken:
+            if self.reply or (overtaken is not None and overtaken.overtaken):
                 resp_msg = await msg.reply(
                     content,
                     allowed_mentions=AllowedMentions(everyone=False),
@@ -365,7 +365,7 @@ class GuildAutoResponses:
             return
         await self.tb_auto_responses.update_by_id({'count': resp.count}, resp.id)
 
-    async def execute(self, msg, overtaken) -> Tuple[Optional[Message], Optional[AutoResponse]]:
+    async def execute(self, msg, overtaken=None) -> Tuple[Optional[Message], Optional[AutoResponse]]:
         if msg.author.bot:
             return None, None
         for r in self.auto_responses:
