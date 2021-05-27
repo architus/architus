@@ -2,6 +2,7 @@ import os
 from uuid import getnode
 from functools import wraps
 from datetime import datetime, timedelta
+import redis
 
 from flask_restful import Resource, reqparse
 from flask import g
@@ -37,6 +38,12 @@ class CustomResource(Resource):
         if 'db' not in g:
             g.db = get_session()
         return g.db
+
+    @property
+    def redis(self):
+        if 'redis' not in g:
+            g.redis = redis.Redis(host='redis', port=6379)
+        return g.redis
 
 
 def reqparams(**params):
