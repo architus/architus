@@ -11,4 +11,23 @@ spec:
           envFrom:
           - secretRef:
               name: architus-secret
+          volumeMounts:
+            - name: dbm-persistent-storage
+              mountPath: /app/current_migration
+      volumes:
+        - name: dbm-persistent-storage
+          persistentVolumeClaim:
+            claimName: dbmanager-claim
       restartPolicy: Never
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: dbmanager-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: my-local-storage
+  resources:
+    requests:
+      storage: 5Mi
