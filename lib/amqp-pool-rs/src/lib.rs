@@ -8,7 +8,7 @@ pub use deadpool::managed::PoolError;
 /// Provides a channel pool around a single AMQP connection.
 /// This struct can be cloned and transferred across thread boundaries
 /// and uses reference counting for its internal state.
-pub type Pool = deadpool::managed::Pool<Channel, Error>;
+pub type Pool = deadpool::managed::Pool<Manager>;
 
 pub struct Manager {
     connection: Connection,
@@ -22,7 +22,9 @@ impl Manager {
 }
 
 #[async_trait]
-impl deadpool::managed::Manager<Channel, Error> for Manager {
+impl deadpool::managed::Manager for Manager {
+    type Type = Channel;
+    type Error = Error;
     async fn create(&self) -> Result<Channel, Error> {
         self.connection
             .create_channel()

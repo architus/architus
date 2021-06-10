@@ -4,8 +4,9 @@ use crate::uptime::{Event as UptimeEvent, UpdateMessage};
 use futures::{stream, Stream, StreamExt as _1};
 use static_assertions::assert_impl_all;
 use std::sync::{Arc, Mutex};
-use tokio::stream::StreamExt as _2;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::StreamExt as _2;
 
 /// Represents a guild-level connection tracking handler for the ingress service,
 /// deriving a stateful status of the connection to each external service
@@ -43,10 +44,14 @@ impl Tracker {
     /// Listen for incoming updates and use them to update the internal state.
     /// Emits outgoing uptime events to be eventually forwarded to the uptime service
     pub fn stream_events(self) -> impl Stream<Item = UptimeEvent> {
-        let uptime_events = self.state.pipe_updates(self.updates);
-        let debounced_uptime_events = self
+        let uptime_events = self
             .state
-            .pipe_debounced_guild_updates(self.debounced_guild_updates);
+            .pipe_updates(UnboundedReceiverStream::new(self.updates));
+        let debounced_uptime_events =
+            self.state
+                .pipe_debounced_guild_updates(UnboundedReceiverStream::new(
+                    self.debounced_guild_updates,
+                ));
 
         // Emit the result of merging both streams
         uptime_events.merge(debounced_uptime_events)

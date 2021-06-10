@@ -1,2 +1,14 @@
 # The port that the gRPC server listens on
 port = 50282
+
+[services]
+# HTTP URL of logstash with http input/protobuf codec to send events to
+logs_submission_logstash = "http://[::1]:51031"
+
+# Parameters for the backoff used to forward events to logstash
+[initialization_backoff]
+initial_interval = "100ms"
+max_interval = "10s"
+duration = "2m"
+multiplier = 2.0
+

@@ -17,7 +17,6 @@ use crate::gateway::{ProcessingError, ProcessorFleet};
 use crate::rpc::logs::submission::Client as LogsImportClient;
 use anyhow::{Context, Result};
 use backoff::backoff::Backoff;
-use backoff::future::FutureOperation as _;
 use backoff::ExponentialBackoff;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
@@ -163,7 +162,7 @@ impl ReconnectionState {
 
             match self.current.next_backoff() {
                 None => return Err(anyhow::anyhow!("reconnection backoff elapsed")),
-                Some(backoff) => tokio::time::delay_for(backoff).await,
+                Some(backoff) => tokio::time::sleep(backoff).await,
             }
         }
 
@@ -330,7 +329,7 @@ async fn submit_event(
         rpc::into_backoff(response)
     };
 
-    match send.retry(config.rpc_backoff.build()).await {
+    match backoff::future::retry(config.rpc_backoff.build(), send).await {
         Ok(_) => {
             match readable_timestamp(timestamp) {
                 Ok(timestamp) => {

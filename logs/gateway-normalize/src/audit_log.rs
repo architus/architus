@@ -2,6 +2,7 @@ use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
 use std::convert::TryFrom;
 use std::time::Duration;
+use twilight_http::error::ErrorType;
 use twilight_http::Client;
 use twilight_model::guild::audit_log::{AuditLog, AuditLogEntry, AuditLogEvent};
 use twilight_model::id::{AuditLogEntryId, GuildId, UserId};
@@ -161,9 +162,12 @@ where
 
         match err {
             BackoffError::Permanent(err) => return Err(err),
-            BackoffError::Transient(Error::Twilight(TwilightError::Unauthorized)) => {
-                return Err(Error::Unauthorized);
-            }
+            BackoffError::Transient(Error::Twilight(twilightErr)) => match twilightErr.kind() {
+                ErrorType::Unauthorized => {
+                    return Err(Error::Unauthorized);
+                }
+                _ => {}
+            },
             _ => {}
         };
 
@@ -172,7 +176,7 @@ where
             None => return Err(Error::TimedOut),
         };
 
-        tokio::time::delay_for(next).await;
+        tokio::time::sleep(next).await;
     }
 }
 

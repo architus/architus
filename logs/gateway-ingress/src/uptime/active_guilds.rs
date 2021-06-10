@@ -3,7 +3,6 @@ use crate::rpc;
 use crate::rpc::feature_gate::{BatchCheck, Client as FeatureGateClient, GuildFeature};
 use crate::uptime::Event as UptimeEvent;
 use anyhow::Result;
-use backoff::future::FutureOperation;
 use futures::{Stream, StreamExt};
 use static_assertions::assert_impl_all;
 use std::borrow::Borrow;
@@ -12,6 +11,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Instant;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 /// Represents the cached online/offline + indexing enabled/disabled status of a single guild,
 /// or a guild with their indexing enabled/disabled status being loaded
@@ -181,7 +181,7 @@ impl ActiveGuilds {
             feature_gate_client: Arc::new(feature_gate_client),
             uptime_event_tx: Arc::new(uptime_event_tx),
         };
-        (new_self, uptime_event_rx)
+        (new_self, UnboundedReceiverStream::new(uptime_event_rx))
     }
 
     /// Filters uptime events to ensure that they only contain active guilds
@@ -221,7 +221,7 @@ impl ActiveGuilds {
     #[allow(clippy::await_holding_lock)]
     pub async fn go_poll(&self) -> Result<()> {
         loop {
-            tokio::time::delay_for(self.config.active_guilds_poll_interval).await;
+            tokio::time::sleep(self.config.active_guilds_poll_interval).await;
             log::debug!("Executing polling logic for active guild set");
 
             // Get a list of all active guilds by their guild ids (only include loaded ones;
@@ -411,7 +411,7 @@ impl ActiveGuilds {
                     .await;
                 rpc::into_backoff(result)
             };
-            let result = send.retry(self.config.rpc_backoff.build()).await;
+            let result = backoff::future::retry(self.config.rpc_backoff.build(), send).await;
             match result {
                 Ok(batch_result) => {
                     if batch_result.has_feature.len() != guild_chunk.len() {
@@ -453,7 +453,7 @@ impl ActiveGuilds {
                 .await;
             rpc::into_backoff(result)
         };
-        let result = send.retry(self.config.rpc_backoff.build()).await;
+        let result = backoff::future::retry(self.config.rpc_backoff.build(), send).await;
         let timestamp = architus_id::time::millisecond_ts();
         let is_active = result.map_or_else(|err| {
             log::warn!(

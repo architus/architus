@@ -1,3 +1,6 @@
+//! Contains configuration options for the service that control its network topology
+//! and internal behaviors
+
 use anyhow::{Context, Result};
 use architus_config_backoff::Backoff;
 use log::{debug, info};

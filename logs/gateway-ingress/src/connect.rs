@@ -6,7 +6,6 @@ use crate::rpc::feature_gate::Client as FeatureGateClient;
 use crate::rpc::logs::uptime::Client as LogsUptimeClient;
 use crate::INTENTS;
 use anyhow::{Context, Result};
-use backoff::future::FutureOperation as _;
 use lapin::{Connection, ConnectionProperties};
 use std::sync::Arc;
 use twilight_gateway::Shard;
@@ -15,7 +14,7 @@ use twilight_gateway::Shard;
 pub async fn to_shard(config: Arc<Configuration>) -> Result<Shard> {
     let initialization_backoff = config.initialization_backoff.build();
     let shard_connect = || async {
-        let mut shard = Shard::new(config.secrets.discord_token.clone(), *INTENTS);
+        let shard = Shard::new(config.secrets.discord_token.clone(), *INTENTS);
         shard.start().await.map_err(|err| {
             log::warn!(
                 "Couldn't start bot shard, retrying after backoff: {:?}",
@@ -25,8 +24,7 @@ pub async fn to_shard(config: Arc<Configuration>) -> Result<Shard> {
         })?;
         Ok(shard)
     };
-    let shard = shard_connect
-        .retry(initialization_backoff)
+    let shard = backoff::future::retry(initialization_backoff, shard_connect)
         .await
         .context("Could not start shard")?;
     log::info!("Created shard and preparing to listen for gateway events");
@@ -49,8 +47,7 @@ pub async fn to_queue(config: Arc<Configuration>) -> Result<Connection> {
             })?;
         Ok(conn)
     };
-    let rmq_connection = rmq_connect
-        .retry(initialization_backoff)
+    let rmq_connection = backoff::future::retry(initialization_backoff, rmq_connect)
         .await
         .context("Could not connect to the RabbitMQ gateway queue")?;
     log::info!("Connected to RabbitMQ at {}", rmq_url);
@@ -73,8 +70,7 @@ pub async fn to_feature_gate(config: Arc<Configuration>) -> Result<FeatureGateCl
             })?;
         Ok(conn)
     };
-    let connection = connect
-        .retry(initialization_backoff)
+    let connection = backoff::future::retry(initialization_backoff, connect)
         .await
         .context("Could not connect to feature-gate")?;
     log::info!("Connected to feature-gate at {}", feature_gate_url);
@@ -97,8 +93,7 @@ pub async fn to_uptime_service(config: Arc<Configuration>) -> Result<LogsUptimeC
             })?;
         Ok(conn)
     };
-    let connection = connect
-        .retry(initialization_backoff)
+    let connection = backoff::future::retry(initialization_backoff, connect)
         .await
         .context("Could not connect to logs/uptime")?;
     log::info!("Connected to logs/uptime at {}", uptime_url);
