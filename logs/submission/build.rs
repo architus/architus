@@ -6,21 +6,21 @@ fn main() -> Result<()> {
         .build_client(false)
         .build_server(true)
         .type_attribute(
-            ".logs.submission.EventOrigin",
+            ".logs.event.EventOrigin",
             "#[derive(::serde_repr::Serialize_repr, ::serde_repr::Deserialize_repr)]",
         )
         .type_attribute(
-            ".logs.submission.EventType",
+            ".logs.event.EventType",
             "#[derive(::serde_repr::Serialize_repr, ::serde_repr::Deserialize_repr)]",
         )
-        .compile(&["submission.proto"], &["../../lib/ipc/proto/logs"])
-        .context("Compiling submission.proto definitions")?;
+        .compile(&["logs/submission.proto"], &["../../lib/ipc/proto"])
+        .context("Compiling logs/submission.proto definitions")?;
     // Compile the logs/revision protobuf definitions into the client code
     tonic_build::configure()
         .build_client(true)
         .build_server(false)
-        .compile(&["revision.proto"], &["../../lib/ipc/proto/logs"])
-        .context("Compiling revision.proto definitions")?;
+        .compile(&["logs/revision.proto"], &["../../lib/ipc/proto"])
+        .context("Compiling logs/revision.proto definitions")?;
 
     Ok(())
 }

@@ -11,8 +11,8 @@ fn main() -> Result<()> {
     tonic_build::configure()
         .build_client(true)
         .build_server(false)
-        .compile(&["uptime.proto"], &["../../lib/ipc/proto/logs"])
-        .context("Compiling uptime.proto definitions")?;
+        .compile(&["logs/uptime.proto"], &["../../lib/ipc/proto"])
+        .context("Compiling logs/uptime.proto definitions")?;
 
     Ok(())
 }

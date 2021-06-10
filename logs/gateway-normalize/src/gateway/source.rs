@@ -179,7 +179,7 @@ pub enum OnFailure<T> {
 assert_impl_all!(Source<u64>: Sync);
 assert_impl_all!(Source<String>: Sync);
 assert_impl_all!(Source<Option<u64>>: Sync);
-assert_impl_all!(Source<crate::rpc::submission::EventType>: Sync);
+assert_impl_all!(Source<crate::rpc::logs::event::EventType>: Sync);
 assert_impl_all!(Source<architus_id::HoarFrost>: Sync);
 assert_impl_all!(Source<Vec<u64>>: Sync);
 

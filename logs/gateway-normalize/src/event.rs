@@ -1,7 +1,10 @@
 use crate::config::Configuration;
-use crate::rpc::submission::{
-    AgentSpecialType, ContentMetadata, EntityRevisionMetadata, EntityType, Event as LogEvent,
-    EventOrigin, EventSource, EventType, SubmitIdempotentRequest,
+use crate::rpc::logs::event::{
+    AgentSpecialType, ContentMetadata, EntityType, Event as LogEvent, EventOrigin, EventSource,
+    EventType,
+};
+use crate::rpc::logs::submission::{
+    EntityRevisionMetadata, SubmitIdempotentRequest, SubmittedEvent,
 };
 use architus_id::HoarFrost;
 use std::convert::Into;
@@ -49,62 +52,65 @@ impl IntoRequest<SubmitIdempotentRequest> for NormalizedEvent {
     }
 }
 
-impl Into<LogEvent> for NormalizedEvent {
-    fn into(self) -> LogEvent {
+impl Into<SubmittedEvent> for NormalizedEvent {
+    fn into(self) -> SubmittedEvent {
         // Convert the normalized event struct (specific to this service)
         // into the `LogEvent` struct, which is the gRPC-serializable struct
         let (content, content_metadata) = self.content.split();
-        LogEvent {
-            id: self.id.0,
-            timestamp: self.timestamp,
-            source: Some(self.source.into()),
-            origin: self.origin.into(),
-            r#type: self.event_type.into(),
-            guild_id: self.guild_id,
-            reason: self.reason.unwrap_or_else(|| String::from("")),
-            audit_log_id: self.audit_log_id.unwrap_or(0_u64),
-            channel_id: self.channel.as_ref().map_or(0_u64, |c| c.id),
+        SubmittedEvent {
+            inner: Some(LogEvent {
+                id: self.id.0,
+                timestamp: self.timestamp,
+                source: Some(self.source.into()),
+                origin: self.origin.into(),
+                r#type: self.event_type.into(),
+                guild_id: self.guild_id,
+                reason: self.reason.unwrap_or_else(|| String::from("")),
+                audit_log_id: self.audit_log_id.unwrap_or(0_u64),
+                channel_id: self.channel.as_ref().map_or(0_u64, |c| c.id),
+                agent_id: self
+                    .agent
+                    .as_ref()
+                    .and_then(|a| a.entity.id())
+                    .unwrap_or(0_u64),
+                agent_type: self
+                    .agent
+                    .as_ref()
+                    .map(|a| &a.entity)
+                    .map_or(EntityType::None, Entity::r#type) as i32,
+                agent_special_type: self
+                    .agent
+                    .as_ref()
+                    .map_or(AgentSpecialType::Default, |a| a.special_type)
+                    as i32,
+                subject_id: self.subject.as_ref().and_then(Entity::id).unwrap_or(0_u64),
+                subject_type: self
+                    .subject
+                    .as_ref()
+                    .map_or(EntityType::None, Entity::r#type) as i32,
+                auxiliary_id: self
+                    .auxiliary
+                    .as_ref()
+                    .and_then(Entity::id)
+                    .unwrap_or(0_u64),
+                auxiliary_type: self
+                    .auxiliary
+                    .as_ref()
+                    .map_or(EntityType::None, Entity::r#type)
+                    as i32,
+                content,
+                content_metadata: Some(content_metadata),
+            }),
             channel_name: self
                 .channel
                 .and_then(|c| c.name)
                 .unwrap_or_else(|| String::from("")),
-            agent_id: self
-                .agent
-                .as_ref()
-                .and_then(|a| a.entity.id())
-                .unwrap_or(0_u64),
-            agent_type: self
-                .agent
-                .as_ref()
-                .map(|a| &a.entity)
-                .map_or(EntityType::None, Entity::r#type) as i32,
-            agent_special_type: self
-                .agent
-                .as_ref()
-                .map_or(AgentSpecialType::Default, |a| a.special_type)
-                as i32,
             agent_metadata: self
                 .agent
                 .map(|a| a.entity)
                 .and_then(Entity::into_revision_metadata),
-            subject_id: self.subject.as_ref().and_then(Entity::id).unwrap_or(0_u64),
-            subject_type: self
-                .subject
-                .as_ref()
-                .map_or(EntityType::None, Entity::r#type) as i32,
             subject_metadata: self.subject.and_then(Entity::into_revision_metadata),
-            auxiliary_id: self
-                .auxiliary
-                .as_ref()
-                .and_then(Entity::id)
-                .unwrap_or(0_u64),
-            auxiliary_type: self
-                .auxiliary
-                .as_ref()
-                .map_or(EntityType::None, Entity::r#type) as i32,
             auxiliary_metadata: self.auxiliary.and_then(Entity::into_revision_metadata),
-            content,
-            content_metadata: Some(content_metadata),
         }
     }
 }

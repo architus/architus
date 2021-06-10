@@ -14,7 +14,7 @@ use crate::config::Configuration;
 use crate::emoji::EmojiDb;
 use crate::event::NormalizedEvent;
 use crate::gateway::{ProcessingError, ProcessorFleet};
-use crate::rpc::submission::Client as LogsImportClient;
+use crate::rpc::logs::submission::Client as LogsImportClient;
 use anyhow::{Context, Result};
 use backoff::backoff::Backoff;
 use backoff::future::FutureOperation as _;
@@ -304,8 +304,10 @@ async fn normalize(
         }
         // Reject the message with/without requeuing depending on the error
         // (poison messages will be handled by max retry policy for quorum queue)
-        let should_requeue =
-            matches!(err, ProcessingError::FatalSourceError(_) | ProcessingError::NoAuditLogEntry(_));
+        let should_requeue = matches!(
+            err,
+            ProcessingError::FatalSourceError(_) | ProcessingError::NoAuditLogEntry(_)
+        );
         EventRejection {
             should_requeue,
             source: err.into(),

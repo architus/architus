@@ -15,7 +15,7 @@ pub mod active_guilds;
 pub mod connection;
 mod debounced_pool;
 
-use crate::rpc::uptime::{GatewaySubmitRequest, GatewaySubmitType};
+use crate::rpc::logs::uptime::{GatewaySubmitRequest, GatewaySubmitType};
 
 /// Raw update messages that can come from the rest of the service,
 /// and are used to update the current connections state,
