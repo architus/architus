@@ -4,7 +4,6 @@
 use crate::config::Configuration;
 use crate::rpc::logs::submission::Client as LogsSubmissionClient;
 use anyhow::{Context, Result};
-use backoff::future::FutureOperation as _;
 use lapin::{Connection, ConnectionProperties};
 use std::sync::Arc;
 
@@ -24,8 +23,7 @@ pub async fn to_queue(config: Arc<Configuration>) -> Result<Connection> {
             })?;
         Ok(conn)
     };
-    let rmq_connection = rmq_connect
-        .retry(initialization_backoff)
+    let rmq_connection = backoff::future::retry(initialization_backoff, rmq_connect)
         .await
         .context("Could not connect to the RabbitMQ gateway queue")?;
     log::info!("Connected to RabbitMQ at {}", rmq_url);
@@ -48,8 +46,7 @@ pub async fn to_submission(config: Arc<Configuration>) -> Result<LogsSubmissionC
             })?;
         Ok(conn)
     };
-    let connection = connect
-        .retry(initialization_backoff)
+    let connection = backoff::future::retry(initialization_backoff, connect)
         .await
         .context("Could not connect to logs/submission")?;
     log::info!("Connected to logs/submission at {}", submission_url);

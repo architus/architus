@@ -2,14 +2,26 @@
 //! and internal behaviors
 
 use anyhow::{Context, Result};
+use architus_config_backoff::Backoff;
 use log::{debug, info};
 use serde::Deserialize;
 
 /// Configuration object loaded upon startup
-#[derive(Default, Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Configuration {
     /// The port that the gRPC server listens on
     pub port: u16,
+    /// Collection of external services that this service connects to
+    pub services: Services,
+    /// Parameters for the backoff used to forward events to logstash
+    pub submission_backoff: Backoff,
+}
+
+/// Collection of external services that this service connects to
+#[derive(Debug, Deserialize, Clone)]
+pub struct Services {
+    /// HTTP URL of logstash with http input/protobuf codec to send events to
+    pub logs_submission_logstash: String,
 }
 
 impl Configuration {

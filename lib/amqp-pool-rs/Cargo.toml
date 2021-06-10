@@ -9,7 +9,7 @@ Handles a simple deadpool of AMQP channels for a single lapin connection\
 license = "MIT"
 
 [dependencies]
-lapin = "1.6"
+lapin = "1.7"
 anyhow = "1.0"
-deadpool = "0.5"
+deadpool = "0.8"
 async-trait = "0.1"

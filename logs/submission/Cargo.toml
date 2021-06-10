@@ -5,7 +5,7 @@ authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
 description = """\
 Accepts individual log events and prepares them to be stored in an Elasticsearch store\
-via a RabbtiMQ queue and a RMQ Logstash plugin.\
+via a RabbtiMQ queue and  RMQ Logstash plugin.\
 """
 license = "MIT"
 
@@ -17,15 +17,16 @@ log = "0.4"
 env_logger = "0.8"
 anyhow = "1.0"
 thiserror = "1.0.22"
-tonic = "0.3"
-prost = "0.6"
+tonic = "0.4"
+prost = "0.7"
 futures = "0.3"
-# Using tokio v2 because tonic uses it
-tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "time", "macros"] }
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "time", "macros"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_repr = "0.1"
-backoff = { version = "0.2", features = ["tokio"] }
+backoff = { version = "0.3", features = ["tokio"] }
+reqwest = "0.11"
+bytes = "1.0"
 
 [build-dependencies]
 tonic-build = "0.3"

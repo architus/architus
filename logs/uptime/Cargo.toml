@@ -14,12 +14,11 @@ config = "0.10"
 log = "0.4"
 env_logger = "0.8"
 anyhow = "1.0"
-# Using tokio v2 because tonic uses it
-tokio = { version = "0.2", features = ["rt-core", "rt-threaded", "macros"] }
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros"] }
 serde = { version = "1.0", features = ["derive"] }
-tonic = "0.3"
-prost = "0.6"
+tonic = "0.4"
+prost = "0.7"
 
 [build-dependencies]
-tonic-build = "0.3"
+tonic-build = "0.4"
 anyhow = "1.0"

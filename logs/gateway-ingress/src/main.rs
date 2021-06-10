@@ -14,7 +14,6 @@ use crate::uptime::{Event as UptimeEvent, UpdateMessage};
 use anyhow::{anyhow, Context, Result};
 use architus_amqp_pool::{Manager, Pool, PoolError};
 use architus_id::{time, HoarFrost, IdProvisioner};
-use backoff::future::FutureOperation as _;
 use futures::{try_join, Stream, StreamExt, TryStreamExt};
 use gateway_queue_lib::GatewayEventOwned;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
@@ -193,7 +192,7 @@ async fn sink_uptime_events(
                         .await;
                     rpc::into_backoff(response)
                 };
-                if let Err(err) = send.retry(config.rpc_backoff.build()).await {
+                if let Err(err) = backoff::future::retry(config.rpc_backoff.build(), send).await {
                     log::warn!("Submitting UptimeEvent to logs/uptime failed: {:?}", err);
                 }
             }
@@ -408,6 +407,8 @@ async fn try_publish(
     // Asynchronously obtain a channel from the pool
     let channel = channel_pool.get().await.map_err(|err| match err {
         PoolError::Backend(err) => err,
+        PoolError::Closed => anyhow!("The pool has been closed"),
+        PoolError::NoRuntimeSpecified => anyhow!("No runtime error specified for pool failure"),
         PoolError::Timeout(timeout) => {
             anyhow!("Timeout error from pool: {:?}", timeout)
         }
