@@ -22,7 +22,7 @@ mod member {
     use crate::gateway::path::Path;
     use crate::gateway::source::{OnFailure, Source};
     use crate::gateway::{Processor, ProcessorFleet};
-    use crate::rpc::submission::EventType;
+    use crate::rpc::logs::event::EventType;
     use chrono::DateTime;
     use lazy_static::lazy_static;
     use std::convert::TryFrom;
@@ -170,7 +170,7 @@ mod reaction {
     use crate::gateway::path::Path;
     use crate::gateway::source::{OnFailure, Source};
     use crate::gateway::{Context, Processor, ProcessorFleet};
-    use crate::rpc::submission::EventType;
+    use crate::rpc::logs::event::EventType;
     use lazy_static::lazy_static;
     use std::fmt::{self, Write as _};
     use twilight_model::channel::ReactionType;

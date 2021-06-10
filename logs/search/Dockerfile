@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:experimental
-
 # Build service
 FROM rust:1.48 as builder
 RUN rustup component add rustfmt
@@ -23,10 +21,7 @@ WORKDIR $REPO_ROOT/$PROTO
 COPY $PROTO/logging.proto .
 # Build via Cargo
 WORKDIR $REPO_ROOT/$SERVICE
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-	--mount=type=cache,target=$REPO_ROOT/$SERVICE/target \
-	--mount=type=cache,target=$REPO_ROOT/$LOGS_LIB/target \
-	cargo build --release
+RUN cargo build --release
 RUN cp $REPO_ROOT/$SERVICE/target/release/logging-service /opt/logging-service
 
 # Create minimal deployment

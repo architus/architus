@@ -5,10 +5,10 @@ mod config;
 mod rpc;
 
 use crate::config::Configuration;
-use crate::rpc::submission::submission_service_server::{
+use crate::rpc::logs::submission::submission_service_server::{
     SubmissionService, SubmissionServiceServer,
 };
-use crate::rpc::submission::{SubmitIdempotentRequest, SubmitIdempotentResponse};
+use crate::rpc::logs::submission::{SubmitIdempotentRequest, SubmitIdempotentResponse};
 use anyhow::{Context, Result};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;

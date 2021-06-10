@@ -8,7 +8,7 @@ use crate::emoji::EmojiDb;
 use crate::event::{Agent, Channel, Content, Entity, NormalizedEvent, Source as EventSource};
 use crate::gateway::path::Path;
 use crate::gateway::source::{AuditLogSource, Source};
-use crate::rpc::submission::EventType;
+use crate::rpc::logs::event::EventType;
 use crate::{audit_log, util};
 use anyhow::Context as _;
 use architus_id::IdProvisioner;
@@ -242,7 +242,7 @@ pub struct CombinedAuditLogEntry {
 /// that might be useful when normalizing an incoming event,
 /// including the source data.
 /// Can be cheaply cloned.
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Context<'a> {
     event: &'a GatewayEvent<'a>,
     id_provisioner: &'a IdProvisioner,

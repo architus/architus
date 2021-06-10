@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:experimental
-
 # Build service
 FROM rust:1.48 as builder
 RUN rustup component add rustfmt
@@ -17,9 +15,7 @@ WORKDIR $REPO_ROOT/$PROTO
 COPY $PROTO/logs/uptime.proto logs/uptime.proto
 # Build via Cargo
 WORKDIR $REPO_ROOT/$SERVICE
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-	--mount=type=cache,target=$REPO_ROOT/$SERVICE/target \
-	cargo build --release
+RUN cargo build --release
 RUN cp $REPO_ROOT/$SERVICE/target/release/logs-uptime /opt/logs-uptime
 
 # Create minimal deployment

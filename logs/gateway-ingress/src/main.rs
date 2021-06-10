@@ -7,7 +7,7 @@ mod rpc;
 mod uptime;
 
 use crate::config::Configuration;
-use crate::rpc::uptime::Client as LogsUptimeClient;
+use crate::rpc::logs::uptime::Client as LogsUptimeClient;
 use crate::uptime::active_guilds::ActiveGuilds;
 use crate::uptime::connection::Tracker;
 use crate::uptime::{Event as UptimeEvent, UpdateMessage};

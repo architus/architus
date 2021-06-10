@@ -108,6 +108,18 @@ services:
       - webnet
     env_file:
       - architus.env
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.13.1
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+      - 9300:9300
+    networks:
+      - webnet
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
   logs-gateway-ingress:
     image: jazevedo6/logs-gateway-ingress:${TAG:-latest}
     build:
@@ -157,7 +169,7 @@ services:
         source: ./logs/submission/config.default.toml
         target: /opt/config.toml
     depends_on:
-      - rabbit
+      - logs-submission-logstash
     networks:
       - webnet
     env_file:
@@ -180,5 +192,21 @@ services:
       - architus.env
     environment:
       RUST_LOG: "info"
+  logs-submission-logstash:
+    image: jazevedo6/logs-logstash:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./logs/submission-logstash/Dockerfile
+    ports:
+      - "51031:51031"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - webnet
+    depends_on:
+      - elasticsearch
+volumes:
+  elasticsearch-data:
+    driver: local
 networks:
   webnet:

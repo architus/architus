@@ -3,7 +3,7 @@
 
 use crate::config::Configuration;
 use crate::rpc::feature_gate::Client as FeatureGateClient;
-use crate::rpc::uptime::Client as LogsUptimeClient;
+use crate::rpc::logs::uptime::Client as LogsUptimeClient;
 use crate::INTENTS;
 use anyhow::{Context, Result};
 use backoff::future::FutureOperation as _;

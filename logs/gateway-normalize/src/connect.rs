@@ -2,7 +2,7 @@
 //! used during service initialization and during potential reconnection
 
 use crate::config::Configuration;
-use crate::rpc::submission::Client as LogsSubmissionClient;
+use crate::rpc::logs::submission::Client as LogsSubmissionClient;
 use anyhow::{Context, Result};
 use backoff::future::FutureOperation as _;
 use lapin::{Connection, ConnectionProperties};

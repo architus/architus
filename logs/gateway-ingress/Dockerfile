@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:experimental
-
 # Build service
 FROM rust:1.48 as builder
 RUN rustup component add rustfmt
@@ -42,13 +40,7 @@ COPY $PROTO/logs/uptime.proto logs/uptime.proto
 COPY $PROTO/feature-gate.proto .
 # Build via Cargo
 WORKDIR $REPO_ROOT/$SERVICE
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-	--mount=type=cache,target=$REPO_ROOT/$SERVICE/target \
-	--mount=type=cache,target=$REPO_ROOT/$GATEWAY_QUEUE_LIB/target \
-	--mount=type=cache,target=$REPO_ROOT/$LOGS_LIB/target \
-	--mount=type=cache,target=$REPO_ROOT/$AMQP_POOL_LIB/target \
-	--mount=type=cache,target=$REPO_ROOT/$CONFIG_BACKOFF_LIB/target \
-	cargo build --release
+RUN cargo build --release
 RUN cp $REPO_ROOT/$SERVICE/target/release/logs-gateway-ingress /opt/logs-gateway-ingress
 
 # Create minimal deployment

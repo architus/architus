@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:experimental
-
 # Build service
 FROM rust:1.48 as builder
 RUN rustup component add rustfmt
@@ -27,14 +25,11 @@ COPY $CONFIG_BACKOFF_LIB/Cargo.toml .
 # Copy protobuf definitions
 WORKDIR $REPO_ROOT/$PROTO
 COPY $PROTO/logs/submission.proto logs/submission.proto
+COPY $PROTO/logs/event.proto logs/event.proto
 COPY $PROTO/logs/revision.proto logs/revision.proto
 # Build via Cargo
 WORKDIR $REPO_ROOT/$SERVICE
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-	--mount=type=cache,target=$REPO_ROOT/$SERVICE/target \
-	--mount=type=cache,target=$REPO_ROOT/$LOGS_LIB/target \
-	--mount=type=cache,target=$REPO_ROOT/$CONFIG_BACKOFF_LIB/target \
-	cargo build --release
+RUN cargo build --release
 RUN cp $REPO_ROOT/$SERVICE/target/release/logs-submission /opt/logs-submission
 
 # Create minimal deployment
