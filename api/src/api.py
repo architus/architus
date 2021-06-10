@@ -36,7 +36,7 @@ def teardown_db(arg):
 class Invite(Resource):
     def get(self, guild_id: int):
         response = redirect(f'https://discordapp.com/oauth2/authorize?client_id={client_id}'
-                            f'&scope=bot&guild_id={guild_id}'
+                            f'&scope=applications.commands%20bot&guild_id={guild_id}'
                             '&response_type=code'
                             f'&redirect_uri={REDIRECT_URI}'
                             '&permissions=2134207679')
