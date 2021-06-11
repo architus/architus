@@ -289,13 +289,6 @@ async fn normalize(
         }
     };
 
-    log::info!(
-        "{}",
-        serde_json::to_string(&event)
-            .ok()
-            .unwrap_or_else(|| String::from(""))
-    );
-
     // Run the processor fleet on the event to obtain a normalized event
     processor.normalize(event).await.map_err(|err| {
         if err.is_unexpected() {

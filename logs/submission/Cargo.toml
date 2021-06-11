@@ -27,7 +27,8 @@ serde_repr = "0.1"
 backoff = { version = "0.3", features = ["tokio"] }
 reqwest = "0.11"
 bytes = "1.0"
+base64 = "0.13"
 
 [build-dependencies]
-tonic-build = "0.3"
+tonic-build = "0.4"
 anyhow = "1.0"

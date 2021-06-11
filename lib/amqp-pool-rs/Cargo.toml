@@ -11,5 +11,5 @@ license = "MIT"
 [dependencies]
 lapin = "1.7"
 anyhow = "1.0"
-deadpool = "0.8"
+deadpool = { version = "0.8", features = ["rt_tokio_1"] }
 async-trait = "0.1"

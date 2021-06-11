@@ -14,6 +14,7 @@ use crate::uptime::{Event as UptimeEvent, UpdateMessage};
 use anyhow::{anyhow, Context, Result};
 use architus_amqp_pool::{Manager, Pool, PoolError};
 use architus_id::{time, HoarFrost, IdProvisioner};
+use deadpool::Runtime;
 use futures::{try_join, Stream, StreamExt, TryStreamExt};
 use gateway_queue_lib::GatewayEventOwned;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
@@ -243,7 +244,9 @@ async fn publish_events(
 
         // Create a pool for the RMQ channels
         let manager = Manager::new(rmq_connection);
-        let channel_pool = Pool::from_config(manager, config.gateway_queue.connection_pool.clone());
+        let mut pool_config = config.gateway_queue.connection_pool.clone();
+        pool_config.runtime = Runtime::Tokio1;
+        let channel_pool = Pool::from_config(manager, pool_config);
 
         // Start listening to the stream
         // (we have to convert the Stream to a TryStream before using `try_for_each_concurrent`)
@@ -408,7 +411,7 @@ async fn try_publish(
     let channel = channel_pool.get().await.map_err(|err| match err {
         PoolError::Backend(err) => err,
         PoolError::Closed => anyhow!("The pool has been closed"),
-        PoolError::NoRuntimeSpecified => anyhow!("No runtime error specified for pool failure"),
+        PoolError::NoRuntimeSpecified => panic!("No async runtime was specified"),
         PoolError::Timeout(timeout) => {
             anyhow!("Timeout error from pool: {:?}", timeout)
         }

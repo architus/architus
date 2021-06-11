@@ -10,8 +10,8 @@ use crate::rpc::logs::submission::submission_service_server::{
 };
 use crate::rpc::logs::submission::{SubmitIdempotentRequest, SubmitIdempotentResponse};
 use anyhow::{Context, Result};
+use architus_id::IdProvisioner;
 use bytes::Bytes;
-use prost::Message;
 use reqwest::{Client, StatusCode};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -66,6 +66,7 @@ pub enum LogstashSendError {
 struct Submission {
     config: Arc<Configuration>,
     http_client: Client,
+    id_provisioner: IdProvisioner,
 }
 
 impl Submission {
@@ -73,17 +74,24 @@ impl Submission {
         Self {
             config,
             http_client: Client::new(),
+            id_provisioner: IdProvisioner::new(),
         }
     }
 
-    async fn send_to_logstash(&self, body: Bytes) -> Result<(), LogstashSendError> {
+    async fn send_to_logstash(
+        &self,
+        body: Bytes,
+        mime_type: &str,
+    ) -> Result<(), LogstashSendError> {
         let response = self
             .http_client
             .post(&self.config.services.logs_submission_logstash)
+            .header("Content-Type", mime_type)
             .body(body)
             .send()
             .await
             .map_err(LogstashSendError::Network)?;
+        // https://www.elastic.co/guide/en/logstash/current/plugins-inputs-http.html#plugins-inputs-http-response_code
         match response.status() {
             StatusCode::TOO_MANY_REQUESTS => Err(LogstashSendError::QueueFull),
             StatusCode::UNAUTHORIZED => Err(LogstashSendError::InvalidCredentials),
@@ -108,49 +116,66 @@ impl SubmissionService for Submission {
         &self,
         request: Request<SubmitIdempotentRequest>,
     ) -> Result<Response<SubmitIdempotentResponse>, tonic::Status> {
-        let request = request.into_inner();
+        let timestamp = architus_id::time::millisecond_ts();
+        let event = request
+            .into_inner()
+            .event
+            .ok_or_else(|| Status::invalid_argument("no event given"))?;
 
-        // TODO consume additional metadata and send to revision service
+        // TODO consume additional metadata in SubmittedEvent message
+        //      and send to revision service
 
-        // Serialize the inner event to protobuf
-        if let Some(event) = request.event.as_ref().and_then(|e| e.inner.as_ref()) {
-            let mut buf = Vec::<u8>::with_capacity(event.encoded_len());
-            event.encode(&mut buf).map_err(|err| {
-                let message = format!("could not encode event to protobuf {:?}", err);
-                log::warn!(
-                    "Could not serialize proto due to {:?}. Original request: {:?} ",
-                    err,
-                    request
-                );
-                Status::internal(message)
-            })?;
-            let body_bytes = Bytes::from(buf);
+        let mut inner = event
+            .inner
+            .ok_or_else(|| Status::invalid_argument("no inner event given"))?;
 
-            // Send the event to logstash
-            log::info!("Forwarding event with id '{}' to logstash", event.id);
-            // let rmq_url = self.config.services.logs_submission_logstash.clone();
-            let send = || async {
-                self.send_to_logstash(body_bytes.clone())
-                    .await
-                    .map_err(|err| match err {
-                        LogstashSendError::InvalidCredentials
-                        | LogstashSendError::InternalError(_) => backoff::Error::Permanent(err),
-                        LogstashSendError::Network(_) | LogstashSendError::QueueFull => {
-                            backoff::Error::Transient(err)
-                        }
-                    })
-            };
-            backoff::future::retry(self.config.submission_backoff.build(), send)
-                .await
-                .map_err(|err| {
-                    let message = format!("could not send request to logstash {:?}", err);
-                    log::warn!("Could not send request to logstash: {:?}", err);
-                    Status::unavailable(message)
-                })?;
-
-            Ok(Response::new(SubmitIdempotentResponse {}))
-        } else {
-            Err(Status::invalid_argument("no inner event in submission"))
+        // Add in a timestamp if needed
+        if inner.timestamp == 0 {
+            inner.timestamp = timestamp;
         }
+
+        // Provision an Id if needed
+        if inner.id == 0 {
+            inner.id = self.id_provisioner.with_ts(timestamp).0;
+        }
+
+        // Serialize the inner event to JSON
+        let json = serde_json::to_vec(&inner).map_err(|err| {
+            let message = format!("could not encode event to JSON {:?}", err);
+            log::warn!(
+                "Could not serialize JSON due to {:?}. Event: {:?} ",
+                err,
+                inner
+            );
+            Status::internal(message)
+        })?;
+        let json_body = Bytes::from(json);
+
+        // Send the event to logstash
+        let send = || async {
+            self.send_to_logstash(json_body.clone(), "application/json")
+                .await
+                .map_err(|err| match err {
+                    LogstashSendError::InvalidCredentials | LogstashSendError::InternalError(_) => {
+                        backoff::Error::Permanent(err)
+                    }
+                    LogstashSendError::Network(_) | LogstashSendError::QueueFull => {
+                        backoff::Error::Transient(err)
+                    }
+                })
+        };
+        backoff::future::retry(self.config.submission_backoff.build(), send)
+            .await
+            .map_err(|err| {
+                let message = format!("could not send request to logstash {:?}", err);
+                log::warn!("Could not send request to logstash: {:?}", err);
+                Status::unavailable(message)
+            })?;
+
+        log::info!(
+            "Successfully forwarded event with id '{}' to logstash",
+            inner.id
+        );
+        Ok(Response::new(SubmitIdempotentResponse {}))
     }
 }
