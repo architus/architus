@@ -5,8 +5,8 @@ mod config;
 mod rpc;
 
 use crate::config::Configuration;
-use crate::rpc::uptime::uptime_service_server::{UptimeService, UptimeServiceServer};
-use crate::rpc::uptime::{GatewaySubmitRequest, GatewaySubmitResponse};
+use crate::rpc::logs::uptime::uptime_service_server::{UptimeService, UptimeServiceServer};
+use crate::rpc::logs::uptime::{GatewaySubmitRequest, GatewaySubmitResponse};
 use anyhow::{Context, Result};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;

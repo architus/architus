@@ -32,7 +32,7 @@ twilight-model = "0.4"
 backoff = { version = "0.3", features = ["tokio"] }
 lapin = "1.7"
 tokio-amqp = "1.0"
-deadpool = "0.8"
+deadpool = { version = "0.8", features = ["rt_tokio_1"] }
 tonic = "0.4"
 prost = "0.7"
 rand = "0.7"
