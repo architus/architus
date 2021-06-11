@@ -1,11 +1,11 @@
 # Build service
-FROM rust:1.48 as builder
+FROM rust:1.52 as builder
 RUN rustup component add rustfmt
 ENV REPO_ROOT=/opt/architus
-ENV SERVICE=logs/logging
+ENV SERVICE=logs/search
 ENV LOGS_LIB=lib/id-rs
 ENV PROTO=lib/ipc/proto
-# Copy logging service itself
+# Copy logs/search service itself
 WORKDIR $REPO_ROOT/$SERVICE
 COPY $SERVICE/src src
 COPY $SERVICE/Cargo.lock .
@@ -18,13 +18,17 @@ COPY $LOGS_LIB/Cargo.lock .
 COPY $LOGS_LIB/Cargo.toml .
 # Copy protobuf definitions
 WORKDIR $REPO_ROOT/$PROTO
-COPY $PROTO/logging.proto .
+COPY $PROTO/logs/event.proto logs/event.proto
 # Build via Cargo
 WORKDIR $REPO_ROOT/$SERVICE
 RUN cargo build --release
-RUN cp $REPO_ROOT/$SERVICE/target/release/logging-service /opt/logging-service
+RUN cp $REPO_ROOT/$SERVICE/target/release/logs-search /opt/logs-search
 
 # Create minimal deployment
 FROM debian:buster-slim as deployment
-COPY --from=builder /opt/logging-service /usr/bin/logging-service
-ENTRYPOINT ["/usr/bin/logging-service"]
+ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -q \
+    && apt-get install -y -q "libssl1.1" "tini" \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /opt/logs-search /usr/bin/logs-search
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-search"]

@@ -30,7 +30,7 @@ impl SearchProvider {
                 config: Arc::new(config.graphql.clone()),
                 index: Arc::from(config.log_index.as_str()),
                 guild_id: None,
-                channel_whitelist: None,
+                channel_allowlist: None,
             }),
             schema: Arc::new(Schema::new(
                 Query,
@@ -44,10 +44,10 @@ impl SearchProvider {
         Arc::clone(&self.schema)
     }
 
-    pub fn context(&self, guild_id: Option<u64>, channel_whitelist: Option<Vec<u64>>) -> Context {
+    pub fn context(&self, guild_id: Option<u64>, channel_allowlist: Option<Vec<u64>>) -> Context {
         let mut context = (*self.base_context).clone();
         context.guild_id = guild_id;
-        context.channel_whitelist = channel_whitelist;
+        context.channel_allowlist = channel_allowlist;
         context
     }
 }
@@ -63,7 +63,7 @@ pub struct Context {
     config: Arc<GraphQLConfig>,
     index: Arc<str>,
     guild_id: Option<u64>,
-    channel_whitelist: Option<Vec<u64>>,
+    channel_allowlist: Option<Vec<u64>>,
 }
 
 impl juniper::Context for Context {}
@@ -128,11 +128,11 @@ impl Query {
         }
 
         // Add in the channel id filter
-        if let Some(channel_id_whitelist) = context.channel_whitelist.as_ref() {
+        if let Some(channel_id_allowlist) = context.channel_allowlist.as_ref() {
             elasticsearch_params.add_filter(json!({
                 "bool": {
                     "minimum_should_match": 1,
-                    "should": channel_id_whitelist.clone(),
+                    "should": channel_id_allowlist.clone(),
                 },
             }));
         }
