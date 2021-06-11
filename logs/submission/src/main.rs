@@ -129,6 +129,11 @@ impl SubmissionService for Submission {
             .inner
             .ok_or_else(|| Status::invalid_argument("no inner event given"))?;
 
+        // guild_id is the only required field
+        if inner.guild_id == 0 {
+            return Err(Status::invalid_argument("missing guild_id on inner event"));
+        }
+
         // Add in a timestamp if needed
         if inner.timestamp == 0 {
             inner.timestamp = timestamp;

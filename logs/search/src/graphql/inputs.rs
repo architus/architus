@@ -1,5 +1,5 @@
 use crate::graphql::{ElasticsearchParams, QueryInput};
-use crate::logging::{EventOrigin, EventType};
+use crate::proto::logs::event::{AgentSpecialType, EntityType, EventOrigin, EventType};
 use juniper::{graphql_value, FieldError, FieldResult};
 use serde_json::json;
 use std::str::FromStr;
@@ -10,14 +10,20 @@ pub struct EventFilterInput {
     id: Option<IdFilterInput>,
     timestamp: Option<UIntStringFilterInput>,
     origin: Option<EnumFilterInput>,
-    event_type: Option<EnumFilterInput>,
+    r#type: Option<EnumFilterInput>,
     guild_id: Option<UIntStringFilterInput>,
-    agent_id: Option<UIntStringOptionFilterInput>,
-    subject_id: Option<UIntStringOptionFilterInput>,
+    reason: Option<TextOptionFilterInput>,
     audit_log_id: Option<UIntStringOptionFilterInput>,
     channel_id: Option<UIntStringOptionFilterInput>,
-    // TODO implement
-    reason: Option<TextOptionFilterInput>,
+    agent_id: Option<UIntStringOptionFilterInput>,
+    agent_type: Option<EnumFilterInput>,
+    agent_special_type: Option<EnumFilterInput>,
+    subject_id: Option<UIntStringOptionFilterInput>,
+    subject_type: Option<EnumFilterInput>,
+    auxiliary_id: Option<UIntStringOptionFilterInput>,
+    auxiliary_type: Option<EnumFilterInput>,
+    content: Option<TextOptionFilterInput>,
+    // TODO implement content metadata filter
 }
 
 impl QueryInput for EventFilterInput {
@@ -31,22 +37,15 @@ impl QueryInput for EventFilterInput {
             .as_ref()
             .map(|filter| filter.apply::<EventOrigin>(params, "origin"))
             .transpose()?;
-        self.event_type
+        self.r#type
             .as_ref()
-            .map(|filter| filter.apply::<EventType>(params, "event_type"))
+            .map(|filter| filter.apply::<EventType>(params, "type"))
             .transpose()?;
         self.guild_id
             .as_ref()
             .map(|filter| filter.apply(params, "guild_id"))
             .transpose()?;
-        self.agent_id
-            .as_ref()
-            .map(|filter| filter.apply(params, "agent_id"))
-            .transpose()?;
-        self.subject_id
-            .as_ref()
-            .map(|filter| filter.apply(params, "subject_id"))
-            .transpose()?;
+        // TODO add reason filter application
         self.audit_log_id
             .as_ref()
             .map(|filter| filter.apply(params, "audit_log_id"))
@@ -55,6 +54,36 @@ impl QueryInput for EventFilterInput {
             .as_ref()
             .map(|filter| filter.apply(params, "channel_id"))
             .transpose()?;
+        self.agent_id
+            .as_ref()
+            .map(|filter| filter.apply(params, "agent_id"))
+            .transpose()?;
+        self.agent_type
+            .as_ref()
+            .map(|filter| filter.apply::<EntityType>(params, "agent_type"))
+            .transpose()?;
+        self.agent_special_type
+            .as_ref()
+            .map(|filter| filter.apply::<AgentSpecialType>(params, "agent_special_type"))
+            .transpose()?;
+        self.subject_id
+            .as_ref()
+            .map(|filter| filter.apply(params, "subject_id"))
+            .transpose()?;
+        self.subject_type
+            .as_ref()
+            .map(|filter| filter.apply::<EntityType>(params, "subject_type"))
+            .transpose()?;
+        self.auxiliary_id
+            .as_ref()
+            .map(|filter| filter.apply(params, "auxiliary_id"))
+            .transpose()?;
+        self.auxiliary_type
+            .as_ref()
+            .map(|filter| filter.apply::<EntityType>(params, "auxiliary_type"))
+            .transpose()?;
+        // TODO add content filter application
+        // TODO add content metadata filter application
 
         Ok(())
     }
@@ -314,6 +343,18 @@ impl FilterableEnum for EventType {
 }
 
 impl FilterableEnum for EventOrigin {
+    fn discriminant(&self) -> i32 {
+        *self as i32
+    }
+}
+
+impl FilterableEnum for EntityType {
+    fn discriminant(&self) -> i32 {
+        *self as i32
+    }
+}
+
+impl FilterableEnum for AgentSpecialType {
     fn discriminant(&self) -> i32 {
         *self as i32
     }

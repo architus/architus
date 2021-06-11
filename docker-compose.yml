@@ -181,6 +181,8 @@ services:
     build:
       context: ./
       dockerfile: ./logs/uptime/Dockerfile
+    ports:
+      - "50281:50281"
     command: /opt/config.toml
     volumes:
       - type: bind
@@ -205,6 +207,26 @@ services:
       - webnet
     depends_on:
       - elasticsearch
+  logs-search:
+    image: jazevedo6/logs-search:${TAG:-latest}
+    build:
+      context: ./
+      dockerfile: ./logs/search/Dockerfile
+    ports:
+      - "8174:8174"
+    command: /opt/config.toml
+    volumes:
+      - type: bind
+        source: ./logs/search/config.default.toml
+        target: /opt/config.toml
+    depends_on:
+      - elasticsearch
+    networks:
+      - webnet
+    env_file:
+      - architus.env
+    environment:
+      RUST_LOG: "info"
 volumes:
   elasticsearch-data:
     driver: local

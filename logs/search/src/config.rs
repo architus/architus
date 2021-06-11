@@ -5,8 +5,6 @@ use serde::Deserialize;
 /// Configuration object loaded upon startup
 #[derive(Debug, Deserialize, Clone)]
 pub struct Configuration {
-    /// Port that the main gRPC server listens on
-    pub port: u16,
     /// Collection of external services that this service connects to
     pub services: Services,
     /// Options related to the GraphQL search API
@@ -25,7 +23,7 @@ pub struct Services {
 /// Options related to the GraphQL search API
 #[derive(Debug, Deserialize, Clone)]
 pub struct GraphQL {
-    /// Port that the optional GraphQL HTTP server runs on (used in development)
+    /// (optional) Port that the optional GraphQL HTTP server runs on (used in development)
     pub http_port: Option<u16>,
     /// Default limit of items to fetch in a single page if none is given
     pub default_page_size: usize,
@@ -55,7 +53,7 @@ impl Configuration {
             // Add in settings from the environment (with a prefix of LOGGING)
             // Eg.. `LOGGING_PORT=8080 ./target/logging-service`
             // would set the `port` key tot 8080
-            .merge(config::Environment::with_prefix("LOGGING").separator("__"))
+            .merge(config::Environment::with_prefix("LOGS_SEARCH").separator("__"))
             .context("Could not merge in values from the environment")?;
         let config = settings
             .try_into()

@@ -1,35 +1,48 @@
 use anyhow::{Context, Result};
 
+const SERDE_STRUCTS: &[&str] = &[
+    ".logs.event.Event",
+    ".logs.event.EventSource",
+    ".logs.event.ContentMetadata",
+];
+
+const ENUMS: &[&str] = &[
+    ".logs.event.EventOrigin",
+    ".logs.event.EventType",
+    ".logs.event.EntityType",
+    ".logs.event.AgentSpecialType",
+];
+
 fn main() -> Result<()> {
-    // Compile the logging protobuf definitions into the server code
-    tonic_build::configure()
+    // Compile the logs/event protobuf definitions
+    let mut builder = tonic_build::configure()
         .build_client(false)
-        .build_server(true)
-        .type_attribute(
-            ".Logging.EventOrigin",
-            "#[derive(::serde_repr::Serialize_repr, ::serde_repr::Deserialize_repr)]",
-        )
-        .type_attribute(
-            ".Logging.EventType",
-            "#[derive(::serde_repr::Serialize_repr, ::serde_repr::Deserialize_repr)]",
-        )
-        .type_attribute(".Logging.EventOrigin", "#[derive(::juniper::GraphQLEnum)]")
-        .type_attribute(".Logging.EventType", "#[derive(::juniper::GraphQLEnum)]")
-        .type_attribute(".Logging.EventOrigin", "#[derive(::strum::EnumString)]")
-        .type_attribute(".Logging.EventType", "#[derive(::strum::EnumString)]")
+        .build_server(false);
+
+    for &struct_path in SERDE_STRUCTS {
+        builder = builder.type_attribute(struct_path, "#[derive(::serde::Deserialize)]");
+    }
+
+    for &enum_path in ENUMS {
         // Note: we have to hope (and pray) that the strum serializations are the same as the juniper ones
         // The book (https://graphql-rust.github.io/juniper/current/types/enums.html#enums) is wrong
         // when it says they are uppercase; they should be SCREAMING_SNAKE_CASE in juniper as well
-        .type_attribute(
-            ".Logging.EventOrigin",
-            r#"#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]"#,
-        )
-        .type_attribute(
-            ".Logging.EventType",
-            r#"#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]"#,
-        )
-        .compile(&["logging.proto"], &["../../lib/ipc/proto"])
-        .context("Compiling logging.proto definitions")?;
+        builder = builder
+            .type_attribute(
+                enum_path,
+                "#[derive(::serde_repr::Serialize_repr, ::serde_repr::Deserialize_repr)]",
+            )
+            .type_attribute(enum_path, "#[derive(::juniper::GraphQLEnum)]")
+            .type_attribute(enum_path, "#[derive(::strum::EnumString)]")
+            .type_attribute(
+                enum_path,
+                r#"#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]"#,
+            );
+    }
+
+    builder
+        .compile(&["logs/event.proto"], &["../../lib/ipc/proto"])
+        .context("Compiling logs/event.proto definitions")?;
 
     Ok(())
 }

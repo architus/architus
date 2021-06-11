@@ -1,11 +1,9 @@
-# Port that the main gRPC server listens on
-port = 8173
 # Elasticsearch index containing the stored log events
-log_index = "events"
+log_index = "logs-events"
 
 # Options related to the GraphQL search API
 [graphql]
-# Port that the optional GraphQL HTTP server runs on (used in development)
+# (optional) Port that the optional GraphQL HTTP server runs on (used in development)
 http_port = 8174
 # Default limit of items to fetch in a single page if none is given
 default_page_size = 100
