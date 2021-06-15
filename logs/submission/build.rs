@@ -21,12 +21,6 @@ fn main() -> Result<()> {
         )
         .compile(&["logs/submission.proto"], &["../../lib/ipc/proto"])
         .context("Compiling logs/submission.proto definitions")?;
-    // Compile the logs/revision protobuf definitions into the client code
-    tonic_build::configure()
-        .build_client(true)
-        .build_server(false)
-        .compile(&["logs/revision.proto"], &["../../lib/ipc/proto"])
-        .context("Compiling logs/revision.proto definitions")?;
 
     Ok(())
 }

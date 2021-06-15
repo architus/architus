@@ -3,8 +3,9 @@
 
 use anyhow::{Context, Result};
 use architus_config_backoff::Backoff;
-use log::{debug, info};
 use serde::Deserialize;
+use sloggers::terminal::TerminalLoggerConfig;
+use std::time::Duration;
 
 /// Configuration object loaded upon startup
 #[derive(Debug, Deserialize, Clone)]
@@ -13,22 +14,36 @@ pub struct Configuration {
     pub port: u16,
     /// Collection of external services that this service connects to
     pub services: Services,
-    /// Parameters for the backoff used to forward events to logstash
+    /// Parameters for the backoff used to forward events to Elasticsearch
     pub submission_backoff: Backoff,
+    /// Logging configuration (for service diagnostic logs, not Architus log events)
+    pub logging: TerminalLoggerConfig,
+    /// How long to wait for durable submission confirmation
+    /// before returning with "deadline exceeded" and encouraging retry
+    #[serde(with = "serde_humantime")]
+    pub submission_wait_timeout: Duration,
+    /// The number of events that will trigger an immediate batch submit
+    /// even if the event submission debounce period has not elapsed
+    pub debounce_size: usize,
+    /// The period of time since the oldest event in a batch was enqueued
+    /// that the entire batch will be submitted
+    #[serde(with = "serde_humantime")]
+    pub debounce_period: Duration,
+    /// Elasticsearch index containing the stored log events
+    pub elasticsearch_index: String,
 }
 
 /// Collection of external services that this service connects to
 #[derive(Debug, Deserialize, Clone)]
 pub struct Services {
-    /// HTTP URL of logstash with http input/protobuf codec to send events to
-    pub logs_submission_logstash: String,
+    /// URL of the Elasticsearch instance to store log entries in
+    pub elasticsearch: String,
 }
 
 impl Configuration {
     /// Attempts to load the config from the file, called once at startup
     pub fn try_load(path: impl AsRef<str>) -> Result<Self> {
         let path = path.as_ref();
-        info!("Loading configuration from {}", path);
         // Use config to load the values and merge with the environment
         let mut settings = config::Config::default();
         settings
@@ -41,7 +56,6 @@ impl Configuration {
         let config = settings
             .try_into()
             .context("Loading the Configuration struct from the merged config failed")?;
-        debug!("Configuration: {:?}", config);
         Ok(config)
     }
 }
