@@ -20,5 +20,5 @@ max_page_size = 500
 max_pagination_amount = 5000
 
 [services]
-# URL of the Elasticsearch instance to store log entries in
+# URL of the Elasticsearch instance to search log entries from
 elasticsearch = "http://[::1]:9200"

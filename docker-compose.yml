@@ -130,10 +130,6 @@ services:
       - type: bind
         source: ./logs/gateway-ingress/config.default.toml
         target: /opt/config.toml
-    depends_on:
-      - rabbit
-      - feature-gate
-      - logs-uptime
     networks:
       - webnet
     env_file:
@@ -150,8 +146,6 @@ services:
       - type: bind
         source: ./logs/gateway-normalize/config.default.toml
         target: /opt/config.toml
-    depends_on:
-      - rabbit
     networks:
       - webnet
     env_file:
@@ -168,14 +162,10 @@ services:
       - type: bind
         source: ./logs/submission/config.default.toml
         target: /opt/config.toml
-    depends_on:
-      - logs-submission-logstash
     networks:
       - webnet
     env_file:
       - architus.env
-    environment:
-      RUST_LOG: "info"
   logs-uptime:
     image: jazevedo6/logs-uptime:${TAG:-latest}
     build:
@@ -194,19 +184,6 @@ services:
       - architus.env
     environment:
       RUST_LOG: "info"
-  logs-submission-logstash:
-    image: jazevedo6/logs-logstash:${TAG:-latest}
-    build:
-      context: ./
-      dockerfile: ./logs/submission-logstash/Dockerfile
-    ports:
-      - "51031:51031"
-    environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
-    networks:
-      - webnet
-    depends_on:
-      - elasticsearch
   logs-search:
     image: jazevedo6/logs-search:${TAG:-latest}
     build:
@@ -219,8 +196,6 @@ services:
       - type: bind
         source: ./logs/search/config.default.toml
         target: /opt/config.toml
-    depends_on:
-      - elasticsearch
     networks:
       - webnet
     env_file:

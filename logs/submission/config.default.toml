@@ -1,14 +1,35 @@
 # The port that the gRPC server listens on
 port = 50282
+# How long to wait for durable submission confirmation
+# before returning with "deadline exceeded" and encouraging retry
+submission_wait_timeout = "2s"
+# The number of events that will trigger an immediate batch submit
+# even if the event submission debounce period has not elapsed
+debounce_size = 32
+# The period of time since the oldest event in a batch was enqueued
+# that the entire batch will be submitted
+debounce_period = "100ms"
+# Elasticsearch index containing the stored log events
+elasticsearch_index = "logs-events"
 
 [services]
-# HTTP URL of logstash with http input/protobuf codec to send events to
-logs_submission_logstash = "http://[::1]:51031"
+# URL of the Elasticsearch instance to store log entries in
+elasticsearch = "http://[::1]:9200"
 
-# Parameters for the backoff used to forward events to logstash
+# Parameters for the backoff used to forward events to Elasticsearch
 [submission_backoff]
 initial_interval = "100ms"
 max_interval = "10s"
 duration = "2m"
 multiplier = 2.0
 
+# Logging configuration (for service diagnostic logs, not Architus log events)
+# https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html
+[logging]
+level = "info"
+format = "json"
+source_location = "file_and_line"
+timezone = "utc"
+destination = "stdout"
+channel_size = 2048
+overflow_strategy = "drop_and_report"

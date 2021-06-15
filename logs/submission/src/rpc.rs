@@ -12,12 +12,4 @@ pub mod logs {
     pub mod submission {
         tonic::include_proto!("logs.submission");
     }
-
-    // Ignore clippy linting on generated code
-    #[allow(clippy::all, clippy::pedantic, clippy::nursery)]
-    pub mod revision {
-        tonic::include_proto!("logs.revision");
-
-        pub type Client = revision_service_client::RevisionServiceClient<tonic::transport::Channel>;
-    }
 }

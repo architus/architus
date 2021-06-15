@@ -16,7 +16,7 @@ pub struct Configuration {
 /// Collection of external services that this service connects to
 #[derive(Debug, Deserialize, Clone)]
 pub struct Services {
-    /// URL of the Elasticsearch instance to store log entries in
+    /// URL of the Elasticsearch instance to search log entries from
     pub elasticsearch: String,
 }
 
@@ -50,8 +50,8 @@ impl Configuration {
         settings
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
-            // Add in settings from the environment (with a prefix of LOGGING)
-            // Eg.. `LOGGING_PORT=8080 ./target/logging-service`
+            // Add in settings from the environment (with a prefix of LOGS_SEARCH)
+            // Eg.. `LOGS_SEARCH_PORT=8080 ./target/logs-search`
             // would set the `port` key tot 8080
             .merge(config::Environment::with_prefix("LOGS_SEARCH").separator("__"))
             .context("Could not merge in values from the environment")?;

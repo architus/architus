@@ -12,22 +12,27 @@ license = "MIT"
 [dependencies]
 architus-id = { path = "../../lib/id-rs" }
 architus-config-backoff = { path = "../../lib/config-backoff-rs" }
-config = "0.10"
-log = "0.4"
-env_logger = "0.8"
+config = "0.11"
+slog = "2.7"
+sloggers = { version = "2.0", features = ["json"] }
 anyhow = "1.0"
 thiserror = "1.0.22"
 tonic = "0.4"
 prost = "0.7"
 futures = "0.3"
+futures-batch = "0.6"
 tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "time", "macros"] }
+tokio-stream = "0.1"
 serde = { version = "1.0", features = ["derive"] }
+serde-humantime = "0.1"
 serde_json = "1.0"
 serde_repr = "0.1"
+serde_with = "1.9"
 backoff = { version = "0.3", features = ["tokio"] }
-reqwest = "0.11"
 bytes = "1.0"
 base64 = "0.13"
+elasticsearch = "7.12.0-alpha.1"
+hyper = "0.14"
 
 [build-dependencies]
 tonic-build = "0.4"

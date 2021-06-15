@@ -26,7 +26,6 @@ COPY $CONFIG_BACKOFF_LIB/Cargo.toml .
 WORKDIR $REPO_ROOT/$PROTO
 COPY $PROTO/logs/submission.proto logs/submission.proto
 COPY $PROTO/logs/event.proto logs/event.proto
-COPY $PROTO/logs/revision.proto logs/revision.proto
 # Build via Cargo
 WORKDIR $REPO_ROOT/$SERVICE
 RUN cargo build --release
