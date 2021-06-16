@@ -10,5 +10,5 @@ license = "MIT"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-serde-humantime = "0.1"
+humantime-serde = "1.0"
 backoff = { version = "0.3", features = [] }

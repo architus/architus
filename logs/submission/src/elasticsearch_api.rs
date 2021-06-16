@@ -43,6 +43,10 @@ pub(crate) mod bulk {
         pub error: Option<Error>,
     }
 
+    /// Defines a `serde(with)` combination of (de)serialize functions
+    /// that convert between `u16` integers and instances of hyper::http::StatusCode values.
+    /// This is used to make consuming their values more ergonomic
+    /// and combine the conversion into the rest of the decoding.
     mod serde_status_code {
         use serde::Deserialize;
 
