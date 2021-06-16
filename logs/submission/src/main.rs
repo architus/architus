@@ -29,7 +29,8 @@ use tonic::transport::Server;
 use tonic::{Request, Response, Status};
 
 /// Loads the config and bootstraps the service
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     // Parse the config
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
@@ -47,17 +48,14 @@ fn main() -> Result<()> {
     slog::info!(logger, "configuration loaded"; "path" => config_path);
     slog::debug!(logger, "configuration dump"; "config" => ?config);
 
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    rt.block_on(async { run(config, logger).await })
+    run(config, logger).await
 }
 
 /// Attempts to connect to external services and prepare the submission pipeline
 async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
     // Connect to Elasticsearch
-    let elasticsearch = Arc::new(connect::to_elasticsearch(
-        Arc::clone(&config),
-        logger.clone(),
-    )?);
+    let elasticsearch =
+        Arc::new(connect::to_elasticsearch(Arc::clone(&config), logger.clone()).await?);
 
     // Create the channel that acts as a stream source for event processing
     let (event_tx, event_rx) = mpsc::unbounded_channel::<submission::Event>();
@@ -109,6 +107,12 @@ async fn submit_events(
     let next_correlation_id = Arc::new(AtomicUsize::new(1));
 
     // Batch together events and then process them as batches
+    slog::info!(
+        logger,
+        "starting batched sink of submission events";
+        "debounce_size" => config.debounce_size,
+        "debounce_period" => ?config.debounce_period
+    );
     UnboundedReceiverStream::new(event_rx)
         .chunks_timeout(config.debounce_size, config.debounce_period)
         .for_each_concurrent(None, move |events| {

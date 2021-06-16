@@ -14,20 +14,22 @@ pub struct Configuration {
     pub port: u16,
     /// Collection of external services that this service connects to
     pub services: Services,
+    /// Parameters for the backoff used to connect to external services during initialization
+    pub initialization_backoff: Backoff,
     /// Parameters for the backoff used to forward events to Elasticsearch
     pub submission_backoff: Backoff,
     /// Logging configuration (for service diagnostic logs, not Architus log events)
     pub logging: TerminalLoggerConfig,
     /// How long to wait for durable submission confirmation
     /// before returning with "deadline exceeded" and encouraging retry
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub submission_wait_timeout: Duration,
     /// The number of events that will trigger an immediate batch submit
     /// even if the event submission debounce period has not elapsed
     pub debounce_size: usize,
     /// The period of time since the oldest event in a batch was enqueued
     /// that the entire batch will be submitted
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub debounce_period: Duration,
     /// Elasticsearch index containing the stored log events
     pub elasticsearch_index: String,

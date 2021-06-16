@@ -6,11 +6,11 @@ use std::time::Duration;
 /// Controls an exponential backoff that can be loaded from a config file
 #[derive(Default, Debug, Deserialize, Clone)]
 pub struct Backoff {
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub initial_interval: Duration,
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub max_interval: Duration,
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub duration: Duration,
     pub multiplier: f64,
 }

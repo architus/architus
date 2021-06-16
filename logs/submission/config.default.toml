@@ -16,6 +16,13 @@ elasticsearch_index = "logs-events"
 # URL of the Elasticsearch instance to store log entries in
 elasticsearch = "http://[::1]:9200"
 
+# Parameters for the backoff used to connect to external services during initialization
+[initialization_backoff]
+initial_interval = "500ms"
+max_interval = "30s"
+duration = "2m"
+multiplier = 2.0
+
 # Parameters for the backoff used to forward events to Elasticsearch
 [submission_backoff]
 initial_interval = "100ms"
