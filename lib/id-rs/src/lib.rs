@@ -1,6 +1,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
 use serde::{Deserialize, Serialize};
+use slog::Logger;
 use std::fmt;
 use std::process;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -16,12 +17,13 @@ const DISCORD_EPOCH_OFFSET: u64 = 1_420_070_400_000;
 pub struct IdProvisioner {
     combined_process_id: u64,
     internal_counter: AtomicU64,
+    logger: Option<Logger>,
 }
 
 impl Default for IdProvisioner {
     #[must_use]
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
@@ -29,13 +31,17 @@ impl IdProvisioner {
     /// Creates a new `IdProvisioner` and examines the system configuration
     /// for the PID and some MAC address
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(logger: Option<Logger>) -> Self {
         let mac_addr_significant = get_mac_address().map_or(0, |bytes| u64::from(bytes[0]));
         let worker_id = mac_addr_significant & 0b1_1111;
         let process_id = u64::from(process::id()) & 0b1_1111;
+        if let Some(ref logger) = logger {
+            slog::info!(logger, "initializing id provisioner"; "worker_id" => worker_id, "process_id" => process_id);
+        }
         Self {
             combined_process_id: (worker_id << 17) | (process_id << 12),
             internal_counter: AtomicU64::new(0),
+            logger,
         }
     }
 

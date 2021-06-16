@@ -11,6 +11,7 @@ license = "MIT"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 mac_address = "1.0"
+slog = "2.7"
 
 # Unix-specific dependencies
 [target.'cfg(unix)'.dependencies]

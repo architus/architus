@@ -133,9 +133,9 @@ async fn submit_events(
 
 struct SubmissionServiceImpl {
     config: Arc<Configuration>,
-    logger: Logger,
     id_provisioner: IdProvisioner,
     event_tx: mpsc::UnboundedSender<submission::Event>,
+    logger: Logger,
 }
 
 impl SubmissionServiceImpl {
@@ -146,9 +146,9 @@ impl SubmissionServiceImpl {
     ) -> Self {
         Self {
             config,
-            logger,
-            id_provisioner: IdProvisioner::new(),
+            id_provisioner: IdProvisioner::new(Some(logger.clone())),
             event_tx,
+            logger,
         }
     }
 }
