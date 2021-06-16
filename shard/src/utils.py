@@ -3,36 +3,12 @@ from pytz import timezone
 from aiohttp import ClientSession
 import io
 import functools
-from threading import Lock
 from string import digits
 
 import discord
 
 from lib.config import logger
 from lib.ipc import manager_pb2 as message
-
-
-class TCPLock:
-    """
-    A basic thread safe TCP socket.
-    """
-    def __init__(self, s):
-        self.connection = s
-        self.lock = Lock()
-
-    def write(self, b):
-        self.lock.acquire()
-        self.connection.send(b)
-        self.lock.release()
-
-    def send(self, b):
-        self.write(b)
-
-    def recv(self, num_bytes):
-        self.lock.acquire()
-        msg = self.connection.recv(num_bytes)
-        self.lock.release()
-        return msg
 
 
 async def download_emoji(emoji: discord.Emoji) -> io.BytesIO:
@@ -104,6 +80,8 @@ def user_to_dict(user: discord.User) -> dict:
     params = ('id', 'name', 'avatar', 'discriminator')
     data = {p: getattr(user, p) for p in params}
     data['id'] = str(data['id'])
+    data['username'] = data['name']
+    del data['name']
     return data
 
 
@@ -114,7 +92,7 @@ def member_to_dict(member: discord.Member) -> dict:
     data['roles'] = [str(r.id) for r in member.roles]
     data['color'] = str(member.color)
     data['joined_at'] = member.joined_at.isoformat()
-    logger.debug(data)
+    # logger.debug(data)
     return data
 
 
@@ -182,3 +160,15 @@ def format_seconds(s: int, hours: bool = False):
         return '{}:{:02}:{:02}'.format(int(hours), int(minutes), int(seconds))
     minutes, seconds = divmod(s, 60)
     return '{}:{:02}'.format(int(minutes), int(seconds))
+
+
+def lavasong_to_dict(song):
+    identifier = song.identifier if 'youtube' in song.uri else None
+    return {
+        'title': song.title,
+        'author': song.author,
+        'duration': song.duration,
+        'uri': song.uri,
+        'identifier': identifier,
+        'thumbnail': f'https://img.youtube.com/vi/{identifier}/1.jpg' if identifier is not None else None,
+    }

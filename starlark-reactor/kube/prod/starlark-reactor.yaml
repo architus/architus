@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: starlark-reactor
+  labels:
+    app: starlark-reactor
+spec:
+  selector:
+    matchLabels:
+      app: starlark-reactor
+  template:
+    metadata:
+      labels:
+        app: starlark-reactor
+    spec:
+      containers:
+        - name: starlark-reactor
+          image: "{{prefix}}starlark-reactor:{{tag}}"
+          envFrom:
+          - secretRef:
+              name: architus-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: starlark-reactor
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: starlark-reactor
+  ports:
+  - protocol: TCP
+    port: 1337
+    targetPort: 1337

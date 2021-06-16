@@ -16,3 +16,5 @@ tags
 .vscode/*
 .idea
 www
+secret.yaml
+tilt_modules

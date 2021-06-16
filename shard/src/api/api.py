@@ -1,5 +1,7 @@
 import secrets
 from typing import List
+from asyncio import create_task
+import re
 
 from discord.ext.commands import Cog, Context
 import discord
@@ -12,7 +14,9 @@ from src.api.util import fetch_guild
 from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 from lib.ipc import manager_pb2 as message
-from src.utils import guild_to_dict
+from src.utils import guild_to_dict, lavasong_to_dict
+
+url_rx = re.compile(r'https?://(?:www\.)?.+')
 
 
 class Api(Cog):
@@ -69,6 +73,36 @@ class Api(Cog):
 
     async def set_response(self, user_id, guild_id, trigger, response):
         return {'message': 'unimplemented'}, 500
+
+    async def get_playlist(self, guild_id):
+        voice = self.bot.lavalink.player_manager.get(guild_id)
+        if voice is None:
+            return {}, sc.OK_200
+        else:
+            dicts = [lavasong_to_dict(s) for s in voice.queue]
+            return {'playlist': dicts}, sc.OK_200
+
+    @fetch_guild
+    async def queue_song(self, guild, uid, song):
+        lava_cog = self.bot.cogs['Voice']
+        if guild is None:
+            return {}, sc.BAD_REQUEST_400
+        user = guild.get_member(uid)
+        if user is None:
+            return {}, sc.BAD_REQUEST_400
+
+        try:
+            await lava_cog.ensure_voice(user, guild, True)
+        except discord.CommandInvokeError:
+            return {}, sc.UNAUTHORIZED_401
+
+        added_songs = await lava_cog.enqueue(song, user, guild)
+        if added_songs == []:
+            return {}, sc.NOT_FOUND_404
+        elif added_songs[0] == 'playlist':
+            return {'playlist': added_songs}, sc.OK_200
+        else:
+            return {lavasong_to_dict(added_songs[1])}, sc.OK_200
 
     async def users_guilds(self, user_id):
         users_guilds = []
@@ -182,6 +216,38 @@ class Api(Cog):
         }, sc.OK_200
 
     @fetch_guild
+    async def load_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if emoji is None:
+            return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
+        await emoji_manager.load_emoji(emoji)
+        return {'message': "successfully loaded"}, sc.OK_200
+
+    @fetch_guild
+    async def cache_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if member_id not in self.bot.settings[guild].admin_ids:
+            return {'message': "only admins may manually cache emoji"}, sc.UNAUTHORIZED_401
+        if emoji is None:
+            return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
+        await emoji_manager.cache_emoji(emoji)
+        return {'message': "successfully cached"}, sc.OK_200
+
+    @fetch_guild
+    async def delete_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
+        member = guild.get_member(member_id)
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        if emoji is None:
+            return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
+        if emoji.author_id != member.id and member.id not in self.bot.settings[guild].admin_ids:
+            return {'message': "you must own this emoji or have admin permissions"}, sc.UNAUTHORIZED_401
+        await emoji_manager.delete_emoji(emoji)
+        return {'message': "successfully deleted"}, sc.OK_200
+
+    @fetch_guild
     async def settings_access(self, guild, setting=None, value=None):
         settings = self.bot.settings[guild]
         if hasattr(settings, setting):
@@ -204,18 +270,28 @@ class Api(Cog):
                 guild_dict.update({'has_architus': False, 'architus_admin': False})
         return {'guilds': guild_list}, sc.OK_200
 
-    async def pool_request(self, guild_id, pool_type: str, entity_id, fetch=False):
+    async def pool_request(self, user_id, guild_id, pool_type: str, entity_ids, fetch=False):
         guild = self.bot.get_guild(int(guild_id)) if guild_id else None
-        try:
-            if pool_type == PoolType.MEMBER:
-                return {'data': await self.pools.get_member(guild, entity_id, fetch)}, 200
-            elif pool_type == PoolType.USER:
-                return {'data': await self.pools.get_user(entity_id, fetch)}, 200
-            elif pool_type == PoolType.EMOJI:
-                return {'data': await self.pools.get_emoji(guild, entity_id, fetch)}, 200
-        except Exception:
-            logger.exception('')
-            return {'data': {}}, sc.NOT_FOUND_404
+        resp = {'data': [], 'nonexistant': []}
+
+        if pool_type == PoolType.MEMBER:
+            tasks = {eid: create_task(self.pools.get_member(guild, eid, fetch)) for eid in entity_ids}
+        elif pool_type == PoolType.USER:
+            tasks = {eid: create_task(self.pools.get_user(eid, fetch)) for eid in entity_ids}
+        elif pool_type == PoolType.EMOJI:
+            tasks = {eid: create_task(self.pools.get_emoji(guild, eid, fetch)) for eid in entity_ids}
+        elif pool_type == PoolType.GUILD:
+            tasks = {eid: create_task(self.pools.get_guild(user_id, eid, fetch)) for eid in entity_ids}
+        else:
+            raise Exception(f"unknown pool type: {pool_type}")
+
+        for entity_id, task in tasks.items():
+            try:
+                resp['data'].append(await task)
+            except Exception as e:
+                logger.debug(e)
+                resp['nonexistant'].append(entity_id)
+        return resp, sc.OK_200
 
     @fetch_guild
     async def pool_all_request(self, guild, pool_type: str):
@@ -238,6 +314,11 @@ class Api(Cog):
             pass
         else:
             return {'error': "Unknown Pool"}, sc.BAD_REQUEST_400
+
+    async def twitch_update(self, stream):
+        twitch_update = self.bot.cogs['Twitch Notification']
+        await twitch_update.update(stream)
+        return {}, sc.OK_200
 
     async def handle_mock_user_action(
             self,
@@ -316,7 +397,10 @@ class Api(Cog):
                     async def ctx_send(content):
                         sends.append(content)
                     ctx.send = ctx_send
-                    await ctx.invoke(triggered_command, *args[1:])
+                    try:
+                        await ctx.invoke(triggered_command, *args[1:])
+                    except TypeError:
+                        await ctx.invoke(triggered_command)
                 else:
                     # no builtin, check for user set commands in this "guild"
                     for resp in responses[guild_id].auto_responses:

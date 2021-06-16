@@ -8,3 +8,5 @@ exclude =
     .venv/*
     ./lib/ipc/manager_pb2.py
     ./lib/ipc/manager_pb2_grpc.py
+    ./lib/ipc/starlark-reactor_pb2.py
+    ./lib/ipc/starlark-reactor_pb2_grpc.py

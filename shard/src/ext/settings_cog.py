@@ -29,8 +29,11 @@ RULER = u"\U0001F4CF"
 TRIAGULAR_RULER = u"\U0001F4D0"
 COLLISION = u"\U0001F4A5"
 CROSS_MARK = u"\U0000274C"
+MOVIE = u"\U0001F3AC"
 CONTROL_KNOBS = u"\U0001F39B"
 SPEAKER = u"\U0001F50A"
+BOOKMARK = u"\U0001F4D1"
+WINDOW = u"\U0001FA9F"
 
 
 class SettingsElement:
@@ -488,14 +491,55 @@ class ResponsesAllowCollisions(SettingsElement):
             tags=['responses'])
 
 
+class ResponsesAllowNewlines(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Allow Newlines in Response",
+            BOOKMARK,
+            "Whether newlines will be stripped or allowed in auto response outputs. Enter `true` or `false`.",
+            'responses_allow_newlines',
+            tags=['responses'])
+
+
+class ResponsesAllowEmbeds(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Expand Links into Embeds",
+            WINDOW,
+            "If false, architus will escape links in responses so discord won't embed them. Enter `true` or `false`",
+            'responses_allow_embeds',
+            tags=['responses'])
+
+
 class ResponsesOnlyAuthorRemove(SettingsElement):
     def __init__(self):
         super().__init__(
             "Restrict Remove",
             CROSS_MARK,
-            "When enabled, only the auto response author or an admin may remove it. Enter `true` or `false.",
+            "When enabled, only the auto response author or an admin may remove it. Enter `true` or `false`.",
             'responses_only_author_remove',
             tags=['responses'])
+
+
+class TwitchChannel(SettingsElement):
+    def __init__(self):
+        super().__init__(
+            "Twitch Updates",
+            MOVIE,
+            "The channel to which Twitch stream updates will be sent. Enter a channel mention.",
+            'twitch_channel_id')
+
+    async def formatted_value(self, bot, ctx, settings):
+        channel = ctx.guild.get_channel(settings.twitch_channel_id)
+        print(channel)
+        return channel.mention if channel else None
+
+    async def parse(self, ctx, msg, settings):
+        try:
+            channel = msg.channel_mentions[0]
+        except IndexError:
+            raise ValueError
+        return channel.id
 
 
 class Settings(Cog):

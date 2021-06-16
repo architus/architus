@@ -1,15 +1,15 @@
 import json
 from io import BytesIO
 
-from flask import Flask, redirect, request, g, Response
+from flask import Flask, redirect, request, g, Response, make_response
 from flask_restful import Api, Resource
 from flask_cors import CORS
 from werkzeug.wsgi import FileWrapper
 
 from lib.status_codes import StatusCodes
-from lib.config import client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod
+from lib.config import logger, client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod, which_shard
 # from lib.models import Log # , Emojis
-from lib.auth import JWT, flask_authenticated as authenticated
+from lib.auth import JWT, flask_authenticated as authenticated, verify_twitch_hub
 from lib.discord_requests import list_guilds_request
 from lib.pool_types import PoolType
 
@@ -160,6 +160,18 @@ class Stats(CustomResource):
         return data, sc
 
 
+class Music(CustomResource):
+    @authenticated(member=True)
+    def get(self, guild_id: int, jwt: JWT):
+        resp, sc = self.shard.get_playlist(guild_id, routing_guild=guild_id)
+        return camelcase_keys(resp), sc
+
+    @reqparams(song=str)
+    @authenticated(member=True)
+    def post(self, guild_id: int, song: str, jwt: JWT):
+        return self.shard.queue_song(guild_id, int(jwt.id), song, routing_guild=guild_id)
+
+
 class Emoji(CustomResource):
 
     def get(self, emoji_id: int):
@@ -167,6 +179,18 @@ class Emoji(CustomResource):
         if result is None:
             return "emoji not found", StatusCodes.NOT_FOUND_404
         return Response(FileWrapper(BytesIO(result['img'])), mimetype="text/plain", direct_passthrough=True)
+
+    @authenticated(member=True)
+    def post(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.load_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+
+    @authenticated(member=True)
+    def patch(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.cache_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
+
+    @authenticated(member=True)
+    def delete(self, guild_id: int, emoji_id: int, jwt: JWT):
+        return self.shard.delete_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
 
 
 class ListGuilds(CustomResource):
@@ -177,6 +201,38 @@ class ListGuilds(CustomResource):
         if status_code == StatusCodes.OK_200:
             resp, _ = self.shard.tag_autbot_guilds(resp, jwt.id)
         return resp, status_code
+
+
+class Twitch(CustomResource):
+    def get(self):
+        challenge = request.args.get("hub.challenge")
+        return make_response(challenge, StatusCodes.OK_200)
+
+    @verify_twitch_hub
+    def post(self):
+        if request.json is None or 'data' not in request.json:
+            return StatusCodes.BAD_REQUEST_400
+
+        # twitch can send the same event more than once.
+        id = request.headers['Twitch-Notification-Id']
+        seen_before = self.redis.getset(id, '1') is not None
+        self.redis.expire(id, 60)
+        if seen_before:
+            return StatusCodes.NO_CONTENT_204
+
+        # send update to all the relevant shards
+        for stream in request.json['data']:
+            user_id = stream["user_id"]
+            result = self.session.execute(
+                '''SELECT guild_id FROM tb_twitch_subs WHERE stream_user_id = :stream_user_id''',
+                {'stream_user_id': int(user_id)}).fetchall()
+            ids = {which_shard(row['guild_id']) for row in result}
+
+            for shard_id in ids:
+                try:
+                    self.shard.client.call('twitch_update', stream, routing_key=f'shard_rpc_{shard_id}')
+                except Exception:
+                    logger.exception(f"Error forwarding twitch update to shard {shard_id}")
 
 
 @app.route('/status')
@@ -197,12 +253,14 @@ def app_factory():
     api.add_resource(Settings, "/settings/<int:guild_id>/<string:setting>", "/settings/<int:guild_id>")
     api.add_resource(ListGuilds, "/guilds")
     api.add_resource(Stats, "/stats/<int:guild_id>")
-    api.add_resource(Emoji, "/emojis/<int:emoji_id>")
+    api.add_resource(Music, "/music/<int:guild_id>")
+    api.add_resource(Emoji, "/emojis/<int:emoji_id>", "/emojis/<int:guild_id>/<int:emoji_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")
     api.add_resource(GuildCounter, "/guild-count")
     api.add_resource(Invite, "/invite/<int:guild_id>")
+    api.add_resource(Twitch, "/twitch")
     if not is_prod:
         api.add_resource(Coggers, "/coggers/<string:extension>", "/coggers")
     return app

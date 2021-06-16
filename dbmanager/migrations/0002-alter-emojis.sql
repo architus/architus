@@ -1,1 +1,1 @@
-ALTER TABLE tb_emojis DROP COLUMN url;
+ALTER TABLE tb_emojis DROP COLUMN IF EXISTS url;

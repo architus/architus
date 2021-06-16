@@ -7,10 +7,11 @@ import discord
 
 from src.utils import guild_to_message, guild_to_dict
 from lib.config import get_session, secret_token, logger, AsyncConnWrapper
+from lib.aiomodels import TbUsageAnalytics
 from lib.ipc import async_rpc_server
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
-from lib.ipc import grpc_client, manager_pb2 as message
+from lib.ipc import grpc_client, starlark_reactor_pb2_grpc, manager_pb2_grpc, manager_pb2 as message
 
 
 class Architus(Bot):
@@ -19,11 +20,12 @@ class Architus(Bot):
         self.session = get_session()
         self.asyncpg_wrapper = AsyncConnWrapper()
         self.deletable_messages = []
+        self.tb_usage_analytics = TbUsageAnalytics(self.asyncpg_wrapper)
 
         self.hoarfrost_gen = HoarFrostGenerator()
 
         logger.debug("registering with manager...")
-        manager_client = grpc_client.get_blocking_client('manager:50051')
+        manager_client = grpc_client.get_blocking_client('manager:50051', manager_pb2_grpc.ManagerStub)
         while True:
             try:
                 shard_info = manager_client.register(message.RegisterRequest())
@@ -50,11 +52,16 @@ class Architus(Bot):
             )
         )
 
-        self.manager_client = grpc_client.get_async_client('manager:50051')
+        self.manager_client = grpc_client.get_async_client('manager:50051', manager_pb2_grpc.ManagerStub)
+        self.starlark_reactor_client = grpc_client.get_async_client('starlark-reactor:1337', starlark_reactor_pb2_grpc.StarlarkReactorStub)
 
         self.loop.create_task(self.emitter.connect())
 
         super().run(token)
+
+    async def on_socket_raw_receive(self, msg):
+        if "Slash" in self.cogs:
+            await self.cogs['Slash'].on_socket_raw_receive(msg)
 
     async def on_message(self, msg):
         """Execute commands, then trigger autoresponses"""
@@ -67,7 +74,6 @@ class Architus(Bot):
         await self.process_commands(msg)
 
     async def on_ready(self):
-        """pull autoresponses from the db, then set activity"""
         await self.asyncpg_wrapper.connect()
         logger.info('Logged on as {0}!'.format(self.user))
         await self.change_presence(activity=discord.Activity(
@@ -96,9 +102,12 @@ class Architus(Bot):
     @property
     def guilds_as_message(self):
         for guild in self.guilds:
-            guild_message = guild_to_message(guild)
-            guild_message.shard_id = self.shard_id
-            guild_message.admin_ids.extend(self.settings[guild].admins_ids)
+            try:
+                guild_message = guild_to_message(guild)
+                guild_message.shard_id = self.shard_id
+                guild_message.admin_ids.extend(self.settings[guild].admins_ids)
+            except Exception:
+                logger.exception(f'error converting guild ({guild.id}) to message')
             yield guild_message
 
     @property
@@ -143,6 +152,26 @@ architus = Architus(command_prefix=command_prefix, max_messages=10000, intents=i
 
 # Remove default help command so it doesn't conflict with ours
 architus.help_command = None
+
+
+@architus.check
+async def globally_block_dms(ctx):
+    return ctx.guild is not None
+
+
+@architus.check_once
+def tracker(ctx):
+    async def task():
+        await architus.tb_usage_analytics.insert({
+            'prefix': ctx.prefix,
+            'command': ctx.command.name,
+            'guild_id': ctx.guild.id,
+            'channel_id': ctx.channel.id,
+            'author_id': ctx.author.id,
+        })
+    architus.loop.create_task(task())
+    return True
+
 
 for ext in (e for e in os.listdir("src/ext") if e.endswith(".py")):
     architus.load_extension(f"src.ext.{ext[:-3]}")

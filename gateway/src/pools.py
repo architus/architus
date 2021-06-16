@@ -78,59 +78,32 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
     await partial_event(payload)
 
 
-class GuildPool:
-    def __init__(self, manager_client, shard_client, jwt):
-        self.manager_client = manager_client
-        self.shard_client = shard_client
-        self.jwt = jwt
-        self.return_guilds = []
-        self.list_task = None
+async def pool_response(shard_client, guild_id, pool_type, ids, partial_event, partial_error, payload, jwt):
+    resp, sc = await shard_client.pool_request(
+        jwt.id, guild_id, pool_type, ids, fetch=False, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+    if sc != 200:
+        logger.error(f"got bad response from `pool_request` for guild: {guild_id}")
+        await partial_error(
+            message=f"guild {guild_id} returned error fetching entities of type {pool_type}",
+            human=f"An error occured fetching {pool_type}.",
+            context=[resp],
+            code=sc)
+        return
+    payload.update({'data': resp['data'], 'finished': len(resp['nonexistant']) == 0})
+    if len(payload['data']) > 0:
+        await partial_event(payload)
+    if payload['finished']:
+        return
 
-    async def fetch_guilds(self):
-        resp, sc = await async_list_guilds_request(self.jwt)
-        if sc != s.OK_200:
-            logger.debug(resp)
-            return []
-
-        guilds = []
-
-        for guild in resp:
-            mem_resp, _ = await self.shard_client.is_member(
-                self.jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
-            guild.update({
-                'has_architus': mem_resp['member'],
-                'architus_admin': mem_resp['admin'],
-            })
-            guilds.append(guild)
-
-        return guilds
-
-    async def fetch_architus_guilds(self):
-        # get discord request started
-        self.list_task = create_task(async_list_guilds_request(self.jwt))
-
-        tasks = (create_task(
-            self.shard_client.users_guilds(self.jwt.id, routing_key=f"shard_rpc_{i}"))
-            for i in range(NUM_SHARDS))
-
-        self.return_guilds = [guild for t in tasks for guild in (await t)[0]]
-        for g in self.return_guilds:
-            g.update({'owner': g['owner_id'] == self.jwt.id})
-        return self.return_guilds
-
-    async def fetch_remaining_guilds(self):
-        resp, sc = await self.list_task
-        if sc != s.OK_200:
-            logger.debug(resp)
-            return []
-        remaining = []
-        ids = [g['id'] for g in self.return_guilds]
-        for guild in resp:
-            if str(guild['id']) not in ids:
-                guild.update({
-                    'has_architus': False,
-                    'architus_admin': False,
-                })
-                remaining.append(guild)
-
-        return remaining
+    resp, sc = await shard_client.pool_request(
+        jwt.id, guild_id, pool_type, resp['nonexistant'], fetch=True, routing_key=f"shard_rpc_{which_shard(guild_id)}")
+    if sc != 200:
+        logger.error(f"got bad response from `pool_request` for guild: {guild_id}")
+        await partial_error(
+            message=f"guild {guild_id} returned error fetching entities of type {pool_type}",
+            human=f"An error occured fetching {pool_type}.",
+            context=[resp],
+            code=sc)
+        return
+    payload.update({'data': resp['data'], 'finished': True, 'nonexistant': resp['nonexistant']})
+    await partial_event(payload)
