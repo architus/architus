@@ -1,2 +1,6 @@
 # Build artifacts
 target/
+
+# Lockfiles (since this is a library)
+# https://doc.rust-lang.org/cargo/faq.html#why-do-binaries-have-cargolock-in-version-control-but-not-libraries
+Cargo.lock
