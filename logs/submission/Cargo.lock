@@ -51,6 +51,7 @@ dependencies = [
  "libc",
  "mac_address",
  "serde 1.0.126",
+ "slog",
 ]
 
 [[package]]
