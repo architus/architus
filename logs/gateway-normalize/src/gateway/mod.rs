@@ -67,7 +67,7 @@ impl ProcessorFleet {
     pub fn new(client: Client, config: Arc<Configuration>, emojis: Arc<EmojiDb>) -> Self {
         Self {
             processors: HashMap::new(),
-            id_provisioner: IdProvisioner::new(),
+            id_provisioner: IdProvisioner::new(None),
             client,
             config,
             emojis,

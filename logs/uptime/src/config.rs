@@ -22,9 +22,9 @@ impl Configuration {
         settings
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
-            // Add in settings from the environment (with a prefix of LOGS_UPTIME_)
-            // Eg.. `LOGS_UPTIME_PORT=X ./target/logs-uptime` would set the `port` key
-            .merge(config::Environment::with_prefix("LOGS_UPTIME").separator("__"))
+            // Add in settings from the environment (with a prefix of LOGS_UPTIME_CONFIG_)
+            // Eg.. `LOGS_UPTIME_CONFIG_PORT=X ./target/logs-uptime` would set the `port` key
+            .merge(config::Environment::with_prefix("LOGS_UPTIME_CONFIG").separator("__"))
             .context("Could not merge in values from the environment")?;
         let config = settings
             .try_into()

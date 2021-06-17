@@ -50,10 +50,10 @@ impl Configuration {
         settings
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
-            // Add in settings from the environment (with a prefix of LOGS_SEARCH)
-            // Eg.. `LOGS_SEARCH_PORT=8080 ./target/logs-search`
+            // Add in settings from the environment (with a prefix of LOGS_SEARCH_CONFIG)
+            // Eg.. `LOGS_SEARCH_CONFIG_PORT=8080 ./target/logs-search`
             // would set the `port` key tot 8080
-            .merge(config::Environment::with_prefix("LOGS_SEARCH").separator("__"))
+            .merge(config::Environment::with_prefix("LOGS_SEARCH_CONFIG").separator("__"))
             .context("Could not merge in values from the environment")?;
         let config = settings
             .try_into()

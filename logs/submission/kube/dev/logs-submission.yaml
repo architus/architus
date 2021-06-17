@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: feature-gate
+  name: logs-submission
   labels:
-    app: feature-gate
+    app: logs-submission
 spec:
   selector:
     matchLabels:
-      app: feature-gate
+      app: logs-submission
   template:
     metadata:
       labels:
-        app: feature-gate
+        app: logs-submission
     spec:
       containers:
-        - name: feature-gate
-          image: feature-gate-image
+        - name: logs-submission
+          image: logs-submission-image
           envFrom:
             - secretRef:
                 name: architus-secret
@@ -23,12 +23,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: feature-gate
+  name: logs-submission
   namespace: default
 spec:
   type: NodePort
   selector:
-    app: feature-gate
+    app: logs-submission
   ports:
-    - port: 50555
-      targetPort: 50555
+    - port: 50282
+      targetPort: 50282

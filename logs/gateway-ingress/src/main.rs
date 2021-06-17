@@ -215,7 +215,7 @@ async fn publish_events(
     update_tx: UnboundedSender<UpdateMessage>,
 ) -> Result<()> {
     // Create a new Id provisioner and use it throughout
-    let id_provisioner = Arc::new(IdProvisioner::new());
+    let id_provisioner = Arc::new(IdProvisioner::new(None));
 
     // Keep looping over the lifecycle,
     // allowing for the state to be eagerly restored after a disconnection

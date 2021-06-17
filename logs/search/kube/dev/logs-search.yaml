@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: feature-gate
+  name: logs-search
   labels:
-    app: feature-gate
+    app: logs-search
 spec:
   selector:
     matchLabels:
-      app: feature-gate
+      app: logs-search
   template:
     metadata:
       labels:
-        app: feature-gate
+        app: logs-search
     spec:
       containers:
-        - name: feature-gate
-          image: feature-gate-image
+        - name: logs-search
+          image: logs-search-image
           envFrom:
             - secretRef:
                 name: architus-secret
@@ -23,12 +23,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: feature-gate
+  name: logs-search
   namespace: default
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
-    app: feature-gate
+    app: logs-search
   ports:
-    - port: 50555
-      targetPort: 50555
+    - port: 8174
+      targetPort: 8174
