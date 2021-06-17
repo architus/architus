@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: feature-gate
+  name: logs-uptime
   labels:
-    app: feature-gate
+    app: logs-uptime
 spec:
   selector:
     matchLabels:
-      app: feature-gate
+      app: logs-uptime
   template:
     metadata:
       labels:
-        app: feature-gate
+        app: logs-uptime
     spec:
       containers:
-        - name: feature-gate
-          image: "{{prefix}}feature-gate:{{tag}}"
+        - name: logs-uptime
+          image: "{{prefix}}logs-uptime:{{tag}}"
           envFrom:
             - secretRef:
                 name: architus-secret
@@ -23,13 +23,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: feature-gate
+  name: logs-uptime
   namespace: default
 spec:
   type: ClusterIP
   selector:
-    app: feature-gate
+    app: logs-uptime
   ports:
     - protocol: TCP
-      port: 50555
-      targetPort: 50555
+      port: 50281
+      targetPort: 50281

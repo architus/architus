@@ -51,9 +51,9 @@ impl Configuration {
         settings
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
-            // Add in settings from the environment (with a prefix of LOGS_SUBMISSION_)
-            // Eg.. `LOGS_SUBMISSION_PORT=X ./target/logs-submission` would set the `port` key
-            .merge(config::Environment::with_prefix("LOGS_SUBMISSION").separator("__"))
+            // Add in settings from the environment (with a prefix of LOGS_SUBMISSION_CONFIG_)
+            // Eg.. `LOGS_SUBMISSION_CONFIG_PORT=X ./target/logs-submission` would set the `port` key
+            .merge(config::Environment::with_prefix("LOGS_SUBMISSION_CONFIG").separator("__"))
             .context("Could not merge in values from the environment")?;
         let config = settings
             .try_into()

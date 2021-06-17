@@ -32,4 +32,3 @@ spec:
   ports:
   - port: 6000
     targetPort: 6000
-    nodePort: 30006

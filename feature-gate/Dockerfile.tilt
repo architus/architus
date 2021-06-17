@@ -1,4 +1,6 @@
 # Create minimal deployment
+# with just the service binary included
+
 FROM debian:buster-slim
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -q \

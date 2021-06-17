@@ -4,6 +4,7 @@ optional_features = {
     'feature-gate': ['feature-gate'],
     'gateway': ['gateway'],
     'api': ['api'],
+    'logs': ['feature-gate', 'logs-gateway-ingress', 'logs-gateway-normalize', 'logs-search', 'logs-submission', 'logs-uptime', 'elasticsearch']
 }
 
 config.define_bool("rust-hot-reload")
@@ -64,12 +65,101 @@ if 'feature-gate' in enabled:
         # From https://docs.tilt.dev/example_go.html
         local_resource('feature-gate-compile', 'cargo build --manifest-path=feature-gate/Cargo.toml',
                        deps=['feature-gate/Cargo.toml', 'feature-gate/Cargo.lock', 'feature-gate/build.rs', 'feature-gate/src'])
-        docker_build_with_restart('feature-gate-image', '.', dockerfile='feature-gate/tilt-build/Dockerfile', only=["feature-gate/target/debug/feature-gate"],
+        docker_build_with_restart('feature-gate-image', '.', dockerfile='feature-gate/Dockerfile.tilt', only=["feature-gate/target/debug/feature-gate"],
                                   entrypoint='/usr/bin/feature-gate', live_update=[sync('feature-gate/target/debug/feature-gate', '/usr/bin/feature-gate')])
     else:
         docker_build('feature-gate-image', '.', dockerfile='feature-gate/Dockerfile', ignore=["*", "!feature-gate/**", "!lib/**"])
     k8s_yaml('feature-gate/kube/dev/feature-gate.yaml')
     k8s_resource('feature-gate')
+
+if 'elasticsearch' in enabled:
+    k8s_yaml('elasticsearch/kube/dev/elasticsearch.yaml')
+    k8s_resource('elasticsearch', port_forwards=[9200, 9300])
+
+if 'logs-gateway-ingress' in enabled:
+    if rust_hot_reload:
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
+        # Additionally, use hot reloading where the service process is restarted in-place upon rebuilds
+        # From https://docs.tilt.dev/example_go.html
+        if not os.path.exists('logs/gateway-ingress/config.toml'):
+            # Create a local copy of the config file if needed
+            local(['cp', 'logs/gateway-ingress/config.default.toml', 'logs/gateway-ingress/config.toml'])
+        local_resource('logs-gateway-ingress-compile', 'cargo build --manifest-path=logs/gateway-ingress/Cargo.toml',
+                       deps=['logs/gateway-ingress/Cargo.toml', 'logs/gateway-ingress/Cargo.lock', 'logs/gateway-ingress/build.rs', 'logs/gateway-ingress/src', 'lib/ipc/proto/logs/uptime.proto', 'lib/ipc/proto/feature-gate.proto', 'logs/gateway-queue-lib/Cargo.lock', 'logs/gateway-queue-lib/Cargo.toml', 'logs/gateway-queue-lib/src', 'lib/id-rs/Cargo.lock', 'lib/id-rs/Cargo.toml', 'lib/id-rs/src', 'lib/config-backoff-rs/Cargo.lock', 'lib/config-backoff-rs/Cargo.toml', 'lib/config-backoff-rs/src', 'lib/amqp-pool-rs/Cargo.lock', 'lib/amqp-pool-rs/Cargo.toml', 'lib/amqp-pool-rs/src'])
+        docker_build_with_restart('logs-gateway-ingress-image', '.', dockerfile='logs/gateway-ingress/Dockerfile.tilt', only=["logs/gateway-ingress/target/debug/logs-gateway-ingress", "logs/gateway-ingress/config.toml"],
+                                  entrypoint=['/usr/bin/logs-gateway-ingress', '/etc/architus/config.toml'], live_update=[sync('logs/gateway-ingress/target/debug/logs-gateway-ingress', '/usr/bin/logs-gateway-ingress'), sync('logs/gateway-ingress/config.toml', '/etc/architus/config.toml')])
+    else:
+        docker_build('logs-gateway-ingress-image', '.', dockerfile='logs/gateway-ingress/Dockerfile', ignore=["*", "!logs/gateway-ingress/**", "!lib/**"])
+    k8s_yaml('logs/gateway-ingress/kube/dev/logs-gateway-ingress.yaml')
+    k8s_resource('logs-gateway-ingress')
+
+if 'logs-gateway-normalize' in enabled:
+    if rust_hot_reload:
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
+        # Additionally, use hot reloading where the service process is restarted in-place upon rebuilds
+        # From https://docs.tilt.dev/example_go.html
+        if not os.path.exists('logs/gateway-normalize/config.toml'):
+            # Create a local copy of the config file if needed
+            local(['cp', 'logs/gateway-normalize/config.default.toml', 'logs/gateway-normalize/config.toml'])
+        local_resource('logs-gateway-normalize-compile', 'cargo build --manifest-path=logs/gateway-normalize/Cargo.toml',
+                       deps=['logs/gateway-normalize/Cargo.toml', 'logs/gateway-normalize/Cargo.lock', 'logs/gateway-normalize/build.rs', 'logs/gateway-normalize/src', 'lib/ipc/proto/logs/submission.proto', 'lib/ipc/proto/logs/event.proto', 'logs/gateway-queue-lib/Cargo.lock', 'logs/gateway-queue-lib/Cargo.toml', 'logs/gateway-queue-lib/src', 'lib/id-rs/Cargo.lock', 'lib/id-rs/Cargo.toml', 'lib/id-rs/src', 'lib/config-backoff-rs/Cargo.lock', 'lib/config-backoff-rs/Cargo.toml', 'lib/config-backoff-rs/src'])
+        docker_build_with_restart('logs-gateway-normalize-image', '.', dockerfile='logs/gateway-normalize/Dockerfile.tilt', only=["logs/gateway-normalize/target/debug/logs-gateway-normalize", "logs/gateway-normalize/config.toml"],
+                                  entrypoint=['/usr/bin/logs-gateway-normalize', '/etc/architus/config.toml'], live_update=[sync('logs/gateway-normalize/target/debug/logs-gateway-normalize', '/usr/bin/logs-gateway-normalize'), sync('logs/gateway-normalize/config.toml', '/etc/architus/config.toml')])
+    else:
+        docker_build('logs-gateway-normalize-image', '.', dockerfile='logs/gateway-normalize/Dockerfile', ignore=["*", "!logs/gateway-normalize/**", "!lib/**"])
+    k8s_yaml('logs/gateway-normalize/kube/dev/logs-gateway-normalize.yaml')
+    k8s_resource('logs-gateway-normalize')
+
+if 'logs-submission' in enabled:
+    if rust_hot_reload:
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
+        # Additionally, use hot reloading where the service process is restarted in-place upon rebuilds
+        # From https://docs.tilt.dev/example_go.html
+        if not os.path.exists('logs/submission/config.toml'):
+            # Create a local copy of the config file if needed
+            local(['cp', 'logs/submission/config.default.toml', 'logs/submission/config.toml'])
+        local_resource('logs-submission-compile', 'cargo build --manifest-path=logs/submission/Cargo.toml',
+                       deps=['logs/submission/Cargo.toml', 'logs/submission/Cargo.lock', 'logs/submission/build.rs', 'logs/submission/src', 'lib/ipc/proto/logs/submission.proto', 'lib/ipc/proto/logs/event.proto', 'lib/id-rs/Cargo.lock', 'lib/id-rs/Cargo.toml', 'lib/id-rs/src', 'lib/config-backoff-rs/Cargo.lock', 'lib/config-backoff-rs/Cargo.toml', 'lib/config-backoff-rs/src'])
+        docker_build_with_restart('logs-submission-image', '.', dockerfile='logs/submission/Dockerfile.tilt', only=["logs/submission/target/debug/logs-submission", "logs/submission/config.toml"],
+                                  entrypoint=['/usr/bin/logs-submission', '/etc/architus/config.toml'], live_update=[sync('logs/submission/target/debug/logs-submission', '/usr/bin/logs-submission'), sync('logs/submission/config.toml', '/etc/architus/config.toml')])
+    else:
+        docker_build('logs-submission-image', '.', dockerfile='logs/submission/Dockerfile', ignore=["*", "!logs/submission/**", "!lib/**"])
+    k8s_yaml('logs/submission/kube/dev/logs-submission.yaml')
+    k8s_resource('logs-submission')
+
+if 'logs-uptime' in enabled:
+    if rust_hot_reload:
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
+        # Additionally, use hot reloading where the service process is restarted in-place upon rebuilds
+        # From https://docs.tilt.dev/example_go.html
+        if not os.path.exists('logs/uptime/config.toml'):
+            # Create a local copy of the config file if needed
+            local(['cp', 'logs/uptime/config.default.toml', 'logs/uptime/config.toml'])
+        local_resource('logs-uptime-compile', 'cargo build --manifest-path=logs/uptime/Cargo.toml',
+                       deps=['logs/uptime/Cargo.toml', 'logs/uptime/Cargo.lock', 'logs/uptime/build.rs', 'logs/uptime/src', 'lib/ipc/proto/logs/uptime.proto'])
+        docker_build_with_restart('logs-uptime-image', '.', dockerfile='logs/uptime/Dockerfile.tilt', only=["logs/uptime/target/debug/logs-uptime", "logs/uptime/config.toml"],
+                                  entrypoint=['/usr/bin/logs-uptime', '/etc/architus/config.toml'], live_update=[sync('logs/uptime/target/debug/logs-uptime', '/usr/bin/logs-uptime'), sync('logs/uptime/config.toml', '/etc/architus/config.toml')])
+    else:
+        docker_build('logs-uptime-image', '.', dockerfile='logs/uptime/Dockerfile', ignore=["*", "!logs/uptime/**", "!lib/**"])
+    k8s_yaml('logs/uptime/kube/dev/logs-uptime.yaml')
+    k8s_resource('logs-uptime')
+
+if 'logs-search' in enabled:
+    if rust_hot_reload:
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
+        # Additionally, use hot reloading where the service process is restarted in-place upon rebuilds
+        # From https://docs.tilt.dev/example_go.html
+        if not os.path.exists('logs/search/config.toml'):
+            # Create a local copy of the config file if needed
+            local(['cp', 'logs/search/config.default.toml', 'logs/search/config.toml'])
+        local_resource('logs-search-compile', 'cargo build --manifest-path=logs/search/Cargo.toml',
+                       deps=['logs/search/Cargo.toml', 'logs/search/Cargo.lock', 'logs/search/build.rs', 'logs/search/src', 'lib/ipc/proto/logs/event.proto', 'lib/id-rs/Cargo.lock', 'lib/id-rs/Cargo.toml', 'lib/id-rs/src'])
+        docker_build_with_restart('logs-search-image', '.', dockerfile='logs/search/Dockerfile.tilt', only=["logs/search/target/debug/logs-search", "logs/search/config.toml"],
+                                  entrypoint=['/usr/bin/logs-search', '/etc/architus/config.toml'], live_update=[sync('logs/search/target/debug/logs-search', '/usr/bin/logs-search'), sync('logs/search/config.toml', '/etc/architus/config.toml')])
+    else:
+        docker_build('logs-search-image', '.', dockerfile='logs/search/Dockerfile', ignore=["*", "!logs/search/**", "!lib/**"])
+    k8s_yaml('logs/search/kube/dev/logs-search.yaml')
+    k8s_resource('logs-search', port_forwards=8174)
 
 if 'gateway' in enabled:
     docker_build('gateway-image', '.', dockerfile='gateway/Dockerfile', ignore=["*", "!gateway/**", "!lib/**"])

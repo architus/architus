@@ -87,10 +87,10 @@ impl Configuration {
         settings
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
-            // Add in settings from the environment (with a prefix of LOGS_GATEWAY_INGRESS)
-            // Eg.. `LOGS_GATEWAY_INGRESS_SECRETS__DISCORD_TOKEN=X ./target/logs-gateway-ingress`
+            // Add in settings from the environment (with a prefix of LOGS_GATEWAY_INGRESS_CONFIG)
+            // Eg.. `LOGS_GATEWAY_INGRESS_CONFIG_SECRETS__DISCORD_TOKEN=X ./target/logs-gateway-ingress`
             // would set the `secrets.discord_token` key
-            .merge(config::Environment::with_prefix("LOGS_GATEWAY_INGRESS").separator("__"))
+            .merge(config::Environment::with_prefix("LOGS_GATEWAY_INGRESS_CONFIG").separator("__"))
             .context("Could not merge in values from the environment")?;
         let config = settings
             .try_into()

@@ -68,10 +68,10 @@ impl Configuration {
         settings
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
-            // Add in settings from the environment (with a prefix of LOGS_GATEWAY_NORMALIZE)
-            // Eg.. `LOGS_GATEWAY_NORMALIZE_SERVICES__LOGS_IMPORT=X ./target/logs-gateway-normalize`
+            // Add in settings from the environment (with a prefix of LOGS_GATEWAY_NORMALIZE_CONFIG)
+            // Eg.. `LOGS_GATEWAY_NORMALIZE_CONFIG_SERVICES__LOGS_IMPORT=X ./target/logs-gateway-normalize`
             // would set the `services.logs_import` key
-            .merge(config::Environment::with_prefix("LOGS_GATEWAY_NORMALIZE").separator("__"))
+            .merge(config::Environment::with_prefix("LOGS_GATEWAY_NORMALIZE_CONFIG").separator("__"))
             .context("Could not merge in values from the environment")?;
         let config = settings
             .try_into()
