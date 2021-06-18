@@ -19,6 +19,13 @@ spec:
           envFrom:
           - secretRef:
               name: architus-secret
+          volumeMounts:
+            - name: manager-persistent-storage
+              mountPath: /app/current_migration
+      volumes:
+        - name: manager-persistent-storage
+          persistentVolumeClaim:
+            claimName: manager-claim
 ---
 apiVersion: v1
 kind: Service
@@ -33,3 +40,15 @@ spec:
   - protocol: TCP
     port: 50051
     targetPort: 50051
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: manager-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: hdd-storage
+  resources:
+    requests:
+      storage: 100Gi

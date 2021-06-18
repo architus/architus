@@ -27,7 +27,7 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: my-local-storage
+  storageClassName: hdd-storage
   resources:
     requests:
       storage: 5Mi
