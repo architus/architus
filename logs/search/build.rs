@@ -42,7 +42,7 @@ fn main() -> Result<()> {
 
     builder
         .compile(&["logs/event.proto"], &["../../lib/ipc/proto"])
-        .context("Compiling logs/event.proto definitions")?;
+        .context("compiling logs/event.proto definitions")?;
 
     Ok(())
 }

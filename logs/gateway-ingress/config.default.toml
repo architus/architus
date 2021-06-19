@@ -37,8 +37,8 @@ durable = true
 [gateway_queue.queue_parameters]
 # Use quorum queue with delivery limit
 # https://www.rabbitmq.com/quorum-queues.html
-x-queue-type = { "LongString" = "quorum" }
-x-delivery-limit = { "ShortUInt" = "4" }
+x-queue-type = { LongString = "quorum" }
+x-delivery-limit = { ShortUInt = "4" }
 
 # Configuration for the connection pool that sits in front of a connection to the gateway queue
 [gateway_queue.connection_pool]
@@ -67,3 +67,14 @@ multiplier = 2.0
 [secrets]
 # Discord bot token
 discord_token = ""
+
+# Logging configuration (for service diagnostic logs, not Architus log events)
+# https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html
+[logging]
+level = "info"
+format = "full"
+source_location = "file_and_line"
+timezone = "utc"
+destination = "stdout"
+channel_size = 2048
+overflow_strategy = "drop_and_report"

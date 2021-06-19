@@ -18,10 +18,11 @@ use deadpool::Runtime;
 use futures::{try_join, Stream, StreamExt, TryStreamExt};
 use gateway_queue_lib::GatewayEventOwned;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
-use lapin::types::{AMQPType, AMQPValue, FieldTable};
+use lapin::types::FieldTable;
 use lapin::{BasicProperties, Channel, Connection};
 use lazy_static::lazy_static;
-use serde_json::Value;
+use slog::Logger;
+use sloggers::Config;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
@@ -50,41 +51,66 @@ lazy_static! {
 /// Loads the config and bootstraps the service
 #[tokio::main]
 async fn main() -> Result<()> {
-    env_logger::init();
-    let value = AMQPValue::try_from(&Value::String("test".to_string()), AMQPType::LongString)
-        .context("")?;
-    log::info!("{:?}", serde_json::to_string(&value)?);
-
     // Parse the config
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
         \nUsage: \
         \nlogs-gateway-ingress [config-path]",
     );
-    let config = Arc::new(Configuration::try_load(config_path)?);
-    run(config).await
+    let config = Arc::new(Configuration::try_load(&config_path)?);
+
+    // Set up the logger from the config
+    let logger = config
+        .logging
+        .build_logger()
+        .context("could not build logger from config values")?;
+
+    slog::info!(logger, "configuration loaded"; "path" => config_path);
+    slog::debug!(logger, "configuration dump"; "config" => ?config);
+
+    match run(config, logger.clone()).await {
+        Ok(_) => slog::info!(logger, "service exited";),
+        Err(err) => {
+            slog::error!(logger, "an error ocurred during service running"; "error" => ?err)
+        }
+    }
+    Ok(())
 }
 
 /// Attempts to initialize the bot and listen for gateway events
-async fn run(config: Arc<Configuration>) -> Result<()> {
+async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
     // Create the tracker and its update message channel
-    let (connection_tracker, update_tx) = Tracker::new(Arc::clone(&config));
+    let (connection_tracker, update_tx) = Tracker::new(Arc::clone(&config), logger.clone());
+
+    // Build an event type flags bitset of all events to receive from the gateway
+    let raw_events = EventTypeFlags::SHARD_PAYLOAD;
+    let lifecycle_events = EventTypeFlags::GATEWAY_HEARTBEAT_ACK
+        | EventTypeFlags::GUILD_CREATE
+        | EventTypeFlags::GUILD_DELETE
+        | EventTypeFlags::SHARD_CONNECTED
+        | EventTypeFlags::SHARD_DISCONNECTED;
+    let event_type_flags = lifecycle_events | raw_events;
 
     // Initialize connections to external services
-    let shard_shared = Arc::new(connect::to_shard(Arc::clone(&config)).await?);
-    let rmq_connection = connect::to_queue(Arc::clone(&config)).await?;
-    let feature_gate_client = connect::to_feature_gate(Arc::clone(&config)).await?;
-    let uptime_service_client = connect::to_uptime_service(Arc::clone(&config)).await?;
+    let (shard, events) = connect::to_shard(Arc::clone(&config), logger.clone(), event_type_flags).await?;
+    let shard_shared = Arc::new(shard);
+    let rmq_connection = connect::to_queue(Arc::clone(&config), logger.clone()).await?;
+    let feature_gate_client = connect::to_feature_gate(Arc::clone(&config), logger.clone()).await?;
+    let uptime_service_client =
+        connect::to_uptime_service(Arc::clone(&config), logger.clone()).await?;
+
+    // Split up the stream of gateway events into lifecycle & raw events
+    let (lifecycle_event_stream, raw_event_stream) = split_gateway_events(events, lifecycle_events, raw_events);
 
     // Notify the connection tracker of the newly connected services
     update_tx
         .send(UpdateMessage::GatewayOnline)
-        .context("Could not send gateway online update to uptime tracker")?;
+        .context("could not send gateway online update to uptime tracker")?;
     update_tx
         .send(UpdateMessage::QueueOnline)
-        .context("Could not send queue online update to uptime tracker")?;
+        .context("could not send queue online update to uptime tracker")?;
 
-    let (active_guilds, uptime_rx) = ActiveGuilds::new(feature_gate_client, Arc::clone(&config));
+    let (active_guilds, uptime_rx) = ActiveGuilds::new(feature_gate_client, Arc::clone(&config), logger.clone());
 
     // Listen to incoming gateway events and start re-publishing them on the queue
     // (performing the primary purpose of the service)
@@ -93,17 +119,13 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
         active_guilds.clone(),
         Arc::clone(&shard_shared),
         Arc::clone(&config),
+        logger.clone(),
         update_tx.clone(),
     );
 
     // Listen for lifecycle events and send them to the uptime tracker
-    let lifecycle_events = EventTypeFlags::GATEWAY_HEARTBEAT_ACK
-        | EventTypeFlags::GUILD_CREATE
-        | EventTypeFlags::GUILD_DELETE
-        | EventTypeFlags::SHARD_CONNECTED
-        | EventTypeFlags::SHARD_DISCONNECTED;
     let lifecycle_event_listener = process_lifecycle_events(
-        shard_shared.some_events(lifecycle_events),
+        lifecycle_event_stream,
         update_tx.clone(),
     );
 
@@ -112,8 +134,12 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
     let unfiltered_uptime_pipe = active_guilds.pipe_uptime_events(uptime_events_stream);
 
     // Sink all uptime events to the uptime tracking service
-    let uptime_events_sink =
-        sink_uptime_events(Arc::clone(&config), uptime_service_client, uptime_rx);
+    let uptime_events_sink = sink_uptime_events(
+        Arc::clone(&config),
+        logger,
+        uptime_service_client,
+        uptime_rx,
+    );
 
     // Continuously poll the set of active guilds
     let active_guilds_poll = active_guilds.go_poll();
@@ -131,6 +157,7 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
 }
 
 /// Listens for lifecycle events from the Gateway and sends corresponding update messages
+///
 /// on the shard mpsc channel, updating the stateful uptime tracker
 async fn process_lifecycle_events(
     in_stream: impl Stream<Item = Event>,
@@ -161,7 +188,7 @@ async fn process_lifecycle_events(
             }
         })
         .await
-        .context("Could not send update messages to uptime tracker")?;
+        .context("could not send update messages to uptime tracker")?;
 
     Ok(())
 }
@@ -170,12 +197,14 @@ async fn process_lifecycle_events(
 /// sending them to the uptime service
 async fn sink_uptime_events(
     config: Arc<Configuration>,
+    logger: Logger,
     uptime_service_client: LogsUptimeClient,
     in_stream: impl Stream<Item = UptimeEvent>,
 ) -> Result<()> {
     // Generate a unique session ID that is used to detect downtime after a forced shutdown
     let session: u64 = rand::random();
-    log::info!("Generated random session ID for uptime events: {}", session);
+    let logger = logger.new(slog::o!("session_id" => session));
+    slog::info!(logger, "generated random session ID for uptime events");
 
     // Note: we don't exit the service if this part fails;
     // this is an acceptable degradation
@@ -183,9 +212,10 @@ async fn sink_uptime_events(
         .for_each_concurrent(None, move |event| {
             let uptime_service_client = uptime_service_client.clone();
             let config = Arc::clone(&config);
+            let logger = logger.clone();
             async move {
                 let request = event.into_request(session);
-                log::debug!("Sending UptimeEvent to logs/uptime: {:?}", request);
+                slog::debug!(logger, "sending UptimeEvent to logs/uptime"; "request" => ?request);
                 let send = || async {
                     let mut uptime_service_client = uptime_service_client.clone();
                     let response = uptime_service_client
@@ -194,7 +224,7 @@ async fn sink_uptime_events(
                     rpc::into_backoff(response)
                 };
                 if let Err(err) = backoff::future::retry(config.rpc_backoff.build(), send).await {
-                    log::warn!("Submitting UptimeEvent to logs/uptime failed: {:?}", err);
+                    slog::warn!(logger, "submitting UptimeEvent to logs/uptime failed"; "error" => ?err);
                 }
             }
         })
@@ -210,12 +240,13 @@ async fn sink_uptime_events(
 async fn publish_events(
     queue_connection: Connection,
     active_guilds: ActiveGuilds,
-    shard: Arc<Shard>,
+    raw_event_stream: impl Stream<Item = Event>,,
     config: Arc<Configuration>,
+    logger: Logger,
     update_tx: UnboundedSender<UpdateMessage>,
 ) -> Result<()> {
     // Create a new Id provisioner and use it throughout
-    let id_provisioner = Arc::new(IdProvisioner::new(None));
+    let id_provisioner = Arc::new(IdProvisioner::new(Some(logger.clone())));
 
     // Keep looping over the lifecycle,
     // allowing for the state to be eagerly restored after a disconnection
@@ -232,15 +263,15 @@ async fn publish_events(
         let rmq_connection = if let Some(rmq) = outer_rmq_connection.take() {
             rmq
         } else {
-            let connection = connect::to_queue(Arc::clone(&config)).await?;
+            let connection = connect::to_queue(Arc::clone(&config), logger.clone()).await?;
             update_tx
                 .send(UpdateMessage::QueueOnline)
-                .context("Could not send queue online update to uptime tracker")?;
+                .context("could not send queue online update to uptime tracker")?;
             connection
         };
 
         // Declare the RMQ queue to publish incoming events to
-        declare_event_queue(&rmq_connection, Arc::clone(&config)).await?;
+        declare_event_queue(&rmq_connection, Arc::clone(&config), logger.clone()).await?;
 
         // Create a pool for the RMQ channels
         let manager = Manager::new(rmq_connection);
@@ -250,12 +281,12 @@ async fn publish_events(
 
         // Start listening to the stream
         // (we have to convert the Stream to a TryStream before using `try_for_each_concurrent`)
-        let event_stream = shard.some_events(EventTypeFlags::SHARD_PAYLOAD);
-        let event_try_stream = event_stream.map(Ok::<Event, anyhow::Error>);
+        let event_try_stream = raw_event_stream.map(Ok::<Event, anyhow::Error>);
         let process = event_try_stream.try_for_each_concurrent(None, move |event| {
             // Provision an ID and note the timestamp immediately
             let timestamp = time::millisecond_ts();
             let id = id_provisioner.with_ts(timestamp);
+            let logger = logger.new(slog::o!("event_timestamp" => timestamp, "event_id" => id));
 
             let config = Arc::clone(&config);
             let active_guilds = active_guilds.clone();
@@ -263,11 +294,12 @@ async fn publish_events(
 
             // Create the `GatewayEvent` from the raw event
             async move {
-                if let Some(gateway_event) = convert_raw_event(event, timestamp, id) {
+                if let Some(gateway_event) = convert_raw_event(event, timestamp, id, logger.clone())
+                {
                     // Make sure the guild is active before forwarding
                     let should_publish = active_guilds.is_active(gateway_event.guild_id).await;
                     if should_publish {
-                        try_publish(gateway_event, channel_pool, config).await?;
+                        try_publish(gateway_event, channel_pool, config, logger).await?;
                     }
                 }
 
@@ -276,10 +308,15 @@ async fn publish_events(
         });
 
         if let Err(err) = process.await {
-            log::error!("An error occurred while listening to gateway events; attempting to reconnect: {:?}", err);
+            slog::error!(
+                logger,
+                "an error occurred while listening to gateway events; attempting to reconnect";
+                "error" => ?err,
+                "rabbit_url" => config.services.gateway_queue,
+            );
             update_tx
                 .send(UpdateMessage::QueueOffline)
-                .context("Could not send queue offline update to uptime tracker")?;
+                .context("could not send queue offline update to uptime tracker")?;
         }
     }
 }
@@ -288,12 +325,13 @@ async fn publish_events(
 async fn declare_event_queue(
     rmq_connection: &Connection,
     config: Arc<Configuration>,
+    logger: Logger,
 ) -> Result<Channel> {
     // Create a temporary channel
     let rmq_channel = rmq_connection
         .create_channel()
         .await
-        .context("Could not create a new RabbitMQ channel")?;
+        .context("could not create a new RabbitMQ channel")?;
 
     // Declare the queue
     let queue_name = &config.gateway_queue.queue_name;
@@ -317,22 +355,33 @@ async fn declare_event_queue(
     rmq_channel
         .queue_declare(queue_name, queue_options, arguments)
         .await
-        .context("Could not declare the RabbitMQ queue")?;
+        .context("could not declare the RabbitMQ queue")?;
 
-    log::info!("Declared RabbitMQ queue {}", queue_name);
+    slog::info!(
+        logger,
+        "declared RabbitMQ queue";
+        "queue_name" => queue_name,
+        "rabbit_url" => &config.services.gateway_queue,
+    );
     Ok(rmq_channel)
 }
 
 /// Attempts to synchronously convert a raw gateway event into our struct
 /// that will eventually be published to the gateway queue
-fn convert_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<GatewayEventOwned> {
+fn convert_raw_event(
+    event: Event,
+    timestamp: u64,
+    id: HoarFrost,
+    logger: Logger,
+) -> Option<GatewayEventOwned> {
     if let Event::ShardPayload(Payload { bytes }) = event {
         let json = match std::str::from_utf8(&bytes) {
             Ok(json) => json,
             Err(err) => {
-                log::warn!(
-                    "An error occurred while deserializing gateway JSON: {:?}",
-                    err
+                slog::warn!(
+                    logger,
+                    "an error occurred while deserializing gateway JSON";
+                    "error" => ?err
                 );
                 return None;
             }
@@ -364,14 +413,16 @@ fn convert_raw_event(event: Event, timestamp: u64, id: HoarFrost) -> Option<Gate
             let inner_json = map.remove("d")?;
 
             // Make sure the guild id can be extracted before forwarding
-            let guild_id_option = try_extract_guild_id(&inner_json, event_type, event_type_str);
+            let guild_id_option =
+                try_extract_guild_id(&inner_json, event_type, event_type_str, logger.clone());
             let guild_id = if let Some(guild_id) = guild_id_option {
                 guild_id
             } else {
-                log::warn!(
-                    "No guild id was extracted for event of type '{}': {:?}",
-                    event_type_str,
-                    inner_json
+                slog::warn!(
+                    logger,
+                    "no guild id was extracted for event";
+                    "event_type" => event_type_str,
+                    "inner_json" => inner_json,
                 );
                 return None;
             };
@@ -394,14 +445,16 @@ async fn try_publish(
     gateway_event: GatewayEventOwned,
     channel_pool: architus_amqp_pool::Pool,
     config: Arc<Configuration>,
+    logger: Logger,
 ) -> Result<()> {
     // Serialize the event into a binary buffer using MessagePack
     let buf = match rmp_serde::to_vec(&gateway_event) {
         Ok(buf) => buf,
         Err(err) => {
-            log::warn!(
-                "An error occurred while serializing event to MessagePack: {:?}",
-                err
+            slog::warn!(
+                logger,
+                "an error occurred while serializing event to MessagePack";
+                "error" => ?err,
             );
             return Ok(());
         }
@@ -429,7 +482,7 @@ async fn try_publish(
             BasicProperties::default().with_delivery_mode(2),
         )
         .await
-        .context("Could not publish gateway event to queue")?;
+        .context("could not publish gateway event to queue")?;
 
     Ok(())
 }
@@ -494,6 +547,7 @@ fn try_extract_guild_id(
     json_value: &serde_json::Value,
     _event_type: Option<EventType>,
     raw_event_type: &str,
+    logger: Logger,
 ) -> Option<u64> {
     if let serde_json::Value::Object(map) = json_value {
         if let Some(guild_id_value) = map.get("guild_id") {
@@ -504,9 +558,10 @@ fn try_extract_guild_id(
         }
     }
 
-    log::warn!(
-        "Couldn't identify guild_id value for event type '{}'",
-        raw_event_type
+    slog::warn!(
+        logger,
+        "couldn't identify guild_id value for event";
+        "event_type" => raw_event_type,
     );
     None
 }

@@ -6,7 +6,7 @@ fn main() -> Result<()> {
         .build_client(true)
         .build_server(false)
         .compile(&["logs/submission.proto"], &["../../lib/ipc/proto"])
-        .context("Compiling logs/submission.proto definitions")?;
+        .context("compiling logs/submission.proto definitions")?;
 
     Ok(())
 }

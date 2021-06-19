@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
     let es_path = &config.services.elasticsearch;
     log::info!("Connecting to Elasticsearch at {}", es_path);
     let es_transport =
-        Transport::single_node(es_path).context("Could not connect to Elasticsearch")?;
+        Transport::single_node(es_path).context("could not connect to Elasticsearch")?;
     let elasticsearch = Arc::new(Elasticsearch::new(es_transport));
 
     let search = SearchProvider::new(&elasticsearch, &config);
@@ -81,7 +81,7 @@ async fn serve_http(search: SearchProvider, config: &Configuration) -> Result<()
         log::info!("Serving GraphQL HTTP at http://{}", addr);
         server
             .await
-            .context("An error occurred while running the HTTP server")?;
+            .context("an error occurred while running the HTTP server")?;
     }
 
     Ok(())

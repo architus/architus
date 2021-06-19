@@ -245,7 +245,7 @@ async fn create_channel(
     let rmq_channel = rmq_connection
         .create_channel()
         .await
-        .context("Could not create a new RabbitMQ channel")?;
+        .context("could not create a new RabbitMQ channel")?;
 
     // Set the channel QOS appropriately
     rmq_channel
@@ -254,7 +254,7 @@ async fn create_channel(
             BasicQosOptions { global: false },
         )
         .await
-        .context("Could not set the QoS level on the RabbitMQ queue")?;
+        .context("could not set the QoS level on the RabbitMQ queue")?;
 
     Ok(rmq_channel)
 }
@@ -360,11 +360,11 @@ async fn submit_event(
 /// Attempts to create a readable timestamp string from the given Unix ms epoch
 fn readable_timestamp(timestamp: u64) -> Result<String> {
     let sec =
-        i64::try_from(timestamp / 1_000).context("Could not convert timestamp seconds to i64")?;
+        i64::try_from(timestamp / 1_000).context("could not convert timestamp seconds to i64")?;
     let nano_sec = u32::try_from((timestamp % 1_000).saturating_mul(1_000_000))
-        .context("Could not convert timestamp nanoseconds to u32")?;
+        .context("could not convert timestamp nanoseconds to u32")?;
     let naive_datetime = NaiveDateTime::from_timestamp_opt(sec, nano_sec)
-        .context("Could not convert timestamp to Naive DateTime")?;
+        .context("could not convert timestamp to Naive DateTime")?;
     let datetime: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
     Ok(datetime.format("%Y-%m-%d %H:%M:%S").to_string())
 }

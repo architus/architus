@@ -2,6 +2,7 @@ use crate::config::Configuration;
 use crate::uptime::debounced_pool::{DebouncedPool, Update as DebouncedPoolUpdate};
 use crate::uptime::{Event as UptimeEvent, UpdateMessage};
 use futures::{stream, Stream, StreamExt as _1};
+use slog::Logger;
 use static_assertions::assert_impl_all;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -20,15 +21,19 @@ pub struct Tracker {
     updates: UnboundedReceiver<UpdateMessage>,
     debounced_guild_updates: UnboundedReceiver<DebouncedPoolUpdate<u64>>,
     state: TrackerState,
+    logger: Logger,
 }
 
 impl Tracker {
     /// Creates a new tracker from the configuration,
     /// also giving a multi-producer clone-able channel that can be used to send updates
-    pub fn new(config: Arc<Configuration>) -> (Self, UnboundedSender<UpdateMessage>) {
+    pub fn new(
+        config: Arc<Configuration>,
+        logger: Logger,
+    ) -> (Self, UnboundedSender<UpdateMessage>) {
         let (update_sender, update_receiver) = mpsc::unbounded_channel::<UpdateMessage>();
         let (active_guilds, debounced_guild_updates) =
-            DebouncedPool::new(config.guild_uptime_debounce_delay);
+            DebouncedPool::new(config.guild_uptime_debounce_delay, logger.clone());
         let new_tracker = Self {
             updates: update_receiver,
             debounced_guild_updates,
@@ -37,6 +42,7 @@ impl Tracker {
                 active_guilds,
                 connection_status: Arc::new(Mutex::new(ConnectionStatus::new())),
             },
+            logger,
         };
         (new_tracker, update_sender)
     }
@@ -244,30 +250,37 @@ impl ConnectionStatus {
 mod tests {
     use crate::config::Configuration;
     use crate::uptime::connection::{Tracker, UpdateMessage};
-    use crate::uptime::UptimeEvent;
+    use crate::uptime::Event;
     use anyhow::Result;
     use futures::StreamExt;
+    use sloggers::terminal::{Destination, TerminalLoggerBuilder};
+    use sloggers::types::{Format, Severity};
+    use sloggers::Build;
     use std::collections::HashSet;
     use std::hash::Hash;
     use std::iter::FromIterator;
     use std::sync::Arc;
     use std::time::Duration;
 
+    fn test_logger() -> slog::Logger {
+        let mut builder = TerminalLoggerBuilder::new();
+        builder.level(Severity::Debug);
+        builder.destination(Destination::Stderr);
+        builder.format(Format::Full);
+        builder.build().unwrap()
+    }
+
     /// Defines set-equality for uptime events
     #[derive(Debug, Clone)]
-    struct TestWrapper(UptimeEvent);
+    struct TestWrapper(Event);
     impl PartialEq for TestWrapper {
         fn eq(&self, other: &Self) -> bool {
             match (&self.0, &other.0) {
-                (UptimeEvent::Online { guilds: a, .. }, UptimeEvent::Online { guilds: b, .. })
-                | (
-                    UptimeEvent::Offline { guilds: a, .. },
-                    UptimeEvent::Offline { guilds: b, .. },
-                )
-                | (
-                    UptimeEvent::Heartbeat { guilds: a, .. },
-                    UptimeEvent::Heartbeat { guilds: b, .. },
-                ) => set(a) == set(b),
+                (Event::Online { guilds: a, .. }, Event::Online { guilds: b, .. })
+                | (Event::Offline { guilds: a, .. }, Event::Offline { guilds: b, .. })
+                | (Event::Heartbeat { guilds: a, .. }, Event::Heartbeat { guilds: b, .. }) => {
+                    set(a) == set(b)
+                }
                 _ => false,
             }
         }
@@ -281,9 +294,9 @@ mod tests {
     async fn test_basic_debounced() -> Result<()> {
         let mut config = Configuration::default();
         config.guild_uptime_debounce_delay = Duration::from_millis(25);
-        let (tracker, update_tx) = Tracker::new(Arc::new(config));
+        let (tracker, update_tx) = Tracker::new(Arc::new(config), test_logger());
         // Apply full back-pressure to process events immediately
-        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<UptimeEvent>();
+        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<Event>();
         tokio::spawn(async move {
             // Apply full back-pressure to process events immediately
             let mut stream = tracker.stream_events();
@@ -296,11 +309,11 @@ mod tests {
         update_tx.send(UpdateMessage::GuildOnline(0))?;
         update_tx.send(UpdateMessage::GuildOnline(1))?;
         update_tx.send(UpdateMessage::GuildOnline(2))?;
-        tokio::time::delay_for(Duration::from_millis(50)).await;
+        tokio::time::sleep(Duration::from_millis(50)).await;
 
         assert_eq!(
-            events_rx.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online {
+            events_rx.recv().await.map(TestWrapper),
+            Some(TestWrapper(Event::Online {
                 guilds: vec![0, 1, 2],
                 timestamp: 0
             }))
@@ -313,9 +326,9 @@ mod tests {
     async fn test_heartbeat_flush() -> Result<()> {
         let mut config = Configuration::default();
         config.guild_uptime_debounce_delay = Duration::from_millis(25);
-        let (tracker, update_tx) = Tracker::new(Arc::new(config));
+        let (tracker, update_tx) = Tracker::new(Arc::new(config), test_logger());
         // Apply full back-pressure to process events immediately
-        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<UptimeEvent>();
+        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<Event>();
         tokio::spawn(async move {
             // Apply full back-pressure to process events immediately
             let mut stream = tracker.stream_events();
@@ -327,35 +340,35 @@ mod tests {
         // Note: timestamp is ignored when asserting equality
         update_tx.send(UpdateMessage::GuildOnline(0))?;
         update_tx.send(UpdateMessage::GuildOnline(1))?;
-        tokio::time::delay_for(Duration::from_millis(50)).await;
+        tokio::time::sleep(Duration::from_millis(50)).await;
         update_tx.send(UpdateMessage::GuildOnline(2))?;
         update_tx.send(UpdateMessage::GuildOffline(0))?;
         update_tx.send(UpdateMessage::GatewayHeartbeat)?;
 
         assert_eq!(
-            events_rx.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online {
+            events_rx.recv().await.map(TestWrapper),
+            Some(TestWrapper(Event::Online {
                 guilds: vec![0, 1],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online {
+            events_rx.recv().await.map(TestWrapper),
+            Some(TestWrapper(Event::Online {
                 guilds: vec![2],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Offline {
+            events_rx.recv().await.map(TestWrapper),
+            Some(TestWrapper(Event::Offline {
                 guilds: vec![0],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Heartbeat {
+            events_rx.recv().await.map(TestWrapper),
+            Some(TestWrapper(Event::Heartbeat {
                 guilds: vec![1, 2],
                 timestamp: 0
             }))
@@ -368,8 +381,8 @@ mod tests {
     async fn test_offline_online() -> Result<()> {
         let mut config = Configuration::default();
         config.guild_uptime_debounce_delay = Duration::from_millis(25);
-        let (tracker, update_tx) = Tracker::new(Arc::new(config));
-        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<UptimeEvent>();
+        let (tracker, update_tx) = Tracker::new(Arc::new(config), test_logger());
+        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<Event>();
         tokio::spawn(async move {
             // Apply full back-pressure to process events immediately
             let mut stream = tracker.stream_events();
@@ -381,29 +394,29 @@ mod tests {
         // Note: timestamp is ignored when asserting equality
         update_tx.send(UpdateMessage::GuildOnline(0))?;
         update_tx.send(UpdateMessage::GuildOnline(1))?;
-        tokio::time::delay_for(Duration::from_millis(50)).await;
+        tokio::time::sleep(Duration::from_millis(50)).await;
         update_tx.send(UpdateMessage::GatewayOffline)?;
         update_tx.send(UpdateMessage::QueueOffline)?;
         update_tx.send(UpdateMessage::QueueOnline)?;
         update_tx.send(UpdateMessage::GatewayOnline)?;
 
         assert_eq!(
-            events_rx.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online {
+            events_rx.recv().await.map(TestWrapper),
+            Some(TestWrapper(Event::Online {
                 guilds: vec![0, 1],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Offline {
+            events_rx.recv().await.map(TestWrapper),
+            Some(TestWrapper(Event::Offline {
                 guilds: vec![0, 1],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.next().await.map(TestWrapper),
-            Some(TestWrapper(UptimeEvent::Online {
+            events_rx.recv().await.map(TestWrapper),
+            Some(TestWrapper(Event::Online {
                 guilds: vec![0, 1],
                 timestamp: 0
             }))

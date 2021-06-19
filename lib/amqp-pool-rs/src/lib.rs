@@ -29,7 +29,7 @@ impl deadpool::managed::Manager for Manager {
         self.connection
             .create_channel()
             .await
-            .context("Could not create new channel in connection's channel pool")
+            .context("could not create new channel in connection's channel pool")
     }
     async fn recycle(&self, _channel: &mut Channel) -> deadpool::managed::RecycleResult<Error> {
         Ok(())

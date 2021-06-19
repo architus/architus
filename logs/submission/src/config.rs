@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use architus_config_backoff::Backoff;
 use serde::Deserialize;
 use sloggers::terminal::TerminalLoggerConfig;
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// Configuration object loaded upon startup
@@ -16,6 +17,8 @@ pub struct Configuration {
     pub services: Services,
     /// Parameters for the backoff used to connect to external services during initialization
     pub initialization_backoff: Backoff,
+    /// Parameters for the backoff used to create the index
+    pub index_creation_backoff: Backoff,
     /// Parameters for the backoff used to forward events to Elasticsearch
     pub submission_backoff: Backoff,
     /// Logging configuration (for service diagnostic logs, not Architus log events)
@@ -33,6 +36,8 @@ pub struct Configuration {
     pub debounce_period: Duration,
     /// Elasticsearch index containing the stored log events
     pub elasticsearch_index: String,
+    /// Elasticsearch index settings file that corresponds to the logs index
+    pub elasticsearch_index_config_path: PathBuf,
 }
 
 /// Collection of external services that this service connects to
@@ -54,10 +59,10 @@ impl Configuration {
             // Add in settings from the environment (with a prefix of LOGS_SUBMISSION_CONFIG_)
             // Eg.. `LOGS_SUBMISSION_CONFIG_PORT=X ./target/logs-submission` would set the `port` key
             .merge(config::Environment::with_prefix("LOGS_SUBMISSION_CONFIG").separator("__"))
-            .context("Could not merge in values from the environment")?;
+            .context("could not merge in values from the environment")?;
         let config = settings
             .try_into()
-            .context("Loading the Configuration struct from the merged config failed")?;
+            .context("loading the Configuration struct from the merged config failed")?;
         Ok(config)
     }
 }

@@ -6,7 +6,7 @@ fn main() -> Result<()> {
         .build_client(false)
         .build_server(true)
         .compile(&["uptime.proto"], &["../../lib/ipc/proto/logs"])
-        .context("Compiling uptime.proto definitions")?;
+        .context("compiling uptime.proto definitions")?;
 
     Ok(())
 }
