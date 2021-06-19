@@ -1,6 +1,7 @@
 import json
 from io import BytesIO
 
+import requests
 from flask import Flask, redirect, request, g, Response, make_response
 from flask_restful import Api, Resource
 from flask_cors import CORS
@@ -86,24 +87,6 @@ class AllGuilds(CustomResource):
         if jwt.id != 214037134477230080:  # johnyburd
             return {"message": "unauthorized"}, StatusCodes.UNAUTHORIZED_401
         return self.shard.all_guilds()
-
-
-class Logs(CustomResource):
-    @authenticated(member=True)
-    def get(self, guild_id: int):
-        # rows = self.session.query(Log).filter(Log.guild_id == guild_id)
-        # .order_by(Log.timestamp.desc()).limit(400).all()
-        rows = []
-        self.session.commit()
-        logs = []
-        for log in rows:
-            logs.append({
-                'type': log.type,
-                'content': log.content,
-                'user_id': str(log.user_id),
-                'timestamp': log.timestamp.isoformat()
-            })
-            return {"logs": logs}, StatusCodes.OK_200
 
 
 class AutoResponses(CustomResource):
@@ -203,6 +186,31 @@ class ListGuilds(CustomResource):
         return resp, status_code
 
 
+class LogsGraphql(CustomResource):
+    @authenticated()
+    def get(self, guild_id: int, jwt: JWT):
+        resp, _ = self.shard.is_member(jwt.id, guild_id)
+        if resp['admin'] is True:
+            try:
+                r = requests.get(f'http://logs-search/graphql?guild_id={guild_id}')
+                return r.json(), r.status_code
+            except requests.exceptions.ConnectionError:
+                return {'message': "Unable to reach logs search service"}, StatusCodes.SERVICE_UNAVAILABLE_503
+        else:
+            return {'message': 'Unauthorized'}, StatusCodes.UNAUTHORIZED_401
+
+
+class LogsPlayground(Resource):
+    def get(self):
+        try:
+            r = requests.get(f'http://logs-search/playground')
+            resp = make_response(r.text, r.status_code)
+            resp.headers['content-type'] = r.headers['content-type']
+            return resp
+        except requests.exceptions.ConnectionError:
+            return {'message': "Unable to reach logs search service"}, StatusCodes.SERVICE_UNAVAILABLE_503
+
+
 class Twitch(CustomResource):
     def get(self):
         challenge = request.args.get("hub.challenge")
@@ -256,7 +264,8 @@ def app_factory():
     api.add_resource(Music, "/music/<int:guild_id>")
     api.add_resource(Emoji, "/emojis/<int:emoji_id>", "/emojis/<int:guild_id>/<int:emoji_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
-    api.add_resource(Logs, "/logs/<int:guild_id>")
+    api.add_resource(LogsGraphql, "/logs/<int:guild_id>/graphql")
+    api.add_resource(LogsPlayground, "/logs/playground")
     api.add_resource(RedirectCallback, "/redirect")
     api.add_resource(GuildCounter, "/guild-count")
     api.add_resource(Invite, "/invite/<int:guild_id>")
