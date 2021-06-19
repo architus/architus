@@ -20,7 +20,7 @@ fn main() -> Result<()> {
             "#[derive(::serde::Serialize)]",
         )
         .compile(&["logs/submission.proto"], &["../../lib/ipc/proto"])
-        .context("Compiling logs/submission.proto definitions")?;
+        .context("compiling logs/submission.proto definitions")?;
 
     Ok(())
 }

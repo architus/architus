@@ -25,7 +25,7 @@ pub async fn to_queue(config: Arc<Configuration>) -> Result<Connection> {
     };
     let rmq_connection = backoff::future::retry(initialization_backoff, rmq_connect)
         .await
-        .context("Could not connect to the RabbitMQ gateway queue")?;
+        .context("could not connect to the RabbitMQ gateway queue")?;
     log::info!("Connected to RabbitMQ at {}", rmq_url);
     Ok(rmq_connection)
 }
@@ -48,7 +48,7 @@ pub async fn to_submission(config: Arc<Configuration>) -> Result<LogsSubmissionC
     };
     let connection = backoff::future::retry(initialization_backoff, connect)
         .await
-        .context("Could not connect to logs/submission")?;
+        .context("could not connect to logs/submission")?;
     log::info!("Connected to logs/submission at {}", submission_url);
     Ok(connection)
 }

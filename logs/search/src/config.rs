@@ -54,10 +54,10 @@ impl Configuration {
             // Eg.. `LOGS_SEARCH_CONFIG_PORT=8080 ./target/logs-search`
             // would set the `port` key tot 8080
             .merge(config::Environment::with_prefix("LOGS_SEARCH_CONFIG").separator("__"))
-            .context("Could not merge in values from the environment")?;
+            .context("could not merge in values from the environment")?;
         let config = settings
             .try_into()
-            .context("Loading the Configuration struct from the merged config failed")?;
+            .context("loading the Configuration struct from the merged config failed")?;
         debug!("Configuration: {:?}", config);
         Ok(config)
     }

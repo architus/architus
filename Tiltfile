@@ -26,13 +26,14 @@ features_to_components = {
     'api': ['api'],
     'logs': [
         'feature-gate',
-        'db',
         'logs-gateway-ingress',
         'logs-gateway-normalize',
         'logs-search',
         'logs-submission',
         'logs-uptime',
-        'elasticsearch'
+        'elasticsearch',
+        'rabbit',
+        'db',
     ]
 }
 
@@ -175,8 +176,8 @@ if 'logs-submission' in enabled:
             local(['cp', 'logs/submission/config.default.toml', 'logs/submission/config.toml'])
         local_resource('logs-submission-compile', 'cargo build --manifest-path=logs/submission/Cargo.toml',
                        deps=['logs/submission/Cargo.toml', 'logs/submission/Cargo.lock', 'logs/submission/build.rs', 'logs/submission/src', 'lib/ipc/proto/logs/submission.proto', 'lib/ipc/proto/logs/event.proto', 'lib/id-rs/Cargo.lock', 'lib/id-rs/Cargo.toml', 'lib/id-rs/src', 'lib/config-backoff-rs/Cargo.lock', 'lib/config-backoff-rs/Cargo.toml', 'lib/config-backoff-rs/src'])
-        docker_build_with_restart('logs-submission-image', '.', dockerfile='logs/submission/Dockerfile.tilt', only=["logs/submission/target/debug/logs-submission", "logs/submission/config.toml"],
-                                  entrypoint=['/usr/bin/logs-submission', '/etc/architus/config.toml'], live_update=[sync('logs/submission/target/debug/logs-submission', '/usr/bin/logs-submission'), sync('logs/submission/config.toml', '/etc/architus/config.toml')])
+        docker_build_with_restart('logs-submission-image', '.', dockerfile='logs/submission/Dockerfile.tilt', only=["logs/submission/target/debug/logs-submission", "logs/submission/config.toml", "logs/submission/schema/index_config.json"],
+                                  entrypoint=['/usr/bin/logs-submission', '/etc/architus/config.toml'], live_update=[sync('logs/submission/target/debug/logs-submission', '/usr/bin/logs-submission'), sync('logs/submission/config.toml', '/etc/architus/config.toml'), sync('logs/submission/schema/index_config.json', '/etc/architus/index_config.json')])
     else:
         docker_build('logs-submission-image', '.', dockerfile='logs/submission/Dockerfile', ignore=["*", "!logs/submission/**", "!lib/**"])
     k8s_yaml('logs/submission/kube/dev/logs-submission.yaml')

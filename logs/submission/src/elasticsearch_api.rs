@@ -1,7 +1,7 @@
 //! Contains bindings for the elasticsearch API,
 //! used to make working with responses more ergonomic
 
-pub(crate) mod bulk {
+pub mod bulk {
     // Source: `https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#bulk-api-response-body`
     use serde::{Deserialize, Serialize};
 
@@ -44,7 +44,7 @@ pub(crate) mod bulk {
     }
 
     /// Defines a `serde(with)` combination of (de)serialize functions
-    /// that convert between `u16` integers and instances of hyper::http::StatusCode values.
+    /// that convert between `u16` integers and instances of `hyper::http::StatusCode` values.
     /// This is used to make consuming their values more ergonomic
     /// and combine the conversion into the rest of the decoding.
     mod serde_status_code {
@@ -58,6 +58,7 @@ pub(crate) mod bulk {
                 .map_err(serde::de::Error::custom)
         }
 
+        #[allow(clippy::trivially_copy_pass_by_ref)]
         pub fn serialize<S>(
             status_code: &hyper::StatusCode,
             serializer: S,
@@ -85,7 +86,7 @@ pub(crate) mod bulk {
         pub index: String,
     }
 
-    /// From https://github.com/elastic/elasticsearch/blob/7.13/docs/reference/docs/bulk.asciidoc#api-examples-title
+    /// From <https://github.com/elastic/elasticsearch/blob/7.13/docs/reference/docs/bulk.asciidoc#api-examples-title>
     #[test]
     fn response_deserializes_example_1() {
         serde_json::from_value::<Response>(serde_json::json!({
@@ -165,7 +166,7 @@ pub(crate) mod bulk {
         .unwrap();
     }
 
-    /// From https://github.com/elastic/elasticsearch/blob/7.13/docs/reference/docs/bulk.asciidoc#example-with-failed-actions
+    /// From <https://github.com/elastic/elasticsearch/blob/7.13/docs/reference/docs/bulk.asciidoc#example-with-failed-actions>
     #[test]
     fn response_deserializes_example_2() {
         serde_json::from_value::<Response>(serde_json::json!({

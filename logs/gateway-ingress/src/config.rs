@@ -5,8 +5,8 @@ use anyhow::{Context, Result};
 use architus_config_backoff::Backoff;
 use deadpool::managed::PoolConfig;
 use lapin::types::AMQPValue;
-use log::{debug, info};
 use serde::Deserialize;
+use sloggers::terminal::TerminalLoggerConfig;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -26,20 +26,22 @@ pub struct Configuration {
     /// Config options related to the Gateway Queue
     pub gateway_queue: GatewayQueue,
     /// Length of time that consecutive guild uptime events are grouped together in
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub guild_uptime_debounce_delay: Duration,
     /// Size of the guild chunks to send to the feature-gate service to check their feature
     pub feature_gate_batch_check_size: usize,
     /// How long to keep offline guilds in the active guild cache
     /// (Allows for detecting guilds that enable/disable their indexing rapidly)
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub active_guild_eviction_duration: Duration,
     /// The amount of time to wait between polls to the feature-gate service
     /// to retrieve the current status of all guilds and whether they have indexing enabled
     /// Lowering increases I/O on the feature-gate and lock contention on the processing hot-path
     /// while increasing response times for indexing enable/disable actions
-    #[serde(with = "serde_humantime")]
+    #[serde(with = "humantime_serde")]
     pub active_guilds_poll_interval: Duration,
+    /// Logging configuration (for service diagnostic logs, not Architus log events)
+    pub logging: TerminalLoggerConfig,
 }
 
 /// Collection of secret values used to connect to services
@@ -81,7 +83,6 @@ impl Configuration {
     /// Attempts to load the config from the file, called once at startup
     pub fn try_load(path: impl AsRef<str>) -> Result<Self> {
         let path = path.as_ref();
-        info!("Loading configuration from {}", path);
         // Use config to load the values and merge with the environment
         let mut settings = config::Config::default();
         settings
@@ -91,11 +92,10 @@ impl Configuration {
             // Eg.. `LOGS_GATEWAY_INGRESS_CONFIG_SECRETS__DISCORD_TOKEN=X ./target/logs-gateway-ingress`
             // would set the `secrets.discord_token` key
             .merge(config::Environment::with_prefix("LOGS_GATEWAY_INGRESS_CONFIG").separator("__"))
-            .context("Could not merge in values from the environment")?;
+            .context("could not merge in values from the environment")?;
         let config = settings
             .try_into()
-            .context("Loading the Configuration struct from the merged config failed")?;
-        debug!("Configuration: {:?}", config);
+            .context("loading the Configuration struct from the merged config failed")?;
         Ok(config)
     }
 }

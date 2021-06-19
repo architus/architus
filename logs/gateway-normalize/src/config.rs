@@ -72,10 +72,10 @@ impl Configuration {
             // Eg.. `LOGS_GATEWAY_NORMALIZE_CONFIG_SERVICES__LOGS_IMPORT=X ./target/logs-gateway-normalize`
             // would set the `services.logs_import` key
             .merge(config::Environment::with_prefix("LOGS_GATEWAY_NORMALIZE_CONFIG").separator("__"))
-            .context("Could not merge in values from the environment")?;
+            .context("could not merge in values from the environment")?;
         let config = settings
             .try_into()
-            .context("Loading the Configuration struct from the merged config failed")?;
+            .context("loading the Configuration struct from the merged config failed")?;
         debug!("Configuration: {:?}", config);
         Ok(config)
     }
