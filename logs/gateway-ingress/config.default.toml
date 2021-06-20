@@ -1,7 +1,7 @@
-# Length of time that consecutive guild uptime events are grouped together in
-guild_uptime_debounce_delay = "200ms"
 # Name of the feature that enables indexing on a guild
 indexing_feature = "beta/logs-indexing"
+# Length of time that consecutive guild uptime events are grouped together in
+guild_uptime_debounce_delay = "200ms"
 # Size of the guild chunks to send to the feature-gate service to check their feature
 feature_gate_batch_check_size = 256
 # How long to keep offline guilds in the active guild cache
@@ -61,6 +61,13 @@ max_interval = "1s"
 duration = "5s"
 multiplier = 2.0
 
+# Parameters for the backoff used to reconnect to the gateway queue
+[reconnection_backoff]
+initial_interval = "100ms"
+max_interval = "1m"
+duration = "2m" # This is ignored
+multiplier = 2.0
+
 # Note: these should be specified using environment variables in production
 # For example, to specify `discord_token`,
 # give a value to the `LOGS_GATEWAY_INGRESS_SECRETS__DISCORD_TOKEN` variable
@@ -78,3 +85,18 @@ timezone = "utc"
 destination = "stdout"
 channel_size = 2048
 overflow_strategy = "drop_and_report"
+
+# Config options for raw event publishing mechanisms
+[raw_events]
+# Length of the bounded queue to store raw events in before processing them.
+# Excess events will be dropped.
+queue_length = 65536
+# This should probably be less than 30% of the queue_length
+# because generally the queue should not be very long.
+warn_threshold = 1000
+# The number of working coroutines to use when publishing events.
+# These will all be blocked when reconnecting to the queue.
+publish_concurrency = 128
+# The period of time to wait between polls of the bounded queue length
+# that may prompt warning messages to be emitted.
+watch_period = "10s"

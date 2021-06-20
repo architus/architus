@@ -43,13 +43,29 @@ pub mod inner {
                 (Err(err), OnFailure::Abort) => Err(ProcessingError::FatalSourceError(err)),
                 (Err(_), OnFailure::Drop) => Err(ProcessingError::Drop),
                 (Err(ref err), OnFailure::Or(t)) => {
-                    log::debug!("A failure occurred with running a JSON processor fragment for event '{:?}': {:?}, falling back to default value", context.event.event_type, err);
-                    log::trace!("Context = {:?}", context);
+                    slog::debug!(
+                        context.logger,
+                        "a failure occurred with running a JSON processor fragment for event, falling back to default value";
+                        "error" => ?err
+                    );
+                    slog::trace!(
+                        context.logger,
+                        "original event dump";
+                        "event" => ?context.event,
+                    );
                     Ok(t.clone())
                 }
                 (Err(ref err), OnFailure::OrElse(func_t)) => {
-                    log::debug!("A failure occurred with running a JSON processor fragment for event '{:?}': {:?}, falling back to default closure", context.event.event_type, err);
-                    log::trace!("Context = {:?}", context);
+                    slog::debug!(
+                        context.logger,
+                        "a failure occurred with running a JSON processor fragment for event, falling back to default closure";
+                        "error" => ?err
+                    );
+                    slog::trace!(
+                        context.logger,
+                        "original event dump";
+                        "event" => ?context.event,
+                    );
                     Ok(func_t(context))
                 }
             }
@@ -78,13 +94,29 @@ pub mod inner {
                 (Err(err), OnFailure::Abort) => Err(ProcessingError::FatalSourceError(err)),
                 (Err(_), OnFailure::Drop) => Err(ProcessingError::Drop),
                 (Err(ref err), OnFailure::Or(t)) => {
-                    log::debug!("A failure occurred with running a sync processor fragment for event '{:?}': {:?}, falling back to default value", context.event.event_type, err);
-                    log::trace!("Context = {:?}", context);
+                    slog::debug!(
+                        context.logger,
+                        "a failure occurred with running a sync processor fragment for event, falling back to default value";
+                        "error" => ?err
+                    );
+                    slog::trace!(
+                        context.logger,
+                        "original event dump";
+                        "event" => ?context.event,
+                    );
                     Ok(t.clone())
                 }
                 (Err(ref err), OnFailure::OrElse(func_t)) => {
-                    log::debug!("A failure occurred with running a sync processor fragment for event '{:?}': {:?}, falling back to default closure", context.event.event_type, err);
-                    log::trace!("Context = {:?}", context);
+                    slog::debug!(
+                        context.logger,
+                        "a failure occurred with running a sync processor fragment for event, falling back to default closure";
+                        "error" => ?err
+                    );
+                    slog::trace!(
+                        context.logger,
+                        "original event dump";
+                        "event" => ?context.event,
+                    );
                     Ok(func_t(context))
                 }
             }
@@ -94,6 +126,7 @@ pub mod inner {
     /// Runs an arbitrary asynchronous, potentially fallible function that produces a value
     /// given an event normalization context
     /// (that provides access to the raw JSON, Discord API, timestamp, and other metadata)
+    #[allow(clippy::type_complexity)]
     pub struct AsyncFnSource<T>
     where
         T: Clone + Send + Sync,
@@ -119,13 +152,29 @@ pub mod inner {
                 (Err(err), OnFailure::Abort) => Err(ProcessingError::FatalSourceError(err)),
                 (Err(_), OnFailure::Drop) => Err(ProcessingError::Drop),
                 (Err(ref err), OnFailure::Or(t)) => {
-                    log::debug!("A failure occurred with running an async processor fragment for event '{:?}': {:?}, falling back to default value", context.event.event_type, err);
-                    log::trace!("Context = {:?}", context);
+                    slog::debug!(
+                        context.logger,
+                        "a failure occurred with running an async processor fragment for event, falling back to default value";
+                        "error" => ?err
+                    );
+                    slog::trace!(
+                        context.logger,
+                        "original event dump";
+                        "event" => ?context.event,
+                    );
                     Ok(t.clone())
                 }
                 (Err(ref err), OnFailure::OrElse(func_t)) => {
-                    log::debug!("A failure occurred with running an async processor fragment for event '{:?}': {:?}, falling back to default closure", context.event.event_type, err);
-                    log::trace!("Context = {:?}", context);
+                    slog::debug!(
+                        context.logger,
+                        "a failure occurred with running an async processor fragment for event, falling back to default closure";
+                        "error" => ?err
+                    );
+                    slog::trace!(
+                        context.logger,
+                        "original event dump";
+                        "event" => ?context.event,
+                    );
                     Ok(func_t(context))
                 }
             }
@@ -249,7 +298,7 @@ where
             Self::Constant(t) => Ok(t.clone()),
             Self::SyncFn(source) => source.consume(context),
             Self::AsyncFn(source) => source.consume(context).await,
-            Self::Gateway(source) => source.consume(context.clone(), &context.event.inner),
+            Self::Gateway(source) => source.consume(context.clone(), context.source),
             Self::AuditLog(source) => {
                 let audit_log_entry = context.audit_log_entry.read().await;
                 match (audit_log_entry.as_ref(), &source.on_failure) {
@@ -258,7 +307,7 @@ where
                         source.consume(context.clone(), json)
                     }
                     (None, OnFailure::Abort) => Err(ProcessingError::NoAuditLogEntry(
-                        String::from(context.event.event_type),
+                        String::from(&context.event.event_type),
                     )),
                     (None, OnFailure::Drop) => Err(ProcessingError::Drop),
                     (None, OnFailure::Or(t)) => Ok(t.clone()),

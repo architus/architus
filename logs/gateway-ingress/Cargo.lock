@@ -904,7 +904,6 @@ dependencies = [
  "humantime-serde",
  "lapin",
  "lazy_static",
- "logs-gateway-queue-lib",
  "prost",
  "rand 0.8.3",
  "rmp-serde",
@@ -920,15 +919,6 @@ dependencies = [
  "tonic-build",
  "twilight-gateway",
  "twilight-model",
-]
-
-[[package]]
-name = "logs-gateway-queue-lib"
-version = "0.1.0"
-dependencies = [
- "architus-id",
- "serde 1.0.118",
- "serde_json",
 ]
 
 [[package]]

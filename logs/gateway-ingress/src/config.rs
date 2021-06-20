@@ -22,7 +22,7 @@ pub struct Configuration {
     /// Parameters for the backoff used to send RPC calls to other services
     pub rpc_backoff: Backoff,
     /// Parameters for the backoff used to reconnect to RabbitMQ
-    pub reconnect_backoff: Backoff,
+    pub reconnection_backoff: Backoff,
     /// Name of the feature that enables indexing on a guild
     pub indexing_feature: String,
     /// Config options related to the Gateway Queue
@@ -69,9 +69,19 @@ pub struct Services {
 /// Config options for raw event publishing mechanisms
 #[derive(Default, Debug, Deserialize, Clone)]
 pub struct RawEvents {
+    /// Length of the bounded queue to store raw events in before processing them.
+    /// Excess events will be dropped.
     pub queue_length: usize,
+    /// The threshold of pending items in the bounded queue that will
+    /// cause warning messages to be emitted to the logs.
+    /// This should probably be less than 30% of the queue_length
+    /// because generally the queue should not be very long.
     pub warn_threshold: usize,
+    /// The number of working coroutines to use when publishing events.
+    /// These will all be blocked when reconnecting to the queue.
     pub publish_concurrency: usize,
+    /// The period of time to wait between polls of the bounded queue length
+    /// that may prompt warning messages to be emitted.
     #[serde(with = "humantime_serde")]
     pub watch_period: Duration,
 }

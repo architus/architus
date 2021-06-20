@@ -426,7 +426,7 @@ impl HandleFactory {
     /// There is no limit on the number of re-attempts
     /// because we want to avoid dropping gateway events if at all possible.
     async fn reconnect(&self) -> Connection {
-        let mut backoff_config = self.config.reconnect_backoff.clone();
+        let mut backoff_config = self.config.reconnection_backoff.clone();
         // Set the duration for 10 years to effectively be forever
         backoff_config.duration = Duration::from_secs(60 * 60 * 24 * 365 * 10);
         let mut backoff = backoff_config.build();
