@@ -550,13 +550,13 @@ impl ActiveGuilds {
             .filter(|id| !active_values.contains_key(id))
             .cloned()
             .collect::<Vec<_>>();
-        slog::debug!(self.logger, "preparing to load active values for guilds"; "to_load" => ?to_load);
+        slog::debug!(self.logger, "preparing to load active values for guilds"; "to_load" => ?&to_load);
         let mut guilds_write = if to_load.is_empty() {
             // Keep the same lock handle
             guilds_write
         } else {
             // Create loading status for all guilds
-            slog::debug!(self.logger, "writing loading channels for each guild"; "to_load" => ?to_load);
+            slog::debug!(self.logger, "writing loading channels for each guild"; "to_load" => ?&to_load);
             for guild_id in &to_load {
                 // Insert the loading status if it already isn't there
                 let logger = self.logger.new(slog::o!("guild_id" => guild_id));

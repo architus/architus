@@ -15,7 +15,7 @@ use anyhow::{anyhow, Context, Result};
 use architus_amqp_pool::{Manager, Pool, PoolError};
 use architus_id::{time, HoarFrost, IdProvisioner};
 use deadpool::Runtime;
-use futures::{try_join, Stream, StreamExt, TryStreamExt};
+use futures::{join, try_join, Stream, StreamExt, TryStreamExt};
 use gateway_queue_lib::GatewayEventOwned;
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
 use lapin::types::FieldTable;
@@ -25,7 +25,8 @@ use slog::Logger;
 use sloggers::Config;
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::Request;
 use twilight_gateway::{Event, EventType, EventTypeFlags, Intents, Shard};
 use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
@@ -92,7 +93,8 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
     let event_type_flags = lifecycle_events | raw_events;
 
     // Initialize connections to external services
-    let (shard, events) = connect::to_shard(Arc::clone(&config), logger.clone(), event_type_flags).await?;
+    let (shard, events) =
+        connect::to_shard(Arc::clone(&config), logger.clone(), event_type_flags).await?;
     let shard_shared = Arc::new(shard);
     let rmq_connection = connect::to_queue(Arc::clone(&config), logger.clone()).await?;
     let feature_gate_client = connect::to_feature_gate(Arc::clone(&config), logger.clone()).await?;
@@ -100,7 +102,8 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
         connect::to_uptime_service(Arc::clone(&config), logger.clone()).await?;
 
     // Split up the stream of gateway events into lifecycle & raw events
-    let (lifecycle_event_stream, raw_event_stream) = split_gateway_events(events, lifecycle_events, raw_events);
+    let (lifecycle_event_stream, raw_event_stream) =
+        split_gateway_events(events, lifecycle_events, raw_events);
 
     // Notify the connection tracker of the newly connected services
     update_tx
@@ -110,7 +113,8 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
         .send(UpdateMessage::QueueOnline)
         .context("could not send queue online update to uptime tracker")?;
 
-    let (active_guilds, uptime_rx) = ActiveGuilds::new(feature_gate_client, Arc::clone(&config), logger.clone());
+    let (active_guilds, uptime_rx) =
+        ActiveGuilds::new(feature_gate_client, Arc::clone(&config), logger.clone());
 
     // Listen to incoming gateway events and start re-publishing them on the queue
     // (performing the primary purpose of the service)
@@ -124,10 +128,8 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
     );
 
     // Listen for lifecycle events and send them to the uptime tracker
-    let lifecycle_event_listener = process_lifecycle_events(
-        lifecycle_event_stream,
-        update_tx.clone(),
-    );
+    let lifecycle_event_listener =
+        process_lifecycle_events(lifecycle_event_stream, update_tx.clone());
 
     // Pipe the uptime events from the tracker into the active guild handler
     let uptime_events_stream = connection_tracker.stream_events();
@@ -233,6 +235,102 @@ async fn sink_uptime_events(
     Ok(())
 }
 
+struct Publisher {
+    queue_connection: Connection,
+    active_guilds: ActiveGuilds,
+    config: Arc<Configuration>,
+    logger: Logger,
+    update_tx: UnboundedSender<UpdateMessage>,
+    id_provisioner: IdProvisioner,
+}
+
+impl Publisher {
+    fn new(
+        queue_connection: Connection,
+        active_guilds: ActiveGuilds,
+        config: Arc<Configuration>,
+        logger: Logger,
+        update_tx: UnboundedSender<UpdateMessage>,
+    ) -> Self {
+        let logger = logger.new(slog::o!("max_queue_length" => config.raw_events.queue_length));
+        Self {
+            queue_connection,
+            active_guilds,
+            config,
+            logger,
+            update_tx,
+            id_provisioner: IdProvisioner::new(Some(logger.clone())),
+        }
+    }
+
+    async fn consume_events(&self, raw_event_stream: impl Stream<Item = Event>) {
+        // Create a backpressure-capable stream factory
+        // so that raw events piling up is caught and reported on
+        let (event_tx, event_rx) = mpsc::channel(self.config.raw_events.queue_length);
+        let queue_future = async {
+            let republish_future = self.republish_events(raw_event_stream, event_tx.clone());
+            let watch_future = self
+                .watch_queue_length(|| self.config.raw_events.queue_length - event_tx.capacity());
+            join!(republish_future, watch_future);
+        };
+
+        // Consume each event from the stream in parallel
+        let consume_future = ReceiverStream::new(event_rx).for_each_concurrent(
+            Some(self.config.raw_events.publish_concurrency),
+            |event| async { self.publish_event(event).await },
+        );
+
+        join!(queue_future, consume_future);
+    }
+
+    async fn republish_events(
+        &self,
+        raw_event_stream: impl Stream<Item = Event>,
+        event_tx: async_channel::Sender<Event>,
+    ) {
+        raw_event_stream
+            .for_each(|event| async {
+                if let Err(send_err) = event_tx.try_send(event) {
+                    slog::warn!(
+                        self.logger,
+                        "sending raw gateway event into shared channel failed; dropping";
+                        "error" => ?send_err
+                    );
+                }
+            })
+            .await;
+    }
+
+    async fn watch_queue_length(&self, check_length: impl Fn() -> usize) {
+        let interval = tokio::time::interval(self.config.raw_events.watch_period);
+        loop {
+            interval.tick().await;
+            let current_length = check_length();
+            if current_length > self.config.raw_events.warn_threshold {
+                slog::warn!(
+                    self.logger,
+                    "current queue length exceeds warning threshold";
+                    "current_queue_length" => current_length,
+                    "warn_threshold" => self.config.raw_events.warn_threshold
+                );
+            }
+        }
+    }
+
+    async fn publish_event(&self, event: Event) {
+        // Provision an ID and note the timestamp immediately
+        let timestamp = time::millisecond_ts();
+        let id = self.id_provisioner.with_ts(timestamp);
+        let logger = self.logger.new(slog::o!(
+            "event_timestamp" => timestamp,
+            "event_id" => id,
+        ));
+
+        // TODO implement
+        Ok(())
+    }
+}
+
 /// Manages the lifecycle of the connection to the downstream Rabbit MQ queue
 /// and the stream of raw events being forwarded from the Discord Gateway.
 /// Attempts to re-connect to Rabbit MQ upon lost connection,
@@ -240,14 +338,11 @@ async fn sink_uptime_events(
 async fn publish_events(
     queue_connection: Connection,
     active_guilds: ActiveGuilds,
-    raw_event_stream: impl Stream<Item = Event>,,
+    raw_event_rx: async_channel::Receiver<Event>,
     config: Arc<Configuration>,
     logger: Logger,
     update_tx: UnboundedSender<UpdateMessage>,
 ) -> Result<()> {
-    // Create a new Id provisioner and use it throughout
-    let id_provisioner = Arc::new(IdProvisioner::new(Some(logger.clone())));
-
     // Keep looping over the lifecycle,
     // allowing for the state to be eagerly restored after a disconnection
     // using the same backoff as initialization.
@@ -258,6 +353,12 @@ async fn publish_events(
         let id_provisioner = Arc::clone(&id_provisioner);
         let config = Arc::clone(&config);
         let active_guilds = active_guilds.clone();
+        let logger = logger.clone();
+
+        // Clone the channel receiver
+        // This is a bounded channel receiver that was created earlier,
+        // and has a maximum capacity.
+        let raw_event_rx = raw_event_rx.clone();
 
         // Reconnect to the Rabbit MQ instance if needed
         let rmq_connection = if let Some(rmq) = outer_rmq_connection.take() {
@@ -281,31 +382,39 @@ async fn publish_events(
 
         // Start listening to the stream
         // (we have to convert the Stream to a TryStream before using `try_for_each_concurrent`)
-        let event_try_stream = raw_event_stream.map(Ok::<Event, anyhow::Error>);
-        let process = event_try_stream.try_for_each_concurrent(None, move |event| {
-            // Provision an ID and note the timestamp immediately
-            let timestamp = time::millisecond_ts();
-            let id = id_provisioner.with_ts(timestamp);
-            let logger = logger.new(slog::o!("event_timestamp" => timestamp, "event_id" => id));
+        let event_try_stream = raw_event_tx.map(Ok::<Event, anyhow::Error>);
+        let process = event_try_stream.try_for_each_concurrent(
+            Some(config.raw_events.publish_concurrency),
+            move |event| {
+                // Provision an ID and note the timestamp immediately
+                let timestamp = time::millisecond_ts();
+                let id = id_provisioner.with_ts(timestamp);
+                let logger = logger.new(slog::o!("event_timestamp" => timestamp, "event_id" => id));
 
-            let config = Arc::clone(&config);
-            let active_guilds = active_guilds.clone();
-            let channel_pool = channel_pool.clone();
+                let config = Arc::clone(&config);
+                let active_guilds = active_guilds.clone();
+                let channel_pool = channel_pool.clone();
 
-            // Create the `GatewayEvent` from the raw event
-            async move {
-                if let Some(gateway_event) = convert_raw_event(event, timestamp, id, logger.clone())
-                {
-                    // Make sure the guild is active before forwarding
-                    let should_publish = active_guilds.is_active(gateway_event.guild_id).await;
-                    if should_publish {
-                        try_publish(gateway_event, channel_pool, config, logger).await?;
+                // Create the `GatewayEvent` from the raw event
+                async move {
+                    if let Some(gateway_event) =
+                        convert_raw_event(event, timestamp, id, logger.clone())
+                    {
+                        // Make sure the guild is active before forwarding
+                        let should_publish = active_guilds.is_active(gateway_event.guild_id).await;
+                        if should_publish {
+                            // TODO: we lose events here when the publish fails,
+                            // and this may also stop all other concurrent futures
+                            // (losing all of these events).
+                            // This should probably be changed but the solution is unclear.
+                            try_publish(gateway_event, channel_pool, config, logger).await?;
+                        }
                     }
-                }
 
-                Ok(())
-            }
-        });
+                    Ok(())
+                }
+            },
+        );
 
         if let Err(err) = process.await {
             slog::error!(
