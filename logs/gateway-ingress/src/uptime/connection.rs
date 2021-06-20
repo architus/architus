@@ -284,7 +284,7 @@ mod tests {
     }
 
     fn set<T: Hash + Eq + Clone>(v: &[T]) -> HashSet<T> {
-        v.iter().cloned().collect::<HashSet::<T>>()
+        v.iter().cloned().collect::<HashSet<T>>()
     }
 
     #[tokio::test]

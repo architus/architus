@@ -4,12 +4,12 @@ use std::collections::HashMap;
 /// Represents a database of emoji shortcodes
 /// that can be used to forward and reverse resolve emojis at runtime
 #[derive(Debug, Clone)]
-pub struct EmojiDb {
+pub struct Db {
     shortcodes_to_emojis: HashMap<String, String>,
     emojis_to_shortcodes: HashMap<String, Vec<String>>,
 }
 
-impl EmojiDb {
+impl Db {
     /// Loads the emoji database from the URL,
     /// which should contain a JSON document of shortcode->emoji mappings
     pub async fn load(url: impl AsRef<str>) -> Result<Self> {
@@ -34,7 +34,7 @@ impl EmojiDb {
         }
 
         // Compact each data structure
-        for (_, shortcodes) in emojis_to_shortcodes.iter_mut() {
+        for shortcodes in &mut emojis_to_shortcodes.values_mut() {
             shortcodes.shrink_to_fit();
         }
         shortcodes_to_emojis.shrink_to_fit();

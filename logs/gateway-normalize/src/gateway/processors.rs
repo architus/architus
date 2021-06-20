@@ -1,3 +1,6 @@
+// It's common to pass Context<'_> by value, so ignore the linter
+#![allow(clippy::needless_pass_by_value)]
+
 use crate::gateway::{Context, ProcessorFleet};
 use anyhow::Context as _;
 use jmespath::Variable;
@@ -36,6 +39,7 @@ mod member {
         static ref NICKNAME_PATH: Path = Path::from("nick");
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn register_all(fleet: &mut ProcessorFleet) {
         // Register MemberJoin processor
         fleet.register(
@@ -182,6 +186,7 @@ mod reaction {
         static ref EMOJI_PATH: Path = Path::from("emoji");
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn register_all(fleet: &mut ProcessorFleet) {
         // Register ReactionAdd processor
         fleet.register(
@@ -438,6 +443,7 @@ where
 }
 
 /// u64 extractor that returns the underlying timestamp for a snowflake-encoded ID
+#[allow(clippy::unnecessary_wraps)]
 const fn timestamp_from_id(id: u64, _ctx: Context<'_>) -> Result<u64, anyhow::Error> {
     Ok(architus_id::extract_timestamp(id))
 }
@@ -465,7 +471,7 @@ where
     Ok(t)
 }
 
-/// Attempts to extract a member struct using twilight's MemberDeserializer struct
+/// Attempts to extract a member struct using twilight's `MemberDeserializer` struct
 /// and the guild id associated with the context's inner event struct
 fn extract_member(variable: &Variable, ctx: Context<'_>) -> Result<Member, anyhow::Error> {
     let member_deserializer = MemberDeserializer::new(GuildId(ctx.event.guild_id));

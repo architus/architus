@@ -162,12 +162,11 @@ where
 
         match err {
             BackoffError::Permanent(err) => return Err(err),
-            BackoffError::Transient(Error::Twilight(twilight_err)) => match twilight_err.kind() {
-                ErrorType::Unauthorized => {
+            BackoffError::Transient(Error::Twilight(twilight_err)) => {
+                if matches!(twilight_err.kind(), ErrorType::Unauthorized) {
                     return Err(Error::Unauthorized);
                 }
-                _ => {}
-            },
+            }
             _ => {}
         };
 
