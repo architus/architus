@@ -21,7 +21,6 @@ pub struct Tracker {
     updates: UnboundedReceiver<UpdateMessage>,
     debounced_guild_updates: UnboundedReceiver<DebouncedPoolUpdate<u64>>,
     state: TrackerState,
-    logger: Logger,
 }
 
 impl Tracker {
@@ -33,7 +32,7 @@ impl Tracker {
     ) -> (Self, UnboundedSender<UpdateMessage>) {
         let (update_sender, update_receiver) = mpsc::unbounded_channel::<UpdateMessage>();
         let (active_guilds, debounced_guild_updates) =
-            DebouncedPool::new(config.guild_uptime_debounce_delay, logger.clone());
+            DebouncedPool::new(config.guild_uptime_debounce_delay, logger);
         let new_tracker = Self {
             updates: update_receiver,
             debounced_guild_updates,
@@ -42,7 +41,6 @@ impl Tracker {
                 active_guilds,
                 connection_status: Arc::new(Mutex::new(ConnectionStatus::new())),
             },
-            logger,
         };
         (new_tracker, update_sender)
     }
@@ -258,7 +256,6 @@ mod tests {
     use sloggers::Build;
     use std::collections::HashSet;
     use std::hash::Hash;
-    use std::iter::FromIterator;
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -286,11 +283,12 @@ mod tests {
         }
     }
 
-    fn set<T: Hash + Eq + Clone>(v: &Vec<T>) -> HashSet<T> {
-        HashSet::<T>::from_iter(v.iter().cloned())
+    fn set<T: Hash + Eq + Clone>(v: &[T]) -> HashSet<T> {
+        v.iter().cloned().collect::<HashSet::<T>>()
     }
 
     #[tokio::test]
+    #[allow(clippy::field_reassign_with_default)]
     async fn test_basic_debounced() -> Result<()> {
         let mut config = Configuration::default();
         config.guild_uptime_debounce_delay = Duration::from_millis(25);
@@ -323,6 +321,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::field_reassign_with_default)]
     async fn test_heartbeat_flush() -> Result<()> {
         let mut config = Configuration::default();
         config.guild_uptime_debounce_delay = Duration::from_millis(25);
@@ -378,6 +377,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::field_reassign_with_default)]
     async fn test_offline_online() -> Result<()> {
         let mut config = Configuration::default();
         config.guild_uptime_debounce_delay = Duration::from_millis(25);

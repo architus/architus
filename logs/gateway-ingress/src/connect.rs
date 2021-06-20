@@ -2,9 +2,9 @@
 //! used during service initialization and during potential reconnection
 
 use crate::config::Configuration;
+use crate::publish::INTENTS;
 use crate::rpc::feature_gate::Client as FeatureGateClient;
 use crate::rpc::logs::uptime::Client as LogsUptimeClient;
-use crate::INTENTS;
 use anyhow::{Context, Result};
 use lapin::{Connection, ConnectionProperties};
 use slog::Logger;
@@ -43,29 +43,33 @@ pub async fn to_shard(
     Ok((shard, events))
 }
 
-/// Creates a new connection to Rabbit MQ
+/// Creates a new connection to RabbitMQ
 pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> Result<Connection> {
     let initialization_backoff = config.initialization_backoff.build();
     let rmq_url = config.services.gateway_queue.clone();
     let rmq_connect = || async {
-        let conn = Connection::connect(&rmq_url, ConnectionProperties::default())
-            .await
-            .map_err(|err| {
-                slog::warn!(
-                    logger,
-                    "couldn't connect to RabbitMQ, retrying after backoff";
-                    "rabbit_url" => rmq_url,
-                    "error" => ?err,
-                );
-                err
-            })?;
-        Ok(conn)
+        let connection = to_queue_attempt(Arc::clone(&config)).await.map_err(|err| {
+            slog::warn!(
+                logger,
+                "couldn't connect to RabbitMQ, retrying after backoff";
+                "rabbit_url" => &rmq_url,
+                "error" => ?err,
+            );
+            err
+        })?;
+        Ok(connection)
     };
     let rmq_connection = backoff::future::retry(initialization_backoff, rmq_connect)
         .await
         .context("could not connect to the RabbitMQ gateway queue")?;
-    slog::info!(logger, "connected to RabbitMQ"; "rabbit_url" => rmq_url);
+    slog::info!(logger, "connected to RabbitMQ"; "rabbit_url" => &rmq_url);
     Ok(rmq_connection)
+}
+
+/// Performs a single connection attempt to RabbitMQ
+pub async fn to_queue_attempt(config: Arc<Configuration>) -> Result<Connection, lapin::Error> {
+    let rmq_url = config.services.gateway_queue.clone();
+    Connection::connect(&rmq_url, ConnectionProperties::default()).await
 }
 
 /// Creates a new connection to the feature gate service
@@ -82,7 +86,7 @@ pub async fn to_feature_gate(
                 slog::warn!(
                     logger,
                     "couldn't connect to feature-gate, retrying after backoff";
-                    "feature_gate_url" => feature_gate_url,
+                    "feature_gate_url" => &feature_gate_url,
                     "error" => ?err,
                 );
                 err
@@ -110,7 +114,7 @@ pub async fn to_uptime_service(
                 slog::warn!(
                     logger,
                     "couldn't connect to logs/uptime, retrying after backoff";
-                    "logs_uptime_url" => uptime_url,
+                    "logs_uptime_url" => &uptime_url,
                     "error" => ?err,
                 );
                 err
