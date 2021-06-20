@@ -21,10 +21,14 @@ pub struct Configuration {
     pub initialization_backoff: Backoff,
     /// Parameters for the backoff used to send RPC calls to other services
     pub rpc_backoff: Backoff,
+    /// Parameters for the backoff used to reconnect to RabbitMQ
+    pub reconnect_backoff: Backoff,
     /// Name of the feature that enables indexing on a guild
     pub indexing_feature: String,
     /// Config options related to the Gateway Queue
     pub gateway_queue: GatewayQueue,
+    /// Config options for raw event publishing mechanisms
+    pub raw_events: RawEvents,
     /// Length of time that consecutive guild uptime events are grouped together in
     #[serde(with = "humantime_serde")]
     pub guild_uptime_debounce_delay: Duration,
@@ -60,6 +64,16 @@ pub struct Services {
     pub feature_gate: String,
     /// HTTP URL of the logs/uptime service
     pub logs_uptime: String,
+}
+
+/// Config options for raw event publishing mechanisms
+#[derive(Default, Debug, Deserialize, Clone)]
+pub struct RawEvents {
+    pub queue_length: usize,
+    pub warn_threshold: usize,
+    pub publish_concurrency: usize,
+    #[serde(with = "humantime_serde")]
+    pub watch_period: Duration,
 }
 
 /// Config options related to the Gateway Queue

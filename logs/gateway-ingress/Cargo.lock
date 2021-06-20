@@ -897,6 +897,7 @@ dependencies = [
  "architus-config-backoff",
  "architus-id",
  "backoff",
+ "bytes 1.0.1",
  "config",
  "deadpool",
  "futures",

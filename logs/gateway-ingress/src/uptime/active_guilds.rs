@@ -559,7 +559,7 @@ impl ActiveGuilds {
             slog::debug!(self.logger, "writing loading channels for each guild"; "to_load" => ?&to_load);
             for guild_id in &to_load {
                 // Insert the loading status if it already isn't there
-                let logger = self.logger.new(slog::o!("guild_id" => guild_id));
+                let logger = self.logger.new(slog::o!("guild_id" => *guild_id));
                 guilds_write
                     .entry(*guild_id)
                     .or_insert_with(|| GuildStatus::Loading(LoadingNotifier::new(logger)));
@@ -686,8 +686,9 @@ impl ActiveGuilds {
         let guilds_read = self.guilds.read().expect("active guilds lock poisoned");
         let uptime_guilds = guilds
             .iter()
+            .cloned()
             .filter(|guild_id| {
-                let logger = self.logger.new(slog::o!("guild_id" => guild_id));
+                let logger = self.logger.new(slog::o!("guild_id" => *guild_id));
                 if let Some(GuildStatus::Loaded(state)) = guilds_read.get(guild_id) {
                     if matches!(state.connection, GuildConnection::Offline(_)) {
                         slog::warn!(
@@ -705,7 +706,6 @@ impl ActiveGuilds {
                     false
                 }
             })
-            .cloned()
             .collect::<Vec<_>>();
         slog::debug!(
             self.logger,
