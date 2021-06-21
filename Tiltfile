@@ -34,6 +34,7 @@ features_to_components = {
         'elasticsearch',
         'rabbit',
         'db',
+        'dbmanager',
     ]
 }
 
@@ -209,7 +210,7 @@ if 'logs-search' in enabled:
             # Create a local copy of the config file if needed
             local(['cp', 'logs/search/config.default.toml', 'logs/search/config.toml'])
         local_resource('logs-search-compile', 'cargo build --manifest-path=logs/search/Cargo.toml',
-                       deps=['logs/search/Cargo.toml', 'logs/search/Cargo.lock', 'logs/search/build.rs', 'logs/search/src', 'lib/ipc/proto/logs/event.proto', 'lib/id-rs/Cargo.lock', 'lib/id-rs/Cargo.toml', 'lib/id-rs/src'])
+                       deps=['logs/search/Cargo.toml', 'logs/search/Cargo.lock', 'logs/search/build.rs', 'logs/search/src', 'lib/ipc/proto/logs/event.proto', 'lib/id-rs/Cargo.lock', 'lib/id-rs/Cargo.toml', 'lib/id-rs/src', 'lib/config-backoff-rs/Cargo.lock', 'lib/config-backoff-rs/Cargo.toml', 'lib/config-backoff-rs/src'])
         docker_build_with_restart('logs-search-image', '.', dockerfile='logs/search/Dockerfile.tilt', only=["logs/search/target/debug/logs-search", "logs/search/config.toml"],
                                   entrypoint=['/usr/bin/logs-search', '/etc/architus/config.toml'], live_update=[sync('logs/search/target/debug/logs-search', '/usr/bin/logs-search'), sync('logs/search/config.toml', '/etc/architus/config.toml')])
     else:

@@ -7,8 +7,8 @@ use crate::graphql::inputs::{EventFilterInput, EventSortInput};
 use crate::stored_event::StoredEvent;
 use elasticsearch::{Elasticsearch, SearchParts};
 use juniper::{graphql_value, EmptyMutation, EmptySubscription, FieldError, FieldResult, RootNode};
-use log::debug;
 use serde_json::json;
+use slog::Logger;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
@@ -23,7 +23,12 @@ pub struct SearchProvider {
 }
 
 impl SearchProvider {
-    pub fn new(elasticsearch: &Arc<Elasticsearch>, config: &Configuration) -> Self {
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn new(
+        elasticsearch: &Arc<Elasticsearch>,
+        config: Arc<Configuration>,
+        logger: Logger,
+    ) -> Self {
         Self {
             base_context: Arc::new(Context {
                 elasticsearch: Arc::clone(elasticsearch),
@@ -31,6 +36,7 @@ impl SearchProvider {
                 index: Arc::from(config.log_index.as_str()),
                 guild_id: None,
                 channel_allowlist: None,
+                logger,
             }),
             schema: Arc::new(Schema::new(
                 Query,
@@ -48,6 +54,7 @@ impl SearchProvider {
         let mut context = (*self.base_context).clone();
         context.guild_id = guild_id;
         context.channel_allowlist = channel_allowlist;
+        context.logger = context.logger.new(slog::o!());
         context
     }
 }
@@ -64,6 +71,7 @@ pub struct Context {
     index: Arc<str>,
     guild_id: Option<u64>,
     channel_allowlist: Option<Vec<u64>>,
+    logger: Logger,
 }
 
 impl juniper::Context for Context {}
@@ -120,7 +128,7 @@ impl Query {
         }
 
         // Resolve the filter and sort expressions into the Elasticsearch search DSL
-        let mut elasticsearch_params = ElasticsearchParams::from_inputs(filter, sort)?;
+        let mut elasticsearch_params = ElasticsearchParams::from_inputs(&filter, &sort)?;
 
         // Add in the guild id filter
         if let Some(guild_id) = context.guild_id.as_ref() {
@@ -174,7 +182,7 @@ impl Query {
                 }
             }
         });
-        debug!("Sending search body to Elasticsearch: {:?}", body);
+        slog::debug!(context.logger, "sending search body to Elasticsearch"; "body" => ?body);
         let index = [context.index.as_ref()];
         let send_future = context
             .elasticsearch
@@ -185,7 +193,7 @@ impl Query {
         let response = send_future.await?;
 
         let response_body = response.json::<serde_json::Value>().await?;
-        debug!("Received response from Elasticsearch: {:?}", response_body);
+        slog::debug!(context.logger, "received response from Elasticsearch"; "body" => ?response_body);
         let search_result: SearchResponse<StoredEvent> = serde_json::from_value(response_body)?;
         let total = search_result.hits.total;
         let nodes = search_result
@@ -297,7 +305,7 @@ where
         juniper::Value::scalar(self.to_string())
     }
 
-    fn from_input_value(v: &juniper::InputValue) -> Option<SnapshotToken> {
+    fn from_input_value(v: &juniper::InputValue) -> Option<Self> {
         v.as_scalar_value()
             .and_then(juniper::ScalarValue::as_str)
             .and_then(|s| FromStr::from_str(s).ok())
@@ -387,8 +395,8 @@ impl ElasticsearchParams {
 
     /// Converts the given input structs into the compound params
     fn from_inputs(
-        filter: Option<EventFilterInput>,
-        sort: Option<EventSortInput>,
+        filter: &Option<EventFilterInput>,
+        sort: &Option<EventSortInput>,
     ) -> FieldResult<Self> {
         let mut params = Self::new();
         params.add_sort(json!({"id": {"order": "desc"}}));

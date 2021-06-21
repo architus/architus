@@ -107,7 +107,11 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
         process_lifecycle_events(lifecycle_event_stream, update_tx.clone());
 
     // Pipe the uptime events from the tracker into the active guild handler
-    let uptime_events_stream = connection_tracker.stream_events();
+    let logger_clone = logger.clone();
+    let uptime_events_stream = connection_tracker.stream_events().map(|event| {
+        slog::debug!(logger_clone, "uptime event from connection tracker"; "uptime_event" => ?event);
+        event
+    });
     let unfiltered_uptime_pipe = active_guilds.pipe_uptime_events(uptime_events_stream);
 
     // Sink all uptime events to the uptime tracking service

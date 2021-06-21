@@ -103,7 +103,7 @@ impl QueryInput for EventSortInput {
     }
 }
 
-/// Parses a uint string into the actual u64 value, or returns a FieldError
+/// Parses a uint string into the actual u64 value, or returns a `FieldError`
 fn parse_uint_string(s: impl AsRef<str>) -> FieldResult<u64> {
     let s = s.as_ref();
     s.parse::<u64>().map_err(|err| {
@@ -372,8 +372,9 @@ pub struct EnumFilterInput {
 }
 
 impl EnumFilterInput {
-    fn try_convert<T>(string: &String) -> FieldResult<i32>
+    fn try_convert<A, T>(string: A) -> FieldResult<i32>
     where
+        A: AsRef<str>,
         T: FilterableEnum + FromStr,
         <T as FromStr>::Err: std::fmt::Debug,
     {
@@ -403,7 +404,12 @@ impl EnumFilterInput {
         T: FilterableEnum + FromStr,
         <T as FromStr>::Err: std::fmt::Debug,
     {
-        if let Some(eq) = self.eq.as_ref().map(Self::try_convert::<T>).transpose()? {
+        if let Some(eq) = self
+            .eq
+            .as_ref()
+            .map(Self::try_convert::<_, T>)
+            .transpose()?
+        {
             // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
             params.add_filter(json!({
                 "term": {
@@ -413,7 +419,12 @@ impl EnumFilterInput {
                 }
             }));
         }
-        if let Some(ne) = self.ne.as_ref().map(Self::try_convert::<T>).transpose()? {
+        if let Some(ne) = self
+            .ne
+            .as_ref()
+            .map(Self::try_convert::<_, T>)
+            .transpose()?
+        {
             // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
             params.add_anti_filter(json!({
                 "term": {
@@ -427,7 +438,7 @@ impl EnumFilterInput {
             // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
             let in_set = in_set
                 .iter()
-                .map(Self::try_convert::<T>)
+                .map(Self::try_convert::<_, T>)
                 .collect::<FieldResult<Vec<_>>>()?;
             params.add_filter(json!({
                 "terms": {
@@ -439,7 +450,7 @@ impl EnumFilterInput {
             // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
             let nin = nin
                 .iter()
-                .map(Self::try_convert::<T>)
+                .map(Self::try_convert::<_, T>)
                 .collect::<FieldResult<Vec<_>>>()?;
             params.add_anti_filter(json!({
                 "terms": {

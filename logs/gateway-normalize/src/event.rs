@@ -179,6 +179,7 @@ impl Agent {
 }
 
 #[derive(Clone, PartialEq, Debug)]
+#[allow(dead_code)]
 pub enum Entity {
     UserLike(UserLike),
     Role(Role),
@@ -278,6 +279,7 @@ pub struct Content {
 }
 
 impl Content {
+    #[allow(dead_code)]
     pub fn make<S: Into<String>>(inner: S) -> Self {
         let inner = inner.into();
         Self {
