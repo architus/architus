@@ -1,16 +1,24 @@
+//! Contains configuration options for the service that control its network topology
+//! and internal behaviors
+
 use anyhow::{Context, Result};
-use log::{debug, info};
+use architus_config_backoff::Backoff;
 use serde::Deserialize;
+use sloggers::terminal::TerminalLoggerConfig;
 
 /// Configuration object loaded upon startup
 #[derive(Debug, Deserialize, Clone)]
 pub struct Configuration {
     /// Collection of external services that this service connects to
     pub services: Services,
+    /// Parameters for the backoff used to connect to external services during initialization
+    pub initialization_backoff: Backoff,
     /// Options related to the GraphQL search API
     pub graphql: GraphQL,
     /// Elasticsearch index containing the stored log events
     pub log_index: String,
+    /// Logging configuration (for service diagnostic logs, not Architus log events)
+    pub logging: TerminalLoggerConfig,
 }
 
 /// Collection of external services that this service connects to
@@ -23,8 +31,8 @@ pub struct Services {
 /// Options related to the GraphQL search API
 #[derive(Debug, Deserialize, Clone)]
 pub struct GraphQL {
-    /// (optional) Port that the optional GraphQL HTTP server runs on (used in development)
-    pub http_port: Option<u16>,
+    /// Port that the optional GraphQL HTTP server runs on
+    pub http_port: u16,
     /// Default limit of items to fetch in a single page if none is given
     pub default_page_size: usize,
     /// Limit on a single page's size
@@ -44,7 +52,6 @@ impl Configuration {
     /// Attempts to load the config from the file, called once at startup
     pub fn try_load(path: impl AsRef<str>) -> Result<Self> {
         let path = path.as_ref();
-        info!("Loading configuration from {}", path);
         // Use config to load the values and merge with the environment
         let mut settings = config::Config::default();
         settings
@@ -54,11 +61,10 @@ impl Configuration {
             // Eg.. `LOGS_SEARCH_CONFIG_PORT=8080 ./target/logs-search`
             // would set the `port` key tot 8080
             .merge(config::Environment::with_prefix("LOGS_SEARCH_CONFIG").separator("__"))
-            .context("Could not merge in values from the environment")?;
+            .context("could not merge in values from the environment")?;
         let config = settings
             .try_into()
-            .context("Loading the Configuration struct from the merged config failed")?;
-        debug!("Configuration: {:?}", config);
+            .context("loading the Configuration struct from the merged config failed")?;
         Ok(config)
     }
 }

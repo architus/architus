@@ -4,19 +4,20 @@ pub mod source;
 
 use crate::audit_log::SearchQuery;
 use crate::config::Configuration;
-use crate::emoji::EmojiDb;
 use crate::event::{Agent, Channel, Content, Entity, NormalizedEvent, Source as EventSource};
 use crate::gateway::path::Path;
 use crate::gateway::source::{AuditLogSource, Source};
+use crate::rpc::gateway_queue_lib::GatewayEvent;
 use crate::rpc::logs::event::EventType;
 use crate::{audit_log, util};
 use anyhow::Context as _;
 use architus_id::IdProvisioner;
 use futures::try_join;
-use gateway_queue_lib::GatewayEvent;
 use jmespath::Variable;
+use slog::Logger;
 use static_assertions::assert_impl_all;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -24,6 +25,24 @@ use twilight_http::Client;
 use twilight_model::gateway::event::EventType as GatewayEventType;
 use twilight_model::guild::audit_log::AuditLogEntry;
 use twilight_model::guild::Permissions;
+
+/// Wrapper around `GatewayEvent` that includes the deserialized JSON
+pub struct EventWithSource {
+    inner: GatewayEvent,
+    source: serde_json::Value,
+}
+
+impl TryFrom<GatewayEvent> for EventWithSource {
+    type Error = rmp_serde::decode::Error;
+
+    fn try_from(value: GatewayEvent) -> Result<Self, Self::Error> {
+        let source = rmp_serde::from_slice::<serde_json::Value>(&value.inner)?;
+        Ok(Self {
+            inner: value,
+            source,
+        })
+    }
+}
 
 /// Enumerates the various errors that can occur during event processing
 /// that cause it to halt
@@ -41,7 +60,7 @@ pub enum ProcessingError {
 
 impl ProcessingError {
     /// Whether the error occurs in a non-nominal case that should be logged
-    pub fn is_unexpected(&self) -> bool {
+    pub const fn is_unexpected(&self) -> bool {
         !matches!(self, Self::Drop)
     }
 }
@@ -55,7 +74,8 @@ pub struct ProcessorFleet {
     id_provisioner: IdProvisioner,
     client: Client,
     config: Arc<Configuration>,
-    emojis: Arc<EmojiDb>,
+    emojis: Arc<crate::emoji::Db>,
+    logger: Logger,
 }
 
 // ProcessorFleet needs to be safe to share
@@ -64,13 +84,19 @@ assert_impl_all!(ProcessorFleet: Sync);
 impl ProcessorFleet {
     /// Creates a processor with an empty set of sub-processors
     #[must_use]
-    pub fn new(client: Client, config: Arc<Configuration>, emojis: Arc<EmojiDb>) -> Self {
+    pub fn new(
+        client: Client,
+        config: Arc<Configuration>,
+        emojis: Arc<crate::emoji::Db>,
+        logger: Logger,
+    ) -> Self {
         Self {
             processors: HashMap::new(),
             id_provisioner: IdProvisioner::new(None),
             client,
             config,
             emojis,
+            logger,
         }
     }
 
@@ -85,9 +111,15 @@ impl ProcessorFleet {
     /// Applies the main data-oriented workflow to the given JSON
     pub async fn normalize(
         &self,
-        event: GatewayEvent<'_>,
+        event: EventWithSource,
     ) -> Result<NormalizedEvent, ProcessingError> {
-        if let Some(processor) = self.processors.get(event.event_type) {
+        if let Some(processor) = self.processors.get(&event.inner.event_type) {
+            let logger = self.logger.new(slog::o!(
+                "event_id" => event.inner.id,
+                "event_ingress_timestamp" => event.inner.ingress_timestamp,
+                "event_type" => event.inner.event_type.clone(),
+                "event_guild_id" => event.inner.guild_id
+            ));
             processor
                 .apply(
                     event,
@@ -95,12 +127,13 @@ impl ProcessorFleet {
                     &self.client,
                     &self.config,
                     &self.emojis,
+                    &logger,
                 )
                 .await
         } else {
-            Err(ProcessingError::SubProcessorNotFound(String::from(
-                event.event_type,
-            )))
+            Err(ProcessingError::SubProcessorNotFound(
+                event.inner.event_type,
+            ))
         }
     }
 }
@@ -124,21 +157,29 @@ impl Processor {
     /// Runs a single processor, attempting to create a Normalized Event as a result
     pub async fn apply<'a>(
         &self,
-        event: GatewayEvent<'a>,
+        event: EventWithSource,
         id_provisioner: &'a IdProvisioner,
         client: &'a Client,
         config: &'a Configuration,
-        emojis: &'a EmojiDb,
+        emojis: &'a crate::emoji::Db,
+        logger: &'a Logger,
     ) -> Result<NormalizedEvent, ProcessingError> {
+        let EventWithSource {
+            inner: event,
+            source,
+        } = event;
+
         // Create a RwLock that source objects can wait on if needed
         let audit_log_lock: RwLock<Option<CombinedAuditLogEntry>> = RwLock::new(None);
         let ctx = Context {
             event: &event,
+            source: &source,
             id_provisioner,
             audit_log_entry: LockReader::new(&audit_log_lock),
             client,
             config,
             emojis,
+            logger,
         };
 
         let write_lock = if self.audit_log.is_some() {
@@ -169,14 +210,14 @@ impl Processor {
         let audit_log_id = audit_log_entry.as_ref().map(|combined| combined.entry.id.0);
         let audit_log_json = audit_log_entry.map(|combined| combined.json);
         let source = EventSource {
-            gateway: Some(event.inner),
+            gateway: Some(source),
             audit_log: audit_log_json,
             ..EventSource::default()
         };
         let origin = source.origin();
 
         Ok(NormalizedEvent {
-            id,
+            id: architus_id::HoarFrost(id),
             timestamp,
             source,
             origin,
@@ -244,21 +285,24 @@ pub struct CombinedAuditLogEntry {
 /// Can be cheaply cloned.
 #[derive(Clone, Debug)]
 pub struct Context<'a> {
-    event: &'a GatewayEvent<'a>,
+    event: &'a GatewayEvent,
+    source: &'a serde_json::Value,
     id_provisioner: &'a IdProvisioner,
     audit_log_entry: LockReader<'a, Option<CombinedAuditLogEntry>>,
     client: &'a Client,
     config: &'a Configuration,
-    emojis: &'a EmojiDb,
+    emojis: &'a crate::emoji::Db,
+    logger: &'a Logger,
 }
 
+#[allow(dead_code)]
 impl Context<'_> {
     /// Attempts to extract a gateway value
     pub fn gateway<T, F>(&self, path: &Path, extractor: F) -> Result<T, anyhow::Error>
     where
         F: (Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync + 'static,
     {
-        path.extract(&self.event.inner, &extractor, self.clone())
+        path.extract(self.source, &extractor, self.clone())
     }
 
     /// Attempts to extract an audit log value

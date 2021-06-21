@@ -11,15 +11,24 @@ debounce_size = 32
 debounce_period = "100ms"
 # Elasticsearch index containing the stored log events
 elasticsearch_index = "logs-events"
+# Elasticsearch index settings file that corresponds to the logs index
+elasticsearch_index_config_path = "/etc/architus/index_config.json"
 
 [services]
 # URL of the Elasticsearch instance to store log entries in
-elasticsearch = "http://[::1]:9200"
+elasticsearch = "http://elasticsearch:9200"
 
 # Parameters for the backoff used to connect to external services during initialization
 [initialization_backoff]
 initial_interval = "500ms"
 max_interval = "30s"
+duration = "2m"
+multiplier = 2.0
+
+# Parameters for the backoff used to create the index
+[index_creation_backoff]
+initial_interval = "100ms"
+max_interval = "10s"
 duration = "2m"
 multiplier = 2.0
 
@@ -34,7 +43,7 @@ multiplier = 2.0
 # https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html
 [logging]
 level = "info"
-format = "json"
+format = "full"
 source_location = "file_and_line"
 timezone = "utc"
 destination = "stdout"

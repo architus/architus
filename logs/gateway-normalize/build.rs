@@ -6,7 +6,13 @@ fn main() -> Result<()> {
         .build_client(true)
         .build_server(false)
         .compile(&["logs/submission.proto"], &["../../lib/ipc/proto"])
-        .context("Compiling logs/submission.proto definitions")?;
+        .context("compiling logs/submission.proto definitions")?;
+    // Compile the gateway-queue-lib protobuf definitions
+    tonic_build::configure()
+        .build_client(false)
+        .build_server(false)
+        .compile(&["event.proto"], &["../gateway-queue-lib/proto"])
+        .context("compiling logs/gateway-queue-lib/proto/event.proto definitions")?;
 
     Ok(())
 }

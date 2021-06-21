@@ -2,7 +2,7 @@
 //! that can be added to or removed from,
 //! and re-emits batch add and delete events after a short debouncing delay.
 
-use log::warn;
+use slog::Logger;
 use static_assertions::assert_impl_all;
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -30,6 +30,7 @@ pub struct DebouncedPool<T: Clone + Eq + Hash> {
     delay: Arc<Duration>,
     inner: Arc<Mutex<PoolInner<T>>>,
     release_publish: mpsc::UnboundedSender<Update<T>>,
+    logger: Logger,
 }
 
 // Make sure a pool of guild ids is sync+send
@@ -38,12 +39,13 @@ assert_impl_all!(DebouncedPool<u64>: Sync, Send);
 impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
     /// Creates a new shared debounced pool
     /// and returns a consumer for the published update messages
-    pub fn new(delay: Duration) -> (Self, mpsc::UnboundedReceiver<Update<T>>) {
+    pub fn new(delay: Duration, logger: Logger) -> (Self, mpsc::UnboundedReceiver<Update<T>>) {
         let (release_publish, release_consume) = mpsc::unbounded_channel::<Update<T>>();
         let new_pool = Self {
-            inner: Arc::new(Mutex::new(PoolInner::new())),
+            inner: Arc::new(Mutex::new(PoolInner::new(logger.clone()))),
             delay: Arc::new(delay),
             release_publish,
+            logger,
         };
         (new_pool, release_consume)
     }
@@ -102,9 +104,10 @@ impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
         let cancel = std::mem::replace(&mut inner_state.preparing_release_cancel, None);
         if let Some(cancel) = cancel {
             if let Err(err) = cancel.send(()) {
-                warn!(
-                    "debounced pool had non-None cancellation but channel was closed: {:?}",
-                    err
+                slog::warn!(
+                    self.logger,
+                    "debounced pool had non-None cancellation but channel was closed";
+                    "error" => ?err,
                 );
             };
         }
@@ -167,15 +170,17 @@ struct PoolInner<T: Clone + Eq + Hash> {
     added: HashSet<T>,
     removed: HashSet<T>,
     preparing_release_cancel: Option<oneshot::Sender<()>>,
+    logger: Logger,
 }
 
 impl<T: Clone + Eq + Hash> PoolInner<T> {
-    fn new() -> Self {
+    fn new(logger: Logger) -> Self {
         Self {
             pool: HashSet::new(),
             added: HashSet::new(),
             removed: HashSet::new(),
             preparing_release_cancel: None,
+            logger,
         }
     }
 
@@ -208,7 +213,10 @@ impl<T: Clone + Eq + Hash> PoolInner<T> {
         if added.is_some() || removed.is_some() {
             Some(Update { added, removed })
         } else {
-            warn!("a release on a DebouncedPool was performed but no items were updated");
+            slog::warn!(
+                self.logger,
+                "a release on a DebouncedPool was performed but no items were updated"
+            );
             None
         }
     }

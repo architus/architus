@@ -52,48 +52,52 @@ impl IntoRequest<SubmitIdempotentRequest> for NormalizedEvent {
     }
 }
 
-impl Into<SubmittedEvent> for NormalizedEvent {
-    fn into(self) -> SubmittedEvent {
+impl From<NormalizedEvent> for SubmittedEvent {
+    fn from(original: NormalizedEvent) -> Self {
         // Convert the normalized event struct (specific to this service)
         // into the `LogEvent` struct, which is the gRPC-serializable struct
-        let (content, content_metadata) = self.content.split();
-        SubmittedEvent {
+        let (content, content_metadata) = original.content.split();
+        Self {
             inner: Some(LogEvent {
-                id: self.id.0,
-                timestamp: self.timestamp,
-                source: Some(self.source.into()),
-                origin: self.origin.into(),
-                r#type: self.event_type.into(),
-                guild_id: self.guild_id,
-                reason: self.reason.unwrap_or_else(|| String::from("")),
-                audit_log_id: self.audit_log_id.unwrap_or(0_u64),
-                channel_id: self.channel.as_ref().map_or(0_u64, |c| c.id),
-                agent_id: self
+                id: original.id.0,
+                timestamp: original.timestamp,
+                source: Some(original.source.into()),
+                origin: original.origin.into(),
+                r#type: original.event_type.into(),
+                guild_id: original.guild_id,
+                reason: original.reason.unwrap_or_else(|| String::from("")),
+                audit_log_id: original.audit_log_id.unwrap_or(0_u64),
+                channel_id: original.channel.as_ref().map_or(0_u64, |c| c.id),
+                agent_id: original
                     .agent
                     .as_ref()
                     .and_then(|a| a.entity.id())
                     .unwrap_or(0_u64),
-                agent_type: self
+                agent_type: original
                     .agent
                     .as_ref()
                     .map(|a| &a.entity)
                     .map_or(EntityType::None, Entity::r#type) as i32,
-                agent_special_type: self
+                agent_special_type: original
                     .agent
                     .as_ref()
                     .map_or(AgentSpecialType::Default, |a| a.special_type)
                     as i32,
-                subject_id: self.subject.as_ref().and_then(Entity::id).unwrap_or(0_u64),
-                subject_type: self
+                subject_id: original
+                    .subject
+                    .as_ref()
+                    .and_then(Entity::id)
+                    .unwrap_or(0_u64),
+                subject_type: original
                     .subject
                     .as_ref()
                     .map_or(EntityType::None, Entity::r#type) as i32,
-                auxiliary_id: self
+                auxiliary_id: original
                     .auxiliary
                     .as_ref()
                     .and_then(Entity::id)
                     .unwrap_or(0_u64),
-                auxiliary_type: self
+                auxiliary_type: original
                     .auxiliary
                     .as_ref()
                     .map_or(EntityType::None, Entity::r#type)
@@ -101,16 +105,16 @@ impl Into<SubmittedEvent> for NormalizedEvent {
                 content,
                 content_metadata: Some(content_metadata),
             }),
-            channel_name: self
+            channel_name: original
                 .channel
                 .and_then(|c| c.name)
                 .unwrap_or_else(|| String::from("")),
-            agent_metadata: self
+            agent_metadata: original
                 .agent
                 .map(|a| a.entity)
                 .and_then(Entity::into_revision_metadata),
-            subject_metadata: self.subject.and_then(Entity::into_revision_metadata),
-            auxiliary_metadata: self.auxiliary.and_then(Entity::into_revision_metadata),
+            subject_metadata: original.subject.and_then(Entity::into_revision_metadata),
+            auxiliary_metadata: original.auxiliary.and_then(Entity::into_revision_metadata),
         }
     }
 }
@@ -175,6 +179,7 @@ impl Agent {
 }
 
 #[derive(Clone, PartialEq, Debug)]
+#[allow(dead_code)]
 pub enum Entity {
     UserLike(UserLike),
     Role(Role),
@@ -199,11 +204,11 @@ impl From<Option<String>> for Nickname {
     }
 }
 
-impl Into<Option<String>> for Nickname {
-    fn into(self) -> Option<String> {
-        match self {
-            Self::Custom(n) => Some(n),
-            Self::Name => None,
+impl From<Nickname> for Option<String> {
+    fn from(original: Nickname) -> Self {
+        match original {
+            Nickname::Custom(n) => Some(n),
+            Nickname::Name => None,
         }
     }
 }
@@ -274,6 +279,7 @@ pub struct Content {
 }
 
 impl Content {
+    #[allow(dead_code)]
     pub fn make<S: Into<String>>(inner: S) -> Self {
         let inner = inner.into();
         Self {
@@ -329,18 +335,18 @@ impl Source {
     }
 }
 
-impl Into<EventSource> for Source {
-    fn into(self) -> EventSource {
-        EventSource {
-            gateway: self
+impl From<Source> for EventSource {
+    fn from(original: Source) -> Self {
+        Self {
+            gateway: original
                 .gateway
                 .and_then(|json| serde_json::to_string(&json).ok())
                 .unwrap_or_else(|| String::from("")),
-            audit_log: self
+            audit_log: original
                 .audit_log
                 .and_then(|json| serde_json::to_string(&json).ok())
                 .unwrap_or_else(|| String::from("")),
-            internal: self
+            internal: original
                 .internal
                 .and_then(|json| serde_json::to_string(&json).ok())
                 .unwrap_or_else(|| String::from("")),

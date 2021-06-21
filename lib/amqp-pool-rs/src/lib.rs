@@ -1,3 +1,10 @@
+//! This library is needed because the deadpool-lapin crate
+//! manages Connections instead of Channels, and this is [an anti-pattern].
+//! More details are available in [this related issue]
+//!
+//! [an anti-pattern]: https://www.cloudamqp.com/blog/part4-rabbitmq-13-common-errors.html
+//! [this related issue]: https://github.com/bikeshedder/deadpool/issues/47
+
 use anyhow::{Context, Error};
 use async_trait::async_trait;
 use lapin::{Channel, Connection};
@@ -29,7 +36,7 @@ impl deadpool::managed::Manager for Manager {
         self.connection
             .create_channel()
             .await
-            .context("Could not create new channel in connection's channel pool")
+            .context("could not create new channel in connection's channel pool")
     }
     async fn recycle(&self, _channel: &mut Channel) -> deadpool::managed::RecycleResult<Error> {
         Ok(())

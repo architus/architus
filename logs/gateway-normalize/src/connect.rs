@@ -5,19 +5,21 @@ use crate::config::Configuration;
 use crate::rpc::logs::submission::Client as LogsSubmissionClient;
 use anyhow::{Context, Result};
 use lapin::{Connection, ConnectionProperties};
+use slog::Logger;
 use std::sync::Arc;
 
 /// Creates a new connection to Rabbit MQ
-pub async fn to_queue(config: Arc<Configuration>) -> Result<Connection> {
+pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> Result<Connection> {
     let initialization_backoff = config.initialization_backoff.build();
     let rmq_url = config.services.gateway_queue.clone();
     let rmq_connect = || async {
         let conn = Connection::connect(&rmq_url, ConnectionProperties::default())
             .await
             .map_err(|err| {
-                log::warn!(
-                    "Couldn't connect to RabbitMQ, retrying after backoff: {:?}",
-                    err
+                slog::warn!(
+                    logger,
+                    "couldn't connect to RabbitMQ, retrying after backoff";
+                    "error" => ?err,
                 );
                 err
             })?;
@@ -25,22 +27,26 @@ pub async fn to_queue(config: Arc<Configuration>) -> Result<Connection> {
     };
     let rmq_connection = backoff::future::retry(initialization_backoff, rmq_connect)
         .await
-        .context("Could not connect to the RabbitMQ gateway queue")?;
-    log::info!("Connected to RabbitMQ at {}", rmq_url);
+        .context("could not connect to the RabbitMQ gateway queue")?;
+    slog::info!(logger, "connected to RabbitMQ"; "rmq_url" => rmq_url);
     Ok(rmq_connection)
 }
 
 /// Creates a new connection to the logs/submission service
-pub async fn to_submission(config: Arc<Configuration>) -> Result<LogsSubmissionClient> {
+pub async fn to_submission(
+    config: Arc<Configuration>,
+    logger: Logger,
+) -> Result<LogsSubmissionClient> {
     let initialization_backoff = config.initialization_backoff.build();
     let submission_url = config.services.logs_submission.clone();
     let connect = || async {
         let conn = LogsSubmissionClient::connect(submission_url.clone())
             .await
             .map_err(|err| {
-                log::warn!(
-                    "Couldn't connect to logs/submission, retrying after backoff: {:?}",
-                    err
+                slog::warn!(
+                    logger,
+                    "couldn't connect to logs/submission, retrying after backoff";
+                    "error" => ?err,
                 );
                 err
             })?;
@@ -48,7 +54,7 @@ pub async fn to_submission(config: Arc<Configuration>) -> Result<LogsSubmissionC
     };
     let connection = backoff::future::retry(initialization_backoff, connect)
         .await
-        .context("Could not connect to logs/submission")?;
-    log::info!("Connected to logs/submission at {}", submission_url);
+        .context("could not connect to logs/submission")?;
+    slog::info!(logger, "connected to logs/submission"; "submission_url" => submission_url);
     Ok(connection)
 }

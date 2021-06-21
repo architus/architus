@@ -4,3 +4,4 @@
 *
 !logs/submission/target/debug/logs-submission
 !logs/submission/config.toml
+!logs/submission/schema/index_config.json

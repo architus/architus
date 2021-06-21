@@ -14,11 +14,9 @@ COPY $SERVICE/src src
 COPY $SERVICE/Cargo.lock .
 COPY $SERVICE/Cargo.toml .
 COPY $SERVICE/build.rs .
-# Copy logs/gateway-ingress-lib library
+# Copy logs/gateway-gateway-lib protos
 WORKDIR $REPO_ROOT/$GATEWAY_QUEUE_LIB
-COPY $GATEWAY_QUEUE_LIB/src src
-COPY $GATEWAY_QUEUE_LIB/Cargo.lock .
-COPY $GATEWAY_QUEUE_LIB/Cargo.toml .
+COPY $GATEWAY_QUEUE_LIB/proto proto
 # Copy shared id library
 WORKDIR $REPO_ROOT/$LOGS_LIB
 COPY $LOGS_LIB/src src

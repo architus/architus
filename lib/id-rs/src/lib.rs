@@ -106,15 +106,21 @@ impl HoarFrost {
     }
 }
 
-impl Into<u64> for HoarFrost {
-    fn into(self) -> u64 {
-        self.0
+impl From<HoarFrost> for u64 {
+    fn from(id: HoarFrost) -> Self {
+        id.0
     }
 }
 
 impl fmt::Display for HoarFrost {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl slog::Value for HoarFrost {
+    fn serialize(&self, _rec: &slog::Record, key: slog::Key, serializer: &mut dyn slog::Serializer) -> slog::Result {
+        serializer.emit_u64(key, self.0)
     }
 }
 

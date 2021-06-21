@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
         \nUsage: \
-        \nlogs-uptime [config-path]",
+        \nlogs-submission [config-path]",
     );
     let config = Arc::new(Configuration::try_load(&config_path)?);
 
@@ -43,12 +43,18 @@ async fn main() -> Result<()> {
     let logger = config
         .logging
         .build_logger()
-        .context("Could not build logger from config values")?;
+        .context("could not build logger from config values")?;
 
     slog::info!(logger, "configuration loaded"; "path" => config_path);
     slog::debug!(logger, "configuration dump"; "config" => ?config);
 
-    run(config, logger).await
+    match run(config, logger.clone()).await {
+        Ok(_) => slog::info!(logger, "service exited";),
+        Err(err) => {
+            slog::error!(logger, "an error ocurred during service running"; "error" => ?err)
+        }
+    }
+    Ok(())
 }
 
 /// Attempts to connect to external services and prepare the submission pipeline
@@ -68,9 +74,18 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
 
     // Start the event sink coroutine that handles actually performing the submission
     // with some batching/debouncing logic included
-    let event_sink_future = submit_events(Arc::clone(&config), logger, event_rx, elasticsearch);
+    let event_sink_future = submit_events(
+        Arc::clone(&config),
+        logger.clone(),
+        event_rx,
+        Arc::clone(&elasticsearch),
+    );
 
-    // Run all futures until an error is encountered
+    // Upload the mapping (schema) to Elasticsearch to create the index
+    let create_index_future = submission::create_index(Arc::clone(&config), logger, elasticsearch);
+
+    // Configure the index first before running the other futures
+    create_index_future.await?;
     try_join!(serve_future, event_sink_future)?;
 
     Ok(())
@@ -89,7 +104,7 @@ async fn serve_grpc(
     server
         .serve(addr)
         .await
-        .context("An error occurred while running the gRPC server")?;
+        .context("an error occurred while running the gRPC server")?;
 
     Ok(())
 }
@@ -118,10 +133,14 @@ async fn submit_events(
         .for_each_concurrent(None, move |events| {
             let correlation_id = next_correlation_id.fetch_add(1, Ordering::SeqCst);
             let config = Arc::clone(&config);
-            let logger = logger.clone();
             let elasticsearch = Arc::clone(&elasticsearch);
-            let batch_submit =
-                submission::BatchSubmit::new(events, correlation_id, config, logger, elasticsearch);
+            let batch_submit = submission::BatchSubmit::new(
+                events,
+                correlation_id,
+                config,
+                &logger,
+                elasticsearch,
+            );
             async move {
                 batch_submit.run().await;
             }

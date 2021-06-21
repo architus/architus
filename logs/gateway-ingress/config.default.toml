@@ -1,7 +1,7 @@
-# Length of time that consecutive guild uptime events are grouped together in
-guild_uptime_debounce_delay = "200ms"
 # Name of the feature that enables indexing on a guild
 indexing_feature = "beta/logs-indexing"
+# Length of time that consecutive guild uptime events are grouped together in
+guild_uptime_debounce_delay = "200ms"
 # Size of the guild chunks to send to the feature-gate service to check their feature
 feature_gate_batch_check_size = 256
 # How long to keep offline guilds in the active guild cache
@@ -15,11 +15,11 @@ active_guilds_poll_interval = "1m"
 
 [services]
 # Full AMQP URL to connect to the gateway queue at
-gateway_queue = "amqp://127.0.0.1:5672/%2f"
+gateway_queue = "amqp://hello:hello@rabbit:5672/%2f"
 # HTTP URL of the feature-gate service
-feature_gate = "http://[::1]:50555"
+feature_gate = "http://feature-gate:50555"
 # HTTP URL of the logs/uptime service
-logs_uptime = "http://[::1]:50281"
+logs_uptime = "http://logs-uptime:50281"
 
 # Config options related to the Gateway Queue
 [gateway_queue]
@@ -37,8 +37,8 @@ durable = true
 [gateway_queue.queue_parameters]
 # Use quorum queue with delivery limit
 # https://www.rabbitmq.com/quorum-queues.html
-x-queue-type = { "LongString" = "quorum" }
-x-delivery-limit = { "ShortUInt" = "4" }
+x-queue-type = { LongString = "quorum" }
+x-delivery-limit = { ShortUInt = "4" }
 
 # Configuration for the connection pool that sits in front of a connection to the gateway queue
 [gateway_queue.connection_pool]
@@ -61,9 +61,42 @@ max_interval = "1s"
 duration = "5s"
 multiplier = 2.0
 
+# Parameters for the backoff used to reconnect to the gateway queue
+[reconnection_backoff]
+initial_interval = "100ms"
+max_interval = "1m"
+duration = "2m" # This is ignored
+multiplier = 2.0
+
 # Note: these should be specified using environment variables in production
 # For example, to specify `discord_token`,
 # give a value to the `LOGS_GATEWAY_INGRESS_SECRETS__DISCORD_TOKEN` variable
 [secrets]
 # Discord bot token
 discord_token = ""
+
+# Logging configuration (for service diagnostic logs, not Architus log events)
+# https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html
+[logging]
+level = "info"
+format = "full"
+source_location = "file_and_line"
+timezone = "utc"
+destination = "stdout"
+channel_size = 2048
+overflow_strategy = "drop_and_report"
+
+# Config options for raw event publishing mechanisms
+[raw_events]
+# Length of the bounded queue to store raw events in before processing them.
+# Excess events will be dropped.
+queue_length = 65536
+# This should probably be less than 30% of the queue_length
+# because generally the queue should not be very long.
+warn_threshold = 1000
+# The number of working coroutines to use when publishing events.
+# These will all be blocked when reconnecting to the queue.
+publish_concurrency = 128
+# The period of time to wait between polls of the bounded queue length
+# that may prompt warning messages to be emitted.
+watch_period = "10s"

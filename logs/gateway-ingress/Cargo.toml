@@ -10,13 +10,12 @@ and routes incoming messages to a durable queue backed by RabbitMQ\
 license = "MIT"
 
 [dependencies]
-gateway-queue-lib = { package = "logs-gateway-queue-lib", path = "../gateway-queue-lib" }
 architus-id = { path = "../../lib/id-rs" }
 architus-amqp-pool = { path = "../../lib/amqp-pool-rs" }
 architus-config-backoff = { path = "../../lib/config-backoff-rs" }
-config = "0.10"
-log = "0.4"
-env_logger = "0.8"
+config = "0.11"
+slog = "2.7"
+sloggers = { version = "2.0", features = ["json"] }
 lazy_static = "1.4"
 static_assertions = "1.1"
 anyhow = "1.0"
@@ -26,17 +25,19 @@ futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rmp-serde = "0.15"
-serde-humantime = "0.1"
-twilight-gateway = "0.4"
-twilight-model = "0.4"
+humantime-serde = "1.0"
+twilight-gateway = "0.5"
+twilight-model = "0.5"
 backoff = { version = "0.3", features = ["tokio"] }
 lapin = "1.7"
 tokio-amqp = "1.0"
 deadpool = { version = "0.8", features = ["rt_tokio_1"] }
 tonic = "0.4"
 prost = "0.7"
-rand = "0.7"
+rand = "0.8"
+bytes = "1.0"
+base64 = "0.13"
 
 [build-dependencies]
-tonic-build = "0.3"
+tonic-build = "0.4"
 anyhow = "1.0"

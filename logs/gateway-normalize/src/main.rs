@@ -11,20 +11,21 @@ mod rpc;
 mod util;
 
 use crate::config::Configuration;
-use crate::emoji::EmojiDb;
 use crate::event::NormalizedEvent;
-use crate::gateway::{ProcessingError, ProcessorFleet};
+use crate::gateway::{EventWithSource, ProcessingError, ProcessorFleet};
+use crate::rpc::gateway_queue_lib::GatewayEvent;
 use crate::rpc::logs::submission::Client as LogsImportClient;
 use anyhow::{Context, Result};
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
-use chrono::{DateTime, NaiveDateTime, Utc};
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
-use gateway_queue_lib::GatewayEvent;
 use lapin::options::{BasicAckOptions, BasicConsumeOptions, BasicQosOptions, BasicRejectOptions};
 use lapin::types::FieldTable;
 use lapin::{Channel, Connection};
-use std::convert::{Into, TryFrom};
+use prost::Message;
+use slog::Logger;
+use sloggers::Config;
+use std::convert::{Into, TryInto};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tonic::IntoRequest;
@@ -33,45 +34,61 @@ use twilight_http::Client;
 /// Loads the config and bootstraps the service
 #[tokio::main]
 async fn main() -> Result<()> {
-    env_logger::init();
-
     // Parse the config
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
         \nUsage: \
         \nlogs-gateway-normalize [config-path]",
     );
-    let config = Arc::new(Configuration::try_load(config_path)?);
-    run(config).await
+    let config = Arc::new(Configuration::try_load(&config_path)?);
+
+    // Set up the logger from the config
+    let logger = config
+        .logging
+        .build_logger()
+        .context("could not build logger from config values")?;
+
+    slog::info!(logger, "configuration loaded"; "path" => config_path);
+    slog::debug!(logger, "configuration dump"; "config" => ?config);
+
+    match run(config, logger.clone()).await {
+        Ok(_) => slog::info!(logger, "service exited";),
+        Err(err) => {
+            slog::error!(logger, "an error ocurred during service running"; "error" => ?err)
+        }
+    }
+    Ok(())
 }
 
 /// Runs the main logic of the service,
 /// acting as a consumer for the Rabbit MQ gateway-queue messages
 /// and running them through a processing pipeline
 /// before forwarding them to the submission service
-async fn run(config: Arc<Configuration>) -> Result<()> {
+async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
     // Create a Discord API client
     let client = Client::new(&config.secrets.discord_token);
 
     // Load the emoji database
-    let emojis = Arc::new(EmojiDb::load(&config.emoji_db_url).await?);
-    log::info!(
-        "Downloaded emoji shortcode mappings from {}",
-        config.emoji_db_url
+    let emojis = Arc::new(emoji::Db::load(&config.emoji_db_url).await?);
+    slog::info!(
+        logger,
+        "downloaded emoji shortcode mappings";
+        "emoji_db_url" => &config.emoji_db_url,
     );
 
     // Initialize the gateway event processor
     // and register all known gateway event handlers
     // (see gateway/processors.rs)
     let processor = {
-        let mut inner = gateway::ProcessorFleet::new(client, Arc::clone(&config), emojis);
+        let mut inner =
+            gateway::ProcessorFleet::new(client, Arc::clone(&config), emojis, logger.clone());
         gateway::processors::register_all(&mut inner);
         Arc::new(inner)
     };
 
     // Initialize connections to external services
-    let rmq_connection = connect::to_queue(Arc::clone(&config)).await?;
-    let submission_client = connect::to_submission(Arc::clone(&config)).await?;
+    let rmq_connection = connect::to_queue(Arc::clone(&config), logger.clone()).await?;
+    let submission_client = connect::to_submission(Arc::clone(&config), logger.clone()).await?;
 
     // Consume raw gateway events from the Rabbit MQ queue
     // and normalize them via the fleet of processors
@@ -80,6 +97,7 @@ async fn run(config: Arc<Configuration>) -> Result<()> {
         submission_client,
         processor,
         Arc::clone(&config),
+        logger.clone(),
     )
     .await?;
 
@@ -93,6 +111,7 @@ async fn normalize_gateway_events(
     submission_client: LogsImportClient,
     processor: Arc<ProcessorFleet>,
     config: Arc<Configuration>,
+    logger: Logger,
 ) -> Result<()> {
     // Keep looping over the lifecycle,
     // allowing for the state to be eagerly restored after a disconnection
@@ -116,15 +135,24 @@ async fn normalize_gateway_events(
         let rmq_connection = if let Some(rmq) = outer_rmq_connection.take() {
             rmq
         } else {
-            connect::to_queue(Arc::clone(&config)).await?
+            // This has an internal backoff loop,
+            // so if it fails, then exit the service entirely
+            connect::to_queue(Arc::clone(&config), logger.clone()).await?
         };
 
         // Run the consumer until an error occurs
-        let consume = run_consume(rmq_connection, submission_client, processor, config);
+        let consume = run_consume(
+            rmq_connection,
+            submission_client,
+            processor,
+            config,
+            logger.clone(),
+        );
         if let Err(err) = consume.await {
-            log::error!(
-                "Could not consume events due to queue error; attempting to reconnect: `{:?}`",
-                err
+            slog::error!(
+                logger,
+                "Could not consume events due to queue error; attempting to reconnect";
+                "error" => ?err,
             );
         }
     }
@@ -179,6 +207,7 @@ async fn run_consume(
     submission_client: LogsImportClient,
     processor: Arc<ProcessorFleet>,
     config: Arc<Configuration>,
+    logger: Logger,
 ) -> Result<()> {
     // Start listening to the queue by creating a consumer
     // (we have to convert the Stream to a TryStream before using `try_for_each_concurrent`)
@@ -199,9 +228,19 @@ async fn run_consume(
                 let config = Arc::clone(&config);
                 let processor = Arc::clone(&processor);
                 let submission_client = submission_client.clone();
+                let logger = logger.clone();
                 async move {
-                    let result = normalize(&delivery.data, processor)
-                        .and_then(|event| submit_event(event, submission_client, config))
+                    let result = normalize(&delivery.data, processor, logger.clone())
+                        .and_then(|event| {
+                            let event_type_str = format!("{:?}", event.event_type);
+                            let logger = logger.new(slog::o!(
+                                "event_type" => event_type_str,
+                                "event_id" => event.id,
+                                "guild_id" => event.guild_id,
+                                "event_timestamp" => event.timestamp,
+                            ));
+                            submit_event(event, submission_client, config, logger)
+                        })
                         .await;
                     // Acknowledge or reject the event based on the result
                     match result {
@@ -210,15 +249,11 @@ async fn run_consume(
                             Ok(())
                         }
                         Err(rejection) => {
-                            let requeue_msg = if rejection.should_requeue {
-                                "requeuing"
-                            } else {
-                                "not requeuing"
-                            };
-                            log::debug!(
-                                "Rejecting message due to error ({}): {:?}",
-                                requeue_msg,
-                                rejection.source
+                            slog::info!(
+                                logger,
+                                "rejecting message due to error";
+                                "requeueing" => rejection.should_requeue,
+                                "error" => ?rejection.source,
                             );
                             delivery
                                 .reject(BasicRejectOptions {
@@ -245,7 +280,7 @@ async fn create_channel(
     let rmq_channel = rmq_connection
         .create_channel()
         .await
-        .context("Could not create a new RabbitMQ channel")?;
+        .context("could not create a new RabbitMQ channel")?;
 
     // Set the channel QOS appropriately
     rmq_channel
@@ -254,7 +289,7 @@ async fn create_channel(
             BasicQosOptions { global: false },
         )
         .await
-        .context("Could not set the QoS level on the RabbitMQ queue")?;
+        .context("could not set the QoS level on the RabbitMQ queue")?;
 
     Ok(rmq_channel)
 }
@@ -272,13 +307,39 @@ struct EventRejection {
 async fn normalize(
     event_bytes: &[u8],
     processor: Arc<ProcessorFleet>,
+    logger: Logger,
 ) -> Result<NormalizedEvent, EventRejection> {
-    let event: GatewayEvent = match rmp_serde::from_read_ref(event_bytes) {
+    let event = match GatewayEvent::decode(event_bytes) {
         Ok(event) => event,
         Err(err) => {
-            log::warn!(
-                "An error occurred while deserializing event from MessagePack: {:?}",
-                err
+            slog::warn!(
+                logger,
+                "an error occurred while deserializing event from protobuf";
+                "error" => ?err,
+            );
+
+            // Reject the message without requeuing
+            return Err(EventRejection {
+                should_requeue: false,
+                source: err.into(),
+            });
+        }
+    };
+
+    let logger = logger.new(slog::o!(
+        "gateway_event_type" => event.event_type.clone(),
+        "event_id" => event.id,
+        "guild_id" => event.guild_id,
+    ));
+
+    // Deserialize the inner JSON
+    let event_with_source: EventWithSource = match event.try_into() {
+        Ok(event) => event,
+        Err(err) => {
+            slog::warn!(
+                logger,
+                "an error occurred while decoding the inner source using MessagePack";
+                "error" => ?err,
             );
 
             // Reject the message without requeuing
@@ -290,9 +351,13 @@ async fn normalize(
     };
 
     // Run the processor fleet on the event to obtain a normalized event
-    processor.normalize(event).await.map_err(|err| {
+    processor.normalize(event_with_source).await.map_err(|err| {
         if err.is_unexpected() {
-            log::warn!("Event normalization failed for event: {:?}", err);
+            slog::warn!(
+                logger,
+                "event normalization failed for event";
+                "error" => ?err,
+            );
         }
         // Reject the message with/without requeuing depending on the error
         // (poison messages will be handled by max retry policy for quorum queue)
@@ -313,9 +378,8 @@ async fn submit_event(
     event: NormalizedEvent,
     client: LogsImportClient,
     config: Arc<Configuration>,
+    logger: Logger,
 ) -> Result<(), EventRejection> {
-    let timestamp = event.timestamp;
-    let id = event.id;
     let send = || async {
         let mut client = client.clone();
         let response = client.submit_idempotent(event.clone().into_request()).await;
@@ -324,47 +388,16 @@ async fn submit_event(
 
     match backoff::future::retry(config.rpc_backoff.build(), send).await {
         Ok(_) => {
-            match readable_timestamp(timestamp) {
-                Ok(timestamp) => {
-                    log::info!(
-                        "Submitted log event type {:?} '{}' at {}",
-                        event.event_type,
-                        id,
-                        timestamp
-                    );
-                    log::debug!("Actual event: {:?}", event);
-                }
-                Err(err) => {
-                    log::warn!(
-                        "Submitted log event type {:?} '{}' at invalid time ({}): {:?}",
-                        event.event_type,
-                        id,
-                        timestamp,
-                        err
-                    );
-                    log::info!("Actual event: {:?}", event);
-                }
-            };
+            slog::info!(logger, "submitted log event");
+            slog::debug!(logger, "event dump"; "event" => ?event);
             Ok(())
         }
         Err(err) => {
-            log::warn!("Failed to submit log event: {:?}", err);
+            slog::error!(logger, "failed to submit log event"; "error" => ?err);
             Err(EventRejection {
                 should_requeue: true,
                 source: err.into(),
             })
         }
     }
-}
-
-/// Attempts to create a readable timestamp string from the given Unix ms epoch
-fn readable_timestamp(timestamp: u64) -> Result<String> {
-    let sec =
-        i64::try_from(timestamp / 1_000).context("Could not convert timestamp seconds to i64")?;
-    let nano_sec = u32::try_from((timestamp % 1_000).saturating_mul(1_000_000))
-        .context("Could not convert timestamp nanoseconds to u32")?;
-    let naive_datetime = NaiveDateTime::from_timestamp_opt(sec, nano_sec)
-        .context("Could not convert timestamp to Naive DateTime")?;
-    let datetime: DateTime<Utc> = DateTime::from_utc(naive_datetime, Utc);
-    Ok(datetime.format("%Y-%m-%d %H:%M:%S").to_string())
 }

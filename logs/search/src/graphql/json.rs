@@ -21,7 +21,7 @@ where
         convert_to_juniper_value(&self.0)
     }
 
-    fn from_input_value(value: &juniper::InputValue) -> Option<GraphQLJson> {
+    fn from_input_value(value: &juniper::InputValue) -> Option<Self> {
         value.as_string_value().and_then(|s| {
             serde_json::from_str::<serde_json::Value>(s)
                 .ok()

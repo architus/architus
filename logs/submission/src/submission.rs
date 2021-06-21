@@ -2,10 +2,16 @@
 //! and notifiers a separate oneshot channel for each event of the result.
 
 use crate::config::Configuration;
+use anyhow::Context;
 use bytes::Bytes;
+use elasticsearch::http::headers::HeaderMap;
+use elasticsearch::http::{Method, StatusCode};
+use elasticsearch::indices::IndicesCreateParts;
 use elasticsearch::{BulkParts, Elasticsearch};
 use slog::Logger;
 use std::collections::BTreeMap;
+use std::fs::File;
+use std::io::Read;
 use std::result::Result as StdResult;
 use std::sync::Arc;
 use tokio::sync::oneshot;
@@ -28,6 +34,143 @@ pub struct Event {
     pub notifier: oneshot::Sender<Result>,
 }
 
+/// Creates the Elasticsearch index before submitting any events
+/// by reading in the file that contains the mappings at the path in the config
+/// and sending it to Elasticsearch
+pub async fn create_index(
+    config: Arc<Configuration>,
+    logger: Logger,
+    elasticsearch: Arc<Elasticsearch>,
+) -> anyhow::Result<()> {
+    // Load in the file from the file system
+    slog::info!(
+        logger,
+        "reading and parsing elasticsearch index config file";
+        "path" => #?&config.elasticsearch_index_config_path,
+        "elasticsearch_index" => &config.elasticsearch_index,
+    );
+    let mut index_config_file =
+        File::open(&config.elasticsearch_index_config_path).context(format!(
+            "could not open index config file at '{:#?}'",
+            config.elasticsearch_index_config_path
+        ))?;
+    let mut file_contents = Vec::new();
+    index_config_file
+        .read_to_end(&mut file_contents)
+        .context(format!(
+            "could not read index config file at '{:#?}'",
+            config.elasticsearch_index_config_path
+        ))?;
+    std::mem::drop(index_config_file);
+
+    // Parse the JSON to validate that it's valid before re-serializing
+    let parsed_json: serde_json::Value =
+        serde_json::from_slice(&file_contents).context(format!(
+            "could not deserialize JSON index config file at '{:#?}'",
+            config.elasticsearch_index_config_path
+        ))?;
+
+    // Re-serialize the JSON back to bytes
+    let bytes = Bytes::from(serde_json::to_vec(&parsed_json).context(format!(
+        "could not re-serialize JSON index config file at '{:#?}'",
+        config.elasticsearch_index_config_path
+    ))?);
+
+    // Send the index config bytes to Elasticsearch
+    ensure_index_exists(config, logger, elasticsearch, bytes).await?;
+    Ok(())
+}
+
+/// Attempts to create the index on Elasticsearch,
+/// detecting and ignoring if it already exists.
+async fn ensure_index_exists(
+    config: Arc<Configuration>,
+    logger: Logger,
+    elasticsearch: Arc<Elasticsearch>,
+    body: Bytes,
+) -> anyhow::Result<()> {
+    // Send the JSON as bytes to Elasticsearch
+    let response =
+        create_index_with_retry(Arc::clone(&config), logger.clone(), elasticsearch, body)
+            .await
+            .context("could not create index on elasticsearch")?;
+    let status_code = response.status_code();
+    if !status_code.is_success() {
+        let content = response
+            .text()
+            .await
+            .context("could not read response body from elasticsearch")?;
+
+        // Check to see if the index already existed (if so, it's fine)
+        let is_exist_error = if status_code == StatusCode::BAD_REQUEST {
+            content.contains("resource_already_exists_exception")
+        } else {
+            false
+        };
+
+        if is_exist_error {
+            slog::info!(
+                logger,
+                "index already existed in elasticsearch; ignoring";
+                "elasticsearch_index" => #?&config.elasticsearch_index,
+            );
+            return Ok(());
+        }
+
+        return Err(anyhow::anyhow!(
+            "creating index in elasticsearch failed with response code {:?}:\n{}",
+            status_code,
+            content,
+        ));
+    }
+
+    slog::info!(
+        logger,
+        "successfully created index in elasticsearch";
+        "elasticsearch_index" => #?&config.elasticsearch_index,
+    );
+    Ok(())
+}
+
+/// Sends a an index create operation to the Elasticsearch data store
+/// using retry parameters specified in the config
+async fn create_index_with_retry(
+    config: Arc<Configuration>,
+    logger: Logger,
+    elasticsearch: Arc<Elasticsearch>,
+    body: Bytes,
+) -> StdResult<elasticsearch::http::response::Response, elasticsearch::Error> {
+    let index_creation_backoff = config.index_creation_backoff.build();
+    let create_index = || async {
+        let elasticsearch = Arc::clone(&elasticsearch);
+        let body = body.clone();
+        // Use the untyped send API so that the raw bytes can be used
+        elasticsearch
+            .send(
+                Method::Put,
+                IndicesCreateParts::Index(&config.elasticsearch_index)
+                    .url()
+                    .as_ref(),
+                HeaderMap::new(),
+                Option::<&serde_json::Value>::None,
+                Some(body),
+                None,
+            )
+            .await
+            .map_err(|err| {
+                slog::warn!(
+                    logger,
+                    "creating elasticsearch index failed";
+                    "error" => ?err,
+                    "elasticsearch_index" => &config.elasticsearch_index,
+                );
+                backoff::Error::Transient(err)
+            })
+    };
+
+    backoff::future::retry(index_creation_backoff, create_index).await
+}
+
 /// Contains all of the behavior to perform a bulk submission to Elasticsearch
 pub struct BatchSubmit {
     pub events: Vec<Event>,
@@ -42,7 +185,7 @@ impl BatchSubmit {
         events: Vec<Event>,
         correlation_id: usize,
         config: Arc<Configuration>,
-        logger: Logger,
+        logger: &Logger,
         elasticsearch: Arc<Elasticsearch>,
     ) -> Self {
         Self {
@@ -74,6 +217,7 @@ impl BatchSubmit {
                     self.logger,
                     "sending to elasticsearch failed all retries";
                     "error" => ?err,
+                    "elasticsearch_index" => &self.config.elasticsearch_index,
                 );
 
                 // Elasticsearch is unavailable: notify all senders
@@ -82,7 +226,7 @@ impl BatchSubmit {
                     internal_details: String::from("see original event"),
                     correlation_id: self.correlation_id,
                 };
-                return self.consume_and_notify_all(Err(failure));
+                return self.consume_and_notify_all(&Err(failure));
             }
         };
 
@@ -97,6 +241,7 @@ impl BatchSubmit {
                     self.logger,
                     "decoding response from elasticsearch failed";
                     "error" => ?decode_err,
+                    "elasticsearch_index" => &self.config.elasticsearch_index,
                 );
 
                 let failure = Failure {
@@ -104,7 +249,7 @@ impl BatchSubmit {
                     internal_details: String::from("see original event"),
                     correlation_id: self.correlation_id,
                 };
-                return self.consume_and_notify_all(Err(failure));
+                return self.consume_and_notify_all(&Err(failure));
             }
         };
 
@@ -116,8 +261,8 @@ impl BatchSubmit {
     }
 
     /// Consumes self and sends all submitters the same submission result
-    fn consume_and_notify_all(self, result: Result) {
-        for event in self.events.into_iter() {
+    fn consume_and_notify_all(self, result: &Result) {
+        for event in self.events {
             let Event {
                 event_id, notifier, ..
             } = event;
@@ -142,7 +287,7 @@ impl BatchSubmit {
     // https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html
     fn construct_bulk_bodies(&self) -> Vec<Bytes> {
         let mut bodies = Vec::<Bytes>::with_capacity(self.events.len() * 2);
-        for event in self.events.iter() {
+        for event in &self.events {
             let json_value = serde_json::json!({"index": {"_id": event.event_id.to_string() }});
             let operation_buf = serde_json::to_vec(&json_value)
                 .map_err(|err| {
@@ -202,20 +347,19 @@ impl BatchSubmit {
             .map(|event| (event.event_id, event))
             .collect::<BTreeMap<_, _>>();
         for response_item in response.items {
-            if let Some(action) = unwrap_index_action(&response_item, self.logger.clone()) {
+            if let Some(action) = unwrap_index_action(&response_item, &self.logger) {
                 let logger = self.logger.new(slog::o!("event_id" => action.id.clone()));
-                if let Some(id) = unwrap_action_id(action, logger.clone()) {
+                if let Some(id) = unwrap_action_id(action, &logger) {
                     // Remove the event from the map to move ownership of it
-                    let event = match id_to_event.remove(&id) {
-                        Some(event) => event,
-                        None => {
-                            slog::warn!(
-                                logger,
-                                "response item from elasticsearch contained unknown or duplicate event id; ignoring";
-                                "response_item" => ?response_item,
-                            );
-                            continue;
-                        }
+                    let event = if let Some(event) = id_to_event.remove(&id) {
+                        event
+                    } else {
+                        slog::warn!(
+                            logger,
+                            "response item from elasticsearch contained unknown or duplicate event id; ignoring";
+                            "response_item" => ?response_item,
+                        );
+                        continue;
                     };
 
                     // Create the submission result depending on whether an error occurred or not
@@ -244,12 +388,12 @@ impl BatchSubmit {
     }
 }
 
-/// Attempts to unwrap the ResultItem struct into the inner ResultItemAction
+/// Attempts to unwrap the `ResultItem` struct into the inner `ResultItemAction`
 /// that should exist at the `index` field since the original actions were index operations.
-fn unwrap_index_action(
-    response_item: &crate::elasticsearch_api::bulk::ResultItem,
-    logger: Logger,
-) -> Option<&crate::elasticsearch_api::bulk::ResultItemAction> {
+fn unwrap_index_action<'a, 'b>(
+    response_item: &'a crate::elasticsearch_api::bulk::ResultItem,
+    logger: &'b Logger,
+) -> Option<&'a crate::elasticsearch_api::bulk::ResultItemAction> {
     match &response_item.index {
         Some(action) => Some(action),
         None => {
@@ -268,7 +412,7 @@ fn unwrap_index_action(
 /// which should be the integer Snowflake ID of the log event.
 fn unwrap_action_id(
     action: &crate::elasticsearch_api::bulk::ResultItemAction,
-    logger: Logger,
+    logger: &Logger,
 ) -> Option<u64> {
     match action.id.parse::<u64>() {
         Ok(id) => Some(id),

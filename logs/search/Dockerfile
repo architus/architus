@@ -4,6 +4,7 @@ RUN rustup component add rustfmt
 ENV REPO_ROOT=/opt/architus
 ENV SERVICE=logs/search
 ENV LOGS_LIB=lib/id-rs
+ENV CONFIG_BACKOFF_LIB=lib/config-backoff-rs
 ENV PROTO=lib/ipc/proto
 # Copy logs/search service itself
 WORKDIR $REPO_ROOT/$SERVICE
@@ -16,6 +17,11 @@ WORKDIR $REPO_ROOT/$LOGS_LIB
 COPY $LOGS_LIB/src src
 COPY $LOGS_LIB/Cargo.lock .
 COPY $LOGS_LIB/Cargo.toml .
+# Copy shared config backoff library
+WORKDIR $REPO_ROOT/$CONFIG_BACKOFF_LIB
+COPY $CONFIG_BACKOFF_LIB/src src
+COPY $CONFIG_BACKOFF_LIB/Cargo.lock .
+COPY $CONFIG_BACKOFF_LIB/Cargo.toml .
 # Copy protobuf definitions
 WORKDIR $REPO_ROOT/$PROTO
 COPY $PROTO/logs/event.proto logs/event.proto

@@ -10,12 +10,11 @@ submitting them to the submission service for eventual insertion into the logs s
 license = "MIT"
 
 [dependencies]
-gateway-queue-lib = { package = "logs-gateway-queue-lib", path = "../gateway-queue-lib" }
 architus-id = { path = "../../lib/id-rs" }
 architus-config-backoff = { path = "../../lib/config-backoff-rs" }
-config = "0.10"
-log = "0.4"
-env_logger = "0.8"
+config = "0.11"
+slog = "2.7"
+sloggers = { version = "2.0", features = ["json"] }
 static_assertions = "1.1"
 lazy_static = "1.4"
 anyhow = "1.0"
@@ -29,10 +28,10 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde-humantime = "0.1"
 rmp-serde = "0.15"
-twilight-gateway = "0.4"
-twilight-model = "0.4"
-twilight-http = "0.4"
-twilight-cache-inmemory = "0.4"
+twilight-gateway = "0.5"
+twilight-model = "0.5"
+twilight-http = "0.5"
+twilight-cache-inmemory = "0.5"
 backoff = { version = "0.3", features = ["tokio"] }
 chrono = "0.4"
 lapin = "1.7"

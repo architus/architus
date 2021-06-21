@@ -17,6 +17,12 @@ pub mod logs {
     }
 }
 
+// Ignore clippy linting on generated code
+#[allow(clippy::all, clippy::pedantic, clippy::nursery)]
+pub mod gateway_queue_lib {
+    tonic::include_proto!("gateway_queue_lib");
+}
+
 /// Transforms an RPC result into a more useful one,
 /// and prepares a backoff error for potentially recoverable tonic Status's
 pub fn into_backoff<T>(
