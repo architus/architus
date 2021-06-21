@@ -9,9 +9,9 @@ emoji_db_url = "https://raw.githubusercontent.com/devcat/discord.emojis/master/d
 
 [services]
 # Full AMQP URL to connect to the gateway queue at
-gateway_queue = "amqp://127.0.0.1:5672/%2f"
+gateway_queue = "amqp://hello:hello@rabbit:5672/%2f"
 # HTTP URL of the logs/submission service that normalized LogEvents are forwarded to
-logs_submission = "http://[::1]:50282"
+logs_submission = "http://logs-submission:50282"
 
 # Config options related to the Gateway Queue
 [gateway_queue]

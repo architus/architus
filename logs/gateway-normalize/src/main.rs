@@ -232,7 +232,14 @@ async fn run_consume(
                 async move {
                     let result = normalize(&delivery.data, processor, logger.clone())
                         .and_then(|event| {
-                            submit_event(event, submission_client, config, logger.clone())
+                            let event_type_str = format!("{:?}", event.event_type);
+                            let logger = logger.new(slog::o!(
+                                "event_type" => event_type_str,
+                                "event_id" => event.id,
+                                "guild_id" => event.guild_id,
+                                "event_timestamp" => event.timestamp,
+                            ));
+                            submit_event(event, submission_client, config, logger)
                         })
                         .await;
                     // Acknowledge or reject the event based on the result
@@ -319,8 +326,13 @@ async fn normalize(
         }
     };
 
+    let logger = logger.new(slog::o!(
+        "gateway_event_type" => event.event_type.clone(),
+        "event_id" => event.id,
+        "guild_id" => event.guild_id,
+    ));
+
     // Deserialize the inner JSON
-    let id = event.id;
     let event_with_source: EventWithSource = match event.try_into() {
         Ok(event) => event,
         Err(err) => {
@@ -328,7 +340,6 @@ async fn normalize(
                 logger,
                 "an error occurred while decoding the inner source using MessagePack";
                 "error" => ?err,
-                "event_id" => id,
             );
 
             // Reject the message without requeuing
@@ -346,7 +357,6 @@ async fn normalize(
                 logger,
                 "event normalization failed for event";
                 "error" => ?err,
-                "event_id" => id,
             );
         }
         // Reject the message with/without requeuing depending on the error
@@ -370,8 +380,6 @@ async fn submit_event(
     config: Arc<Configuration>,
     logger: Logger,
 ) -> Result<(), EventRejection> {
-    let timestamp = event.timestamp;
-    let id = event.id;
     let send = || async {
         let mut client = client.clone();
         let response = client.submit_idempotent(event.clone().into_request()).await;
@@ -380,31 +388,12 @@ async fn submit_event(
 
     match backoff::future::retry(config.rpc_backoff.build(), send).await {
         Ok(_) => {
-            slog::info!(
-                logger,
-                "submitted log event type";
-                "event_type" => ?event.event_type,
-                "event_id" => id,
-                "event_guild_id" => event.guild_id,
-                "event_timestamp" => timestamp,
-            );
-            slog::debug!(
-                logger,
-                "event dump";
-                "event_id" => id,
-                "event" => ?event,
-            );
+            slog::info!(logger, "submitted log event");
+            slog::debug!(logger, "event dump"; "event" => ?event);
             Ok(())
         }
         Err(err) => {
-            slog::error!(
-                logger,
-                "failed to submit log event";
-                "event_type" => ?event.event_type,
-                "event_id" => id,
-                "event_guild_id" => event.guild_id,
-                "error" => ?err,
-            );
+            slog::error!(logger, "failed to submit log event"; "error" => ?err);
             Err(EventRejection {
                 should_requeue: true,
                 source: err.into(),

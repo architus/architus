@@ -52,6 +52,7 @@ impl Db {
     }
 
     /// Attempts to resolve the emoji from a shortcode
+    #[allow(dead_code)]
     pub fn from_shortcode(&self, shortcode: impl AsRef<str>) -> Option<&str> {
         self.shortcodes_to_emojis
             .get(shortcode.as_ref())

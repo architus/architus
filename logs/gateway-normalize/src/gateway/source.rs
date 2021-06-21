@@ -188,6 +188,7 @@ pub mod inner {
 /// and supports specifying what to do in the case of failure for the fallible variants,
 /// such as whether to fall back to some constant/closure result
 /// or to abort the entire event normalization.
+#[allow(dead_code)]
 pub enum Source<T>
 where
     T: Clone + Send + Sync,
@@ -212,6 +213,7 @@ where
 }
 
 /// Specifies the desired behavior when an operation fails to source a value
+#[allow(dead_code)]
 pub enum OnFailure<T> {
     /// Unexpected scenario that causes the entire event normalization to fail
     /// (no events will be submitted, and the original event will be re-queued)
@@ -232,6 +234,7 @@ assert_impl_all!(Source<crate::rpc::logs::event::EventType>: Sync);
 assert_impl_all!(Source<architus_id::HoarFrost>: Sync);
 assert_impl_all!(Source<Vec<u64>>: Sync);
 
+#[allow(dead_code)]
 impl<T> Source<T>
 where
     T: Clone + Send + Sync,
@@ -327,6 +330,7 @@ pub struct AuditLogSource(inner::AsyncFnSource<Option<AuditLogEntry>>);
 // Make sure source is sync
 assert_impl_all!(AuditLogSource: Sync);
 
+#[allow(dead_code)]
 impl AuditLogSource {
     /// Utility constructor for the audit log source
     /// that takes in an async closure that is run when sourcing,

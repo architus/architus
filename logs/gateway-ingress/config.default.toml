@@ -15,11 +15,11 @@ active_guilds_poll_interval = "1m"
 
 [services]
 # Full AMQP URL to connect to the gateway queue at
-gateway_queue = "amqp://127.0.0.1:5672/%2f"
+gateway_queue = "amqp://hello:hello@rabbit:5672/%2f"
 # HTTP URL of the feature-gate service
-feature_gate = "http://[::1]:50555"
+feature_gate = "http://feature-gate:50555"
 # HTTP URL of the logs/uptime service
-logs_uptime = "http://[::1]:50281"
+logs_uptime = "http://logs-uptime:50281"
 
 # Config options related to the Gateway Queue
 [gateway_queue]

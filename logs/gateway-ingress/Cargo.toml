@@ -36,6 +36,7 @@ tonic = "0.4"
 prost = "0.7"
 rand = "0.8"
 bytes = "1.0"
+base64 = "0.13"
 
 [build-dependencies]
 tonic-build = "0.4"

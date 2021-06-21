@@ -32,9 +32,9 @@ impl StoredEvent {
         self.0.timestamp.to_string()
     }
 
-    fn source(&self) -> &StoredEventSource {
+    fn source(&self) -> &Source {
         lazy_static! {
-            static ref EMPTY_SOURCE: StoredEventSource = StoredEventSource(EventSource {
+            static ref EMPTY_SOURCE: Source = Source(EventSource {
                 gateway: String::new(),
                 audit_log: String::new(),
                 internal: String::new(),
@@ -43,7 +43,7 @@ impl StoredEvent {
 
         match &self.0.source {
             None => &EMPTY_SOURCE,
-            Some(source) => StoredEventSource::ref_cast(source),
+            Some(source) => Source::ref_cast(source),
         }
     }
 
@@ -129,10 +129,10 @@ impl StoredEvent {
 #[derive(Debug, Deserialize, RefCast)]
 #[serde(transparent)]
 #[repr(transparent)]
-pub struct StoredEventSource(EventSource);
+pub struct Source(EventSource);
 
 #[juniper::graphql_object(name = "EventSource")]
-impl StoredEventSource {
+impl Source {
     fn gateway(&self) -> Option<GraphQLJson> {
         match self.0.gateway.as_str() {
             "" => None,

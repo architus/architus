@@ -177,6 +177,10 @@ impl Publisher {
                 return;
             };
 
+        let logger = self.logger.new(slog::o!(
+            "guild_id" => gateway_event.guild_id,
+        ));
+
         // Serialize the event to raw bytes
         let mut raw_bytes = Vec::with_capacity(gateway_event.encoded_len());
         if let Err(encode_err) = gateway_event.encode(&mut raw_bytes) {
@@ -188,6 +192,13 @@ impl Publisher {
             );
             return;
         }
+
+        // Print out the raw bytes for debugging
+        slog::debug!(
+            logger,
+            "raw event bytes";
+            "event_bytes" => base64::encode(&raw_bytes),
+        );
 
         // Make sure the guild is active before forwarding
         if !self.active_guilds.is_active(gateway_event.guild_id).await {
@@ -717,6 +728,13 @@ fn convert_raw_event(
                     return None;
                 }
             };
+
+            // Print out the raw bytes for debugging
+            slog::debug!(
+                logger,
+                "raw event inner bytes";
+                "event_inner_bytes" => base64::encode(&inner_json_bytes)
+            );
 
             return Some(GatewayEvent {
                 id: id.0,

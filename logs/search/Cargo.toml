@@ -10,9 +10,10 @@ license = "MIT"
 
 [dependencies]
 architus-id = { path = "../../lib/id-rs" }
-config = "0.10"
-log = "0.4"
-env_logger = "0.8"
+architus-config-backoff = { path = "../../lib/config-backoff-rs" }
+config = "0.11"
+slog = "2.7"
+sloggers = { version = "2.0", features = ["json"] }
 anyhow = "1.0"
 thiserror = "1.0"
 tonic = "0.4"
@@ -27,9 +28,10 @@ elasticsearch = "7.12.0-alpha.1"
 base64 = "0.13"
 juniper = { git = "https://github.com/engylemure/juniper", branch="tokio1" }
 juniper_hyper = { git = "https://github.com/engylemure/juniper", branch="tokio1" }
-strum = { version = "0.20", features = ["derive"] }
+strum = { version = "0.21", features = ["derive"] }
 ref-cast = "1.0"
-lazy_static = "1.4.0"
+lazy_static = "1.4"
+backoff = { version = "0.3", features = ["tokio"] }
 
 [build-dependencies]
 tonic-build = "0.4"

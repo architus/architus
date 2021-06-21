@@ -444,6 +444,7 @@ where
 
 /// u64 extractor that returns the underlying timestamp for a snowflake-encoded ID
 #[allow(clippy::unnecessary_wraps)]
+#[allow(dead_code)]
 const fn timestamp_from_id(id: u64, _ctx: Context<'_>) -> Result<u64, anyhow::Error> {
     Ok(architus_id::extract_timestamp(id))
 }

@@ -9,7 +9,7 @@ component_map = {
         'starlark-reactor',
         'rabbit',
         'dbmanager',
-        'lavalink'
+        'lavalink',
     ],
     'feature-gate': ['feature-gate', 'db'],
     'gateway': ['gateway'],
@@ -23,7 +23,8 @@ component_map = {
         'logs-uptime',
         'elasticsearch',
         'rabbit',
-        'db'
+        'db',
+        'dbmanager',
     ]
 }
 
@@ -82,7 +83,7 @@ if 'starlark-reactor' in enabled:
 if 'rabbit' in enabled:
     docker_build('rabbit-image', '.', dockerfile='rabbitmq/Dockerfile', ignore=["*", "!rabbitmq/*", "!lib/**"])
     k8s_yaml('rabbitmq/kube/dev/rabbit.yaml')
-    k8s_resource('rabbit')
+    k8s_resource('rabbit', port_forwards=8090)
 
 if 'dbmanager' in enabled:
     docker_build('dbmanager-image', 'dbmanager', dockerfile='dbmanager/Dockerfile')
@@ -197,7 +198,7 @@ if 'logs-search' in enabled:
             # Create a local copy of the config file if needed
             local(['cp', 'logs/search/config.default.toml', 'logs/search/config.toml'])
         local_resource('logs-search-compile', 'cargo build --manifest-path=logs/search/Cargo.toml',
-                       deps=['logs/search/Cargo.toml', 'logs/search/Cargo.lock', 'logs/search/build.rs', 'logs/search/src', 'lib/ipc/proto/logs/event.proto', 'lib/id-rs/Cargo.lock', 'lib/id-rs/Cargo.toml', 'lib/id-rs/src'])
+                       deps=['logs/search/Cargo.toml', 'logs/search/Cargo.lock', 'logs/search/build.rs', 'logs/search/src', 'lib/ipc/proto/logs/event.proto', 'lib/id-rs/Cargo.lock', 'lib/id-rs/Cargo.toml', 'lib/id-rs/src', 'lib/config-backoff-rs/Cargo.lock', 'lib/config-backoff-rs/Cargo.toml', 'lib/config-backoff-rs/src'])
         docker_build_with_restart('logs-search-image', '.', dockerfile='logs/search/Dockerfile.tilt', only=["logs/search/target/debug/logs-search", "logs/search/config.toml"],
                                   entrypoint=['/usr/bin/logs-search', '/etc/architus/config.toml'], live_update=[sync('logs/search/target/debug/logs-search', '/usr/bin/logs-search'), sync('logs/search/config.toml', '/etc/architus/config.toml')])
     else:

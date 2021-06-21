@@ -33,10 +33,10 @@ pub struct EventWithSource {
 }
 
 impl TryFrom<GatewayEvent> for EventWithSource {
-    type Error = serde_json::Error;
+    type Error = rmp_serde::decode::Error;
 
     fn try_from(value: GatewayEvent) -> Result<Self, Self::Error> {
-        let source = serde_json::from_slice::<serde_json::Value>(&value.inner)?;
+        let source = rmp_serde::from_slice::<serde_json::Value>(&value.inner)?;
         Ok(Self {
             inner: value,
             source,
@@ -295,6 +295,7 @@ pub struct Context<'a> {
     logger: &'a Logger,
 }
 
+#[allow(dead_code)]
 impl Context<'_> {
     /// Attempts to extract a gateway value
     pub fn gateway<T, F>(&self, path: &Path, extractor: F) -> Result<T, anyhow::Error>
