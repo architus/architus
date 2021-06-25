@@ -47,7 +47,7 @@ class DiscordInteraction(CustomResource):
                 emoji = {o['name']: o['value'] for o in options if o['name'].startswith('emoji')}
                 roles = {o['name']: o['value'] for o in options if o['name'].startswith('role')}
                 both = {value: roles['role' + name.replace('emoji', '')] for name, value in emoji.items()}
-                resp, sc = self.shard.role_setup(guild_id, channel_id, member_id, both)
+                resp, sc = self.shard.role_setup(guild_id, channel_id, member_id, both, routing_guild=guild_id)
             return {
                 'type': InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
                 'data': {

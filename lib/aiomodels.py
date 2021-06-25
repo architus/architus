@@ -59,6 +59,11 @@ class Base:
             async with conn.transaction():
                 await conn.execute(f'DELETE FROM {self.__class__.__tablename__} WHERE guild_id = $1', guild_id)
 
+    async def delete_by_message_id(self, message_id):
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(f'DELETE FROM {self.__class__.__tablename__} WHERE message_id = $1', message_id)
+
     async def select(self, cols):
         columns, values = zip(*cols.items())
         async with (await self.pool()).acquire() as conn:

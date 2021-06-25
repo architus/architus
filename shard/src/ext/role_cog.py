@@ -25,12 +25,12 @@ class Roles(commands.Cog):
     async def setup_roles(self, guild, channel, roles):
         roles_str = ""
         for emoji, role in roles.items():
-            roles_str += f'{emoji}➧{role.mention}'
+            roles_str += f'{emoji} ➧ {role.mention}\n\n'
         embed = discord.Embed(title="Role Select", description=roles_str)
         msg = await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         self.role_messages.append(msg.id)
 
-        await self.tb_roles.delete_by_guild_id(guild.id)
+        # await self.tb_roles.delete_by_guild_id(guild.id)
         errors = []
         for emoji, role in roles.items():
             try:
@@ -51,6 +51,10 @@ class Roles(commands.Cog):
     @commands.Cog.listener()
     async def on_raw_reaction_remove(self, payload):
         await self.handle_react(payload, False)
+
+    @commands.Cog.listener()
+    async def on_raw_message_delete(self, payload):
+        await self.tb_roles.delete_by_message_id(payload.message_id)
 
     async def handle_react(self, payload, react_add):
         if payload.message_id not in self.role_messages:
