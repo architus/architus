@@ -23,8 +23,9 @@ class Roles(commands.Cog):
                 self.role_messages.append(r['message_id'])
 
     async def setup_roles(self, guild, channel, roles):
-        roles_str = reduce(lambda a, b: (f"{a[0]}  {a[1].mention}"
-                           if len(a) == 2 else a) + f"\n{b[0]}  {b[1].mention}", roles.items())
+        roles_str = ""
+        for emoji, role in roles.items():
+            roles_str += f'{emoji}➧{role.mention}'
         embed = discord.Embed(title="Role Select", description=roles_str)
         msg = await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
         self.role_messages.append(msg.id)

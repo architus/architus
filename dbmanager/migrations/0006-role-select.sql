@@ -1,4 +1,3 @@
-DROP TABLE IF EXISTS tb_roles;
 CREATE TABLE IF NOT EXISTS public.tb_roles (
     guild_id BIGINT NOT NULL,
     message_id BIGINT NOT NULL,
