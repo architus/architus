@@ -19,15 +19,15 @@ class Roles(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         for guild in self.bot.guilds:
-            for r in await self.tb_roles.select_by_guild(guild.id):
+            for r in (await self.tb_roles.select_by_guild(guild.id)):
                 self.role_messages.append(r['message_id'])
 
     async def setup_roles(self, guild, channel, roles):
         roles_str = reduce(lambda a, b: (f"{a[0]}  {a[1].mention}"
                            if len(a) == 2 else a) + f"\n{b[0]}  {b[1].mention}", roles.items())
-        embed = discord.Embed(title="Role Select", description=discord.utils.escape_mentions(roles_str))
-        msg = await channel.send(embed=embed)
-        self.role_messages.append(msg)
+        embed = discord.Embed(title="Role Select", description=roles_str)
+        msg = await channel.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+        self.role_messages.append(msg.id)
 
         await self.tb_roles.delete_by_guild_id(guild.id)
         errors = []
@@ -44,24 +44,29 @@ class Roles(commands.Cog):
             return f"Unknown emoji: {', '.join(errors)}"
 
     @commands.Cog.listener()
-    async def on_reaction_add(self, react, user):
-        if react.message.id not in self.role_messages:
-            return
-        guild = react.message.channel.guild
-        record = await self.tb_roles.select_by_id({'emoji': str(react.emoji), 'message_id': react.message.id})
-        if record is None:
-            return
-        await user.add_roles(guild.get_role(record['role_id']))
+    async def on_raw_reaction_add(self, payload):
+        await self.handle_react(payload, True)
 
     @commands.Cog.listener()
-    async def on_reaction_remove(self, react, user):
-        if react.message.id not in self.role_messages:
+    async def on_raw_reaction_remove(self, payload):
+        await self.handle_react(payload, False)
+
+    async def handle_react(self, payload, react_add):
+        if payload.message_id not in self.role_messages:
             return
-        guild = react.message.channel.guild
-        record = await self.tb_roles.select_by_id({'emoji': str(react.emoji), 'message_id': react.message.id})
+        guild = self.bot.get_guild(payload.guild_id)
+        record = await self.tb_roles.select_by_id({'emoji': str(payload.emoji), 'message_id': int(payload.message_id)})
         if record is None:
             return
-        await user.remove_roles(guild.get_role(record['role_id']))
+        member = guild.get_member(int(payload.user_id))
+        role = guild.get_role(record['role_id'])
+        try:
+            if react_add:
+                await member.add_roles(role)
+            else:
+                await member.remove_roles(role)
+        except Exception:
+            logger.warning(f"Error adding {member} to {role}")
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
