@@ -74,14 +74,13 @@ class TbReactEvents(Base):
     __tablename__ = 'tb_react_events'
 
     async def insert(self, message_id: int, guild_id: int, channel_id: int,
-                     event_type: int, payload: str, expires_on: int):
+                     event_type: int, payload: str):
         cols = {
             'message_id': message_id,
             'guild_id': guild_id,
             'channel_id': channel_id,
             'event_type': event_type,
-            'payload': payload,
-            'expires_on': expires_on
+            'payload': payload
         }
 
         await super().insert(cols)
