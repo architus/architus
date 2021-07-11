@@ -137,12 +137,13 @@ impl<T: Clone + Debug + Eq + Hash + Send + 'static> DebouncedPool<T> {
         let delay = Arc::clone(&self.delay);
         tokio::spawn(async move {
             tokio::time::sleep(*delay).await;
-            let mut inner_state = inner_state_mutex.lock().expect("debounced pool poisoned");
 
             // Make sure the release wasn't cancelled
             if cancel_receiver.try_recv().is_ok() {
                 return;
             }
+
+            let mut inner_state = inner_state_mutex.lock().expect("debounced pool poisoned");
 
             // Get the update and add all updates to the inner pool
             let update = inner_state.release();

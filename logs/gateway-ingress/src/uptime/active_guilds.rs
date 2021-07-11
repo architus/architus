@@ -243,7 +243,7 @@ impl ActiveGuilds {
                     GuildStatus::Loading(_) => None,
                     GuildStatus::Loaded { .. } => Some(guild_id),
                 })
-                .cloned()
+                .copied()
                 .collect::<Vec<_>>();
             slog::debug!(self.logger, "currently loaded guilds"; "loaded_guilds" => ?loaded_guilds);
             drop(guilds_read);
@@ -507,7 +507,7 @@ impl ActiveGuilds {
                     GuildStatus::Loaded(state) => {
                         edges.consume(guild_id, state.update(Some(is_active), None));
                     }
-                    _ => *status = default_status.clone(),
+                    GuildStatus::Loading(_) => *status = default_status.clone(),
                 };
             })
             .or_insert(default_status);
@@ -548,7 +548,7 @@ impl ActiveGuilds {
         let to_load = guilds
             .iter()
             .filter(|id| !active_values.contains_key(id))
-            .cloned()
+            .copied()
             .collect::<Vec<_>>();
         slog::debug!(self.logger, "preparing to load active values for guilds"; "to_load" => ?&to_load);
         let mut guilds_write = if to_load.is_empty() {
@@ -686,7 +686,7 @@ impl ActiveGuilds {
         let guilds_read = self.guilds.read().expect("active guilds lock poisoned");
         let uptime_guilds = guilds
             .iter()
-            .cloned()
+            .copied()
             .filter(|guild_id| {
                 let logger = self.logger.new(slog::o!("guild_id" => *guild_id));
                 if let Some(GuildStatus::Loaded(state)) = guilds_read.get(guild_id) {
