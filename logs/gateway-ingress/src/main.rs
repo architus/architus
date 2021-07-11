@@ -5,6 +5,8 @@ mod config;
 mod connect;
 mod publish;
 mod rpc;
+#[cfg(test)]
+mod testutils;
 mod uptime;
 
 use crate::config::Configuration;
@@ -257,4 +259,61 @@ fn split_gateway_events(
         UnboundedReceiverStream::new(matches_rx),
         UnboundedReceiverStream::new(other_rx),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::testutils;
+    use std::time::Duration;
+    use tokio::sync::mpsc;
+    use tokio_stream::wrappers::UnboundedReceiverStream;
+    use twilight_gateway::{Event, EventTypeFlags};
+    use twilight_model::gateway::payload::MessageDelete;
+
+    #[tokio::test]
+    async fn test_split_gateway_events() -> Result<(), anyhow::Error> {
+        let logger = testutils::logger("test_split_gateway_events");
+        let (gateway_event_tx, gateway_event_rx) = mpsc::unbounded_channel::<Event>();
+
+        // Create the two sink streams & span the split future
+        let (split_future, split_a, split_b) = super::split_gateway_events(
+            UnboundedReceiverStream::new(gateway_event_rx),
+            EventTypeFlags::GUILD_CREATE | EventTypeFlags::MESSAGE_DELETE,
+            logger,
+        );
+        tokio::spawn(split_future);
+
+        // Create consumer channels to constantly poll the stream
+        let (consume_a, mut a_rx) = testutils::adapt_stream(split_a);
+        let (consume_b, mut b_rx) = testutils::adapt_stream(split_b);
+        tokio::spawn(consume_a);
+        tokio::spawn(consume_b);
+
+        // Send a volley of events
+        // Should go to channel a
+        let matching_filter_event = Event::MessageDelete(serde_json::from_value::<MessageDelete>(
+            serde_json::json!({
+                "channel_id": 0,
+                "id": 0,
+            }),
+        )?);
+        // Should go to channel b
+        let non_matching_event = Event::GatewayHeartbeat(1);
+        gateway_event_tx.send(matching_filter_event.clone())?;
+        gateway_event_tx.send(non_matching_event.clone())?;
+
+        // There should be exactly 1 event on each channel
+        assert_eq!(
+            tokio::time::timeout(Duration::from_millis(500), a_rx.recv()).await?,
+            Some(matching_filter_event),
+        );
+        assert_eq!(
+            tokio::time::timeout(Duration::from_millis(500), b_rx.recv()).await?,
+            Some(non_matching_event),
+        );
+        testutils::assert_empty(&mut a_rx);
+        testutils::assert_empty(&mut b_rx);
+
+        Ok(())
+    }
 }

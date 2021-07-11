@@ -32,7 +32,7 @@ impl Tracker {
     ) -> (Self, UnboundedSender<UpdateMessage>) {
         let (update_sender, update_receiver) = mpsc::unbounded_channel::<UpdateMessage>();
         let (active_guilds, debounced_guild_updates) =
-            DebouncedPool::new(config.guild_uptime_debounce_delay, logger);
+            DebouncedPool::new(config.guild_uptime_debounce_delay, logger.clone());
         let new_tracker = Self {
             updates: update_receiver,
             debounced_guild_updates,
@@ -40,6 +40,7 @@ impl Tracker {
                 config,
                 active_guilds,
                 connection_status: Arc::new(Mutex::new(ConnectionStatus::new())),
+                logger,
             },
         };
         (new_tracker, update_sender)
@@ -68,6 +69,7 @@ struct TrackerState {
     config: Arc<Configuration>,
     active_guilds: DebouncedPool<u64>,
     connection_status: Arc<Mutex<ConnectionStatus>>,
+    logger: Logger,
 }
 
 assert_impl_all!(TrackerState: Sync, Send);
@@ -81,12 +83,18 @@ impl TrackerState {
     ) -> impl Stream<Item = UptimeEvent> {
         let pool_copy = self.active_guilds.clone();
         let connection_status_mutex = Arc::clone(&self.connection_status);
+        let logger = self.logger.clone();
         in_stream.flat_map(move |update| {
             // Note the timestamp that this was received,
             // (ignores the propagation delay from source to here,
             // but since this processor is synchronous,
             // this should be negligible and provides a more ergonomic upstream API)
             let timestamp = architus_id::time::millisecond_ts();
+            slog::debug!(
+                logger,
+                "processing connection tracking update";
+                "update" => ?update,
+            );
             match update {
                 // For guild online/offline,
                 // instead of emitting an event right now,
@@ -107,11 +115,14 @@ impl TrackerState {
                     let events = if connection_status.online_update(&update) {
                         pool_copy.release();
                         let items = pool_copy.items::<Vec<_>>();
-                        let events = vec![UptimeEvent::Online {
-                            guilds: items,
-                            timestamp,
-                        }];
-                        events
+                        if items.is_empty() {
+                            Vec::with_capacity(0)
+                        } else {
+                            vec![UptimeEvent::Online {
+                                guilds: items,
+                                timestamp,
+                            }]
+                        }
                     } else {
                         Vec::with_capacity(0)
                     };
@@ -124,12 +135,17 @@ impl TrackerState {
                     // Only emit an uptime event if the entire service just became offline
                     let events = if connection_status.offline_update(&update) {
                         let items = pool_copy.items::<Vec<_>>();
-                        let events = vec![UptimeEvent::Offline {
-                            guilds: items,
-                            timestamp,
-                        }];
-                        pool_copy.release();
-                        events
+                        if items.is_empty() {
+                            pool_copy.release();
+                            Vec::with_capacity(0)
+                        } else {
+                            let events = vec![UptimeEvent::Offline {
+                                guilds: items,
+                                timestamp,
+                            }];
+                            pool_copy.release();
+                            events
+                        }
                     } else {
                         Vec::with_capacity(0)
                     };
@@ -143,12 +159,16 @@ impl TrackerState {
                         let mut events = pool_copy
                             .release()
                             .map_or_else(Vec::new, pool_update_to_uptime);
-                        let items = pool_copy.items();
-                        events.push(UptimeEvent::Heartbeat {
-                            guilds: items,
-                            timestamp,
-                        });
-                        events
+                        let items = pool_copy.items::<Vec<_>>();
+                        if events.is_empty() && items.is_empty() {
+                            Vec::with_capacity(0)
+                        } else {
+                            events.push(UptimeEvent::Heartbeat {
+                                guilds: items,
+                                timestamp,
+                            });
+                            events
+                        }
                     } else {
                         Vec::with_capacity(0)
                     };
@@ -204,6 +224,7 @@ fn pool_update_to_uptime(update: DebouncedPoolUpdate<u64>) -> Vec<UptimeEvent> {
 
 /// Holds the connection state to the gateway and queue
 /// and utility methods to capture the rising/falling edges of overall connection
+#[derive(Debug)]
 struct ConnectionStatus {
     gateway_online: bool,
     queue_online: bool,
@@ -247,25 +268,13 @@ impl ConnectionStatus {
 #[cfg(test)]
 mod tests {
     use crate::config::Configuration;
+    use crate::testutils;
     use crate::uptime::connection::{Tracker, UpdateMessage};
     use crate::uptime::Event;
-    use anyhow::Result;
-    use futures::StreamExt;
-    use sloggers::terminal::{Destination, TerminalLoggerBuilder};
-    use sloggers::types::{Format, Severity};
-    use sloggers::Build;
     use std::collections::HashSet;
     use std::hash::Hash;
     use std::sync::Arc;
     use std::time::Duration;
-
-    fn test_logger() -> slog::Logger {
-        let mut builder = TerminalLoggerBuilder::new();
-        builder.level(Severity::Debug);
-        builder.destination(Destination::Stderr);
-        builder.format(Format::Full);
-        builder.build().unwrap()
-    }
 
     /// Defines set-equality for uptime events
     #[derive(Debug, Clone)]
@@ -288,112 +297,137 @@ mod tests {
     }
 
     #[tokio::test]
-    #[allow(clippy::field_reassign_with_default)]
-    async fn test_basic_debounced() -> Result<()> {
-        let mut config = Configuration::default();
-        config.guild_uptime_debounce_delay = Duration::from_millis(25);
-        let (tracker, update_tx) = Tracker::new(Arc::new(config), test_logger());
-        // Apply full back-pressure to process events immediately
-        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<Event>();
-        tokio::spawn(async move {
-            // Apply full back-pressure to process events immediately
-            let mut stream = tracker.stream_events();
-            while let Some(event) = stream.next().await {
-                events_tx.send(event).unwrap();
-            }
-        });
+    async fn test_basic_debounced() -> Result<(), anyhow::Error> {
+        let test_timeout = Duration::from_millis(100);
+        let logger = testutils::logger("test_basic_debounced");
+
+        #[allow(clippy::field_reassign_with_default)]
+        let config = {
+            let mut config = Configuration::default();
+            config.guild_uptime_debounce_delay = Duration::from_millis(25);
+            config
+        };
+        let (tracker, update_tx) = Tracker::new(Arc::new(config), logger.clone());
+
+        // Create a consumer channel to constantly poll the stream
+        let (consume_events, mut events_rx) = testutils::adapt_stream(tracker.stream_events());
+        tokio::spawn(consume_events);
 
         // Note: timestamp is ignored when asserting equality
+        update_tx.send(UpdateMessage::QueueOnline)?;
+        update_tx.send(UpdateMessage::GatewayOnline)?;
         update_tx.send(UpdateMessage::GuildOnline(0))?;
         update_tx.send(UpdateMessage::GuildOnline(1))?;
         update_tx.send(UpdateMessage::GuildOnline(2))?;
+        // Sleep for more than the debounce delay
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         assert_eq!(
-            events_rx.recv().await.map(TestWrapper),
+            tokio::time::timeout(test_timeout, events_rx.recv())
+                .await?
+                .map(TestWrapper),
             Some(TestWrapper(Event::Online {
                 guilds: vec![0, 1, 2],
                 timestamp: 0
             }))
         );
+        testutils::assert_empty(&mut events_rx);
 
         Ok(())
     }
 
     #[tokio::test]
-    #[allow(clippy::field_reassign_with_default)]
-    async fn test_heartbeat_flush() -> Result<()> {
-        let mut config = Configuration::default();
-        config.guild_uptime_debounce_delay = Duration::from_millis(25);
-        let (tracker, update_tx) = Tracker::new(Arc::new(config), test_logger());
-        // Apply full back-pressure to process events immediately
-        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<Event>();
-        tokio::spawn(async move {
-            // Apply full back-pressure to process events immediately
-            let mut stream = tracker.stream_events();
-            while let Some(event) = stream.next().await {
-                events_tx.send(event).unwrap();
-            }
-        });
+    async fn test_heartbeat_flush() -> Result<(), anyhow::Error> {
+        let test_timeout = Duration::from_millis(100);
+        let logger = testutils::logger("test_heartbeat_flush");
+
+        #[allow(clippy::field_reassign_with_default)]
+        let config = {
+            let mut config = Configuration::default();
+            config.guild_uptime_debounce_delay = Duration::from_millis(25);
+            config
+        };
+        let (tracker, update_tx) = Tracker::new(Arc::new(config), logger.clone());
+
+        // Create a consumer channel to constantly poll the stream
+        let (consume_events, mut events_rx) = testutils::adapt_stream(tracker.stream_events());
+        tokio::spawn(consume_events);
 
         // Note: timestamp is ignored when asserting equality
+        update_tx.send(UpdateMessage::QueueOnline)?;
+        update_tx.send(UpdateMessage::GatewayOnline)?;
         update_tx.send(UpdateMessage::GuildOnline(0))?;
         update_tx.send(UpdateMessage::GuildOnline(1))?;
+        // Sleep for more than the debounce delay
         tokio::time::sleep(Duration::from_millis(50)).await;
         update_tx.send(UpdateMessage::GuildOnline(2))?;
         update_tx.send(UpdateMessage::GuildOffline(0))?;
         update_tx.send(UpdateMessage::GatewayHeartbeat)?;
 
         assert_eq!(
-            events_rx.recv().await.map(TestWrapper),
+            tokio::time::timeout(test_timeout, events_rx.recv())
+                .await?
+                .map(TestWrapper),
             Some(TestWrapper(Event::Online {
                 guilds: vec![0, 1],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.recv().await.map(TestWrapper),
+            tokio::time::timeout(test_timeout, events_rx.recv())
+                .await?
+                .map(TestWrapper),
             Some(TestWrapper(Event::Online {
                 guilds: vec![2],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.recv().await.map(TestWrapper),
+            tokio::time::timeout(test_timeout, events_rx.recv())
+                .await?
+                .map(TestWrapper),
             Some(TestWrapper(Event::Offline {
                 guilds: vec![0],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.recv().await.map(TestWrapper),
+            tokio::time::timeout(test_timeout, events_rx.recv())
+                .await?
+                .map(TestWrapper),
             Some(TestWrapper(Event::Heartbeat {
                 guilds: vec![1, 2],
                 timestamp: 0
             }))
         );
+        testutils::assert_empty(&mut events_rx);
 
         Ok(())
     }
 
     #[tokio::test]
-    #[allow(clippy::field_reassign_with_default)]
-    async fn test_offline_online() -> Result<()> {
-        let mut config = Configuration::default();
-        config.guild_uptime_debounce_delay = Duration::from_millis(25);
-        let (tracker, update_tx) = Tracker::new(Arc::new(config), test_logger());
-        let (events_tx, mut events_rx) = tokio::sync::mpsc::unbounded_channel::<Event>();
-        tokio::spawn(async move {
-            // Apply full back-pressure to process events immediately
-            let mut stream = tracker.stream_events();
-            while let Some(event) = stream.next().await {
-                events_tx.send(event).unwrap();
-            }
-        });
+    async fn test_offline_online() -> Result<(), anyhow::Error> {
+        let test_timeout = Duration::from_millis(100);
+        let logger = testutils::logger("test_offline_online");
+
+        #[allow(clippy::field_reassign_with_default)]
+        let config = {
+            let mut config = Configuration::default();
+            config.guild_uptime_debounce_delay = Duration::from_millis(25);
+            config
+        };
+        let (tracker, update_tx) = Tracker::new(Arc::new(config), logger.clone());
+
+        // Create a consumer channel to constantly poll the stream
+        let (consume_events, mut events_rx) = testutils::adapt_stream(tracker.stream_events());
+        tokio::spawn(consume_events);
 
         // Note: timestamp is ignored when asserting equality
+        update_tx.send(UpdateMessage::QueueOnline)?;
+        update_tx.send(UpdateMessage::GatewayOnline)?;
         update_tx.send(UpdateMessage::GuildOnline(0))?;
         update_tx.send(UpdateMessage::GuildOnline(1))?;
+        // Sleep for more than the debounce delay
         tokio::time::sleep(Duration::from_millis(50)).await;
         update_tx.send(UpdateMessage::GatewayOffline)?;
         update_tx.send(UpdateMessage::QueueOffline)?;
@@ -401,26 +435,33 @@ mod tests {
         update_tx.send(UpdateMessage::GatewayOnline)?;
 
         assert_eq!(
-            events_rx.recv().await.map(TestWrapper),
+            tokio::time::timeout(test_timeout, events_rx.recv())
+                .await?
+                .map(TestWrapper),
             Some(TestWrapper(Event::Online {
                 guilds: vec![0, 1],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.recv().await.map(TestWrapper),
+            tokio::time::timeout(test_timeout, events_rx.recv())
+                .await?
+                .map(TestWrapper),
             Some(TestWrapper(Event::Offline {
                 guilds: vec![0, 1],
                 timestamp: 0
             }))
         );
         assert_eq!(
-            events_rx.recv().await.map(TestWrapper),
+            tokio::time::timeout(test_timeout, events_rx.recv())
+                .await?
+                .map(TestWrapper),
             Some(TestWrapper(Event::Online {
                 guilds: vec![0, 1],
                 timestamp: 0
             }))
         );
+        testutils::assert_empty(&mut events_rx);
 
         Ok(())
     }
