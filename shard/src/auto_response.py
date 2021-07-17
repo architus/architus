@@ -14,6 +14,17 @@ from lib.config import logger
 from lib.aiomodels import TbAutoResponses
 from lib.ipc import sandbox_pb2 as message
 
+class DefaultUser:
+    def __init__(self):
+        self.id = 0
+        self.avatar_url = ""
+        self.color = ""
+        self.discriminator = 0
+        self.roles = []
+        self.name = ""
+        self.nick = ""
+        self.dispplay_name = ""
+        self.permissions = 0
 
 class WordGen:
     def __init__(self):
@@ -191,6 +202,9 @@ class AutoResponse:
             else:
                 content.append(f"<{node.text}>")
         elif (node.type == NodeType.Eval):
+            script_author = msg.guild.get_member(self.author_id)
+            if script_author == None:
+                sauthor = DefaultUser()
             output = await self.bot.sandbox_client.RunStarlarkScript(
                 message.StarlarkScript(
                     script=node.text,
@@ -199,7 +213,7 @@ class AutoResponse:
                         content=msg.content,
                         id=msg.id
                     ),
-                    author=message.Author(
+                    message_author=message.Author(
                         id=msg.author.id,
                         avatar_url=str(msg.author.avatar_url),
                         color=str(msg.author.color),
@@ -207,7 +221,19 @@ class AutoResponse:
                         roles=[r.id for r in msg.author.roles],
                         name=msg.author.name,
                         nick="" if msg.author.nick is None else msg.author.nick,
-                        disp_name=msg.author.display_name
+                        disp_name=msg.author.display_name,
+                        permissions=msg.author.permissions
+                    ),
+                    script_author=message.Author(
+                        id=sauthor.id,
+                        avatar_url=str(sauthor.avatar_url),
+                        color=str(sauthor.color),
+                        discriminator=int(sauthor.discriminator),
+                        roles=[r.id for r in sauthor.roles],
+                        name=sauthor.name,
+                        nick="" if sauthor.nick is None else author.nick,
+                        disp_name=sauthor.display_name,
+                        permissions=sauthor.permissions
                     ),
                     count=self.count,
                     captures=list(match.groups()),
