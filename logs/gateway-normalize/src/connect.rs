@@ -3,13 +3,13 @@
 
 use crate::config::Configuration;
 use crate::rpc::logs::submission::Client as LogsSubmissionClient;
-use anyhow::{Context, Result};
+use anyhow::Context;
 use lapin::{Connection, ConnectionProperties};
 use slog::Logger;
 use std::sync::Arc;
 
 /// Creates a new connection to Rabbit MQ
-pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> Result<Connection> {
+pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<Connection> {
     let initialization_backoff = config.initialization_backoff.build();
     let rmq_url = config.services.gateway_queue.clone();
     let rmq_connect = || async {
@@ -36,7 +36,7 @@ pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> Result<Conn
 pub async fn to_submission(
     config: Arc<Configuration>,
     logger: Logger,
-) -> Result<LogsSubmissionClient> {
+) -> anyhow::Result<LogsSubmissionClient> {
     let initialization_backoff = config.initialization_backoff.build();
     let submission_url = config.services.logs_submission.clone();
     let connect = || async {

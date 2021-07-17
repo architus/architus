@@ -7,7 +7,7 @@ mod rpc;
 use crate::config::Configuration;
 use crate::rpc::logs::uptime::uptime_service_server::{UptimeService, UptimeServiceServer};
 use crate::rpc::logs::uptime::{GatewaySubmitRequest, GatewaySubmitResponse};
-use anyhow::{Context, Result};
+use anyhow::Context;
 use slog::Logger;
 use sloggers::Config;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -17,7 +17,7 @@ use tonic::{Request, Response};
 
 /// Loads the config and bootstraps the service
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     // Parse the config
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
 }
 
 /// Attempts to initialize the bot and start the gRPC server
-async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
+async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     // Start the server on the specified port
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), config.port);
     let uptime_service = UptimeServiceImpl::new(logger.clone());
@@ -59,7 +59,7 @@ async fn serve_grpc(
     uptime_service: UptimeServiceImpl,
     addr: SocketAddr,
     logger: Logger,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let uptime_server = UptimeServiceServer::new(uptime_service);
     let server = Server::builder().add_service(uptime_server);
 
@@ -87,7 +87,7 @@ impl UptimeService for UptimeServiceImpl {
     async fn gateway_submit(
         &self,
         request: Request<GatewaySubmitRequest>,
-    ) -> Result<Response<GatewaySubmitResponse>, tonic::Status> {
+    ) -> anyhow::Result<Response<GatewaySubmitResponse>, tonic::Status> {
         let request = request.into_inner();
 
         // TODO consume request

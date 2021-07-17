@@ -14,7 +14,7 @@ use crate::rpc::logs::uptime::Client as LogsUptimeClient;
 use crate::uptime::active_guilds::ActiveGuilds;
 use crate::uptime::connection::Tracker;
 use crate::uptime::{Event as UptimeEvent, UpdateMessage};
-use anyhow::{Context, Result};
+use anyhow::Context;
 use futures::{try_join, FutureExt, Stream, StreamExt, TryStreamExt};
 use slog::Logger;
 use sloggers::Config;
@@ -27,7 +27,7 @@ use twilight_gateway::{Event, EventTypeFlags};
 
 /// Loads the config and bootstraps the service
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     // Parse the config
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
 }
 
 /// Attempts to initialize the bot and listen for gateway events
-async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
+async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     // Create the tracker and its update message channel
     let (connection_tracker, update_tx) = Tracker::new(Arc::clone(&config), logger.clone());
 
@@ -146,7 +146,7 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
 async fn process_lifecycle_events(
     in_stream: impl Stream<Item = Event>,
     update_tx: UnboundedSender<UpdateMessage>,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     type SendError = tokio::sync::mpsc::error::SendError<UpdateMessage>;
     // Convert the stream into a TryStream
     let try_stream = StreamExt::map(in_stream, Ok::<Event, SendError>);
@@ -184,7 +184,7 @@ async fn sink_uptime_events(
     logger: Logger,
     uptime_service_client: LogsUptimeClient,
     in_stream: impl Stream<Item = UptimeEvent>,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     // Generate a unique session ID that is used to detect downtime after a forced shutdown
     let session: u64 = rand::random();
     let logger = logger.new(slog::o!("session_id" => session));
@@ -271,7 +271,7 @@ mod tests {
     use twilight_model::gateway::payload::MessageDelete;
 
     #[tokio::test]
-    async fn test_split_gateway_events() -> Result<(), anyhow::Error> {
+    async fn test_split_gateway_events() -> anyhow::Result<(), anyhow::Error> {
         let logger = testutils::logger("test_split_gateway_events");
         let (gateway_event_tx, gateway_event_rx) = mpsc::unbounded_channel::<Event>();
 

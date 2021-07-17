@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 
 const SERDE_STRUCTS: &[&str] = &[
     ".logs.event.Event",
@@ -13,7 +13,7 @@ const ENUMS: &[&str] = &[
     ".logs.event.AgentSpecialType",
 ];
 
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     // Compile the logs/event protobuf definitions
     let mut builder = tonic_build::configure()
         .build_client(false)

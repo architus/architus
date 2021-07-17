@@ -1,9 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 use serde::Serialize;
 
 /// Attempts to serialize a simple value to retrieve its literal representation
 /// without leading or trailing quotes
-pub fn value_to_string<E>(val: &E) -> Result<String>
+pub fn value_to_string<E>(val: &E) -> anyhow::Result<String>
 where
     E: Serialize,
 {

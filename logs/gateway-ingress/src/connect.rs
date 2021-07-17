@@ -5,7 +5,7 @@ use crate::config::Configuration;
 use crate::publish::INTENTS;
 use crate::rpc::feature_gate::Client as FeatureGateClient;
 use crate::rpc::logs::uptime::Client as LogsUptimeClient;
-use anyhow::{Context, Result};
+use anyhow::Context;
 use lapin::{Connection, ConnectionProperties};
 use slog::Logger;
 use std::sync::Arc;
@@ -17,7 +17,7 @@ pub async fn to_shard(
     config: Arc<Configuration>,
     logger: Logger,
     events: EventTypeFlags,
-) -> Result<(Shard, Events)> {
+) -> anyhow::Result<(Shard, Events)> {
     let initialization_backoff = config.initialization_backoff.build();
     let shard_connect = || async {
         let (shard, events) = Shard::builder(config.secrets.discord_token.clone(), *INTENTS)
@@ -44,7 +44,7 @@ pub async fn to_shard(
 }
 
 /// Creates a new connection to RabbitMQ
-pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> Result<Connection> {
+pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<Connection> {
     let initialization_backoff = config.initialization_backoff.build();
     let rmq_url = config.services.gateway_queue.clone();
     let rmq_connect = || async {
@@ -67,7 +67,7 @@ pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> Result<Conn
 }
 
 /// Performs a single connection attempt to RabbitMQ
-pub async fn to_queue_attempt(config: Arc<Configuration>) -> Result<Connection, lapin::Error> {
+pub async fn to_queue_attempt(config: Arc<Configuration>) -> anyhow::Result<Connection, lapin::Error> {
     let rmq_url = config.services.gateway_queue.clone();
     Connection::connect(&rmq_url, ConnectionProperties::default()).await
 }
@@ -76,7 +76,7 @@ pub async fn to_queue_attempt(config: Arc<Configuration>) -> Result<Connection, 
 pub async fn to_feature_gate(
     config: Arc<Configuration>,
     logger: Logger,
-) -> Result<FeatureGateClient> {
+) -> anyhow::Result<FeatureGateClient> {
     let initialization_backoff = config.initialization_backoff.build();
     let feature_gate_url = config.services.feature_gate.clone();
     let connect = || async {
@@ -104,7 +104,7 @@ pub async fn to_feature_gate(
 pub async fn to_uptime_service(
     config: Arc<Configuration>,
     logger: Logger,
-) -> Result<LogsUptimeClient> {
+) -> anyhow::Result<LogsUptimeClient> {
     let initialization_backoff = config.initialization_backoff.build();
     let uptime_url = config.services.logs_uptime.clone();
     let connect = || async {
