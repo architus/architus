@@ -1,6 +1,8 @@
 syntax = "proto3";
 package sandbox;
 
+option go_package = "https://github.com/architus/architus/sandbox";
+
 service Sandbox {
     rpc RunStarlarkScript (StarlarkScript) returns (ScriptOutput) {}
 }
@@ -8,7 +10,8 @@ service Sandbox {
 message StarlarkScript {
     string script = 1;
     Message trigger_message = 2;
-    Author author = 3;
+    Author message_author = 3;
+    Author script_author = 8;
     uint64 count = 4;
     repeated string captures = 5;
     repeated string arguments = 6;
@@ -35,6 +38,7 @@ message Author {
     string name = 6;
     string nick = 7;
     string disp_name = 8;
+    uint64 permissions = 9;
 }
 
 message Message {

@@ -5,7 +5,6 @@ import (
     "go.starlark.net/starlark";
     "go.starlark.net/resolve";
     "go.starlark.net/starlarkstruct";
-    // "os";
     "log";
     "strings";
     "net";
@@ -13,17 +12,36 @@ import (
     "math/rand";
     "math";
     "strconv";
+    "encoding/json";
+    "net/http";
+    "net/url";
+    "io";
+    "io/ioutil";
+    "bytes";
 
     context "context";
     grpc "google.golang.org/grpc";
     keepalive "google.golang.org/grpc/keepalive";
-    // uuid "github.com/satori/go.uuid";
 
     rpc "archit.us/sandbox";
 )
 
+const MaxMessageSize = 1000000;
+
 type Sandbox struct {
     rpc.SandboxServer;
+}
+
+type Author struct {
+    Id uint64
+    Name string
+    AvatarUrl string
+    Color string
+    Discrim uint32
+    Roles []uint64
+    Nick string
+    Display_name string
+    Permissions uint64
 }
 
 func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
@@ -47,6 +65,15 @@ def sum(iterable):
     for i in iterable:
         s += i
     return s
+def post(url, headers=None, data=None, j=None):
+    if j is not None:
+        j = json.encode(j)
+    (resp_code, body) = internal_post(url, headers, data, j)
+    try:
+        json_values = json.decode(body)
+        return (resp_code, json_values)
+    except:
+        return (resp_code, body)
 
 `;
 
@@ -64,7 +91,7 @@ def sum(iterable):
     // Need to set up a global variable for this before putting it into a struct because it's a list
     // and I don't know how to make a list within a call to sprintf.
     script += "author_roles = [";
-    for _, r := range in.Author.Roles {
+    for _, r := range in.MessageAuthor.Roles {
         script += strconv.FormatUint(r, 10) + ", ";
     }
     script += "]\n";
@@ -75,17 +102,18 @@ def sum(iterable):
     // random special characters don't break everything.
     script += fmt.Sprintf("message = struct(id=%d, content=message_content_full, clean=message_clean_full)\n",
                           in.TriggerMessage.Id);
-    script += fmt.Sprintf("author = struct(id=%d, avatar_url=\"%s\", color=\"%s\", discrim=%d, roles=author_roles, name=auth_list[0], nick=auth_list[1], disp=auth_list[2])\n",
-                          in.Author.Id, in.Author.AvatarUrl, in.Author.Color, in.Author.Discriminator);
+    script += fmt.Sprintf("author = struct(id=%d, avatar_url=\"%s\", color=\"%s\", discrim=%d, roles=author_roles, name=\"%s\", nick=\"%s\", disp=\"%s\", perms=%d)\n",
+                          in.MessageAuthor.Id, in.MessageAuthor.AvatarUrl, in.MessageAuthor.Color, in.MessageAuthor.Discriminator,
+                          in.MessageAuthor.Name, in.MessageAuthor.Nick, in.MessageAuthor.DispName, in.MessageAuthor.Permissions);
     script += fmt.Sprintf("channel = struct(id=%d, name=channel_name)\n",
                           in.Channel.Id);
     script += fmt.Sprintf("count = %d\n", in.Count);
     script += "msg = message; a = author; ch = channel;\n";
 
     var author = make([]starlark.Value, 3);
-    author[0] = starlark.String(in.Author.Name);
-    author[1] = starlark.String(in.Author.Nick);
-    author[2] = starlark.String(in.Author.DispName);
+    author[0] = starlark.String(in.MessageAuthor.Name);
+    author[1] = starlark.String(in.MessageAuthor.Nick);
+    author[2] = starlark.String(in.MessageAuthor.DispName);
 
     channel_name := starlark.String(in.Channel.Name);
 
@@ -133,13 +161,104 @@ def sum(iterable):
         return starlark.MakeInt(int(v)), nil;
     }
 
+    post_internal := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+        var raw_url string = "";
+        var headers map[string]string = nil;
+        var data []byte = nil;
+        var user_json string = "";
+        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "url", &raw_url, "?headers", &headers, "?data", &data, "?json", &user_json); err != nil {
+            return nil, err;
+        }
+
+        post_url, err := url.Parse(raw_url);
+        if err != nil {
+            return nil, err;
+        }
+
+        var post_header http.Header;
+        if (headers != nil) {
+            for k, v := range headers {
+                post_header.Set(k, v);
+            }
+        }
+
+        mauthor := Author{
+            Name: in.MessageAuthor.Name,
+            Id: in.MessageAuthor.Id,
+            AvatarUrl: in.MessageAuthor.AvatarUrl,
+            Color: in.MessageAuthor.Color,
+            Discrim: in.MessageAuthor.Discriminator,
+            Roles: in.MessageAuthor.Roles,
+            Nick: in.MessageAuthor.Nick,
+            Permissions: in.MessageAuthor.Permissions,
+        }
+
+        sauthor := Author{
+            Name: in.ScriptAuthor.Name,
+            Id: in.ScriptAuthor.Id,
+            AvatarUrl: in.ScriptAuthor.AvatarUrl,
+            Color: in.ScriptAuthor.Color,
+            Discrim: in.ScriptAuthor.Discriminator,
+            Roles: in.ScriptAuthor.Roles,
+            Nick: in.ScriptAuthor.Nick,
+            Permissions: in.ScriptAuthor.Permissions,
+        }
+
+        mauthor_json, err := json.Marshal(mauthor);
+        if err != nil {
+            return nil, err;
+        }
+
+        sauthor_json, err := json.Marshal(sauthor);
+        if err != nil {
+            return nil, err;
+        }
+        post_header.Set("X-Arch-Author", string(mauthor_json));
+        post_header.Set("X-Arch-Script-Author", string(sauthor_json));
+        post_header.Set("User-Agent", "Mozilla/5.0 (compatible; Architus/1.0; +https://archit.us");
+
+        var req http.Request;
+        req.Method = http.MethodPost;
+        req.URL = post_url;
+        req.Header = post_header;
+        if (user_json != "") {
+            req.Body = ioutil.NopCloser(strings.NewReader(user_json));
+        } else if (data != nil) {
+            req.Body = ioutil.NopCloser(bytes.NewReader(data));
+        } else {
+            req.Body = nil;
+        }
+
+        var client http.Client;
+        resp, err := client.Do(&req);
+        if err != nil {
+            return nil, err;
+        }
+
+        limited_body := io.LimitReader(resp.Body, MaxMessageSize);
+        bytes, err := io.ReadAll(limited_body);
+        if err != nil {
+            return nil, err;
+        }
+        resp.Body.Close();
+
+        resp_code := starlark.MakeInt(resp.StatusCode);
+        body := starlark.String(bytes);
+        tup := make([]starlark.Value, 2);
+        tup[0] = resp_code;
+        tup[1] = body;
+        return starlark.Tuple(tup), nil;
+    }
+
     // This tells the interpreter what all of our builtins are. Struct is a starlark-go specific functionality that
     // allows for creating a struct from kwarg values.
+    // TODO(jjohnson): Add get and post builtins
     predeclared := starlark.StringDict{
         "random": starlark.NewBuiltin("random", random),
         "randint": starlark.NewBuiltin("randint", randint),
         "sin": starlark.NewBuiltin("sin", sin),
         "struct": starlark.NewBuiltin("struct", starlarkstruct.Make),
+        "post_internal": starlark.NewBuiltin("post_internal", post_internal),
         "message_content_full": starlark.String(in.TriggerMessage.Content),
         "message_clean_full": starlark.String(in.TriggerMessage.Clean),
         "caps": starlark.NewList(caps),
