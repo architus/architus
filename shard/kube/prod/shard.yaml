@@ -5,6 +5,7 @@ metadata:
   labels:
     app: shard
 spec:
+  replicas: 10
   selector:
     matchLabels:
       app: shard
@@ -16,6 +17,12 @@ spec:
       containers:
         - name: shard
           image: "{{prefix}}shard:{{tag}}"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "1"
           envFrom:
           - secretRef:
               name: architus-secret
+      imagePullSecrets:
+        - name: regcred

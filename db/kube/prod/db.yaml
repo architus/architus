@@ -22,6 +22,8 @@ spec:
           volumeMounts:
             - name: db-persistent-storage
               mountPath: /app/current_migration
+      imagePullSecrets:
+        - name: regcred
       volumes:
         - name: db-persistent-storage
           persistentVolumeClaim:

@@ -1,38 +1,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: api
+  name: redis
   labels:
-    app: api
+    app: redis
 spec:
-  replicas: 3
   selector:
     matchLabels:
-      app: api
+      app: redis
   template:
     metadata:
       labels:
-        app: api
+        app: redis
     spec:
       containers:
-        - name: api
-          image: "{{prefix}}api:{{tag}}"
-          envFrom:
-          - secretRef:
-              name: architus-secret
+        - name: redis
+          image: "{{prefix}}redis:{{tag}}"
       imagePullSecrets:
         - name: regcred
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: api
+  name: redis
   namespace: default
 spec:
   type: ClusterIP
   selector:
-    app: api
+    app: redis
   ports:
   - protocol: TCP
-    port: 5000
-    targetPort: 5000
+    port: 6379
+    targetPort: 6379

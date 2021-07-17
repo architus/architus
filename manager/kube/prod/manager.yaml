@@ -26,6 +26,8 @@ spec:
         - name: manager-persistent-storage
           persistentVolumeClaim:
             claimName: manager-claim
+      imagePullSecrets:
+        - name: regcred
 ---
 apiVersion: v1
 kind: Service
