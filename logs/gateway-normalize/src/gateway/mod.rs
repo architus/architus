@@ -92,7 +92,7 @@ impl ProcessorFleet {
     ) -> Self {
         Self {
             processors: HashMap::new(),
-            id_provisioner: IdProvisioner::new(None),
+            id_provisioner: IdProvisioner::new(logger.clone()),
             client,
             config,
             emojis,

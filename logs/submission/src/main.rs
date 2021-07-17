@@ -165,7 +165,7 @@ impl SubmissionServiceImpl {
     ) -> Self {
         Self {
             config,
-            id_provisioner: IdProvisioner::new(Some(logger.clone())),
+            id_provisioner: IdProvisioner::new(logger.clone()),
             event_tx,
             logger,
         }

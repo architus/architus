@@ -66,7 +66,7 @@ impl Publisher {
             active_guilds,
             config: Arc::clone(&config),
             logger: logger.clone(),
-            id_provisioner: IdProvisioner::new(Some(logger.clone())),
+            id_provisioner: IdProvisioner::new(logger.clone()),
             handle_factory: Arc::new(HandleFactory::new(
                 queue_connection,
                 update_tx,
