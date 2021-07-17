@@ -16,6 +16,8 @@ spec:
       containers:
         - name: redis
           image: "{{prefix}}redis:{{tag}}"
+      imagePullSecrets:
+        - name: regcred
 ---
 apiVersion: v1
 kind: Service

@@ -16,9 +16,15 @@ spec:
       containers:
         - name: starlark-reactor
           image: "{{prefix}}starlark-reactor:{{tag}}"
+          resources:
+            limits:
+              memory: "1Gi"
+              cpu: "1"
           envFrom:
           - secretRef:
               name: architus-secret
+      imagePullSecrets:
+        - name: regcred
 ---
 apiVersion: v1
 kind: Service
