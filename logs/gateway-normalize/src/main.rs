@@ -15,7 +15,7 @@ use crate::event::NormalizedEvent;
 use crate::gateway::{EventWithSource, ProcessingError, ProcessorFleet};
 use crate::rpc::gateway_queue_lib::GatewayEvent;
 use crate::rpc::logs::submission::Client as LogsImportClient;
-use anyhow::{Context, Result};
+use anyhow::Context;
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
@@ -33,7 +33,7 @@ use twilight_http::Client;
 
 /// Loads the config and bootstraps the service
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     // Parse the config
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
@@ -64,7 +64,7 @@ async fn main() -> Result<()> {
 /// acting as a consumer for the Rabbit MQ gateway-queue messages
 /// and running them through a processing pipeline
 /// before forwarding them to the submission service
-async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
+async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     // Create a Discord API client
     let client = Client::new(&config.secrets.discord_token);
 
@@ -112,7 +112,7 @@ async fn normalize_gateway_events(
     processor: Arc<ProcessorFleet>,
     config: Arc<Configuration>,
     logger: Logger,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     // Keep looping over the lifecycle,
     // allowing for the state to be eagerly restored after a disconnection
     // using the same backoff as initialization.
@@ -179,7 +179,7 @@ impl ReconnectionState {
         }
     }
 
-    async fn wait(&mut self) -> Result<()> {
+    async fn wait(&mut self) -> anyhow::Result<()> {
         if let Some(last_start) = self.last_start {
             let running_time = Instant::now().duration_since(last_start);
             if running_time > self.threshold {
@@ -208,7 +208,7 @@ async fn run_consume(
     processor: Arc<ProcessorFleet>,
     config: Arc<Configuration>,
     logger: Logger,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     // Start listening to the queue by creating a consumer
     // (we have to convert the Stream to a TryStream before using `try_for_each_concurrent`)
     let channel = create_channel(&rmq_connection, Arc::clone(&config)).await?;
@@ -275,7 +275,7 @@ async fn run_consume(
 async fn create_channel(
     rmq_connection: &Connection,
     config: Arc<Configuration>,
-) -> Result<Channel> {
+) -> anyhow::Result<Channel> {
     // Create a temporary channel
     let rmq_channel = rmq_connection
         .create_channel()
@@ -308,7 +308,7 @@ async fn normalize(
     event_bytes: &[u8],
     processor: Arc<ProcessorFleet>,
     logger: Logger,
-) -> Result<NormalizedEvent, EventRejection> {
+) -> anyhow::Result<NormalizedEvent, EventRejection> {
     let event = match GatewayEvent::decode(event_bytes) {
         Ok(event) => event,
         Err(err) => {
@@ -379,7 +379,7 @@ async fn submit_event(
     client: LogsImportClient,
     config: Arc<Configuration>,
     logger: Logger,
-) -> Result<(), EventRejection> {
+) -> anyhow::Result<(), EventRejection> {
     let send = || async {
         let mut client = client.clone();
         let response = client.submit_idempotent(event.clone().into_request()).await;

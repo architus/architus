@@ -1,6 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     // Compile the logs/submission protobuf definitions into the server code
     tonic_build::configure()
         .build_client(false)

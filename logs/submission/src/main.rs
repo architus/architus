@@ -12,7 +12,7 @@ use crate::rpc::logs::submission::submission_service_server::{
     SubmissionService, SubmissionServiceServer,
 };
 use crate::rpc::logs::submission::{SubmitIdempotentRequest, SubmitIdempotentResponse};
-use anyhow::{Context, Result};
+use anyhow::Context;
 use architus_id::IdProvisioner;
 use bytes::Bytes;
 use elasticsearch::Elasticsearch;
@@ -30,7 +30,7 @@ use tonic::{Request, Response, Status};
 
 /// Loads the config and bootstraps the service
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     // Parse the config
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
 }
 
 /// Attempts to connect to external services and prepare the submission pipeline
-async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
+async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     // Connect to Elasticsearch
     let elasticsearch =
         Arc::new(connect::to_elasticsearch(Arc::clone(&config), logger.clone()).await?);
@@ -96,7 +96,7 @@ async fn serve_grpc(
     submission_service: SubmissionServiceImpl,
     addr: SocketAddr,
     logger: Logger,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let submission_server = SubmissionServiceServer::new(submission_service);
     let server = Server::builder().add_service(submission_server);
 
@@ -118,7 +118,7 @@ async fn submit_events(
     logger: Logger,
     event_rx: mpsc::UnboundedReceiver<submission::Event>,
     elasticsearch: Arc<Elasticsearch>,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let next_correlation_id = Arc::new(AtomicUsize::new(1));
 
     // Batch together events and then process them as batches
@@ -177,7 +177,7 @@ impl SubmissionService for SubmissionServiceImpl {
     async fn submit_idempotent(
         &self,
         request: Request<SubmitIdempotentRequest>,
-    ) -> Result<Response<SubmitIdempotentResponse>, tonic::Status> {
+    ) -> anyhow::Result<Response<SubmitIdempotentResponse>, tonic::Status> {
         let timestamp = architus_id::time::millisecond_ts();
         let event = request
             .into_inner()

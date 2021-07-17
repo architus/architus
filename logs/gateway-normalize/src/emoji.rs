@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 use std::collections::HashMap;
 
 /// Represents a database of emoji shortcodes
@@ -12,7 +12,7 @@ pub struct Db {
 impl Db {
     /// Loads the emoji database from the URL,
     /// which should contain a JSON document of shortcode->emoji mappings
-    pub async fn load(url: impl AsRef<str>) -> Result<Self> {
+    pub async fn load(url: impl AsRef<str>) -> anyhow::Result<Self> {
         // Download and parse the JSON
         let url = url.as_ref();
         let body = reqwest::get(url)

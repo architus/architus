@@ -2,7 +2,6 @@ use crate::config::Configuration;
 use crate::rpc;
 use crate::rpc::feature_gate::{BatchCheck, Client as FeatureGateClient, GuildFeature};
 use crate::uptime::Event as UptimeEvent;
-use anyhow::Result;
 use futures::{Stream, StreamExt};
 use slog::Logger;
 use static_assertions::assert_impl_all;
@@ -198,7 +197,7 @@ impl ActiveGuilds {
     pub async fn pipe_uptime_events(
         &self,
         in_stream: impl Stream<Item = UptimeEvent>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         // Process each item in order and do not shut down the service if it fails
         in_stream
             .for_each(|event| async {
@@ -229,7 +228,7 @@ impl ActiveGuilds {
     /// Note: clippy lint ignore is due to bug I discovered;
     /// remove once `https://github.com/rust-lang/rust-clippy/issues/6446` is addressed
     #[allow(clippy::await_holding_lock)]
-    pub async fn go_poll(&self) -> Result<()> {
+    pub async fn go_poll(&self) -> anyhow::Result<()> {
         loop {
             tokio::time::sleep(self.config.active_guilds_poll_interval).await;
             slog::debug!(self.logger, "executing polling logic for active guild set");

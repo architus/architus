@@ -1,7 +1,7 @@
 //! Contains configuration options for the service that control its network topology
 //! and internal behaviors
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use architus_config_backoff::Backoff;
 use serde::Deserialize;
 use sloggers::terminal::TerminalLoggerConfig;
@@ -49,7 +49,7 @@ pub struct Services {
 
 impl Configuration {
     /// Attempts to load the config from the file, called once at startup
-    pub fn try_load(path: impl AsRef<str>) -> Result<Self> {
+    pub fn try_load(path: impl AsRef<str>) -> anyhow::Result<Self> {
         let path = path.as_ref();
         // Use config to load the values and merge with the environment
         let mut settings = config::Config::default();

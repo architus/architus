@@ -1,6 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::Context;
 
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     // Compile the feature-gate protobuf definitions into the client code
     tonic_build::configure()
         .build_client(true)

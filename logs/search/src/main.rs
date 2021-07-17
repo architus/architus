@@ -9,7 +9,7 @@ mod stored_event;
 
 use crate::config::Configuration;
 use crate::graphql::SearchProvider;
-use anyhow::{Context, Result};
+use anyhow::Context;
 use hyper::http::{Method, Request, Response, StatusCode};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Server};
@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 /// Loads the config and bootstraps the service
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> anyhow::Result<()> {
     // Parse the config
     let config_path = std::env::args().nth(1).expect(
         "no config path given \
@@ -49,7 +49,7 @@ async fn main() -> Result<()> {
 }
 
 /// Attempts to initialize the service and listen GraphQL requests
-async fn run(config: Arc<Configuration>, logger: Logger) -> Result<()> {
+async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     // Connect to Elasticsearch
     let elasticsearch =
         Arc::new(connect::to_elasticsearch(Arc::clone(&config), logger.clone()).await?);
@@ -67,7 +67,7 @@ async fn serve_http(
     search: SearchProvider,
     config: Arc<Configuration>,
     logger: Logger,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), config.graphql.http_port);
     let new_service = make_service_fn(move |_| {
         let search = search.clone();
