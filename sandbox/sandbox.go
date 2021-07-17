@@ -44,6 +44,34 @@ type Author struct {
     Permissions uint64
 }
 
+func sin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+    var rad float64 = 0.0;
+    if err := starlark.UnpackArgs(b.Name(), args, kwargs, "rad", &rad); err != nil {
+        return nil, err;
+    }
+
+    return starlark.Float(math.Sin(rad)), nil;
+}
+
+func random(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+    return starlark.Float(rand.Float64()), nil;
+}
+
+func randint(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+    var low int = 0;
+    var high int = 1;
+    if err := starlark.UnpackArgs(b.Name(), args, kwargs, "low", &low, "high", &high); err != nil {
+        return nil, err;
+    }
+
+    r := rand.Float64();
+    var v float64 = float64(high - low);
+    v *= r;
+    v += float64(low);
+
+    return starlark.MakeInt(int(v)), nil;
+}
+
 func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
     /*
     These are some of the builtin things that are there for the user's convenience.
@@ -133,33 +161,6 @@ def post(url, headers=None, data=None, j=None):
     script += in.Script;
 
     // These next few functions are go defined builtins. What they do should be fairly self explanatory.
-    sin := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-        var rad float64 = 0.0;
-        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "rad", &rad); err != nil {
-            return nil, err;
-        }
-
-        return starlark.Float(math.Sin(rad)), nil;
-    }
-
-    random := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-        return starlark.Float(rand.Float64()), nil;
-    }
-
-    randint := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-        var low int = 0;
-        var high int = 1;
-        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "low", &low, "high", &high); err != nil {
-            return nil, err;
-        }
-
-        r := rand.Float64();
-        var v float64 = float64(high - low);
-        v *= r;
-        v += float64(low);
-
-        return starlark.MakeInt(int(v)), nil;
-    }
 
     get := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
         var raw_url string = "";
