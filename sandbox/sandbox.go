@@ -161,6 +161,87 @@ def post(url, headers=None, data=None, j=None):
         return starlark.MakeInt(int(v)), nil;
     }
 
+    get := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+        var raw_url string = "";
+        var headers map[string]string = nil;
+        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "url", &raw_url, "?headers", &headers); err != nil {
+            return nil, err;
+        }
+
+        get_url, err := url.Parse(raw_url);
+        if err != nil {
+            return nil, err;
+        }
+
+        var get_header http.Header;
+        if (headers != nil) {
+            for k, v := range headers {
+                get_header.Set(k, v);
+            }
+        }
+
+        mauthor := Author{
+            Name: in.MessageAuthor.Name,
+            Id: in.MessageAuthor.Id,
+            AvatarUrl: in.MessageAuthor.AvatarUrl,
+            Color: in.MessageAuthor.Color,
+            Discrim: in.MessageAuthor.Discriminator,
+            Roles: in.MessageAuthor.Roles,
+            Nick: in.MessageAuthor.Nick,
+            Permissions: in.MessageAuthor.Permissions,
+        }
+
+        sauthor := Author{
+            Name: in.ScriptAuthor.Name,
+            Id: in.ScriptAuthor.Id,
+            AvatarUrl: in.ScriptAuthor.AvatarUrl,
+            Color: in.ScriptAuthor.Color,
+            Discrim: in.ScriptAuthor.Discriminator,
+            Roles: in.ScriptAuthor.Roles,
+            Nick: in.ScriptAuthor.Nick,
+            Permissions: in.ScriptAuthor.Permissions,
+        }
+
+        mauthor_json, err := json.Marshal(mauthor);
+        if err != nil {
+            return nil, err;
+        }
+
+        sauthor_json, err := json.Marshal(sauthor);
+        if err != nil {
+            return nil, err;
+        }
+
+        get_header.Set("X-Arch-Author", string(mauthor_json));
+        get_header.Set("X-Arch-Script-Author", string(sauthor_json));
+        get_header.Set("User-Agent", "Mozilla/5.0 (compatible; Architus/1.0; +https://archit.us");
+
+        var req http.Request;
+        req.Method = http.MethodGet;
+        req.URL = get_url;
+        req.Header = get_header;
+
+        var client http.Client;
+        resp, err := client.Do(&req);
+        if err != nil {
+            return nil, err;
+        }
+
+        limited_body := io.LimitReader(resp.Body, MaxMessageSize);
+        bytes, err := io.ReadAll(limited_body);
+        if err != nil {
+            return nil, err;
+        }
+        resp.Body.Close();
+
+        resp_code := starlark.MakeInt(resp.StatusCode);
+        body := starlark.String(bytes);
+        tup := make([]starlark.Value, 2);
+        tup[0] = resp_code;
+        tup[1] = body;
+        return starlark.Tuple(tup), nil;
+    }
+
     post_internal := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
         var raw_url string = "";
         var headers map[string]string = nil;
@@ -259,6 +340,7 @@ def post(url, headers=None, data=None, j=None):
         "sin": starlark.NewBuiltin("sin", sin),
         "struct": starlark.NewBuiltin("struct", starlarkstruct.Make),
         "post_internal": starlark.NewBuiltin("post_internal", post_internal),
+        "get": starlark.NewBuiltin("get", get),
         "message_content_full": starlark.String(in.TriggerMessage.Content),
         "message_clean_full": starlark.String(in.TriggerMessage.Clean),
         "caps": starlark.NewList(caps),
