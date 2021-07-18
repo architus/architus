@@ -25,5 +25,6 @@ RUN apt-get update -q \
     && apt-get install -y -q "libssl1.1" "tini" \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /opt/logs-uptime /usr/bin/logs-uptime
+COPY $SERVICE/config.default.toml /etc/architus/config.toml
 ENV RUST_BACKTRACE=1
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-uptime"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-uptime", "/etc/architus/config.toml"]

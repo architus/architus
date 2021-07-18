@@ -40,5 +40,6 @@ RUN apt-get update -q \
     && apt-get install -y -q "libssl1.1" "tini" "ca-certificates" \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /opt/logs-gateway-normalize /usr/bin/logs-gateway-normalize
+COPY $SERVICE/config.default.toml /etc/architus/config.toml
 ENV RUST_BACKTRACE=1
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-gateway-normalize"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-gateway-normalize", "/etc/architus/config.toml"]
