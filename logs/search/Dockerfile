@@ -1,11 +1,17 @@
+ARG REPO_ROOT=/opt/architus
+ARG SERVICE=logs/search
+ARG LOGS_LIB=lib/id-rs
+ARG CONFIG_BACKOFF_LIB=lib/config-backoff-rs
+ARG PROTO=lib/ipc/proto
+
 # Build service
 FROM rust:1.52 as builder
+ARG REPO_ROOT
+ARG SERVICE
+ARG LOGS_LIB
+ARG CONFIG_BACKOFF_LIB
+ARG PROTO
 RUN rustup component add rustfmt
-ENV REPO_ROOT=/opt/architus
-ENV SERVICE=logs/search
-ENV LOGS_LIB=lib/id-rs
-ENV CONFIG_BACKOFF_LIB=lib/config-backoff-rs
-ENV PROTO=lib/ipc/proto
 # Copy logs/search service itself
 WORKDIR $REPO_ROOT/$SERVICE
 COPY $SERVICE/src src
@@ -30,7 +36,8 @@ RUN cp $REPO_ROOT/$SERVICE/target/release/logs-search /opt/logs-search
 
 # Create minimal deployment
 FROM debian:buster-slim as deployment
-ARG DEBIAN_FRONTEND=noninteractive
+ARG SERVICE
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -q \
     && apt-get install -y -q "libssl1.1" "tini" \
     && rm -rf /var/lib/apt/lists/*
