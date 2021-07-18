@@ -1,9 +1,13 @@
+ARG REPO_ROOT=/opt/architus
+ARG SERVICE=logs/uptime
+ARG PROTO=lib/ipc/proto
+
 # Build service
 FROM rust:1.48 as builder
+ARG REPO_ROOT
+ARG SERVICE
+ARG PROTO
 RUN rustup component add rustfmt
-ENV REPO_ROOT=/opt/architus
-ENV SERVICE=logs/uptime
-ENV PROTO=lib/ipc/proto
 # Copy logs/uptime service itself
 WORKDIR $REPO_ROOT/$SERVICE
 COPY $SERVICE/src src
@@ -20,7 +24,8 @@ RUN cp $REPO_ROOT/$SERVICE/target/release/logs-uptime /opt/logs-uptime
 
 # Create minimal deployment
 FROM debian:buster-slim as deployment
-ARG DEBIAN_FRONTEND=noninteractive
+ARG SERVICE
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -q \
     && apt-get install -y -q "libssl1.1" "tini" \
     && rm -rf /var/lib/apt/lists/*
