@@ -20,17 +20,14 @@ COPY $GATEWAY_QUEUE_LIB/proto proto
 # Copy shared id library
 WORKDIR $REPO_ROOT/$LOGS_LIB
 COPY $LOGS_LIB/src src
-COPY $LOGS_LIB/Cargo.lock .
 COPY $LOGS_LIB/Cargo.toml .
 # Copy shared amqp pool library
 WORKDIR $REPO_ROOT/$AMQP_POOL_LIB
 COPY $AMQP_POOL_LIB/src src
-COPY $AMQP_POOL_LIB/Cargo.lock .
 COPY $AMQP_POOL_LIB/Cargo.toml .
 # Copy shared config backoff library
 WORKDIR $REPO_ROOT/$CONFIG_BACKOFF_LIB
 COPY $CONFIG_BACKOFF_LIB/src src
-COPY $CONFIG_BACKOFF_LIB/Cargo.lock .
 COPY $CONFIG_BACKOFF_LIB/Cargo.toml .
 # Copy protobuf definitions
 WORKDIR $REPO_ROOT/$PROTO
