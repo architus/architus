@@ -36,5 +36,6 @@ RUN apt-get update -q \
     && apt-get install -y -q "libssl1.1" "tini" \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /opt/logs-submission /usr/bin/logs-submission
+COPY $SERVICE/config.default.toml /etc/architus/config.toml
 ENV RUST_BACKTRACE=1
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-submission"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-submission", "/etc/architus/config.toml"]

@@ -134,7 +134,7 @@ if 'logs-gateway-ingress' in enabled:
         docker_build_with_restart('logs-gateway-ingress-image', '.', dockerfile='logs/gateway-ingress/Dockerfile.tilt', only=["logs/gateway-ingress/target/debug/logs-gateway-ingress", "logs/gateway-ingress/config.toml"],
                                   entrypoint=['/usr/bin/logs-gateway-ingress', '/etc/architus/config.toml'], live_update=[sync('logs/gateway-ingress/target/debug/logs-gateway-ingress', '/usr/bin/logs-gateway-ingress'), sync('logs/gateway-ingress/config.toml', '/etc/architus/config.toml')])
     else:
-        docker_build('logs-gateway-ingress-image', '.', dockerfile='logs/gateway-ingress/Dockerfile', ignore=["*", "!logs/gateway-ingress/**", "!lib/**"])
+        docker_build('logs-gateway-ingress-image', '.', dockerfile='logs/gateway-ingress/Dockerfile', ignore=["*", "!logs/gateway-ingress/**", "!lib/**", "!logs/gateway-queue-lib/**"])
     k8s_yaml('logs/gateway-ingress/kube/dev/logs-gateway-ingress.yaml')
     k8s_resource('logs-gateway-ingress')
 
@@ -151,7 +151,7 @@ if 'logs-gateway-normalize' in enabled:
         docker_build_with_restart('logs-gateway-normalize-image', '.', dockerfile='logs/gateway-normalize/Dockerfile.tilt', only=["logs/gateway-normalize/target/debug/logs-gateway-normalize", "logs/gateway-normalize/config.toml"],
                                   entrypoint=['/usr/bin/logs-gateway-normalize', '/etc/architus/config.toml'], live_update=[sync('logs/gateway-normalize/target/debug/logs-gateway-normalize', '/usr/bin/logs-gateway-normalize'), sync('logs/gateway-normalize/config.toml', '/etc/architus/config.toml')])
     else:
-        docker_build('logs-gateway-normalize-image', '.', dockerfile='logs/gateway-normalize/Dockerfile', ignore=["*", "!logs/gateway-normalize/**", "!lib/**"])
+        docker_build('logs-gateway-normalize-image', '.', dockerfile='logs/gateway-normalize/Dockerfile', ignore=["*", "!logs/gateway-normalize/**", "!lib/**", "!logs/gateway-queue-lib/**"])
     k8s_yaml('logs/gateway-normalize/kube/dev/logs-gateway-normalize.yaml')
     k8s_resource('logs-gateway-normalize')
 
