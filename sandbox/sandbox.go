@@ -18,6 +18,7 @@ import (
     "io";
     "io/ioutil";
     "bytes";
+    "os";
 
     context "context";
     grpc "google.golang.org/grpc";
@@ -418,6 +419,12 @@ func main() {
         ),
     );
     rpc.RegisterSandboxServer(grpcServer, newServer());
-    fmt.Println("Starting server");
+    proxy := os.Getenv("HTTP_PROXY");
+    if proxy != "" {
+        fmt.Print("Starting production server with proxy: ");
+        fmt.Println(proxy);
+    } else {
+        fmt.Println("Starting debug server without a proxy");
+    }
     grpcServer.Serve(lis);
 }
