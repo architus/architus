@@ -231,7 +231,7 @@ async fn stop_record(ctx: &Context, msg: &Message, _args: Args) -> CommandResult
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     sleep(Duration::from_secs(10));
     SimpleLogger::new()
         .with_level(LevelFilter::Info)
@@ -240,14 +240,20 @@ async fn main() {
         .unwrap();
     info!("Starting recording microservice");
 
-    let token = env::var("bot_token").expect("Need bot token in environment");
+    let config_path = std::env::args().nth(1).expect(
+        "no config path given \
+        \nUsage: \
+        \nrecord-service [config-path]",
+    );
+
+    let config = Configuration::try_load(&config_path)?);
 
     let framework = StandardFramework::new().configure(|c| c.prefix("!"));
 
     let songbird = Songbird::serenity();
     songbird.set_config(DriverConfig::default().decode_mode(DecodeMode::Decode));
 
-    let mut client = Client::builder(&token)
+    let mut client = Client::builder(&config.secrets.discord_token)
         .event_handler(Handler)
         .framework(framework)
         .register_songbird_with(songbird.into())

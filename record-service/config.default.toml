@@ -1,0 +1,2 @@
+[services]
+postgres = "postgres:5432"
