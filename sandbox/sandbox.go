@@ -5,6 +5,7 @@ import (
     "go.starlark.net/starlark";
     "go.starlark.net/resolve";
     "go.starlark.net/starlarkstruct";
+    starlarkjson "go.starlark.net/lib/json"
     "log";
     "strings";
     "net";
@@ -19,6 +20,7 @@ import (
     "io/ioutil";
     "bytes";
     "os";
+    "errors";
 
     context "context";
     grpc "google.golang.org/grpc";
@@ -43,6 +45,21 @@ type Author struct {
     Nick string
     Display_name string
     Permissions uint64
+}
+
+func make_author(a *rpc.Author) Author {
+    new_author := Author{
+        Name: a.Name,
+        Id: a.Id,
+        AvatarUrl: a.AvatarUrl,
+        Color: a.Color,
+        Discrim: a.Discriminator,
+        Roles: a.Roles,
+        Nick: a.Nick,
+        Permissions: a.Permissions,
+    }
+
+    return new_author;
 }
 
 func sin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -73,6 +90,23 @@ func randint(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, 
     return starlark.MakeInt(int(v)), nil;
 }
 
+func parse_headers(request *http.Request, h starlark.Value) error {
+    if h.Type() != "dict" {
+        return errors.New("Second argument must be a dictionary");
+    }
+    for _, kv := range (h.(*starlark.Dict)).Items() {
+        if len(kv) != 2 {
+            return errors.New("Dictionary formatted incorrectly. How'd you do that?");
+        }
+        if kv[0].Type() != "string" || kv[1].Type() != "string" {
+            return errors.New("Dictionary must be of type string -> string");
+        }
+        request.Header.Set(strings.Trim(kv[0].String(), "'\"\\"), strings.Trim(kv[1].String(), "'\"\\"));
+    }
+
+    return nil;
+}
+
 func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
     /*
     These are some of the builtin things that are there for the user's convenience.
@@ -82,7 +116,6 @@ func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript)
     - print alias
     */
     const functions = `
-load("json.star", "json")
 p = print
 def choice(iterable):
     n = len(iterable)
@@ -98,10 +131,22 @@ def sum(iterable):
 def post(url, headers=None, data=None, j=None):
     if j != None:
         j = json.encode(j)
-    (resp_code, body) = post_internal(url, headers, data, j)
-    json_values = json.decode(body)
-    return (resp_code, json_values)
-    #return (resp_code, body)
+    (resp_code, body, is_json) = post_internal(url, headers, data, j)
+    if is_json:
+        json_values = json.decode(body)
+        return (resp_code, json_values)
+    else:
+        return (resp_code, body)
+def get(url, headers=None):
+    if headers == None:
+        (resp_code, body, is_json) = get_internal(url)
+    else:
+        (resp_code, body, is_json) = get_internal(url, headers)
+    if is_json:
+        json_values = json.decode(body)
+        return (resp_code, json_values)
+    else:
+        return (resp_code, body)
 
 `;
 
@@ -162,46 +207,32 @@ def post(url, headers=None, data=None, j=None):
 
     // These next few functions are go defined builtins. What they do should be fairly self explanatory.
 
-    get := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+    get_internal := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
         var raw_url string = "";
-        var headers map[string]string = nil;
-        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "url", &raw_url, "?headers", &headers); err != nil {
-            return nil, err;
+
+        if len(args) < 1 {
+            return nil, errors.New("Wrong number of arguments");
         }
 
-        get_url, err := url.Parse(raw_url);
+        if args[0].Type() != "string" {
+            return nil, errors.New("Url must be a string");
+        }
+
+        raw_url = strings.Trim(args[0].String(), "'\"\\");
+        req, err := http.NewRequest("GET", raw_url, nil);
         if err != nil {
             return nil, err;
         }
 
-        var get_header http.Header;
-        if (headers != nil) {
-            for k, v := range headers {
-                get_header.Set(k, v);
+        if len(args) == 2 {
+            err = parse_headers(req, args[1]);
+            if err != nil {
+                return nil, err;
             }
         }
 
-        mauthor := Author{
-            Name: in.MessageAuthor.Name,
-            Id: in.MessageAuthor.Id,
-            AvatarUrl: in.MessageAuthor.AvatarUrl,
-            Color: in.MessageAuthor.Color,
-            Discrim: in.MessageAuthor.Discriminator,
-            Roles: in.MessageAuthor.Roles,
-            Nick: in.MessageAuthor.Nick,
-            Permissions: in.MessageAuthor.Permissions,
-        }
-
-        sauthor := Author{
-            Name: in.ScriptAuthor.Name,
-            Id: in.ScriptAuthor.Id,
-            AvatarUrl: in.ScriptAuthor.AvatarUrl,
-            Color: in.ScriptAuthor.Color,
-            Discrim: in.ScriptAuthor.Discriminator,
-            Roles: in.ScriptAuthor.Roles,
-            Nick: in.ScriptAuthor.Nick,
-            Permissions: in.ScriptAuthor.Permissions,
-        }
+        sauthor := make_author(in.ScriptAuthor);
+        mauthor := make_author(in.MessageAuthor);
 
         mauthor_json, err := json.Marshal(mauthor);
         if err != nil {
@@ -213,17 +244,12 @@ def post(url, headers=None, data=None, j=None):
             return nil, err;
         }
 
-        get_header.Set("X-Arch-Author", string(mauthor_json));
-        get_header.Set("X-Arch-Script-Author", string(sauthor_json));
-        get_header.Set("User-Agent", "Mozilla/5.0 (compatible; Architus/1.0; +https://archit.us");
-
-        var req http.Request;
-        req.Method = http.MethodGet;
-        req.URL = get_url;
-        req.Header = get_header;
+        req.Header.Set("X-Arch-Author", string(mauthor_json));
+        req.Header.Set("X-Arch-Script-Author", string(sauthor_json));
+        req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Architus/1.0; +https://archit.us)");
 
         var client http.Client;
-        resp, err := client.Do(&req);
+        resp, err := client.Do(req);
         if err != nil {
             return nil, err;
         }
@@ -235,11 +261,20 @@ def post(url, headers=None, data=None, j=None):
         }
         resp.Body.Close();
 
+        json_content := false;
+        content, ok := resp.Header["Content-Type"];
+        if ok == true {
+            if len(content) > 0 {
+                json_content = content[0] == "application/json";
+            }
+        }
+
         resp_code := starlark.MakeInt(resp.StatusCode);
         body := starlark.String(bytes);
-        tup := make([]starlark.Value, 2);
+        tup := make([]starlark.Value, 3);
         tup[0] = resp_code;
         tup[1] = body;
+        tup[2] = starlark.Bool(json_content);
         return starlark.Tuple(tup), nil;
     }
 
@@ -248,11 +283,17 @@ def post(url, headers=None, data=None, j=None):
         var headers map[string]string = nil;
         var data []byte = nil;
         var user_json string = "";
-        if err := starlark.UnpackArgs(b.Name(), args, kwargs, "url", &raw_url, "?headers", &headers, "?data", &data, "?json", &user_json); err != nil {
-            return nil, err;
+
+        if len(args) != 1 {
+            return nil, errors.New("You can only pass the url as a positional argument");
         }
 
-        post_url, err := url.Parse(raw_url);
+        if args[0].Type() != "string" {
+            return nil, errors.New("Url must be a string");
+        }
+
+        raw_url = strings.Trim(args[0].String(), "'\"\\");
+        req, err := http.NewRequest("GET", raw_url, nil);
         if err != nil {
             return nil, err;
         }
@@ -297,7 +338,7 @@ def post(url, headers=None, data=None, j=None):
         }
         post_header.Set("X-Arch-Author", string(mauthor_json));
         post_header.Set("X-Arch-Script-Author", string(sauthor_json));
-        post_header.Set("User-Agent", "Mozilla/5.0 (compatible; Architus/1.0; +https://archit.us");
+        post_header.Set("User-Agent", "Mozilla/5.0 (compatible; Architus/1.0; +https://archit.us)");
 
         var req http.Request;
         req.Method = http.MethodPost;
@@ -341,13 +382,14 @@ def post(url, headers=None, data=None, j=None):
         "sin": starlark.NewBuiltin("sin", sin),
         "struct": starlark.NewBuiltin("struct", starlarkstruct.Make),
         "post_internal": starlark.NewBuiltin("post_internal", post_internal),
-        "get": starlark.NewBuiltin("get", get),
+        "get_internal": starlark.NewBuiltin("get_internal", get_internal),
         "message_content_full": starlark.String(in.TriggerMessage.Content),
         "message_clean_full": starlark.String(in.TriggerMessage.Clean),
         "caps": starlark.NewList(caps),
         "args": starlark.NewList(args),
         "auth_list": starlark.NewList(author),
         "channel_name": channel_name,
+        "json": starlarkjson.Module,
     };
 
     var messages []string;

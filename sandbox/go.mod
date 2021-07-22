@@ -1,6 +1,6 @@
 module sandbox
 
-go 1.15
+go 1.16
 
 require (
 	archit.us/sandbox v0.0.0
