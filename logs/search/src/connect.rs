@@ -10,7 +10,10 @@ use std::sync::Arc;
 
 /// Creates a new Elasticsearch client
 /// and pings it to ensure that the connection is live.
-pub async fn to_elasticsearch(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<Elasticsearch> {
+pub async fn to_elasticsearch(
+    config: Arc<Configuration>,
+    logger: Logger,
+) -> anyhow::Result<Elasticsearch> {
     let es_path = &config.services.elasticsearch;
     let es_transport =
         Transport::single_node(es_path).context("could not create elasticsearch client")?;

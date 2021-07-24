@@ -1,158 +1,179 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 
-use serde::{Deserialize, Serialize};
-use slog::Logger;
-use std::fmt;
-use std::process;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::convert::TryInto;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Difference between Unix epoch and Discord epoch
-/// (milliseconds since the first second of 2015)
-const DISCORD_EPOCH_OFFSET: u64 = 1_420_070_400_000;
-
-/// Handles atomic provisioning of `HoarFrost` Ids
+/// Operations related to processing Discord-generated snowflake IDs.
 ///
 /// See <https://discord.com/developers/docs/reference#snowflakes>
-#[derive(Debug)]
-pub struct IdProvisioner {
-    combined_process_id: u64,
-    internal_counter: AtomicU64,
-    logger: Logger,
+pub mod snowflake {
+    /// Difference between Unix epoch and Discord epoch
+    /// (milliseconds since the first second of 2015)
+    pub const DISCORD_EPOCH_OFFSET: u64 = 1_420_070_400_000;
+
+    /// Start position of the timestamp portion of the snowflake binary encoding.
+    const TIMESTAMP_BIT_OFFSET: isize = 22;
+
+    /// Naively converts a timestamp into an snowflake boundary.
+    /// This should not be used as an actual snowflake,
+    /// rather; it can be used as a range boundary for filtering/querying
+    #[must_use]
+    pub const fn bound_from_ts(timestamp: u64) -> u64 {
+        (timestamp - DISCORD_EPOCH_OFFSET) << TIMESTAMP_BIT_OFFSET
+    }
+
+    /// Extracts the creation timestamp of the given snowflake
+    #[must_use]
+    pub const fn extract_timestamp(snowflake: u64) -> u64 {
+        (snowflake >> TIMESTAMP_BIT_OFFSET) + DISCORD_EPOCH_OFFSET
+    }
 }
 
-impl IdProvisioner {
-    /// Creates a new `IdProvisioner` and examines the system configuration
-    /// for the PID and some MAC address
-    #[must_use]
-    pub fn new(logger: Logger) -> Self {
-        let mac_addr_significant = get_mac_address().map_or(0, |bytes| u64::from(bytes[0]));
-        let worker_id = mac_addr_significant & 0b1_1111;
-        let process_id = u64::from(process::id()) & 0b1_1111;
-        slog::info!(logger, "initializing id provisioner"; "worker_id" => worker_id, "process_id" => process_id);
-        Self {
-            combined_process_id: (worker_id << 17) | (process_id << 12),
-            internal_counter: AtomicU64::new(0),
-            logger,
+/// Gives a millisecond Unix timestamp.
+/// Internally panics if the system time is past approximately year 584,556,019 :)
+#[must_use]
+pub fn millisecond_ts() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis()
+        .try_into()
+        .expect("System time past year 584,556,019")
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Type {
+    LogEvent,
+}
+
+impl From<Type> for &'static str {
+    fn from(id_type: Type) -> Self {
+        match id_type {
+            Type::LogEvent => "lgev",
         }
     }
-
-    /// Atomically provisions a new Id
-    /// (mutates inner state but doesn't require &mut self because the mutation is atomic
-    /// and requiring mutability would make the API un-ergonomic)
-    #[must_use]
-    pub fn provision(&self) -> HoarFrost {
-        self.with_ts(time::millisecond_ts())
-    }
-
-    /// Atomically provisions a new Id using the given timestamp
-    /// (mutates inner state but doesn't require &mut self because the mutation is atomic
-    /// and requiring mutability would make the API un-ergonomic)
-    #[must_use]
-    pub fn with_ts(&self, timestamp: u64) -> HoarFrost {
-        // Note: we can use Ordering::Relaxed here because the overall ordering
-        // doesn't really matter; all that matters is that the operation is atomic
-        // (since the timestamp is at a more significant bit than the counter)
-        let increment = self.internal_counter.fetch_add(1, Ordering::Relaxed) & 0b1111_1111_1111;
-        let shifted_timestamp = (timestamp - DISCORD_EPOCH_OFFSET) << 22;
-        let id = increment | shifted_timestamp | self.combined_process_id;
-        slog::debug!(self.logger, "provisioned new ID"; "timestamp" => timestamp, "new_id" => id);
-        HoarFrost(id)
-    }
 }
 
-/// Attempts to get the first non-local MAC address of the current system
+/// Generates a new ID from the given ID type
 #[must_use]
-fn get_mac_address() -> Option<[u8; 6]> {
-    mac_address::get_mac_address()
-        .ok()
-        .flatten()
-        .map(mac_address::MacAddress::bytes)
+pub fn new(id_type: Type) -> String {
+    format_id(id_type, ksuid::Ksuid::generate())
 }
 
-/// Naively converts a timestamp into an ID boundary.
+#[derive(thiserror::Error, Debug)]
+pub enum WithTsError {
+    #[error("unix timestamp is too low; underflowed when converting")]
+    TimestampTooLow {
+        original: u64,
+        sec_timestamp: u64,
+        offset: u64,
+    },
+    #[error("unix timestamp is too high; exceeded u32 max after converting")]
+    TimestampTooHigh {
+        original: u64,
+        converted_timestamp: u64,
+    },
+}
+
+#[allow(clippy::cast_sign_loss)]
+const KSUID_TIMESTAMP_OFFSET: u64 = ksuid::EPOCH.sec as u64;
+
+/// Tries to generates a new ID from the given ID type and Unix MS timestamp.
+/// Returns `None` if the Unix millisecond timestamp can't be converted into a valid KSUID timestamp,
+/// which is an unsigned 32 bit integer
+/// representing the seconds since the KSUID epoch (March 5th, 2014).
+/// # Errors
+/// - Returns `WithTsError::TimestampTooLow` if the given timestamp
+/// underflowed when converting to a second timestamp based on the KSUID epoch
+/// - Returns `WithTsError::TimestampTooHigh` if the given timestamp
+/// couldn't safely fit into a `u32`
+/// even after being converted to a second timestamp based on the KSUID epoch
+pub fn with_ts(id_type: Type, ms_timestamp: u64) -> Result<String, WithTsError> {
+    let ksuid_timestamp: u32 = ms_timestamp_to_ksuid_timestamp(ms_timestamp)?;
+    let mut id = ksuid::Ksuid::generate();
+    id.set_timestamp(ksuid_timestamp);
+    Ok(format_id(id_type, id))
+}
+
+fn ms_timestamp_to_ksuid_timestamp(ms_timestamp: u64) -> Result<u32, WithTsError> {
+    // Calculate the second timestamp from the KSUID epoch
+    let sec_timestamp: u64 = ms_timestamp / 1_000;
+    let (ksuid_timestamp_u64, overflowed) = sec_timestamp.overflowing_sub(KSUID_TIMESTAMP_OFFSET);
+    if overflowed {
+        return Err(WithTsError::TimestampTooLow {
+            original: ms_timestamp,
+            sec_timestamp,
+            offset: KSUID_TIMESTAMP_OFFSET,
+        });
+    }
+    let ksuid_timestamp: u32 =
+        ksuid_timestamp_u64
+            .try_into()
+            .map_err(|_| WithTsError::TimestampTooHigh {
+                original: ms_timestamp,
+                converted_timestamp: ksuid_timestamp_u64,
+            })?;
+        
+    Ok(ksuid_timestamp)
+}
+
+fn format_id(id_type: Type, id: ksuid::Ksuid) -> String {
+    let id_type_str: &str = id_type.into();
+    format!("{}_{}", id_type_str, id.to_base62())
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ValidationError {
+    #[error("ID did not have underscore-separated prefix & ID components")]
+    NoPrefixOrID,
+    #[error("ID had too many underscores")]
+    TooManyUnderscores,
+    #[error("ID had unexpected prefix")]
+    WrongPrefix { actual: String, expected: String },
+    #[error("The ID couldn't be parsed")]
+    MalformedID(#[source] std::io::Error),
+}
+
+/// Validates the given ID, returning Ok(()) if it is valid
+/// # Errors
+/// The error result indicates that the ID wasn't valid,
+/// and the error enum inside gives more information
+/// on what specifically made it invalid.
+pub fn validate(id_type: Type, id: impl AsRef<str>) -> Result<(), ValidationError> {
+    // Parse the components
+    let components = id.as_ref().split('_').collect::<Vec<_>>();
+    if components.len() < 2 {
+        return Err(ValidationError::NoPrefixOrID);
+    }
+    if components.len() > 2 {
+        return Err(ValidationError::TooManyUnderscores);
+    }
+
+    // Validate the prefix
+    let expected_id_type_str: &str = id_type.into();
+    if components[0] != expected_id_type_str {
+        return Err(ValidationError::WrongPrefix {
+            actual: String::from(components[0]),
+            expected: String::from(expected_id_type_str),
+        });
+    }
+
+    match ksuid::Ksuid::from_base62(components[1]) {
+        Ok(_) => Ok(()),
+        Err(err) => Err(ValidationError::MalformedID(err)),
+    }
+}
+
+
+/// Naively converts a timestamp into an ID upper boundary.
 /// This should not be used as an actual ID,
 /// rather; it can be used as a range boundary for filtering/querying
 #[must_use]
-pub const fn id_bound_from_ts(timestamp: u64) -> u64 {
-    (timestamp - DISCORD_EPOCH_OFFSET) << 22
-}
-
-/// Extracts the creation timestamp of the given snowflake-format Id
-///
-/// See <https://discord.com/developers/docs/reference#snowflakes>
-#[must_use]
-pub const fn extract_timestamp(snowflake: u64) -> u64 {
-    (snowflake >> 22) + DISCORD_EPOCH_OFFSET
-}
-
-// Architus-style ID
-#[derive(Copy, Clone, PartialEq, Debug, Deserialize, Serialize)]
-pub struct HoarFrost(pub u64);
-
-impl HoarFrost {
-    /// Extracts the creation timestamp of the given hoar frost Id
-    ///
-    /// See <https://discord.com/developers/docs/reference#snowflakes>
-    #[must_use]
-    pub const fn extract_timestamp(self) -> u64 {
-        extract_timestamp(self.0)
-    }
-}
-
-impl From<HoarFrost> for u64 {
-    fn from(id: HoarFrost) -> Self {
-        id.0
-    }
-}
-
-impl fmt::Display for HoarFrost {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl slog::Value for HoarFrost {
-    fn serialize(&self, _rec: &slog::Record, key: slog::Key, serializer: &mut dyn slog::Serializer) -> slog::Result {
-        serializer.emit_u64(key, self.0)
-    }
-}
-
-/// Contains ID-related time operations
-pub mod time {
-    /// Gets the current millisecond unix timestamp
-    #[must_use]
-    pub fn millisecond_ts() -> u64 {
-        imp::millisecond_ts()
-    }
-
-    #[cfg(target_os = "linux")]
-    mod imp {
-        use libc::{clock_gettime, timespec, CLOCK_REALTIME};
-        use std::convert::TryFrom;
-
-        /// Invokes `clock_gettime` from time.h in libc to get a `timespec` struct
-        fn get_time() -> timespec {
-            let mut tp_out = timespec {
-                tv_nsec: 0_i64,
-                tv_sec: 0_i64,
-            };
-
-            // unsafe needed for FFI call to libc
-            // (it's (almost?) impossible for this call to break safety)
-            let result = unsafe { clock_gettime(CLOCK_REALTIME, &mut tp_out) };
-            if result != 0 {
-                // this should be impossible and indicates something is very wrong
-                // see https://linux.die.net/man/3/clock_gettime
-                panic!("clock_gettime returned non-zero result code")
-            }
-
-            tp_out
-        }
-
-        pub fn millisecond_ts() -> u64 {
-            let tp = get_time();
-            u64::try_from(tp.tv_nsec / 1_000_000).unwrap_or(0)
-                + u64::try_from(tp.tv_sec).unwrap_or(0) * 1_000
-        }
-    }
+pub fn upper_bound_from_ts(id_type: Type, ms_timestamp: u64) -> String {
+    let ksuid_timestamp: u32 = match ms_timestamp_to_ksuid_timestamp(ms_timestamp) {
+        Ok(ts) => ts,
+        Err(WithTsError::TimestampTooLow {.. }) => u32::MIN,
+        Err(WithTsError::TimestampTooHigh {.. }) => u32::MAX,
+    };
+    format_id(id_type, ksuid::Ksuid::new(ksuid_timestamp, [0xFF; 16]))
 }

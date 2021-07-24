@@ -446,7 +446,7 @@ where
 #[allow(clippy::unnecessary_wraps)]
 #[allow(dead_code)]
 const fn timestamp_from_id(id: u64, _ctx: Context<'_>) -> Result<u64, anyhow::Error> {
-    Ok(architus_id::extract_timestamp(id))
+    Ok(architus_id::snowflake::extract_timestamp(id))
 }
 
 /// Extractor function for a `u64` from a JSON string

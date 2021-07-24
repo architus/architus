@@ -6,7 +6,6 @@ use crate::rpc::logs::event::{
 use crate::rpc::logs::submission::{
     EntityRevisionMetadata, SubmitIdempotentRequest, SubmittedEvent,
 };
-use architus_id::HoarFrost;
 use std::convert::Into;
 use tonic::{IntoRequest, Request};
 
@@ -14,9 +13,9 @@ use tonic::{IntoRequest, Request};
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, PartialEq, Debug)]
 pub struct NormalizedEvent {
-    /// Id using snowflake format,
+    /// "lgev_" Prefixed ksuid ID,
     /// using the *time that the event was received by wherever it's ingested*
-    pub id: HoarFrost,
+    pub id: String,
     /// Unix timestamp of the *time of the underlying event* (if available)
     pub timestamp: u64,
     /// The source data, including the original gateway/audit log entries
@@ -59,7 +58,7 @@ impl From<NormalizedEvent> for SubmittedEvent {
         let (content, content_metadata) = original.content.split();
         Self {
             inner: Some(LogEvent {
-                id: original.id.0,
+                id: original.id,
                 timestamp: original.timestamp,
                 source: Some(original.source.into()),
                 origin: original.origin.into(),

@@ -7,7 +7,6 @@ use crate::uptime::active_guilds::ActiveGuilds;
 use crate::uptime::UpdateMessage;
 use anyhow::{anyhow, Context};
 use architus_amqp_pool::{Manager, Pool, PoolError};
-use architus_id::{time, HoarFrost, IdProvisioner};
 use backoff::backoff::Backoff;
 use deadpool::Runtime;
 use futures::{join, try_join, FutureExt, Stream, StreamExt};
@@ -46,7 +45,6 @@ pub struct Publisher {
     active_guilds: ActiveGuilds,
     config: Arc<Configuration>,
     logger: Logger,
-    id_provisioner: IdProvisioner,
     handle_factory: Arc<HandleFactory>,
     reconnect_rx: Option<mpsc::UnboundedReceiver<ReconnectRequest>>,
 }
@@ -66,7 +64,6 @@ impl Publisher {
             active_guilds,
             config: Arc::clone(&config),
             logger: logger.clone(),
-            id_provisioner: IdProvisioner::new(logger.clone()),
             handle_factory: Arc::new(HandleFactory::new(
                 queue_connection,
                 update_tx,
@@ -162,11 +159,13 @@ impl Publisher {
     /// This can cause events to start being dropped on the bounded queue.
     async fn publish_event(&self, event: Event) {
         // Provision an ID and note the timestamp immediately
-        let timestamp = time::millisecond_ts();
-        let id = self.id_provisioner.with_ts(timestamp);
+        // (creating the ID from the timestamp can never fail
+        // unless the system time is past the maximum for ksuid, which is year ~2100)
+        let timestamp = architus_id::millisecond_ts();
+        let id = architus_id::with_ts(architus_id::Type::LogEvent, timestamp).unwrap();
         let logger = self.logger.new(slog::o!(
             "event_timestamp" => timestamp,
-            "event_id" => id,
+            "event_id" => id.clone(),
         ));
 
         // Create the `GatewayEvent` from the raw event
@@ -660,7 +659,7 @@ async fn declare_event_queue(
 fn convert_raw_event(
     event: Event,
     timestamp: u64,
-    id: HoarFrost,
+    id: String,
     logger: &Logger,
 ) -> Option<GatewayEvent> {
     if let Event::ShardPayload(Payload { bytes }) = event {
@@ -737,7 +736,7 @@ fn convert_raw_event(
             );
 
             return Some(GatewayEvent {
-                id: id.0,
+                id,
                 ingress_timestamp: timestamp,
                 inner: inner_json_bytes,
                 event_type: event_type_str.to_owned(),

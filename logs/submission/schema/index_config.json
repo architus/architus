@@ -2,7 +2,7 @@
   "mappings": {
     "properties": {
       "id": {
-        "type": "unsigned_long"
+        "type": "keyword"
       },
       "timestamp": {
         "type": "date",

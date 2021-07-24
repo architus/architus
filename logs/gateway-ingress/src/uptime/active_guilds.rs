@@ -255,7 +255,7 @@ impl ActiveGuilds {
 
             // Acquire a write lock and merge the results of the polling into the map
             let mut guilds_write = self.guilds.write().expect("active guilds lock poisoned");
-            let timestamp = architus_id::time::millisecond_ts();
+            let timestamp = architus_id::millisecond_ts();
             let mut edges = EdgeDetector::new();
             for (guild_id, is_active) in poll_results {
                 // Only update the status if it is still in the map
@@ -467,7 +467,7 @@ impl ActiveGuilds {
             rpc::into_backoff(result)
         };
         let result = backoff::future::retry(self.config.rpc_backoff.build(), send).await;
-        let timestamp = architus_id::time::millisecond_ts();
+        let timestamp = architus_id::millisecond_ts();
         let is_active = result.map_or_else(|err| {
             slog::warn!(
                 self.logger,

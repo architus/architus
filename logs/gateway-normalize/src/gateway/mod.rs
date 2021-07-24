@@ -11,7 +11,6 @@ use crate::rpc::gateway_queue_lib::GatewayEvent;
 use crate::rpc::logs::event::EventType;
 use crate::{audit_log, util};
 use anyhow::Context as _;
-use architus_id::IdProvisioner;
 use futures::try_join;
 use jmespath::Variable;
 use slog::Logger;
@@ -71,7 +70,6 @@ impl ProcessingError {
 /// into `NormalizedEvent`s
 pub struct ProcessorFleet {
     processors: HashMap<String, Processor>,
-    id_provisioner: IdProvisioner,
     client: Client,
     config: Arc<Configuration>,
     emojis: Arc<crate::emoji::Db>,
@@ -92,7 +90,6 @@ impl ProcessorFleet {
     ) -> Self {
         Self {
             processors: HashMap::new(),
-            id_provisioner: IdProvisioner::new(logger.clone()),
             client,
             config,
             emojis,
@@ -115,7 +112,7 @@ impl ProcessorFleet {
     ) -> Result<NormalizedEvent, ProcessingError> {
         if let Some(processor) = self.processors.get(&event.inner.event_type) {
             let logger = self.logger.new(slog::o!(
-                "event_id" => event.inner.id,
+                "event_id" => event.inner.id.clone(),
                 "event_ingress_timestamp" => event.inner.ingress_timestamp,
                 "event_type" => event.inner.event_type.clone(),
                 "event_guild_id" => event.inner.guild_id
@@ -123,7 +120,6 @@ impl ProcessorFleet {
             processor
                 .apply(
                     event,
-                    &self.id_provisioner,
                     &self.client,
                     &self.config,
                     &self.emojis,
@@ -158,7 +154,6 @@ impl Processor {
     pub async fn apply<'a>(
         &self,
         event: EventWithSource,
-        id_provisioner: &'a IdProvisioner,
         client: &'a Client,
         config: &'a Configuration,
         emojis: &'a crate::emoji::Db,
@@ -174,7 +169,6 @@ impl Processor {
         let ctx = Context {
             event: &event,
             source: &source,
-            id_provisioner,
             audit_log_entry: LockReader::new(&audit_log_lock),
             client,
             config,
@@ -217,7 +211,7 @@ impl Processor {
         let origin = source.origin();
 
         Ok(NormalizedEvent {
-            id: architus_id::HoarFrost(id),
+            id,
             timestamp,
             source,
             origin,
@@ -287,7 +281,6 @@ pub struct CombinedAuditLogEntry {
 pub struct Context<'a> {
     event: &'a GatewayEvent,
     source: &'a serde_json::Value,
-    id_provisioner: &'a IdProvisioner,
     audit_log_entry: LockReader<'a, Option<CombinedAuditLogEntry>>,
     client: &'a Client,
     config: &'a Configuration,

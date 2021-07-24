@@ -89,7 +89,7 @@ impl TrackerState {
             // (ignores the propagation delay from source to here,
             // but since this processor is synchronous,
             // this should be negligible and provides a more ergonomic upstream API)
-            let timestamp = architus_id::time::millisecond_ts();
+            let timestamp = architus_id::millisecond_ts();
             slog::debug!(
                 logger,
                 "processing connection tracking update";
@@ -203,7 +203,7 @@ fn pool_update_to_uptime(update: DebouncedPoolUpdate<u64>) -> Vec<UptimeEvent> {
     // Use the timestamp that the debounced pool update is processed
     // since it can contain any backing items that happened at any point
     // from t_now to t_now - debounced_delay
-    let timestamp = architus_id::time::millisecond_ts();
+    let timestamp = architus_id::millisecond_ts();
 
     let mut updates = Vec::new();
     if let Some(added) = update.added {
