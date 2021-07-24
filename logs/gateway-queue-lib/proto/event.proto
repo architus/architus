@@ -4,9 +4,9 @@ package gateway_queue_lib;
 // Represents a half-serialized gateway event that exists on the durable RMQ queue
 // before it gets normalized into a standard log event
 message GatewayEvent {
-  // Unique snowflake-formatted Id
+  // "lgev_" Prefixed ksuid ID
   // that will be eventually used to idempotently import a gateway-originating log event
-  fixed64 id = 1;
+  string id = 1;
   // Timestamp that the event was received,
   // used to build the unique hoar frost ID
   uint64 ingress_timestamp = 2;

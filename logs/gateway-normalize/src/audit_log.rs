@@ -122,7 +122,7 @@ impl Strategy {
         match self {
             Self::First => true,
             Self::GrowingInterval { max } => {
-                let timestamp = architus_id::time::millisecond_ts();
+                let timestamp = architus_id::millisecond_ts();
                 // Construct the interval based on how much time has elapsed
                 // since the start
                 let ratio: f64 = max.as_secs_f64() / search.max_duration().as_secs_f64();
@@ -133,7 +133,7 @@ impl Strategy {
                 let upper = timing.target.saturating_add(interval_width);
 
                 // Only match if the entry's timestamp is inside the interval
-                let entry_ts = architus_id::extract_timestamp(entry.id.0);
+                let entry_ts = architus_id::snowflake::extract_timestamp(entry.id.0);
                 entry_ts > lower && entry_ts < upper
             }
         }
@@ -150,7 +150,7 @@ where
     P: Fn(&AuditLogEntry) -> bool,
 {
     let mut backoff = search.make_backoff();
-    let start = architus_id::time::millisecond_ts();
+    let start = architus_id::millisecond_ts();
     let timing = SearchTiming {
         start,
         target: search.target_timestamp.unwrap_or(start),
@@ -243,7 +243,7 @@ where
                 }
 
                 // determine whether to continue
-                let oldest_timestamp = oldest.map_or(0, |i| architus_id::extract_timestamp(i.0));
+                let oldest_timestamp = oldest.map_or(0, |i| architus_id::snowflake::extract_timestamp(i.0));
                 if (timing.target - oldest_timestamp) > time_threshold {
                     break;
                 }

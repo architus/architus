@@ -13,7 +13,6 @@ use crate::rpc::logs::submission::submission_service_server::{
 };
 use crate::rpc::logs::submission::{SubmitIdempotentRequest, SubmitIdempotentResponse};
 use anyhow::Context;
-use architus_id::IdProvisioner;
 use bytes::Bytes;
 use elasticsearch::Elasticsearch;
 use futures::{try_join, StreamExt};
@@ -152,7 +151,6 @@ async fn submit_events(
 
 struct SubmissionServiceImpl {
     config: Arc<Configuration>,
-    id_provisioner: IdProvisioner,
     event_tx: mpsc::UnboundedSender<submission::Event>,
     logger: Logger,
 }
@@ -165,7 +163,6 @@ impl SubmissionServiceImpl {
     ) -> Self {
         Self {
             config,
-            id_provisioner: IdProvisioner::new(logger.clone()),
             event_tx,
             logger,
         }
@@ -178,7 +175,7 @@ impl SubmissionService for SubmissionServiceImpl {
         &self,
         request: Request<SubmitIdempotentRequest>,
     ) -> anyhow::Result<Response<SubmitIdempotentResponse>, tonic::Status> {
-        let timestamp = architus_id::time::millisecond_ts();
+        let timestamp = architus_id::millisecond_ts();
         let event = request
             .into_inner()
             .event
@@ -201,13 +198,39 @@ impl SubmissionService for SubmissionServiceImpl {
             inner.timestamp = timestamp;
         }
 
-        // Provision an Id if needed
-        if inner.id == 0 {
-            inner.id = self.id_provisioner.with_ts(timestamp).0;
+        // Provision an ID if needed
+        if inner.id == "" {
+            inner.id =
+                architus_id::with_ts(architus_id::Type::LogEvent, timestamp).map_err(|err| {
+                    slog::warn!(
+                        self.logger,
+                        "could not create ID for timestamp";
+                        "event" => ?inner,
+                        "timestamp" => timestamp,
+                        "error" => ?err,
+                    );
+                    Status::invalid_argument("invalid timestamp")
+                })?;
+        } else {
+            // Validate the ID given
+            if let Err(err) = architus_id::validate(architus_id::Type::LogEvent, &inner.id) {
+                slog::warn!(
+                    self.logger,
+                    "given ID was invalid";
+                    "event_id" => inner.id.clone(),
+                    "event" => ?inner,
+                    "timestamp" => timestamp,
+                    "error" => ?err,
+                );
+                return Err(Status::invalid_argument(format!(
+                    "invalid id given: {:?}",
+                    err
+                )));
+            }
         }
 
         // Serialize the inner event to JSON
-        let logger = self.logger.new(slog::o!("event_id" => inner.id));
+        let logger = self.logger.new(slog::o!("event_id" => inner.id.clone()));
         let json = serde_json::to_vec(&inner).map_err(|err| {
             slog::warn!(
                 logger,
@@ -215,7 +238,7 @@ impl SubmissionService for SubmissionServiceImpl {
                 "event" => ?inner,
                 "error" => ?err,
             );
-            Status::invalid_argument(format!("could not encode event to JSON {:?}", err))
+            Status::invalid_argument(format!("could not encode event to JSON: {:?}", err))
         })?;
         let json_body = Bytes::from(json);
 

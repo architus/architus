@@ -235,7 +235,7 @@ async fn run_consume(
                             let event_type_str = format!("{:?}", event.event_type);
                             let logger = logger.new(slog::o!(
                                 "event_type" => event_type_str,
-                                "event_id" => event.id,
+                                "event_id" => event.id.clone(),
                                 "guild_id" => event.guild_id,
                                 "event_timestamp" => event.timestamp,
                             ));
@@ -328,7 +328,7 @@ async fn normalize(
 
     let logger = logger.new(slog::o!(
         "gateway_event_type" => event.event_type.clone(),
-        "event_id" => event.id,
+        "event_id" => event.id.clone(),
         "guild_id" => event.guild_id,
     ));
 

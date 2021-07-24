@@ -29,7 +29,7 @@ pub type Result = std::result::Result<usize, Failure>;
 
 #[derive(Debug)]
 pub struct Event {
-    pub event_id: u64,
+    pub event_id: String,
     pub event_json: Bytes,
     pub notifier: oneshot::Sender<Result>,
 }
@@ -204,7 +204,7 @@ impl BatchSubmit {
         slog::debug!(
             self.logger,
             "preparing to send batch of events to elasticsearch";
-            "event_ids" => ?self.events.iter().map(|event| event.event_id).collect::<Vec<_>>()
+            "event_ids" => ?self.events.iter().map(|event| &event.event_id).cloned().collect::<Vec<_>>()
         );
 
         // Construct all of the bulk operations as separate JSON objects
@@ -295,7 +295,7 @@ impl BatchSubmit {
                         self.logger,
                         "trivial serialization of index operation failed";
                         "error" => ?err,
-                        "event_id" => event.event_id,
+                        "event_id" => event.event_id.clone(),
                     )
                 })
                 // Unwrap here because this should never fail
@@ -344,44 +344,42 @@ impl BatchSubmit {
         let mut id_to_event = self
             .events
             .into_iter()
-            .map(|event| (event.event_id, event))
+            .map(|event| (event.event_id.clone(), event))
             .collect::<BTreeMap<_, _>>();
         for response_item in response.items {
             if let Some(action) = unwrap_index_action(&response_item, &self.logger) {
                 let logger = self.logger.new(slog::o!("event_id" => action.id.clone()));
-                if let Some(id) = unwrap_action_id(action, &logger) {
-                    // Remove the event from the map to move ownership of it
-                    let event = if let Some(event) = id_to_event.remove(&id) {
-                        event
-                    } else {
-                        slog::warn!(
-                            logger,
-                            "response item from elasticsearch contained unknown or duplicate event id; ignoring";
-                            "response_item" => ?response_item,
-                        );
-                        continue;
-                    };
+                let id = &action.id;
 
-                    // Create the submission result depending on whether an error occurred or not
-                    let submission_result = match &action.error {
-                        Some(err) => Err(Failure {
-                            status: Status::internal(
-                                "Elasticsearch failed index operation for event",
-                            ),
-                            internal_details: format!("error object: {:?}", err),
-                            correlation_id: self.correlation_id,
-                        }),
-                        None => Ok(self.correlation_id),
-                    };
+                // Remove the event from the map to move ownership of it
+                let event = if let Some(event) = id_to_event.remove(id) {
+                    event
+                } else {
+                    slog::warn!(
+                        logger,
+                        "response item from elasticsearch contained unknown or duplicate event id; ignoring";
+                        "response_item" => ?response_item,
+                    );
+                    continue;
+                };
 
-                    // Notify the submitter
-                    if let Err(send_err) = event.notifier.send(submission_result) {
-                        slog::warn!(
-                            logger,
-                            "sending submission result to notifier failed; ignoring";
-                            "error" => ?send_err,
-                        );
-                    }
+                // Create the submission result depending on whether an error occurred or not
+                let submission_result = match &action.error {
+                    Some(err) => Err(Failure {
+                        status: Status::internal("Elasticsearch failed index operation for event"),
+                        internal_details: format!("error object: {:?}", err),
+                        correlation_id: self.correlation_id,
+                    }),
+                    None => Ok(self.correlation_id),
+                };
+
+                // Notify the submitter
+                if let Err(send_err) = event.notifier.send(submission_result) {
+                    slog::warn!(
+                        logger,
+                        "sending submission result to notifier failed; ignoring";
+                        "error" => ?send_err,
+                    );
                 }
             }
         }
@@ -401,27 +399,6 @@ fn unwrap_index_action<'a, 'b>(
                 logger,
                 "response item from elasticsearch missing 'index' action field, ignoring";
                 "response_item" => ?response_item,
-            );
-
-            None
-        }
-    }
-}
-
-/// Attempts to unwrap the ID of the bulk result action,
-/// which should be the integer Snowflake ID of the log event.
-fn unwrap_action_id(
-    action: &crate::elasticsearch_api::bulk::ResultItemAction,
-    logger: &Logger,
-) -> Option<u64> {
-    match action.id.parse::<u64>() {
-        Ok(id) => Some(id),
-        Err(err) => {
-            slog::warn!(
-                logger,
-                "response item from elasticsearch had malformed id field";
-                "action" => ?action,
-                "error" => ?err,
             );
 
             None

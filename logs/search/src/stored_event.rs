@@ -24,7 +24,7 @@ pub struct StoredEvent(Event);
 impl StoredEvent {
     fn id(&self) -> String {
         // This field will always be present
-        self.0.id.to_string()
+        self.0.id.clone()
     }
 
     fn timestamp(&self) -> String {
