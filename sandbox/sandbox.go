@@ -82,6 +82,7 @@ func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript)
     - print alias
     */
     const functions = `
+load("json.star", "json")
 p = print
 def choice(iterable):
     n = len(iterable)
@@ -95,14 +96,12 @@ def sum(iterable):
         s += i
     return s
 def post(url, headers=None, data=None, j=None):
-    if j is not None:
+    if j != None:
         j = json.encode(j)
-    (resp_code, body) = internal_post(url, headers, data, j)
-    try:
-        json_values = json.decode(body)
-        return (resp_code, json_values)
-    except:
-        return (resp_code, body)
+    (resp_code, body) = post_internal(url, headers, data, j)
+    json_values = json.decode(body)
+    return (resp_code, json_values)
+    #return (resp_code, body)
 
 `;
 

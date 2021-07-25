@@ -202,8 +202,8 @@ class AutoResponse:
             else:
                 content.append(f"<{node.text}>")
         elif (node.type == NodeType.Eval):
-            script_author = msg.guild.get_member(self.author_id)
-            if script_author == None:
+            sauthor = msg.guild.get_member(self.author_id)
+            if sauthor is None:
                 sauthor = DefaultUser()
             output = await self.bot.sandbox_client.RunStarlarkScript(
                 message.StarlarkScript(
@@ -222,7 +222,7 @@ class AutoResponse:
                         name=msg.author.name,
                         nick="" if msg.author.nick is None else msg.author.nick,
                         disp_name=msg.author.display_name,
-                        permissions=msg.author.permissions
+                        permissions=msg.author.guild_permissions.value
                     ),
                     script_author=message.Author(
                         id=sauthor.id,
@@ -231,9 +231,9 @@ class AutoResponse:
                         discriminator=int(sauthor.discriminator),
                         roles=[r.id for r in sauthor.roles],
                         name=sauthor.name,
-                        nick="" if sauthor.nick is None else author.nick,
+                        nick="" if sauthor.nick is None else sauthor.nick,
                         disp_name=sauthor.display_name,
-                        permissions=sauthor.permissions
+                        permissions=sauthor.guild_permissions.value
                     ),
                     count=self.count,
                     captures=list(match.groups()),

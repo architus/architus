@@ -20,13 +20,13 @@ RUN apt-get -y install libxml2-dev libxslt-dev python-libxslt1 libpq-dev libffi-
 
 # Install architus re2 library
 RUN git clone https://github.com/architus/re2
-WORKDIR ./re2
+WORKDIR /app/re2
 RUN make install
 
 # Install pyre2 python library
 WORKDIR /app
 RUN git clone https://github.com/facebook/pyre2
-WORKDIR ./pyre2
+WORKDIR /app/pyre2
 RUN python3.8 setup.py build
 RUN python3.8 setup.py install
 RUN python3.8 setup.py check
@@ -41,17 +41,7 @@ RUN python3.8 -m pip install wheel
 RUN python3.8 -m pip install --trusted-host pypi.python.org -r requirements.txt
 #RUN apk del libpng-dev jpeg-dev libffi-dev libxml2-dev python3-dev libxslt-dev freetype-dev
 
-WORKDIR /app
-RUN mkdir -p /etc/cron.d
-RUN touch /var/log/cron.log
-RUN echo "@hourly root python3.8 -m pip install --upgrade youtube-dlc > /var/log/cron.log 2>&1\n# Empty line for syntax" >> /etc/cron.d/youtube-dl_update
-RUN chmod 0744 /etc/cron.d/youtube-dl_update
-RUN crontab /etc/cron.d/youtube-dl_update
-RUN cron
-RUN python3.8 -m pip install --upgrade youtube-dlc
-
 ENV PYTHONIOENCODING UTF-8
-
 
 # Copy the current directory contents into the container at /app
 COPY  ./shard/ /app/
@@ -59,4 +49,4 @@ COPY ./lib /app/lib
 
 # Run app.py when the container launches
 ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
-CMD cron && python3.8 -u bot.py
+CMD python3.8 -u bot.py

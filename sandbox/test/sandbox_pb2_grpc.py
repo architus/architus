@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import lib.ipc.sandbox_pb2 as sandbox__pb2
+import sandbox_pb2 as sandbox__pb2
 
 
 class SandboxStub(object):

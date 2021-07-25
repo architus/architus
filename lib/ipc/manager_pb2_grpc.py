@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import manager_pb2 as manager__pb2
+import lib.ipc.manager_pb2 as manager__pb2
 
 
 class ManagerStub(object):
