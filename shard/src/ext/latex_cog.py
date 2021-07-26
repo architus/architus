@@ -72,7 +72,7 @@ class Latexify(commands.Cog, name="Latex Compiler"):
                 return
 
             if not os.path.isfile(os.path.join(work_dir, 'out.dvi')):
-                output = stdout.decode('ascii')
+                output = stdout.decode('UTF-8')
 
                 # The only latex output that we want comes after the first '!'
                 # Pdflatex includes a bunch of boilerplate output at the beginning
