@@ -19,6 +19,8 @@ pub struct Configuration {
     pub log_index: String,
     /// Logging configuration (for service diagnostic logs, not Architus log events)
     pub logging: TerminalLoggerConfig,
+    /// Configuration for Rocket, the HTTP framework
+    pub rocket: rocket::Config,
 }
 
 /// Collection of external services that this service connects to
@@ -31,8 +33,6 @@ pub struct Services {
 /// Options related to the GraphQL search API
 #[derive(Debug, Deserialize, Clone)]
 pub struct GraphQL {
-    /// Port that the optional GraphQL HTTP server runs on
-    pub http_port: u16,
     /// Default limit of items to fetch in a single page if none is given
     pub default_page_size: usize,
     /// Limit on a single page's size
@@ -55,11 +55,13 @@ impl Configuration {
         // Use config to load the values and merge with the environment
         let mut settings = config::Config::default();
         settings
+            .set_default("rocket", rocket_config_defaults()?)
+            .context("could not set default Rocket config values")?
             .merge(config::File::with_name(path))
             .context(format!("Could not read in config file from {}", path))?
             // Add in settings from the environment (with a prefix of LOGS_SEARCH_CONFIG)
-            // Eg.. `LOGS_SEARCH_CONFIG_PORT=8080 ./target/logs-search`
-            // would set the `port` key tot 8080
+            // Eg.. `LOGS_SEARCH_CONFIG_LOG_INDEX=logs ./target/logs-search`
+            // would set the `log_index` key to logs
             .merge(config::Environment::with_prefix("LOGS_SEARCH_CONFIG").separator("__"))
             .context("could not merge in values from the environment")?;
         let config = settings
@@ -67,4 +69,13 @@ impl Configuration {
             .context("loading the Configuration struct from the merged config failed")?;
         Ok(config)
     }
+}
+
+/// Gets the `rocket::Config` default values as `config::Value` instance
+/// to be folded into a `config::Config` instance as a sub-key
+fn rocket_config_defaults() -> anyhow::Result<config::Value> {
+    config::Config::try_from(&rocket::Config::default())
+        .context("could not convert rocket::Config to config::Config")?
+        .try_into()
+        .context("could not convert config::Config to config::Value")
 }

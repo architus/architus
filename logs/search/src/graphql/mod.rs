@@ -31,7 +31,7 @@ impl SearchProvider {
                 elasticsearch: Arc::clone(elasticsearch),
                 config: Arc::new(config.graphql.clone()),
                 index: Arc::from(config.log_index.as_str()),
-                guild_id: None,
+                guild_id: 0,
                 channel_allowlist: None,
                 logger,
             }),
@@ -43,11 +43,11 @@ impl SearchProvider {
         }
     }
 
-    pub fn schema(&self) -> Arc<Schema> {
-        Arc::clone(&self.schema)
+    pub fn schema(&self) -> &Schema {
+        &self.schema
     }
 
-    pub fn context(&self, guild_id: Option<u64>, channel_allowlist: Option<Vec<u64>>) -> Context {
+    pub fn context(&self, guild_id: u64, channel_allowlist: Option<Vec<u64>>) -> Context {
         let mut context = (*self.base_context).clone();
         context.guild_id = guild_id;
         context.channel_allowlist = channel_allowlist;
@@ -66,7 +66,7 @@ pub struct Context {
     elasticsearch: Arc<Elasticsearch>,
     config: Arc<GraphQLConfig>,
     index: Arc<str>,
-    guild_id: Option<u64>,
+    guild_id: u64,
     channel_allowlist: Option<Vec<u64>>,
     logger: Logger,
 }
@@ -128,9 +128,7 @@ impl Query {
         let mut elasticsearch_params = ElasticsearchParams::from_inputs(&filter, &sort)?;
 
         // Add in the guild id filter
-        if let Some(guild_id) = context.guild_id.as_ref() {
-            elasticsearch_params.add_filter(json!({"match": {"guild_id": *guild_id}}));
-        }
+        elasticsearch_params.add_filter(json!({"match": {"guild_id": context.guild_id}}));
 
         // Add in the channel id filter
         if let Some(channel_id_allowlist) = context.channel_allowlist.as_ref() {

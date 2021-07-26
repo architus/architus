@@ -197,12 +197,16 @@ class ListGuilds(CustomResource):
 
 class LogsGraphql(CustomResource):
     @authenticated()
-    def get(self, guild_id: int, jwt: JWT):
+    def post(self, guild_id: int, jwt: JWT):
         resp, _ = self.shard.is_member(jwt.id, guild_id)
         if resp['admin'] is True:
             try:
-                r = requests.get(f'http://logs-search/graphql?guild_id={guild_id}')
-                return r.json(), r.status_code
+                r = requests.post(
+                    f'http://logs-search:8174/graphql/{guild_id}',
+                    headers={"Content-Type": "application/json"},
+                    data=request.data,
+                )
+                return Response(r.content, r.status_code, mimetype=r.headers['content-type'])
             except requests.exceptions.ConnectionError:
                 return {'message': "Unable to reach logs search service"}, StatusCodes.SERVICE_UNAVAILABLE_503
         else:
@@ -212,7 +216,7 @@ class LogsGraphql(CustomResource):
 class LogsPlayground(Resource):
     def get(self):
         try:
-            r = requests.get(f'http://logs-search/playground')
+            r = requests.get(f'http://logs-search:8174/playground')
             resp = make_response(r.text, r.status_code)
             resp.headers['content-type'] = r.headers['content-type']
             return resp

@@ -3,6 +3,7 @@
 mod config;
 mod connect;
 mod elasticsearch_api;
+mod fairings;
 mod graphql;
 mod proto;
 mod stored_event;
@@ -10,13 +11,12 @@ mod stored_event;
 use crate::config::Configuration;
 use crate::graphql::SearchProvider;
 use anyhow::Context;
-use hyper::http::{Method, Request, Response, StatusCode};
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Server};
+use rocket::response::content::Html;
+use rocket::response::status::BadRequest;
+use rocket::serde::json::Json;
+use rocket::State;
 use slog::Logger;
 use sloggers::Config;
-use std::convert::Infallible;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 /// Loads the config and bootstraps the service
@@ -55,50 +55,59 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
         Arc::new(connect::to_elasticsearch(Arc::clone(&config), logger.clone()).await?);
 
     let search = SearchProvider::new(&elasticsearch, Arc::clone(&config), logger.clone());
-    serve_http(search.clone(), Arc::clone(&config), logger.clone()).await?;
-
-    Ok(())
-}
-
-/// Starts the embedded HTTP server if configured,
-/// used to serve the GraphQL playground utility in development
-/// in addition to the normal graphql route needed to make it function
-async fn serve_http(
-    search: SearchProvider,
-    config: Arc<Configuration>,
-    logger: Logger,
-) -> anyhow::Result<()> {
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), config.graphql.http_port);
-    let new_service = make_service_fn(move |_| {
-        let search = search.clone();
-        async {
-            Ok::<_, Infallible>(service_fn(move |req| {
-                let search = search.clone();
-                async { Ok::<_, Error>(handle_http(req, search).await) }
-            }))
-        }
-    });
-
-    let server = Server::bind(&addr).serve(new_service);
-    slog::info!(logger, "serving GraphQL HTTP"; "address" => ?addr);
-    server
+    rocket::custom(config.rocket.clone())
+        .manage(search)
+        .mount("/", rocket::routes![playground, post_graphql, get_graphql])
+        .attach(fairings::request_id::Fairing::new())
+        .attach(fairings::attach_logger::Fairing::new(logger.clone()))
+        .attach(fairings::request_logging::Fairing::new(logger.clone()))
+        .launch()
         .await
-        .context("an error occurred while running the HTTP server")?;
+        .expect("server to launch");
 
     Ok(())
 }
 
-/// Hyper HTTP handler function used to serve the GraphQL playground & GraphQL query API
-async fn handle_http(req: Request<Body>, search: SearchProvider) -> Response<Body> {
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/playground") => juniper_hyper::playground("/graphql", None).await,
-        (&Method::GET, "/graphql") | (&Method::POST, "/graphql") => {
-            let context = Arc::new(search.context(None, None));
-            juniper_hyper::graphql(search.schema(), context, req).await
-        }
-        _ => Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::empty())
-            .unwrap(),
+#[derive(serde::Serialize, Debug, Clone)]
+struct ApiError {
+    message: String,
+}
+
+#[rocket::get("/playground")]
+fn playground() -> Html<String> {
+    juniper_rocket::playground_source("/graphql/000000000000000000", None)
+}
+
+#[rocket::post("/graphql/<guild_id>", data = "<request>")]
+async fn post_graphql(
+    guild_id: u64,
+    search: &State<SearchProvider>,
+    request: Option<juniper_rocket::GraphQLRequest>,
+) -> Result<juniper_rocket::GraphQLResponse, BadRequest<Json<ApiError>>> {
+    match request {
+        Some(request) => Ok(request
+            .execute(search.schema(), &search.context(guild_id, None))
+            .await),
+        None => Err(BadRequest(Some(Json(ApiError {
+            message: String::from("route requires JSON GraphQL request as body"),
+        })))),
+    }
+}
+
+#[rocket::get("/graphql/<guild_id>?<request..>")]
+async fn get_graphql(
+    guild_id: u64,
+    search: &State<SearchProvider>,
+    request: Option<juniper_rocket::GraphQLRequest>,
+) -> Result<juniper_rocket::GraphQLResponse, BadRequest<Json<ApiError>>> {
+    match request {
+        Some(request) => Ok(request
+            .execute(search.schema(), &search.context(guild_id, None))
+            .await),
+        None => Err(BadRequest(Some(Json(ApiError {
+            message: String::from(
+                "route requires JSON GraphQL request as 'request?' query parameter",
+            ),
+        })))),
     }
 }
