@@ -6,11 +6,14 @@ use crate::elasticsearch_api::search::{HitsTotal, Response as SearchResponse};
 use crate::graphql::inputs::{EventFilterInput, EventSortInput};
 use crate::stored_event::StoredEvent;
 use elasticsearch::{Elasticsearch, SearchParts};
-use juniper::{EmptyMutation, EmptySubscription, FieldResult, RootNode};
+use juniper::{graphql_value, EmptyMutation, EmptySubscription, FieldError, FieldResult, RootNode};
 use serde_json::json;
 use slog::Logger;
 use std::convert::TryFrom;
+use std::fmt;
+use std::str::FromStr;
 use std::sync::Arc;
+use thiserror::Error;
 
 /// Defines the context factory for search requests
 #[derive(Clone)]
@@ -143,9 +146,21 @@ impl Query {
         // Add in the snapshot field if given
         let mut previous_snapshot = None;
         if let Some(raw_snapshot) = snapshot {
-            let token = SnapshotToken(raw_snapshot);
-            elasticsearch_params.add_snapshot_filter(&token);
-            previous_snapshot = Some(token);
+            match FromStr::from_str(&raw_snapshot) {
+                Ok(token) => {
+                    elasticsearch_params.add_snapshot_filter(&token);
+                    previous_snapshot = Some(token);
+                }
+                Err(err) => {
+                    let message = format!("{:?}", err);
+                    return Err(FieldError::new(
+                        "Bad snapshot token given",
+                        graphql_value!({
+                            "internal": message,
+                        }),
+                    ));
+                }
+            }
         }
 
         // Reverse the sorts so that the most recently applied has the highest priority
@@ -267,23 +282,47 @@ pub struct PageInfo {
 #[derive(Debug, Clone)]
 pub struct SnapshotToken(String);
 
+impl fmt::Display for SnapshotToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &base64::encode(self.0.as_bytes()))
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum SnapshotParsingError {
+    #[error("could not decode snapshot token base64: {0}")]
+    FailedBase64Decode(base64::DecodeError),
+    #[error("could not decode inner bytes to UTF-8: {0}")]
+    FailedUtf8Decode(std::string::FromUtf8Error),
+}
+
 #[juniper::graphql_scalar(description = "SnapshotToken")]
 impl<S> juniper::GraphQLScalar for SnapshotToken
 where
     S: juniper::ScalarValue,
 {
     fn resolve(&self) -> juniper::Value {
-        juniper::Value::scalar(self.0.clone())
+        juniper::Value::scalar(self.to_string())
     }
 
     fn from_input_value(v: &juniper::InputValue) -> Option<Self> {
         v.as_scalar_value()
             .and_then(juniper::ScalarValue::as_str)
-            .map(|s| SnapshotToken(String::from(s)))
+            .and_then(|s| FromStr::from_str(s).ok())
     }
 
     fn from_str(value: juniper::parser::ScalarToken) -> juniper::ParseScalarResult<S> {
         <String as juniper::ParseScalarValue<S>>::from_str(value)
+    }
+}
+
+impl FromStr for SnapshotToken {
+    type Err = SnapshotParsingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let base64_bytes = base64::decode(s).map_err(SnapshotParsingError::FailedBase64Decode)?;
+        let id = String::from_utf8(base64_bytes).map_err(SnapshotParsingError::FailedUtf8Decode)?;
+        Ok(Self(id))
     }
 }
 
