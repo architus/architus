@@ -1,0 +1,24 @@
+{
+    "name": "set",
+    "description": "Sets an Auto Response",
+    "options": [
+      {
+        "type": 3,
+        "name": "trigger",
+        "description": "When to trigger the auto response",
+        "required": true
+      },
+      {
+        "type": 3,
+        "name": "response",
+        "description": "Sent when the auto response is triggered",
+        "required": true
+      },
+      {
+        "type": 5,
+        "name": "reply",
+        "description": "Reply to trigger",
+        "required": false
+      }
+    ]
+}

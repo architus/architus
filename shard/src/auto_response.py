@@ -2,6 +2,7 @@ import string
 from contextlib import suppress
 from typing import Optional, Tuple
 from random import choice
+from asyncio import sleep
 import json
 
 from discord import Message, Guild, Member, AllowedMentions
@@ -58,6 +59,7 @@ class AutoResponse:
         response_ast: str = "",
         mode: Optional[ResponseMode] = None,
         count: int = 0,
+        reply: bool = False,
         word_gen: Optional[WordGen] = None,
         emoji_manager: Optional[EmojiManager] = None
     ):
@@ -67,7 +69,9 @@ class AutoResponse:
         self.author_id = author_id
         self.guild_id = guild_id
         self.count = count
+        self.reply = reply
         self.word_gen = word_gen
+        self.settings = self.bot.settings[self.bot.get_guild(guild_id)]
 
         if id is None:
             self.id = bot.hoarfrost_gen.generate()
@@ -182,7 +186,10 @@ class AutoResponse:
                 content.append(string if string is not None else "")
 
         elif (node.type == NodeType.Url):
-            content.append(node.text)
+            if self.settings.responses_allow_embeds:
+                content.append(node.text)
+            else:
+                content.append(f"<{node.text}>")
         elif (node.type == NodeType.Eval):
             output = await self.bot.sandbox_client.RunStarlarkScript(
                 message.StarlarkScript(
@@ -221,7 +228,7 @@ class AutoResponse:
                 await self.resolve_resp(c, match, msg, content, reacts)
             return content, reacts
 
-    async def execute(self, msg: Message) -> Optional[Message]:
+    async def execute(self, msg: Message, overtaken) -> Optional[Message]:
         content = msg.content
 
         if self.mode == ResponseMode.REGEX:
@@ -237,8 +244,25 @@ class AutoResponse:
         content, reacts = await self.resolve_resp(self.response_ast, match, msg)
         content = "".join(content)
 
+        if not self.settings.responses_allow_newlines:
+            content = content.translate(str.maketrans('', '', '\n\r'))
+
+        limit = min(self.settings.responses_response_length, 2000)
+        if len(content) > limit:
+            content = f"*content of response was over{' discord' if limit >= 2000 else ''} character limit ({limit})*"
+
         if content.strip() != "":
-            resp_msg = await msg.channel.send(content, allowed_mentions=AllowedMentions(everyone=False))
+            await sleep(0.1)  # yield event loop so we can process whether we've been 'overtaken'
+            if self.reply or (overtaken is not None and overtaken.overtaken):
+                resp_msg = await msg.reply(
+                    content,
+                    allowed_mentions=AllowedMentions(everyone=False),
+                    mention_author=False)
+            else:
+                resp_msg = await msg.channel.send(
+                    content,
+                    allowed_mentions=AllowedMentions(everyone=False)
+                )
         else:
             resp_msg = None
         for emoji in reacts:
@@ -305,6 +329,7 @@ class GuildAutoResponses:
                     "",
                     r['mode'],
                     r['count'],
+                    r['reply'],
                     self.word_gen,
                     None)  # TODO
                 resp = await self.bot.loop.run_in_executor(self.executor, AutoResponse, *args)
@@ -316,18 +341,19 @@ class GuildAutoResponses:
     async def _insert_into_db(self, resp: AutoResponse) -> None:
         if self.no_db:
             return
-        await self.tb_auto_responses.insert_one((
-            resp.id,
-            resp.trigger,
-            resp.response,
-            resp.author_id,
-            resp.guild_id,
-            resp.trigger_regex,
-            resp.trigger_punctuation,
-            json.dumps(resp.response_ast.stringify()),
-            resp.mode,
-            resp.count
-        ))
+        await self.tb_auto_responses.insert({
+            'id': resp.id,
+            'trigger': resp.trigger,
+            'response': resp.response,
+            'author_id': resp.author_id,
+            'guild_id': resp.guild_id,
+            'trigger_regex': resp.trigger_regex,
+            'trigger_punctuation': resp.trigger_punctuation,
+            'response_ast': json.dumps(resp.response_ast.stringify()),
+            'mode': resp.mode,
+            'count': resp.count,
+            'reply': resp.reply,
+        })
 
     async def _delete_from_db(self, resp: AutoResponse) -> None:
         if self.no_db:
@@ -339,17 +365,18 @@ class GuildAutoResponses:
             return
         await self.tb_auto_responses.update_by_id({'count': resp.count}, resp.id)
 
-    async def execute(self, msg) -> Tuple[Optional[Message], Optional[AutoResponse]]:
+    async def execute(self, msg, overtaken=None) -> Tuple[Optional[Message], Optional[AutoResponse]]:
         if msg.author.bot:
             return None, None
         for r in self.auto_responses:
-            resp_msg = await r.execute(msg)
+            resp_msg = await r.execute(msg, overtaken)
             if resp_msg is not None:
                 await self._update_resp_db(r)
                 return resp_msg, r
         return None, None
 
-    async def new_response(self, trigger: str, response: str, guild: Guild, author: Member) -> AutoResponse:
+    async def new_response(
+            self, trigger: str, response: str, guild: Guild, author: Member, reply: bool = False) -> AutoResponse:
         """factory method for creating a guild-specific auto response"""
         if self.no_db:
             manager = None
@@ -368,6 +395,7 @@ class GuildAutoResponses:
             "",
             None,
             0,
+            reply,
             self.word_gen,
             manager)
 
@@ -380,7 +408,7 @@ class GuildAutoResponses:
         """helper method for removing guild-specific auto response"""
         for r in self.auto_responses:
             if r.trigger == trigger:
-                admin = r.author_id in self.settings.admin_ids
+                admin = author.id in self.settings.admin_ids
                 if not admin and self.settings.responses_only_author_remove and r.author_id != author.id:
                     raise PermissionException(r.author_id)
                 self.auto_responses.remove(r)

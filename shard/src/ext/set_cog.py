@@ -8,7 +8,14 @@ from lib.config import logger
 
 from contextlib import suppress
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+from collections import defaultdict
 import re
+
+
+@dataclass
+class MsgOvertaken:
+    overtaken: bool = False
 
 
 class AutoResponseCog(commands.Cog, name="Auto Responses"):
@@ -19,6 +26,7 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         self.response_msgs = {}
         self.react_msgs = {}
         self.executor = ThreadPoolExecutor(max_workers=5)
+        self.last_overtaken_ptrs = defaultdict(MsgOvertaken)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -29,8 +37,10 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
     async def on_message(self, msg):
         if not self.bot.settings[msg.channel.guild].responses_enabled:
             return
+        self.last_overtaken_ptrs[msg.guild.id].overtaken = True
         with suppress(KeyError):
-            resp_msg, response = await self.responses[msg.guild.id].execute(msg)
+            self.last_overtaken_ptrs[msg.guild.id] = MsgOvertaken(False)
+            resp_msg, response = await self.responses[msg.guild.id].execute(msg, self.last_overtaken_ptrs[msg.guild.id])
             if resp_msg is not None:
                 self.response_msgs[resp_msg.id] = response
 
@@ -79,16 +89,21 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
 
         match = re.match(f'^{prefix}remove (.+?)(::.+)?$', ctx.message.content.strip(), re.IGNORECASE)
         if match:
-            try:
-                resp = await self.responses[ctx.guild.id].remove(match[1], ctx.author)
-            except PermissionException as e:
-                member = ctx.guild.get_member(e.author_id)
-                whom = f"{member.display_name} or an admin" if member else "an admin"
-                await ctx.send(f"❌ please ask {whom} to remove this response")
-            except UnknownResponseException:
-                await ctx.send("❌ idk what response you want me to remove")
-            else:
-                await ctx.send(f"✅ `{resp}` _successfully removed_")
+            resp = await self._remove(ctx.guild, match[1], ctx.author)
+            if resp:
+                await ctx.send(resp)
+
+    async def _remove(self, guild, trigger, author):
+        try:
+            resp = await self.responses[guild.id].remove(trigger, author)
+        except PermissionException as e:
+            member = guild.get_member(e.author_id)
+            whom = f"{member.display_name} or an admin" if member else "an admin"
+            return f"❌ please ask {whom} to remove this response"
+        except UnknownResponseException:
+            return "❌ idk what response you want me to remove"
+        else:
+            return f"✅ `{resp}` _successfully removed_"
 
     @commands.command()
     @bot_commands_only
@@ -97,45 +112,73 @@ class AutoResponseCog(commands.Cog, name="Auto Responses"):
         """set <trigger>::<response>
         Sets an auto response.
         """
+        await self._set(ctx)
+
+    @commands.command()
+    @bot_commands_only
+    @doc_url("https://docs.archit.us/features/auto-responses/#setting-auto-responses")
+    async def setr(self, ctx):
+        """set <regex>::<response>
+        Sets a regex auto response.
+        """
+        await self._set(ctx, regex=True)
+
+    @commands.command()
+    @bot_commands_only
+    @doc_url("https://docs.archit.us/features/auto-responses/#setting-auto-responses")
+    async def reply(self, ctx):
+        """set <trigger>::<response>
+        Sets an auto response that will reply to the trigger message.
+        """
+        await self._set(ctx, regex=False, reply=True)
+
+    async def _set(self, ctx, regex=False, reply=False):
         settings = self.bot.settings[ctx.guild]
         prefix = re.escape(settings.command_prefix)
 
-        match = re.match(f'{prefix}set (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+        match = re.match(f'{prefix}\\w+ (.+?)::(.+)', ctx.message.content, re.IGNORECASE)
+        trigger = f"^{match[1]}$" if regex else match[1]
+
         if match:
-            try:
-                resp = await self.responses[ctx.guild.id].new_response(match[1], match[2], ctx.guild, ctx.author)
-            except TriggerCollisionException as e:
-                msg = "❌ sorry that trigger collides with the following auto responses:\n"
-                msg += '\n'.join([f"`{r}`" for r in e.conflicts[:4]])
-                if len(e.conflicts) > 4:
-                    msg += f"\n_...{len(e.conflicts) - 4} more not shown_"
-                await ctx.send(msg)
-            except LongResponseException:
-                await ctx.send(f"❌ that response is too long :confused: max length is "
-                               f"{settings.responses_response_length} characters")
-            except ShortTriggerException:
-                await ctx.send(
-                    f"❌ please make your trigger longer than {settings.responses_trigger_length} characters")
-            except UserLimitException:
-                await ctx.send(f"❌ looks like you've already used all your auto responses "
-                               f"in this server ({settings.responses_limit}), try deleting some")
-            except ParseError as e:
-                await ctx.send(f"❌ unable to parse that response: `{e}`")
-            except NotParseable as e:
-                await ctx.send(f"❌ unable to parse your trigger: `{e}`")
-            except DisabledException as e:
-                await ctx.send(f"❌ {e} disabled, you can enable in `{settings.command_prefix}settings responses`")
-            except Exception:
-                logger.exception("")
-                await ctx.send("❌ unknown error 😵")
-            else:
-                await ctx.send(f"✅ `{resp}` _successfully set_")
+            result = await self.new_response(trigger, match[2], ctx.guild, ctx.author, reply)
+            if result:
+                await ctx.send(result)
         else:
-            match = re.match(f'{prefix}set (.+?):(.+)', ctx.message.content, re.IGNORECASE)
+            match = re.match(f'{prefix}\\w+ ([^\\\\]+?):([^\\\\]+)', ctx.message.content, re.IGNORECASE)
             if match:
                 await ctx.send(f"❌ **nice brain** use two `::`\n`{prefix}set {match[1]}::{match[2]}`")
             else:
                 await ctx.send("❌ use the syntax: `trigger::response`")
+
+    async def new_response(self, trigger, response, guild, author, reply):
+        settings = await self.bot.settings.aio[guild]
+        try:
+            resp = await self.responses[guild.id].new_response(trigger, response, guild, author, reply)
+        except TriggerCollisionException as e:
+            msg = "❌ sorry that trigger collides with the following auto responses:\n"
+            msg += '\n'.join([f"`{r}`" for r in e.conflicts[:4]])
+            if len(e.conflicts) > 4:
+                msg += f"\n_...{len(e.conflicts) - 4} more not shown_"
+            return msg
+        except LongResponseException:
+            return f"❌ that response is too long :confused: max length is " \
+                   f"{settings.responses_response_length} characters"
+        except ShortTriggerException:
+            return f"❌ please make your trigger longer than {settings.responses_trigger_length} characters"
+        except UserLimitException:
+            return f"❌ looks like you've already used all your auto responses " \
+                   f"in this server ({settings.responses_limit}), try deleting some"
+        except ParseError as e:
+            return f"❌ unable to parse that response: `{e}`"
+        except NotParseable as e:
+            return f"❌ unable to parse your trigger: `{e}`"
+        except DisabledException as e:
+            return f"❌ {e} disabled, you can enable in `{settings.command_prefix}settings responses`"
+        except Exception:
+            logger.exception("")
+            return "❌ unknown error 😵"
+        else:
+            return f"✅ `{resp}` _successfully set_"
 
 
 def setup(bot):

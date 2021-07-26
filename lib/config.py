@@ -34,21 +34,20 @@ try:
     db_pass = os.environ['db_pass']
     client_id = os.environ['client_id']
     client_secret = os.environ['client_secret']
+    application_public_key = os.environ['application_public_key']
     domain_name = os.environ['domain_name']
     is_prod = domain_name == 'archit.us'
     jwt_secret = os.environ['jwt_secret']
     domain_name = os.environ['domain_name']
     alphavantage_api_key = os.environ['alphavantage_api_key']
-    twitter_consumer_key = os.environ['twitter_consumer_key']
-    twitter_consumer_secret = os.environ['twitter_consumer_secret']
-    twitter_access_token_key = os.environ['twitter_access_token_key']
-    twitter_access_token_secret = os.environ['twitter_access_token_secret']
     scraper_token = os.environ['scraper_bot_token']
-    spotify_client_secret = os.environ['spotify_client_secret']
+    twitch_client_id = os.environ['twitch_client_id']
+    twitch_client_secret = os.environ['twitch_client_secret']
+    twitch_hub_secret = os.environ['twitch_hub_secret']
 except KeyError:
     raise EnvironmentError("environment variables not set. Did you create architus.env?") from None
 
-API_ENDPOINT = 'https://discordapp.com/api/v6'
+API_ENDPOINT = 'https://discordapp.com/api/v8'
 REDIRECT_URI = f'https://api.{domain_name}/redirect'
 
 logger.debug("creating db engine...")

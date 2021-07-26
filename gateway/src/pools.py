@@ -72,6 +72,7 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
             guild.update({
                 'has_architus': mem_resp['member'] if sc == 200 else False,
                 'architus_admin': mem_resp['admin'] if sc == 200 else False,
+                'permissions': int(guild['permissions']),
             })
             remaining.append(guild)
     payload.update({'data': remaining, 'finished': True})

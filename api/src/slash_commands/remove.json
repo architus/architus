@@ -1,0 +1,12 @@
+{
+    "name": "remove",
+    "description": "Removes an Auto Response",
+    "options": [
+      {
+        "type": 3,
+        "name": "trigger",
+        "description": "Trigger pattern used to set the auto response",
+        "required": true
+      }
+    ]
+}

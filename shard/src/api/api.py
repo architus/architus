@@ -1,6 +1,7 @@
 import secrets
 from typing import List
 from asyncio import create_task
+import re
 
 from discord.ext.commands import Cog, Context
 import discord
@@ -13,7 +14,9 @@ from src.api.util import fetch_guild
 from src.api.pools import Pools
 from src.api.mock_discord import MockMember, MockMessage, LogActions, MockGuild
 from lib.ipc import manager_pb2 as message
-from src.utils import guild_to_dict
+from src.utils import guild_to_dict, lavasong_to_dict
+
+url_rx = re.compile(r'https?://(?:www\.)?.+')
 
 
 class Api(Cog):
@@ -68,13 +71,51 @@ class Api(Cog):
             })
         return {'guilds': all_guilds}, sc.OK_200
 
-    async def set_response(self, user_id, guild_id, trigger, response):
-        return {'message': 'unimplemented'}, 500
+    @fetch_guild
+    async def set_response(self, guild, member_id, trigger, response, reply):
+        member = guild.get_member(int(member_id))
+        responses = self.bot.cogs['Auto Responses']
+        result = await responses.new_response(trigger, response, guild, member, reply)
+
+        return {'content': result}, 200
 
     @fetch_guild
-    async def get_playlist(self, guild):
-        voice = self.bot.cogs['Voice'].voice_managers[guild.id]
-        return voice.q.as_dict(), sc.OK_200
+    async def remove_response(self, guild, member_id, trigger):
+        member = guild.get_member(int(member_id))
+        responses = self.bot.cogs['Auto Responses']
+        result = await responses._remove(guild, trigger, member)
+
+        return {'content': result}, 200
+
+    async def get_playlist(self, guild_id):
+        voice = self.bot.lavalink.player_manager.get(guild_id)
+        if voice is None:
+            return {}, sc.OK_200
+        else:
+            dicts = [lavasong_to_dict(s) for s in voice.queue]
+            return {'playlist': dicts}, sc.OK_200
+
+    @fetch_guild
+    async def queue_song(self, guild, uid, song):
+        lava_cog = self.bot.cogs['Voice']
+        if guild is None:
+            return {}, sc.BAD_REQUEST_400
+        user = guild.get_member(uid)
+        if user is None:
+            return {}, sc.BAD_REQUEST_400
+
+        try:
+            await lava_cog.ensure_voice(user, guild, True)
+        except discord.CommandInvokeError:
+            return {}, sc.UNAUTHORIZED_401
+
+        added_songs = await lava_cog.enqueue(song, user, guild)
+        if added_songs == []:
+            return {}, sc.NOT_FOUND_404
+        elif added_songs[0] == 'playlist':
+            return {'playlist': added_songs}, sc.OK_200
+        else:
+            return {lavasong_to_dict(added_songs[1])}, sc.OK_200
 
     async def users_guilds(self, user_id):
         users_guilds = []
@@ -287,6 +328,11 @@ class Api(Cog):
         else:
             return {'error': "Unknown Pool"}, sc.BAD_REQUEST_400
 
+    async def twitch_update(self, stream):
+        twitch_update = self.bot.cogs['Twitch Notification']
+        await twitch_update.update(stream)
+        return {}, sc.OK_200
+
     async def handle_mock_user_action(
             self,
             action: int = None,
@@ -364,7 +410,10 @@ class Api(Cog):
                     async def ctx_send(content):
                         sends.append(content)
                     ctx.send = ctx_send
-                    await ctx.invoke(triggered_command, *args[1:])
+                    try:
+                        await ctx.invoke(triggered_command, *args[1:])
+                    except TypeError:
+                        await ctx.invoke(triggered_command)
                 else:
                     # no builtin, check for user set commands in this "guild"
                     for resp in responses[guild_id].auto_responses:

@@ -4,7 +4,7 @@ try:
 except ImportError:
     pass
 
-from lib.config import client_id, client_secret, REDIRECT_URI, API_ENDPOINT
+from lib.config import client_id, client_secret, REDIRECT_URI, API_ENDPOINT, secret_token
 
 template = {
     'client_id': client_id,
@@ -62,4 +62,22 @@ def refresh_token_request(refresh_token):
     data['grant_type'] = 'refresh_token',
     data['refresh_token'] = refresh_token
     r = requests.post(f'{API_ENDPOINT}/oauth2/token', data=data, headers=headers)
+    return r.json(), r.status_code
+
+
+def register_command(json_cmd):
+    url = f"{API_ENDPOINT}/applications/{client_id}/commands"
+    headers = {
+        "Authorization": f"Bot {secret_token}"
+    }
+    r = requests.post(url, headers=headers, json=json_cmd)
+    return r.json(), r.status_code
+
+
+def register_guild_command(guild_id, json_cmd):
+    url = f"{API_ENDPOINT}/applications/{client_id}/guilds/{guild_id}/commands"
+    headers = {
+        "Authorization": f"Bot {secret_token}"
+    }
+    r = requests.post(url, headers=headers, json=json_cmd)
     return r.json(), r.status_code
