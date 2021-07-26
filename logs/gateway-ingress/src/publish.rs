@@ -694,10 +694,9 @@ fn convert_raw_event(
         }
 
         let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
-        if let serde_json::Value::Object(map) = value {
+        if let serde_json::Value::Object(mut map) = value {
             // Attempt to find the ".d" value (contains the Gateway message payload)
             // https://discord.com/developers/docs/topics/gateway#payloads-gateway-payload-structure
-            let mut map = map;
             let inner_json = map.remove("d")?;
 
             // Make sure the guild id can be extracted before forwarding
