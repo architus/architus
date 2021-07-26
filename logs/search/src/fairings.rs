@@ -19,7 +19,7 @@ pub mod request_id {
     }
 
     impl Fairing {
-        pub fn new() -> Self {
+        pub const fn new() -> Self {
             Self {
                 current: AtomicUsize::new(0),
             }
@@ -52,7 +52,7 @@ pub mod request_id {
 
         async fn from_request(request: &'r Request<'_>) -> Outcome<Self, ()> {
             match *request.local_cache(|| AttachedId(None)) {
-                AttachedId(Some(id)) => Outcome::Success(RequestId(id)),
+                AttachedId(Some(id)) => Outcome::Success(Self(id)),
                 AttachedId(None) => Outcome::Failure((Status::InternalServerError, ())),
             }
         }
@@ -118,7 +118,7 @@ pub mod attach_logger {
 
         async fn from_request(request: &'r Request<'_>) -> Outcome<Self, ()> {
             match &*request.local_cache(|| AttachedLogger(None)) {
-                AttachedLogger(Some(logger)) => Outcome::Success(RequestLogger(logger.clone())),
+                AttachedLogger(Some(logger)) => Outcome::Success(Self(logger.clone())),
                 AttachedLogger(None) => Outcome::Failure((Status::InternalServerError, ())),
             }
         }
@@ -166,39 +166,39 @@ pub mod request_logging {
         }
 
         /// Notes how long the request took to process, and log the response
-        async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
-            let start_time = req.local_cache(|| TimerStart(None));
+        async fn on_response<'r>(&self, request: &'r Request<'_>, response: &mut Response<'r>) {
+            let start_time = request.local_cache(|| TimerStart(None));
             let response_timing = if let Some(Ok(duration)) = start_time.0.map(|st| st.elapsed()) {
-                Some(duration.as_secs() * 1000 + duration.subsec_millis() as u64)
+                Some(duration.as_secs() * 1000 + u64::from(duration.subsec_millis()))
             } else {
                 None
             };
 
             // Use the request logger if available
-            let logger = req
+            let logger = request
                 .local_cache(|| super::attach_logger::AttachedLogger(None))
                 .0
                 .as_ref()
-                .unwrap_or_else(|| &self.fallback_logger);
+                .unwrap_or(&self.fallback_logger);
 
             // Log using the response timing if available
             match response_timing {
-                None => log_request(logger, req, res),
+                None => log_request(logger, request, response),
                 Some(timing) => {
                     let logger_with_timing = logger.new(slog::o!("latency_ms" => timing));
-                    log_request(&logger_with_timing, req, res);
+                    log_request(&logger_with_timing, request, response);
                 }
             };
         }
     }
 
-    fn log_request<'r>(logger: &Logger, req: &'r Request<'_>, res: &mut Response<'r>) {
+    fn log_request<'r>(logger: &Logger, request: &'r Request<'_>, response: &mut Response<'r>) {
         slog::info!(
             logger,
             "handled request";
-            "method" => %req.method(),
-            "uri" => %req.uri(),
-            "status" => %res.status(),
+            "method" => %request.method(),
+            "uri" => %request.uri(),
+            "status" => %response.status(),
         );
     }
 
@@ -213,7 +213,7 @@ pub mod request_logging {
 
         async fn from_request(request: &'r Request<'_>) -> Outcome<Self, ()> {
             match *request.local_cache(|| TimerStart(None)) {
-                TimerStart(Some(time)) => Outcome::Success(StartTime(time)),
+                TimerStart(Some(time)) => Outcome::Success(Self(time)),
                 TimerStart(None) => Outcome::Failure((Status::InternalServerError, ())),
             }
         }
