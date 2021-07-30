@@ -14,6 +14,7 @@ from lib.config import logger
 from lib.aiomodels import TbAutoResponses
 from lib.ipc import sandbox_pb2 as message
 
+
 class DefaultUser:
     def __init__(self):
         self.id = 0
@@ -25,6 +26,7 @@ class DefaultUser:
         self.nick = ""
         self.dispplay_name = ""
         self.permissions = 0
+
 
 class WordGen:
     def __init__(self):
