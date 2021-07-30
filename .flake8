@@ -6,5 +6,5 @@ exclude =
     ./shard/src/generate/*
     ./lib/response_grammar/*
     .venv/*
-    ./lib/ipc/*._pb2.py
-    ./lib/ipc/*._pb2_grpc.py
+    *_pb2.py
+    *_pb2_grpc.py
