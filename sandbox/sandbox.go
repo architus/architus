@@ -222,7 +222,7 @@ def get(url, headers=None):
             return nil, errors.New("Url must be a string");
         }
 
-        raw_url = ((args[0]).(*starlark.String)).GoString();
+        raw_url = ((args[0]).(starlark.String)).GoString();
         req, err := http.NewRequest("GET", raw_url, nil);
         if err != nil {
             return nil, err;
