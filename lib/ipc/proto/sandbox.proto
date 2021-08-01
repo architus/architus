@@ -16,6 +16,7 @@ message StarlarkScript {
     repeated string captures = 5;
     repeated string arguments = 6;
     Channel channel = 7;
+    uint64 guild_id = 9;
 }
 
 message ScriptOutput {

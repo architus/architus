@@ -61,6 +61,14 @@ func make_author(a *rpc.Author) Author {
     return new_author;
 }
 
+/*
+ * These next few functions are just used as builtins in the starlark interpreter to add some important features to the language.
+ *
+ * Not all of the Architus specific builtins can be defined as functions here. Some of them require additional state about the
+ * specific auto-response that called them to have full functionality. Therefore, those functions are defined as lambdas
+ * further down so that they can capture some state. These functions are just the ones that are "pure"/"stateless" so that a
+ * new lambda doesn't have to be declared each time a script needs to be run.
+ */
 func sin(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
     var rad float64 = 0.0;
     if err := starlark.UnpackArgs(b.Name(), args, kwargs, "rad", &rad); err != nil {
@@ -89,6 +97,7 @@ func randint(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, 
     return starlark.MakeInt(int(v)), nil;
 }
 
+// Parse user defined headers from a starlark dict into an HTTP request.
 func parse_headers(request *http.Request, h starlark.Value) error {
     if h.Type() == "None" {
         return nil;
@@ -112,13 +121,6 @@ func parse_headers(request *http.Request, h starlark.Value) error {
 }
 
 func (c *Sandbox) RunStarlarkScript(ctx context.Context, in *rpc.StarlarkScript) (*rpc.ScriptOutput, error) {
-    /*
-    These are some of the builtin things that are there for the user's convenience.
-    Currently included in this part of the code is:
-    - Choice
-    - Sum
-    - print alias
-    */
     const functions = `
 p = print
 def choice(iterable):
@@ -210,8 +212,6 @@ def get(url, headers=None):
     // of allowing users to put newlines in their scripts and not having to do some fancy logic to account for that.
     script += in.Script;
 
-    // These next few functions are go defined builtins. What they do should be fairly self explanatory.
-
     get_internal := func(thread *starlark.Thread, b *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
         var raw_url string = "";
 
@@ -251,6 +251,7 @@ def get(url, headers=None):
 
         req.Header.Set("X-Arch-Author", string(mauthor_json));
         req.Header.Set("X-Arch-Script-Author", string(sauthor_json));
+        req.Header.Set("X-Arch-Guild", fmt.Sprintf("%d", in.GuildId))
         req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Architus/1.0; +https://archit.us)");
 
         var client http.Client;
@@ -353,6 +354,7 @@ def get(url, headers=None):
         }
         req.Header.Set("X-Arch-Author", string(mauthor_json));
         req.Header.Set("X-Arch-Script-Author", string(sauthor_json));
+        req.Header.Set("X-Arch-Guild", fmt.Sprintf("%d", in.GuildId))
         req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Architus/1.0; +https://archit.us)");
 
         req.Body = ioutil.NopCloser(strings.NewReader(data));
