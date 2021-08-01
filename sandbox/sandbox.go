@@ -268,8 +268,11 @@ def get(url, headers=None):
         json_content := false;
         content, ok := resp.Header["Content-Type"];
         if ok == true {
-            if len(content) > 0 {
-                json_content = content[0] == "application/json";
+            for _, v := range content {
+                if strings.Contains(v, "application/json") {
+                    json_content = true;
+                    break;
+                }
             }
         }
 
