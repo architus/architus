@@ -28,6 +28,7 @@ import (
 )
 
 const MaxMessageSize = 1000000;
+const TIMEOUT = 3 * time.Second;
 
 type Sandbox struct {
     rpc.SandboxServer;
@@ -425,7 +426,7 @@ def get(url, headers=None):
     select {
     case runtime_err = <- starChan:
         log.Print(runtime_err);
-    case <- time.After(time.Second):
+    case <- time.After(TIMEOUT):
         log.Print("Script timed out");
         return &rpc.ScriptOutput{
             Output: "",
