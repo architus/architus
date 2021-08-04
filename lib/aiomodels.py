@@ -54,6 +54,26 @@ class Base:
             async with conn.transaction():
                 await conn.execute(f'DELETE FROM {self.__class__.__tablename__} WHERE id = $1', id)
 
+    async def delete_by_guild_id(self, guild_id):
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(f'DELETE FROM {self.__class__.__tablename__} WHERE guild_id = $1', guild_id)
+
+    async def delete_by_message_id(self, message_id):
+        async with (await self.pool()).acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(f'DELETE FROM {self.__class__.__tablename__} WHERE message_id = $1', message_id)
+
+    async def select(self, cols):
+        columns, values = zip(*cols.items())
+        async with (await self.pool()).acquire() as conn:
+            return await conn.fetch(
+                f'''SELECT *
+                FROM {self.__class__.__tablename__}
+                WHERE ({','.join(columns)}) = ({','.join(f'${num}' for num in range(1, len(values) + 1))})
+                ''', *cols.values()
+            )
+
     async def select_by_id(self, cols):
         columns, values = zip(*cols.items())
         async with (await self.pool()).acquire() as conn:
@@ -148,3 +168,7 @@ class Tokens(Base):
                                      DO UPDATE SET client_token = excluded.client_token, \
                                      expires_at = excluded.expires_at',
                                    client_id, client_token, expires_at)
+
+
+class Roles(Base):
+    __tablename__ = 'tb_roles'

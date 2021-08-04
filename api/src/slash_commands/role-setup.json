@@ -1,0 +1,126 @@
+{
+  "name": "role-setup",
+  "description": "Creates an emoji role select menu.",
+  "options": [
+    {
+      "type": 3,
+      "name": "emoji",
+      "description": "Emoji for role 1",
+      "required": true
+    },
+    {
+      "type": 8,
+      "name": "role",
+      "description": "Role 1",
+      "required": true
+    },
+    {
+      "type": 3,
+      "name": "emoji2",
+      "description": "Emoji for role 2",
+      "required": false
+    },
+    {
+      "type": 8,
+      "name": "role2",
+      "description": "Role 2",
+      "required": false
+    },
+    {
+      "type": 3,
+      "name": "emoji3",
+      "description": "Emoji for role 3",
+      "required": false
+    },
+    {
+      "type": 8,
+      "name": "role3",
+      "description": "Role 3",
+      "required": false
+    },
+    {
+      "type": 3,
+      "name": "emoji4",
+      "description": "Emoji for role 4",
+      "required": false
+    },
+    {
+      "type": 8,
+      "name": "role4",
+      "description": "Role 4",
+      "required": false
+    },
+    {
+      "type": 3,
+      "name": "emoji5",
+      "description": "Emoji for role 5",
+      "required": false
+    },
+    {
+      "type": 8,
+      "name": "role5",
+      "description": "Role 5",
+      "required": false
+    },
+    {
+      "type": 3,
+      "name": "emoji6",
+      "description": "Emoji for role 6",
+      "required": false
+    },
+    {
+      "type": 8,
+      "name": "role6",
+      "description": "Role 6",
+      "required": false
+    },
+    {
+      "type": 3,
+      "name": "emoji7",
+      "description": "Emoji for role 7",
+      "required": false
+    },
+    {
+      "type": 8,
+      "name": "role7",
+      "description": "Role 7",
+      "required": false
+    },
+    {
+      "type": 3,
+      "name": "emoji8",
+      "description": "Emoji for role 8",
+      "required": false
+    },
+    {
+      "type": 8,
+      "name": "role8",
+      "description": "Role 8",
+      "required": false
+    },
+    {
+      "type": 3,
+      "name": "emoji9",
+      "description": "Emoji for role 9",
+      "required": false
+    },
+    {
+      "type": 8,
+      "name": "role9",
+      "description": "Role 9",
+      "required": false
+    },
+    {
+      "type": 3,
+      "name": "emoji10",
+      "description": "Emoji for role 10",
+      "required": false
+    },
+    {
+      "type": 8,
+      "name": "role10",
+      "description": "Role 10",
+      "required": false
+    }
+  ]
+}

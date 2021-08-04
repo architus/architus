@@ -267,6 +267,17 @@ class Api(Cog):
             return {'value': getattr(settings, setting)}, sc.OK_200
         return {'value': "unknown setting"}, sc.NOT_FOUND_404
 
+    @fetch_guild
+    async def role_setup(self, guild, channel_id, member_id, react_roles):
+        settings = self.bot.settings[guild]
+        member = guild.get_member(int(member_id))
+        channel = guild.get_channel(int(channel_id))
+        if member is None or member.id not in settings.admin_ids:
+            return {'content': "Admins only"}, sc.UNAUTHORIZED_401
+        resp = await self.bot.cogs['Roles'].setup_roles(
+            guild, channel, {e: guild.get_role(int(r)) for e, r in react_roles.items()})
+        return {'content': resp}, sc.OK_200
+
     async def tag_autbot_guilds(self, guild_list, user_id: int):
         try:
             all_guilds = [guild for guild in await self.bot.manager_client.all_guilds(message.AllGuildsRequest())]
