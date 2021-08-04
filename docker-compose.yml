@@ -113,6 +113,9 @@ services:
       dockerfile: ./sandbox/Dockerfile
     networks:
       - webnet
+    environment:
+      - HTTP_PROXY=
+      - HTTPS_PROXY=
   lavalink:
       image: johnyburd/lavalink:${TAG:-latest}
       build:

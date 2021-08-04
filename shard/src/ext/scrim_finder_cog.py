@@ -50,13 +50,17 @@ class ScrimFinderCog(Cog, name="Scrim Finder"):
         ss = ScrimScraper(('!',))
         self.q = Queue()
         ss.q = self.q
-        p = Process(target=ss.run, args=(scraper_token,), kwargs={'bot': False})
-        p.daemon = True
-        p.start()
+        if scraper_token:
+            p = Process(target=ss.run, args=(scraper_token,), kwargs={'bot': False})
+            p.daemon = True
+            p.start()
 
     @commands.Cog.listener()
     async def on_ready(self):
         last_author = {}
+        if not scraper_token:
+            logger.warn("Scraper token not found")
+            return
         while True:
             while not self.q.empty():
                 item = self.q.get()
