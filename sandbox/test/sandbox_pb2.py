@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z,https://github.com/architus/architus/sandbox',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\rsandbox.proto\x12\x07sandbox\"\x85\x02\n\x0eStarlarkScript\x12\x0e\n\x06script\x18\x01 \x01(\t\x12)\n\x0ftrigger_message\x18\x02 \x01(\x0b\x32\x10.sandbox.Message\x12\'\n\x0emessage_author\x18\x03 \x01(\x0b\x32\x0f.sandbox.Author\x12&\n\rscript_author\x18\x08 \x01(\x0b\x32\x0f.sandbox.Author\x12\r\n\x05\x63ount\x18\x04 \x01(\x04\x12\x10\n\x08\x63\x61ptures\x18\x05 \x03(\t\x12\x11\n\targuments\x18\x06 \x03(\t\x12!\n\x07\x63hannel\x18\x07 \x01(\x0b\x32\x10.sandbox.Channel\x12\x10\n\x08guild_id\x18\t \x01(\x04\"<\n\x0cScriptOutput\x12\x0e\n\x06output\x18\x01 \x01(\t\x12\r\n\x05\x65rror\x18\x02 \x01(\t\x12\r\n\x05\x65rrno\x18\x03 \x01(\x04\"#\n\x07\x43hannel\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x0c\n\x04name\x18\x02 \x01(\t\"\xa1\x01\n\x06\x41uthor\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x12\n\navatar_url\x18\x02 \x01(\t\x12\r\n\x05\x63olor\x18\x03 \x01(\t\x12\x15\n\rdiscriminator\x18\x04 \x01(\r\x12\r\n\x05roles\x18\x05 \x03(\x04\x12\x0c\n\x04name\x18\x06 \x01(\t\x12\x0c\n\x04nick\x18\x07 \x01(\t\x12\x11\n\tdisp_name\x18\x08 \x01(\t\x12\x13\n\x0bpermissions\x18\t \x01(\x04\"5\n\x07Message\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\r\n\x05\x63lean\x18\x03 \x01(\t2P\n\x07Sandbox\x12\x45\n\x11RunStarlarkScript\x12\x17.sandbox.StarlarkScript\x1a\x15.sandbox.ScriptOutput\"\x00\x42.Z,https://github.com/architus/architus/sandboxb\x06proto3'
+  serialized_pb=b'\n\rsandbox.proto\x12\x07sandbox\"\xf3\x01\n\x0eStarlarkScript\x12\x0e\n\x06script\x18\x01 \x01(\t\x12)\n\x0ftrigger_message\x18\x02 \x01(\x0b\x32\x10.sandbox.Message\x12\'\n\x0emessage_author\x18\x03 \x01(\x0b\x32\x0f.sandbox.Author\x12&\n\rscript_author\x18\x08 \x01(\x0b\x32\x0f.sandbox.Author\x12\r\n\x05\x63ount\x18\x04 \x01(\x04\x12\x10\n\x08\x63\x61ptures\x18\x05 \x03(\t\x12\x11\n\targuments\x18\x06 \x03(\t\x12!\n\x07\x63hannel\x18\x07 \x01(\x0b\x32\x10.sandbox.Channel\"<\n\x0cScriptOutput\x12\x0e\n\x06output\x18\x01 \x01(\t\x12\r\n\x05\x65rror\x18\x02 \x01(\t\x12\r\n\x05\x65rrno\x18\x03 \x01(\x04\"#\n\x07\x43hannel\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x0c\n\x04name\x18\x02 \x01(\t\"\xa1\x01\n\x06\x41uthor\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x12\n\navatar_url\x18\x02 \x01(\t\x12\r\n\x05\x63olor\x18\x03 \x01(\t\x12\x15\n\rdiscriminator\x18\x04 \x01(\r\x12\r\n\x05roles\x18\x05 \x03(\x04\x12\x0c\n\x04name\x18\x06 \x01(\t\x12\x0c\n\x04nick\x18\x07 \x01(\t\x12\x11\n\tdisp_name\x18\x08 \x01(\t\x12\x13\n\x0bpermissions\x18\t \x01(\x04\"5\n\x07Message\x12\n\n\x02id\x18\x01 \x01(\x04\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\r\n\x05\x63lean\x18\x03 \x01(\t2P\n\x07Sandbox\x12\x45\n\x11RunStarlarkScript\x12\x17.sandbox.StarlarkScript\x1a\x15.sandbox.ScriptOutput\"\x00\x42.Z,https://github.com/architus/architus/sandboxb\x06proto3'
 )
 
 
@@ -89,13 +89,6 @@ _STARLARKSCRIPT = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='guild_id', full_name='sandbox.StarlarkScript.guild_id', index=8,
-      number=9, type=4, cpp_type=4, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -109,7 +102,7 @@ _STARLARKSCRIPT = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=27,
-  serialized_end=288,
+  serialized_end=270,
 )
 
 
@@ -154,8 +147,8 @@ _SCRIPTOUTPUT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=290,
-  serialized_end=350,
+  serialized_start=272,
+  serialized_end=332,
 )
 
 
@@ -193,8 +186,8 @@ _CHANNEL = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=352,
-  serialized_end=387,
+  serialized_start=334,
+  serialized_end=369,
 )
 
 
@@ -281,8 +274,8 @@ _AUTHOR = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=390,
-  serialized_end=551,
+  serialized_start=372,
+  serialized_end=533,
 )
 
 
@@ -327,8 +320,8 @@ _MESSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=553,
-  serialized_end=606,
+  serialized_start=535,
+  serialized_end=588,
 )
 
 _STARLARKSCRIPT.fields_by_name['trigger_message'].message_type = _MESSAGE
@@ -387,8 +380,8 @@ _SANDBOX = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=608,
-  serialized_end=688,
+  serialized_start=590,
+  serialized_end=670,
   methods=[
   _descriptor.MethodDescriptor(
     name='RunStarlarkScript',
