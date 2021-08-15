@@ -224,6 +224,10 @@ def get(url, headers=None):
         }
 
         raw_url = ((args[0]).(starlark.String)).GoString();
+        if !strings.HasPrefix(raw_url, "http") {
+            raw_url = "https://" + raw_url;
+        }
+
         req, err := http.NewRequest("GET", raw_url, nil);
         if err != nil {
             return nil, err;
@@ -300,6 +304,10 @@ def get(url, headers=None):
         }
 
         raw_url = ((args[0]).(starlark.String)).GoString();
+        if !strings.HasPrefix(raw_url, "http") {
+            raw_url = "https://" + raw_url;
+        }
+
         req, err := http.NewRequest("POST", raw_url, nil);
         if err != nil {
             return nil, err;
@@ -394,7 +402,6 @@ def get(url, headers=None):
 
     // This tells the interpreter what all of our builtins are. Struct is a starlark-go specific functionality that
     // allows for creating a struct from kwarg values.
-    // TODO(jjohnson): Add get and post builtins
     predeclared := starlark.StringDict{
         "random": starlark.NewBuiltin("random", random),
         "randint": starlark.NewBuiltin("randint", randint),
