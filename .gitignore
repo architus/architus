@@ -16,3 +16,4 @@ tags
 .vscode/*
 www
 */target
+**/Cargo.lock
