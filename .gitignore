@@ -15,3 +15,4 @@ tags
 .vs/*
 .vscode/*
 www
+*/target
