@@ -19,7 +19,6 @@ discortp = "0.2"
 config = "0.11"
 serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0"
-amiquip = "0.4"
 
 [dependencies.serenity]
 default-features = false
@@ -29,6 +28,10 @@ version = "0.10"
 [dependencies.songbird]
 version = "0.1"
 features = ["driver", "serenity", "rustls"]
+
+[dependencies.postgres]
+version = "0.19"
+features = ["with-serde_json-1"]
 
 [build-dependencies]
 tonic-build = "0.4"

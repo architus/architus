@@ -1,12 +1,14 @@
 use log::{info, warn, LevelFilter};
 use simple_logger::SimpleLogger;
 
+mod config;
+mod database;
 mod manager;
 mod receiver;
 mod zipper;
 
+use database::Database;
 use std::collections::HashMap;
-use std::env;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
@@ -50,6 +52,14 @@ struct RecordState;
 
 impl TypeMapKey for RecordState {
     type Value = HashMap<u64, receiver::Recording>;
+}
+
+// Another struct so that a new database connection doesn't have
+// to be created each time someone starts recording.
+struct DB;
+
+impl TypeMapKey for DB {
+    type Value = Arc<Mutex<Database>>;
 }
 
 struct Handler;
@@ -134,6 +144,14 @@ async fn record(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     // Set up a recorder to keep track of all the audio that architus receives.
     let bot_id = ctx.cache.current_user().await.id.0;
     let recordings = state.get_mut::<RecordState>().unwrap();
+    let disallowed: Vec<u64>;
+
+    {
+        let db_lock = state.get_mut::<DB>().unwrap();
+        let mut db = db_lock.lock().await;
+        disallowed = db.get_muted_ids(guild_id);
+    }
+
     // TODO: Get actual disallowed ids from database.
     let recorder = receiver::Recording(Arc::new(Mutex::new(receiver::WAVReceiver::new(
         vec![],
@@ -246,7 +264,7 @@ async fn main() -> anyhow::Result<()> {
         \nrecord-service [config-path]",
     );
 
-    let config = Configuration::try_load(&config_path)?);
+    let config = config::Configuration::try_load(&config_path)?;
 
     let framework = StandardFramework::new().configure(|c| c.prefix("!"));
 
@@ -260,10 +278,23 @@ async fn main() -> anyhow::Result<()> {
         .await
         .expect("Err creating client");
 
+    let db = Database::get_connection(
+        config.services.database,
+        config.secrets.db_username,
+        config.secrets.db_password,
+    )?;
+
+    {
+        let mut data = client.data.write().await;
+        data.insert::<DB>(Arc::new(Mutex::new(db)));
+    }
+
     let _ = client
         .start()
         .await
         .map_err(|why| println!("Client ended: {:?}", why));
+
+    Ok(())
 }
 
 // Checks that a message successfully sent; if not, then logs why to stdout.

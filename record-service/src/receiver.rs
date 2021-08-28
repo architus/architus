@@ -15,6 +15,8 @@ use tokio::sync::Mutex;
 const MAX_SEQ_BREAK: Wrapping<u16> = Wrapping(10u16);
 const MAX_SEQ_NUM: Wrapping<u16> = Wrapping(65530);
 
+// Need a new)type that wraps the actual recording in an arc mutex because
+// Serenity requires us to make multiple references to it.
 pub struct Recording(pub Arc<Mutex<WAVReceiver>>);
 
 /// Stores all relevant state about recording of voice channel.

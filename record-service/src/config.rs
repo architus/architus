@@ -17,6 +17,8 @@ pub struct Services {
 #[derive(Default, Debug, Deserialize, Clone)]
 pub struct Secrets {
     pub discord_token: String,
+    pub db_username: String,
+    pub db_password: String,
 }
 
 impl Configuration {
