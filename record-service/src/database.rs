@@ -6,11 +6,16 @@ use postgres::{Client, NoTls};
 pub struct Database(Client);
 
 impl Database {
-    pub fn get_connection(url: String, user: String, pass: String) -> anyhow::Result<Self> {
-        let db = format!("host={} user={} password={} port=5432", url, user, pass);
+    pub fn get_connection(
+        url: String,
+        user: String,
+        pass: String,
+        port: String,
+    ) -> anyhow::Result<Self> {
+        let db = format!("host={} user={} password={} port={}", url, user, pass, port);
         match Client::connect(db, NoTls) {
             Ok(c) => Ok(Self(c)),
-            Err(_) => Err(()),
+            Err(_) => Err(anyhow::Error::new()),
         }
     }
 
