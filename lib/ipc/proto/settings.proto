@@ -1,0 +1,46 @@
+syntax = "proto3";
+package settings;
+
+service Settings {
+    rpc GetSetting(SettingsRequest) returns (GetResponse) {};
+    rpc SetSetting(SettingsUpdate) returns (UpdateResponse) {};
+}
+
+message SettingsRequest {
+    repeated SettingsRequestInner settings = 1;
+}
+
+message SettingsRequestInner {
+    string name = 1;
+}
+
+message GetResponseInner {
+    string value = 1;
+    uint64 return_code = 2;
+    string dev_error_msg = 3;
+    string user_error_msg = 4;
+}
+
+message GetResponse {
+    repeated GetResponseInner settings = 1;
+}
+
+message UpdateResponseInner {
+    string value = 1;
+    uint64 return_code = 2;
+    string dev_error_msg = 3;
+    string user_error_msg = 4;
+}
+
+message UpdateResponse {
+    repeated UpdateResponseInner updates = 1;
+}
+
+message SettingsUpdateInner {
+    string name = 1;
+    string value = 2;
+}
+
+message SettingsUpdate {
+    repeated SettingsUpdateInner updates = 1;
+}

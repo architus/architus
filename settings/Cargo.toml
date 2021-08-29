@@ -1,0 +1,21 @@
+[package]
+name = "settings"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+prost = "0.8"
+bb8-postgres = "0.7"
+tokio = {version = "1", features = ["rt-multi-thread"]}
+
+[dependencies.tonic]
+version = "0.5"
+features = ["transport", "codegen"]
+
+[dependencies.postgres]
+version = "0.19"
+
+[build-dependencies]
+tonic-build = {version = "0.5", features = ["rustfmt"]}
