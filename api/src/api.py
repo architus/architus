@@ -172,6 +172,10 @@ class Music(CustomResource):
     def post(self, guild_id: int, song: str, jwt: JWT):
         return self.shard.queue_song(guild_id, int(jwt.id), song, routing_guild=guild_id)
 
+class LoadMaxEmojis(CustomResource):
+    @authenticated(member=True)
+    def get (self, guild_id: int):
+        return self.shard.load_max_emojis(guild_id, jwt.id, routing_guild=guild_id)
 
 class Emoji(CustomResource):
 
@@ -262,6 +266,7 @@ def app_factory():
     api.add_resource(Stats, "/stats/<int:guild_id>")
     api.add_resource(Music, "/music/<int:guild_id>")
     api.add_resource(Emoji, "/emojis/<int:emoji_id>", "/emojis/<int:guild_id>/<int:emoji_id>")
+    api.add_resource(LoadMaxEmojis, "/load-emojis/<int:guild_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")
     api.add_resource(RedirectCallback, "/redirect")

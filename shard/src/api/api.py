@@ -229,6 +229,14 @@ class Api(Cog):
         }, sc.OK_200
 
     @fetch_guild
+    async def load_max_emojis(self, guild: discord.Guild, member_id: int):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        if member_id not in self.bot.settings[guild].admin_ids:
+            return {'message': "only admins may load max emoji"}, sc.UNAUTHORIZED_401
+        emojis = await emoji_manager.load_max_emojis()
+        return {'emojis': [e.as_dict() for e in emojis]}, sc.OK_200
+
+    @fetch_guild
     async def load_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
         emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
         emoji = emoji_manager.find_emoji(a_id=emoji_id)
