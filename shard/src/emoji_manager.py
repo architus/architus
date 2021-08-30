@@ -221,7 +221,7 @@ class EmojiManager:
         if emoji.loaded:
             self.sort()
             return emoji
-        for _ in range(max(0, len(self.guild_emojis) - self.max_emojis + 1))
+        for _ in range(max(0, len(self.guild_emojis) - self.max_emojis + 1)):
             await self.cache_worst_emoji()
         logger.debug(f"loading {emoji}")
 
@@ -276,7 +276,7 @@ class EmojiManager:
         """
         logger.debug(f"added emoji: {emoji}")
         if self.settings.manage_emojis:
-            for _ in range(max(0, len(self.guild_emojis) - self.max_emojis + 1))
+            for _ in range(max(0, len(self.guild_emojis) - self.max_emojis + 1)):
                 await self.cache_worst_emoji()
 
         self.emojis.append(emoji)

@@ -44,8 +44,8 @@ async def start_server(loop, listener_queue, entry_point):
 
     while True:
         await sleep(60)
-        logger.debug(f"last heartbeat was at {channel.heartbeat_last}")
-        if channel.heartbeat_last < loop.time() - 60:
+        logger.debug(f"last heartbeat was at {rabbit_connection.heartbeat_last}")
+        if rabbit_connection.heartbeat_last < loop.time() - 60:
             logger.warning("seems as though we aren't connected to rabbit anymore :thinking:")
             await start_server(loop, listener_queue, entry_point)
 
