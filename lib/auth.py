@@ -3,7 +3,6 @@ from flask import request
 from datetime import datetime, timedelta
 from lib.status_codes import StatusCodes
 from lib.config import jwt_secret, twitch_hub_secret, logger
-
 from functools import wraps
 import hmac
 import hashlib
@@ -107,7 +106,10 @@ class JWT:
 
     def get_token(self):
         if self._dirty:
-            self._token = self._encode(self._data).decode()
+            try:
+                self._token = self._encode(self._data).decode()
+            except AttributeError:
+                self._token = self._encode(self._data)
             self._dirty = False
         return self._token
 
