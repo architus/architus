@@ -1,0 +1,3 @@
+# tilt_modules is full of vendored files
+# https://docs.tilt.dev/extensions.html
+tilt_modules/** linguist-vendored
