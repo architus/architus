@@ -2,7 +2,7 @@
 FROM debian:buster-slim
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -q \
-    && apt-get install -y -q "libssl1.1" "tini" "libpq-dev" \
+    && apt-get install -y -q "libssl1.1" "libpq-dev" \
     && rm -rf /var/lib/apt/lists/*
 COPY feature-gate/target/debug/feature-gate /usr/bin/feature-gate
 ENV RUST_BACKTRACE=1
