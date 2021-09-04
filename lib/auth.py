@@ -8,7 +8,7 @@ import hmac
 import hashlib
 
 
-def flask_authenticated(member=False):
+def flask_authenticated(member=False, admin=False):
     """decorator for rest endpoint functions
     returns 401 if user is not logged in
     and prepends a JWT object to the kwargs for id data
@@ -35,6 +35,9 @@ def flask_authenticated(member=False):
                 if sc != 200 or not data['member']:
                     logger.info(f'{jwt.id} attempted to access {request.path} but was not a member')
                     return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
+            if admin:
+                if jwt.id not in (214037134477230080,):
+                    return 'admins only', StatusCodes.FORBIDDEN_403
             return func(self, *args, **kwargs, jwt=jwt)
         return wrapper
     return decorator

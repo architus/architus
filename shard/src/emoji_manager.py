@@ -107,6 +107,13 @@ class EmojiManager:
         """find loaded emoji with the worst priority and cache it"""
         worst_emoji = next(e for e in reversed(self.emojis) if e.loaded)
         await self.cache_emoji(worst_emoji)
+        return worst_emoji
+
+    async def load_best_emoji(self) -> None:
+        """find cached emoji with the best priority and load it"""
+        best_emoji = next(e for e in self.emojis if not e.loaded)
+        await self.load_emoji(best_emoji)
+        return best_emoji
 
     async def initialize(self) -> None:
         # populate emojis from db here
@@ -197,13 +204,24 @@ class EmojiManager:
         emoji.cache()
         # no need to update the db here cause we're about to trigger the on_emoji_removed event
 
+    async def load_max_emojis(self):
+        if not self.settings.manage_emojis:
+            return
+
+        loaded = []
+        num = max(0, self.max_emojis - len(self.guild_emojis) - 1)
+        logger.debug(f"trying to load the {num} best emojis for {self.guild.name}")
+        for _ in range(num):
+            loaded.append(await self.load_best_emoji())
+        return loaded
+
     async def load_emoji(self, emoji: ArchitusEmoji) -> ArchitusEmoji:
         if not self.settings.manage_emojis:
             return emoji
         if emoji.loaded:
             self.sort()
             return emoji
-        while len(self.guild_emojis) >= self.max_emojis - 1:
+        for _ in range(max(0, len(self.guild_emojis) - self.max_emojis + 1)):
             await self.cache_worst_emoji()
         logger.debug(f"loading {emoji}")
 
@@ -258,7 +276,7 @@ class EmojiManager:
         """
         logger.debug(f"added emoji: {emoji}")
         if self.settings.manage_emojis:
-            while len(self.guild_emojis) >= self.max_emojis:
+            for _ in range(max(0, len(self.guild_emojis) - self.max_emojis + 1)):
                 await self.cache_worst_emoji()
 
         self.emojis.append(emoji)

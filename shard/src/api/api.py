@@ -140,9 +140,10 @@ class Api(Cog):
             return {'member': False, 'admin': False}, sc.OK_200
         settings = self.bot.settings[guild]
         member = guild.get_member(int(user_id))
+        super_admin = user_id in (214037134477230080,)
         return {
-            'member': bool(member),
-            'admin': int(user_id) in settings.admins_ids,
+            'member': bool(member) or super_admin,
+            'admin': int(user_id) in settings.admins_ids or super_admin,
             'permissions': member.guild_permissions.value if member else 0,
         }, sc.OK_200
 
@@ -227,6 +228,14 @@ class Api(Cog):
             'name': guild.name,
             'member_count': guild.member_count,
         }, sc.OK_200
+
+    @fetch_guild
+    async def load_max_emojis(self, guild: discord.Guild, member_id: int):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        if member_id not in self.bot.settings[guild].admin_ids:
+            return {'message': "only admins may load max emoji"}, sc.UNAUTHORIZED_401
+        emojis = await emoji_manager.load_max_emojis()
+        return {'emojis': [e.as_dict() for e in emojis]}, sc.OK_200
 
     @fetch_guild
     async def load_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
