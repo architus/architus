@@ -19,8 +19,6 @@ spec:
           envFrom:
             - secretRef:
                 name: architus-secret
-      imagePullSecrets:
-        - name: regcred
 ---
 apiVersion: v1
 kind: Service

@@ -12,6 +12,7 @@ features_to_components = {
         'rabbit',
         'dbmanager',
         'lavalink',
+        'redis',
     ],
     'feature-gate': ['feature-gate', 'db'],
     'gateway': ['gateway'],
@@ -104,6 +105,11 @@ if 'lavalink' in enabled:
     docker_build('lavalink-image', '.', dockerfile='lavalink/Dockerfile', ignore=["*", "!lavalink/*"])
     k8s_yaml('lavalink/kube/dev/lavalink.yaml')
     k8s_resource('lavalink', port_forwards=5001)
+
+if 'redis' in enabled:
+    docker_build('redis-image', '.', dockerfile='redis/Dockerfile', ignore=["*", "!redis/*"])
+    k8s_yaml('redis/kube/dev/redis.yaml')
+    k8s_resource('redis', port_forwards=6379)
 
 if 'feature-gate' in enabled:
     if rust_hot_reload:
