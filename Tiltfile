@@ -1,8 +1,12 @@
 load('ext://restart_process', 'docker_build_with_restart')
 load('ext://configmap', 'configmap_create')
+load ('./tilt/features.Tiltfile', 'get_enabled_components')
+load ('./tilt/config.Tiltfile', 'copy_example')
 
-# Define features as the keys,
-# and their component dependencies as values:
+# Define how higher-level 'features' to map onto lower-level 'components'
+# that are dependened on by potentially more than one feature.
+# 'all' is a special built-in feature that causes all other features
+# to be considered enabled no matter what the other enabled features are.
 features_to_components = {
     'core': [
         'db',
@@ -14,7 +18,10 @@ features_to_components = {
         'lavalink',
         'redis',
     ],
-    'feature-gate': ['feature-gate', 'db'],
+    'feature-gate': [
+        'feature-gate',
+        'db',
+    ],
     'gateway': ['gateway'],
     'api': ['api'],
 }
@@ -27,30 +34,16 @@ cfg = config.parse()
 
 no_core = cfg.get('no-core', False)
 rust_hot_reload = cfg.get('rust-hot-reload', False)
-enabled_features_list = cfg.get('enable', [] if no_core else ["core"])
-
-# Use a dict of key -> True as a set
-enabled_features = {f: True for f in enabled_features_list}
-invalid_features = [f for f in enabled_features if f != 'all' and f not in features_to_components]
-if invalid_features:
-    fail("Invalid features specified: " + repr(invalid_features) + "\n"
-         + "  Given: " + repr(enabled_features_list) + "\n"
-         + "  Valid features: " + repr([f for f in features_to_components] + ['all']))
-
-# Use all features if 'all' was specified
-if 'all' in enabled_features:
-    enabled_features = {f: True for f in features_to_components}
+enabled_features = cfg.get('enable', [] if no_core else ["core"])
 
 # Convert the enabled features to components
-enabled = {}
-for f in enabled_features:
-    for component in features_to_components[f]:
-        enabled[component] = True
+enabled = get_enabled_components(features_to_components, enabled_features)
 
 
 # Base resources
 # ===================
 
+copy_example(path='secret.yaml')
 k8s_yaml('secret.yaml')
 
 
@@ -73,10 +66,7 @@ if 'db' in enabled:
     k8s_resource('postgres', port_forwards=5432)
 
 if 'sandbox' in enabled:
-    # Create a local copy of the .env file if needed,
-    # and then create a configmap from it
-    if not os.path.exists('sandbox/.env'):
-        local(['cp', 'sandbox/.env.example', 'sandbox/.env'])
+    copy_example(path='sandbox/.env')
     configmap_create('sandbox-config', from_env_file='sandbox/.env')
 
     docker_build('sandbox-image', '.', dockerfile='sandbox/Dockerfile.tilt', ignore=["*", "!sandbox/*", "!lib/**"])

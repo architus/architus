@@ -9,3 +9,6 @@ tilt_modules/** linguist-vendored
 # except for Dockerfile.*.dockerignore, which are docker ignore files
 **/Dockerfile.* linguist-language=Dockerfile
 **/Dockerfile.*.dockerignore linguist-language=Ignore-List
+
+# *.Tiltfile files should be considered Tiltfile (Starlark) libraries
+**/*.Tiltfile linguist-language=Starlark
