@@ -96,7 +96,6 @@ class CustomNamespace(socketio.AsyncNamespace):
         else:
             logger.info("No valid token found, logging into unprivileged gateway...")
 
-
     @authenticated(shard_client)
     async def on_pool_request(self, sid: str, data, jwt):
         logger.debug(f"pool request for {jwt.id}")

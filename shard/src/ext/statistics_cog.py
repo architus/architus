@@ -6,13 +6,12 @@ from discord.ext import commands
 from discord import Forbidden, HTTPException
 import discord
 import json
-import aiohttp
 import pytz
 from typing import Dict, List, Counter as TCounter
 from string import punctuation
 
 import src.generate.wordcount as wordcount_gen
-from src.generate import corona, member_growth
+from src.generate import member_growth
 from lib.config import DISCORD_EPOCH, logger
 from lib.ipc import manager_pb2 as message_type
 from src.utils import mention_to_name, doc_url

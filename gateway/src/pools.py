@@ -37,7 +37,6 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
     async def cached_response(shard_id, returned_guilds):
         '''requests information about all the guilds a shard knows about for a user'''
         resp, sc = await shard_client.users_guilds(jwt.id, routing_key=f"shard_rpc_{shard_id}")
-        logger.debug(f'got response from shard {shard_id} w/ {len(resp)} guilds')
         if sc != 200:
             logger.error(f"got bad response from `users_guilds` from shard: {shard_id}")
             await partial_error(
@@ -79,18 +78,16 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
     for guild in resp:
         if str(guild['id']) not in ids:
             # if it's not in our list from the shards it doesn't have architus
-            #mem_resp, sc = await shard_client.is_member(
-            #    jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
+
             guild.update({
-                'has_architus': False, #mem_resp['member'] if sc == 200 else False,
-                'architus_admin': False, #mem_resp['admin'] if sc == 200 else False,
+                'has_architus': False,
+                'architus_admin': False,
                 'permissions': int(guild['permissions']),
             })
             remaining.append(guild)
 
     # send the remaining guilds
     payload.update({'data': remaining, 'finished': True})
-    logger.debug("final payload")
     await partial_event(payload)
 
 

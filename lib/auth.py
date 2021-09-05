@@ -1,17 +1,17 @@
 import jwt as pyjwt
 from flask import request
 from datetime import datetime, timedelta
-from typing import Optional
 from lib.status_codes import StatusCodes
 from lib.config import jwt_secret, twitch_hub_secret, logger, is_prod
 from functools import wraps
 import hmac
 import hashlib
 
+
 def get_valid_jwt(cookies):
     try:
         if is_prod:
-            tokens = cookies['token']
+            token = cookies['token']
         else:
             token = cookies['dev-token']
     except KeyError:
@@ -23,6 +23,7 @@ def get_valid_jwt(cookies):
         logger.info(f'{bad_jwt.id} attempted to access {request.path} with an invalid signature')
     except pyjwt.exceptions.InvalidTokenError:
         logger.info('error decoding jwt attempting to access {request.path}')
+
 
 def flask_authenticated(member=False, admin=False):
     """decorator for rest endpoint functions

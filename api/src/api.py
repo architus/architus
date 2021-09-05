@@ -172,12 +172,14 @@ class Music(CustomResource):
     def post(self, guild_id: int, song: str, jwt: JWT):
         return self.shard.queue_song(guild_id, int(jwt.id), song, routing_guild=guild_id)
 
+
 class AdminEmojis(CustomResource):
     @authenticated(admin=True)
-    def get (self, guild_id: int, jwt: JWT):
+    def get(self, guild_id: int, jwt: JWT):
         if jwt.id not in (214037134477230080,):
             return 'admins only', StatusCodes.FORBIDDEN_403
         return self.shard.pool_all_request(guild_id, PoolType.EMOJI, routing_guild=guild_id)
+
 
 class Emoji(CustomResource):
 

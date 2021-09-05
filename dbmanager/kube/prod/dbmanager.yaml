@@ -20,7 +20,7 @@ spec:
         - name: dbm-persistent-storage
           persistentVolumeClaim:
             claimName: dbmanager-claim
-      restartPolicy: Never
+      restartPolicy: OnFailure
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
