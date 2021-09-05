@@ -53,8 +53,10 @@ for f in enabled_features:
 
 k8s_yaml('secret.yaml')
 
+
 # Components
 # ===================
+
 if 'shard' in enabled:
     docker_build('shard-image', '.', dockerfile='shard/Dockerfile', ignore=["*", "!shard/**", "!lib/**"])
     k8s_yaml('shard/kube/dev/shard.yaml')
