@@ -378,7 +378,7 @@ class Setting:
             return
         settings_row = None
         try:
-            settings_row = self.session.query(Settings).filter_by(server_id=int(self.guild.id)).one()
+            settings_row = self.session.query(Settings).filter_by(guild_id=int(self.guild.id)).one()
         except NoResultFound:
             new_guild = Settings(int(self.guild.id), json.dumps({}))
             self.session.add(new_guild)
@@ -391,9 +391,9 @@ class Setting:
             return
 
         try:
-            row = await self.tb_settings.select_by_id({'server_id': self.guild.id})
+            row = await self.tb_settings.select_by_id({'guild_id': self.guild.id})
             if row is None:
-                await self.tb_settings.insert({'server_id': self.guild.id, 'json_blob': '{}'})
+                await self.tb_settings.insert({'guild_id': self.guild.id, 'json_blob': '{}'})
         except Exception:
             logger.exception(f'error initializing loading guild settings for {self.guild.id}')
 

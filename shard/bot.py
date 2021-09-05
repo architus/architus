@@ -57,7 +57,16 @@ class Architus(Bot):
 
         self.loop.create_task(self.emitter.connect())
 
-        super().run(token)
+        while True:
+            try:
+                super().run(token)
+                break
+            except RuntimeError:
+                logger.exception('')
+                break
+            except Exception:
+                logger.exception("Error starting shard, retrying in 10 seconds...")
+                time.sleep(10)
 
     async def on_socket_raw_receive(self, msg):
         if "Slash" in self.cogs:

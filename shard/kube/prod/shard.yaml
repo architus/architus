@@ -5,7 +5,7 @@ metadata:
   labels:
     app: shard
 spec:
-  replicas: 10
+  replicas: 3
   selector:
     matchLabels:
       app: shard
@@ -19,7 +19,7 @@ spec:
           image: "{{prefix}}shard:{{tag}}"
           resources:
             requests:
-              memory: "1Gi"
+              memory: "4Gi"
               cpu: "1"
           envFrom:
           - secretRef:

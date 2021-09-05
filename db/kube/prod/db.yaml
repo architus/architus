@@ -21,7 +21,7 @@ spec:
               name: architus-secret
           volumeMounts:
             - name: db-persistent-storage
-              mountPath: /app/current_migration
+              mountPath: /var/lib/postgresql/data
       imagePullSecrets:
         - name: regcred
       volumes:

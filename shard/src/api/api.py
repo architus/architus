@@ -322,7 +322,7 @@ class Api(Cog):
             try:
                 resp['data'].append(await task)
             except Exception as e:
-                logger.debug(e)
+                logger.exception(e)
                 resp['nonexistant'].append(entity_id)
         return resp, sc.OK_200
 
