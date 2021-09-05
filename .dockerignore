@@ -1,8 +1,11 @@
+# Ignore non-service source directories
 .github
 .idea
 .vscode
 .git
 feature-gate/target
-secret.yaml
 tilt_modules
 tilt
+
+# Ignore the secrets file, ensuring that builds don't rely on it
+secret.yaml
