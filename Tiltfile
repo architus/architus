@@ -1,7 +1,12 @@
 load('ext://restart_process', 'docker_build_with_restart')
+load('ext://configmap', 'configmap_create')
+load ('./tilt/features.Tiltfile', 'get_enabled_components')
+load ('./tilt/config.Tiltfile', 'copy_example')
 
-# Define features as the keys,
-# and their component dependencies as values:
+# Define how higher-level 'features' to map onto lower-level 'components'
+# that are dependened on by potentially more than one feature.
+# 'all' is a special built-in feature that causes all other features
+# to be considered enabled no matter what the other enabled features are.
 features_to_components = {
     'core': [
         'db',
@@ -11,8 +16,12 @@ features_to_components = {
         'rabbit',
         'dbmanager',
         'lavalink',
+        'redis',
     ],
-    'feature-gate': ['feature-gate', 'db'],
+    'feature-gate': [
+        'feature-gate',
+        'db',
+    ],
     'gateway': ['gateway'],
     'api': ['api'],
 }
@@ -25,34 +34,22 @@ cfg = config.parse()
 
 no_core = cfg.get('no-core', False)
 rust_hot_reload = cfg.get('rust-hot-reload', False)
-enabled_features_list = cfg.get('enable', [] if no_core else ["core"])
-
-# Use a dict of key -> True as a set
-enabled_features = {f: True for f in enabled_features_list}
-invalid_features = [f for f in enabled_features if f != 'all' and f not in features_to_components]
-if invalid_features:
-    fail("Invalid features specified: " + repr(invalid_features) + "\n"
-         + "  Given: " + repr(enabled_features_list) + "\n"
-         + "  Valid features: " + repr([f for f in features_to_components] + ['all']))
-
-# Use all features if 'all' was specified
-if 'all' in enabled_features:
-    enabled_features = {f: True for f in features_to_components}
+enabled_features = cfg.get('enable', [] if no_core else ["core"])
 
 # Convert the enabled features to components
-enabled = {}
-for f in enabled_features:
-    for component in features_to_components[f]:
-        enabled[component] = True
+enabled = get_enabled_components(features_to_components, enabled_features)
 
 
 # Base resources
 # ===================
 
+copy_example(path='secret.yaml')
 k8s_yaml('secret.yaml')
+
 
 # Components
 # ===================
+
 if 'shard' in enabled:
     docker_build('shard-image', '.', dockerfile='shard/Dockerfile', ignore=["*", "!shard/**", "!lib/**"])
     k8s_yaml('shard/kube/dev/shard.yaml')
@@ -69,7 +66,10 @@ if 'db' in enabled:
     k8s_resource('postgres', port_forwards=5432)
 
 if 'sandbox' in enabled:
-    docker_build('sandbox-image', '.', dockerfile='sandbox/Dockerfile', ignore=["*", "!sandbox/*", "!lib/**"])
+    copy_example(path='sandbox/.env')
+    configmap_create('sandbox-config', from_env_file='sandbox/.env')
+
+    docker_build('sandbox-image', '.', dockerfile='sandbox/Dockerfile.tilt', ignore=["*", "!sandbox/*", "!lib/**"])
     k8s_yaml('sandbox/kube/dev/sandbox.yaml')
     k8s_resource('sandbox', port_forwards=1337)
 
@@ -94,7 +94,14 @@ if 'api' in enabled:
     k8s_resource('api', port_forwards=5000)
 
 if 'lavalink' in enabled:
+    docker_build('lavalink-image', '.', dockerfile='lavalink/Dockerfile', ignore=["*", "!lavalink/*"])
     k8s_yaml('lavalink/kube/dev/lavalink.yaml')
+    k8s_resource('lavalink', port_forwards=5001)
+
+if 'redis' in enabled:
+    docker_build('redis-image', '.', dockerfile='redis/Dockerfile', ignore=["*", "!redis/*"])
+    k8s_yaml('redis/kube/dev/redis.yaml')
+    k8s_resource('redis', port_forwards=6379)
 
 if 'feature-gate' in enabled:
     if rust_hot_reload:

@@ -1,34 +1,35 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sandbox
+  name: lavalink
   labels:
-    app: sandbox
+    app: lavalink
 spec:
   selector:
     matchLabels:
-      app: sandbox
+      app: lavalink
   template:
     metadata:
       labels:
-        app: sandbox
+        app: lavalink
     spec:
       containers:
-        - name: sandbox
-          image: sandbox-image
+        - name: lavalink
+          image: "lavalink-image"
           envFrom:
-          - secretRef:
-              name: architus-secret
+            - secretRef:
+                name: architus-secret
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: sandbox
+  name: lavalink
   namespace: default
 spec:
   type: ClusterIP
   selector:
-    app: sandbox
+    app: lavalink
   ports:
-  - port: 1337
-    targetPort: 1337
+  - protocol: TCP
+    port: 2333
+    targetPort: 2333
