@@ -1,4 +1,5 @@
 load('ext://restart_process', 'docker_build_with_restart')
+load('ext://configmap', 'configmap_create')
 
 # Define features as the keys,
 # and their component dependencies as values:
@@ -69,7 +70,13 @@ if 'db' in enabled:
     k8s_resource('postgres', port_forwards=5432)
 
 if 'sandbox' in enabled:
-    docker_build('sandbox-image', '.', dockerfile='sandbox/Dockerfile', ignore=["*", "!sandbox/*", "!lib/**"])
+    # Create a local copy of the .env file if needed,
+    # and then create a configmap from it
+    if not os.path.exists('sandbox/.env'):
+        local(['cp', 'sandbox/.env.example', 'sandbox/.env'])
+    configmap_create('sandbox-config', from_env_file='sandbox/.env')
+
+    docker_build('sandbox-image', '.', dockerfile='sandbox/Dockerfile.tilt', ignore=["*", "!sandbox/*", "!lib/**"])
     k8s_yaml('sandbox/kube/dev/sandbox.yaml')
     k8s_resource('sandbox', port_forwards=1337)
 
@@ -94,7 +101,9 @@ if 'api' in enabled:
     k8s_resource('api', port_forwards=5000)
 
 if 'lavalink' in enabled:
+    docker_build('lavalink-image', '.', dockerfile='lavalink/Dockerfile', ignore=["*", "!lavalink/*"])
     k8s_yaml('lavalink/kube/dev/lavalink.yaml')
+    k8s_resource('lavalink', port_forwards=5001)
 
 if 'feature-gate' in enabled:
     if rust_hot_reload:
