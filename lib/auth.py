@@ -2,13 +2,30 @@ import jwt as pyjwt
 from flask import request
 from datetime import datetime, timedelta
 from lib.status_codes import StatusCodes
-from lib.config import jwt_secret, twitch_hub_secret, logger
+from lib.config import jwt_secret, twitch_hub_secret, logger, is_prod
 from functools import wraps
 import hmac
 import hashlib
 
 
-def flask_authenticated(member=False):
+def get_valid_jwt(cookies):
+    try:
+        if is_prod:
+            token = cookies['token']
+        else:
+            token = cookies['dev-token']
+    except KeyError:
+        return None
+    try:
+        return JWT(token=token)
+    except pyjwt.exceptions.InvalidSignatureError:
+        bad_jwt = JWT(token=token, verify_signature=False)
+        logger.info(f'{bad_jwt.id} attempted to access {request.path} with an invalid signature')
+    except pyjwt.exceptions.InvalidTokenError:
+        logger.info('error decoding jwt attempting to access {request.path}')
+
+
+def flask_authenticated(member=False, admin=False):
     """decorator for rest endpoint functions
     returns 401 if user is not logged in
     and prepends a JWT object to the kwargs for id data
@@ -18,14 +35,8 @@ def flask_authenticated(member=False):
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            try:
-                jwt = JWT(token=request.cookies.get('token'))
-            except pyjwt.exceptions.InvalidTokenError:
-                try:
-                    bad_jwt = JWT(token=request.cookies.get('token'), verify_signature=False)
-                    logger.info(f'{bad_jwt.id} attempted to access {request.path} with an invalid token')
-                except Exception:
-                    logger.exception("very bad jwt")
+            jwt = get_valid_jwt(request.cookies)
+            if jwt is None:
                 return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
             if expired(jwt):
                 logger.info(f'{jwt.id} attempted to access {request.path} with an expired token')
@@ -35,6 +46,9 @@ def flask_authenticated(member=False):
                 if sc != 200 or not data['member']:
                     logger.info(f'{jwt.id} attempted to access {request.path} but was not a member')
                     return ({'message': "Not Authorized"}, StatusCodes.UNAUTHORIZED_401)
+            if admin:
+                if jwt.id not in (214037134477230080,):
+                    return 'admins only', StatusCodes.FORBIDDEN_403
             return func(self, *args, **kwargs, jwt=jwt)
         return wrapper
     return decorator
@@ -97,7 +111,7 @@ class JWT:
             raise pyjwt.exceptions.InvalidTokenError("Token (or data) is empty")
 
         if data is None:
-            self._data = self._decode(token)
+            self._data = self._decode(token, verify_signature)
         else:
             self._data = data
 

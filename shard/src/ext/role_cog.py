@@ -2,7 +2,6 @@ from src.list_embed import ListEmbed
 from discord.ext import commands
 import discord
 from contextlib import suppress
-from functools import reduce
 
 from lib.config import logger
 from lib.aiomodels import Roles as TbRoles

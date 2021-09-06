@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: manager
+  labels:
+    app: manager
+spec:
+  selector:
+    matchLabels:
+      app: manager
+  template:
+    metadata:
+      labels:
+        app: manager
+    spec:
+      containers:
+        - name: manager
+          image: "{{prefix}}manager:{{tag}}"
+          envFrom:
+          - secretRef:
+              name: architus-secret
+          volumeMounts:
+            - name: manager-persistent-storage
+              mountPath: /var/www
+        - name: nginx
+          image: nginx
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - mountPath: /etc/nginx/conf.d
+              readOnly: true
+              name: nginx-conf
+            - name: manager-persistent-storage
+              mountPath: /var/www/nginx-default
+      volumes:
+        - name: manager-persistent-storage
+          persistentVolumeClaim:
+            claimName: manager-claim
+        - name: nginx-conf
+          configMap:
+            name: nginx-conf # place ConfigMap `nginx-conf` on /etc/nginx
+            items:
+              - key: cdn.conf
+                path: cdn.conf
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: manager
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: manager
+  ports:
+  - name: manager-grpc
+    protocol: TCP
+    port: 50051
+    targetPort: 50051
+  - name: nginx-http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: manager-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: hdd-storage
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+data:
+  cdn.conf: |
+    server {
+        listen       80;
+        server_name  _;
+        location / {
+          root /var/www/nginx-default;
+          add_header 'Access-Control-Allow-Origin' "$http_origin" always;
+          add_header 'Access-Control-Allow-Credentials' 'true' always;
+          add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+          add_header 'Access-Control-Allow-Headers' 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With' always;
+        }
+    }

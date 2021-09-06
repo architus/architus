@@ -1,7 +1,7 @@
 from lib.discord_requests import async_list_guilds_request
 from lib.status_codes import StatusCodes as s
 from lib.config import logger, which_shard, NUM_SHARDS
-from asyncio import create_task
+from asyncio import create_task, wait
 
 guild_attrs = [
     'id', 'name', 'icon', 'splash', 'owner_id', 'region', 'description',
@@ -35,6 +35,7 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
     returned_guilds = []
 
     async def cached_response(shard_id, returned_guilds):
+        '''requests information about all the guilds a shard knows about for a user'''
         resp, sc = await shard_client.users_guilds(jwt.id, routing_key=f"shard_rpc_{shard_id}")
         if sc != 200:
             logger.error(f"got bad response from `users_guilds` from shard: {shard_id}")
@@ -46,15 +47,23 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
             return
         for g in resp:
             g.update({'owner': g['owner_id'] == jwt.id})
+
+        # send this shard's chunk of guilds up
         if not payload['finished']:
-            payload.update({'data': resp})
+            copy_payload = payload.copy()
+            copy_payload.update({'data': resp})
             returned_guilds += resp
-            await partial_event(payload)
+            await partial_event(copy_payload)
 
-    for i in range(NUM_SHARDS):
-        create_task(cached_response(i, returned_guilds))
+    # start tasks for fetching guilds from each shard (but don't await yet)
+    shard_tasks = [create_task(cached_response(i, returned_guilds)) for i in range(NUM_SHARDS)]
 
+    # start request to discord for complete list of guilds
     resp, sc = await async_list_guilds_request(jwt)
+
+    # wait for shards to respond before continuing...
+    await wait(shard_tasks)
+
     if sc != s.OK_200:
         logger.error(f"discord returned error from guild_list: {resp}")
         await partial_error(
@@ -65,16 +74,19 @@ async def guild_pool_response(shard_client, partial_event, partial_error, payloa
         return
     remaining = []
     ids = [g['id'] for g in returned_guilds]
+    # merge data from discord and shards to get a complete picture
     for guild in resp:
         if str(guild['id']) not in ids:
-            mem_resp, sc = await shard_client.is_member(
-                jwt.id, guild['id'], routing_key=f"shard_rpc_{which_shard(guild['id'])}")
+            # if it's not in our list from the shards it doesn't have architus
+
             guild.update({
-                'has_architus': mem_resp['member'] if sc == 200 else False,
-                'architus_admin': mem_resp['admin'] if sc == 200 else False,
+                'has_architus': False,
+                'architus_admin': False,
                 'permissions': int(guild['permissions']),
             })
             remaining.append(guild)
+
+    # send the remaining guilds
     payload.update({'data': remaining, 'finished': True})
     await partial_event(payload)
 

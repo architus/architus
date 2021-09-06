@@ -1,15 +1,15 @@
 from functools import partial
 from aio_pika import Message
+from asyncio import sleep
 import json
 
 from lib.ipc.util import poll_for_async_connection
-# from lib.config import logger
+from lib.config import logger
 
 
 async def on_message(entry_point, exchange, message):
     with message.process():
         msg = json.loads(message.body.decode())
-        # logger.debug(f"remote call of '{msg['method']}' with {len(msg['args'])} args and {len(msg['kwargs'])} kwargs")
 
         ret, status_code = await entry_point(msg['method'], *msg['args'], **msg['kwargs'])
 
@@ -40,3 +40,9 @@ async def start_server(loop, listener_queue, entry_point):
             channel.default_exchange
         )
     )
+
+    while True:
+        await sleep(60)
+        if rabbit_connection.heartbeat_last < loop.time() - 60:
+            logger.warning("seems as though we aren't connected to rabbit anymore :thinking:")
+            await start_server(loop, listener_queue, entry_point)

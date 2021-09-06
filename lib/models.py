@@ -61,11 +61,11 @@ class AutoResponse(Base):
 
 class Settings(Base):
     __tablename__ = 'tb_settings'
-    server_id = Column('server_id', BigInteger, primary_key=True)
+    guild_id = Column('guild_id', BigInteger, primary_key=True)
     json_blob = Column('json_blob', Text)
 
-    def __init__(self, server_id, json_blob):
-        self.server_id = server_id
+    def __init__(self, guild_id, json_blob):
+        self.guild_id = guild_id
         self.json_blob = json_blob
 
 

@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shard
+  labels:
+    app: shard
+spec:
+  selector:
+    matchLabels:
+      app: shard
+  template:
+    metadata:
+      labels:
+        app: shard
+    spec:
+      containers:
+        - name: shard
+          image: shard-image
+          envFrom:
+          - secretRef:
+              name: architus-secret

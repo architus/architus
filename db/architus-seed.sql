@@ -60,21 +60,6 @@ CREATE TABLE public.tb_emojis (
 ALTER TABLE public.tb_emojis OWNER TO postgres;
 
 --
--- Name: tb_commands; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.tb_commands (
-    trigger text NOT NULL,
-    response text NOT NULL,
-    count bigint NOT NULL,
-    server_id bigint NOT NULL,
-    author_id bigint
-);
-
-
-ALTER TABLE public.tb_commands OWNER TO postgres;
-
---
 -- Name: tb_logs; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -90,18 +75,6 @@ CREATE TABLE public.tb_logs (
 
 ALTER TABLE public.tb_logs OWNER TO postgres;
 
---
--- Name: tb_roles; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.tb_roles (
-    target_role_id bigint NOT NULL,
-    server_id bigint NOT NULL,
-    required_role_id bigint
-);
-
-
-ALTER TABLE public.tb_roles OWNER TO postgres;
 
 --
 -- Name: tb_session; Type: TABLE; Schema: public; Owner: postgres
@@ -125,7 +98,7 @@ ALTER TABLE public.tb_session OWNER TO postgres;
 --
 
 CREATE TABLE public.tb_settings (
-    server_id bigint NOT NULL,
+    guild_id bigint NOT NULL,
     json_blob text NOT NULL
 );
 
@@ -192,22 +165,6 @@ ALTER TABLE ONLY public.tb_auto_responses
 
 
 --
--- Name: tb_commands tb_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.tb_commands
-    ADD CONSTRAINT tb_commands_pkey PRIMARY KEY (trigger);
-
-
---
--- Name: tb_roles tb_roles_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.tb_roles
-    ADD CONSTRAINT tb_roles_pkey PRIMARY KEY (target_role_id);
-
-
---
 -- Name: tb_session tb_session_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -220,7 +177,7 @@ ALTER TABLE ONLY public.tb_session
 --
 
 ALTER TABLE ONLY public.tb_settings
-    ADD CONSTRAINT tb_settings_pkey PRIMARY KEY (server_id);
+    ADD CONSTRAINT tb_settings_pkey PRIMARY KEY (guild_id);
 
 
 --
@@ -237,25 +194,12 @@ ALTER TABLE ONLY public.tb_users
 
 GRANT ALL ON TABLE public.tb_emojis TO autbot;
 
---
--- Name: TABLE tb_commands; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.tb_commands TO autbot;
-
 
 --
 -- Name: TABLE tb_logs; Type: ACL; Schema: public; Owner: postgres
 --
 
 GRANT ALL ON TABLE public.tb_logs TO autbot;
-
-
---
--- Name: TABLE tb_roles; Type: ACL; Schema: public; Owner: postgres
---
-
-GRANT ALL ON TABLE public.tb_roles TO autbot;
 
 
 --
