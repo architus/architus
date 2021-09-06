@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sandbox
+  labels:
+    app: sandbox
+spec:
+  selector:
+    matchLabels:
+      app: sandbox
+  template:
+    metadata:
+      labels:
+        app: sandbox
+    spec:
+      containers:
+        - name: sandbox
+          image: sandbox-image
+          env:
+            - name: HTTP_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: sandbox-config
+                  key: HTTP_PROXY
+            - name: HTTPS_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: sandbox-config
+                  key: HTTPS_PROXY
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sandbox
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: sandbox
+  ports:
+  - port: 1337
+    targetPort: 1337

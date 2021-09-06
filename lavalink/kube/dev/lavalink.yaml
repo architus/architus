@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lavalink
+  labels:
+    app: lavalink
+spec:
+  selector:
+    matchLabels:
+      app: lavalink
+  template:
+    metadata:
+      labels:
+        app: lavalink
+    spec:
+      containers:
+        - name: lavalink
+          image: "lavalink-image"
+          envFrom:
+            - secretRef:
+                name: architus-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lavalink
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: lavalink
+  ports:
+  - protocol: TCP
+    port: 2333
+    targetPort: 2333

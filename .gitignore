@@ -14,5 +14,7 @@ shard/res/meme.png
 tags
 .vs/*
 .vscode/*
+.idea/*
 www
 **/target
+secret.yaml

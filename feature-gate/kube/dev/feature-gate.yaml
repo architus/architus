@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feature-gate
+  labels:
+    app: feature-gate
+spec:
+  selector:
+    matchLabels:
+      app: feature-gate
+  template:
+    metadata:
+      labels:
+        app: feature-gate
+    spec:
+      containers:
+        - name: feature-gate
+          image: feature-gate-image
+          envFrom:
+            - secretRef:
+                name: architus-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: feature-gate
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: feature-gate
+  ports:
+    - port: 50555
+      targetPort: 50555

@@ -1,0 +1,14 @@
+# GitHub Linguist overrides
+# See https://github.com/github/linguist/blob/master/docs/overrides.md
+
+# tilt_modules is full of vendored files
+# https://docs.tilt.dev/extensions.html
+tilt_modules/** linguist-vendored
+
+# Dockerfile.* files should be considered custom Dockerfiles,
+# except for Dockerfile.*.dockerignore, which are docker ignore files
+**/Dockerfile.* linguist-language=Dockerfile
+**/Dockerfile.*.dockerignore linguist-language=Ignore-List
+
+# *.Tiltfile files should be considered Tiltfile (Starlark) libraries
+**/*.Tiltfile linguist-language=Starlark

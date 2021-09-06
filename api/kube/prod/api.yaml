@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: "{{prefix}}api:{{tag}}"
+          envFrom:
+          - secretRef:
+              name: architus-secret
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: api
+  ports:
+  - protocol: TCP
+    port: 5000
+    targetPort: 5000

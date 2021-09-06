@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dbmanager
+spec:
+  template:
+    spec:
+      containers:
+        - name: dbmanager
+          image: "{{prefix}}dbmanager:{{tag}}"
+          envFrom:
+          - secretRef:
+              name: architus-secret
+          volumeMounts:
+            - name: dbm-persistent-storage
+              mountPath: /app/current_migration
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: dbm-persistent-storage
+          persistentVolumeClaim:
+            claimName: dbmanager-claim
+      restartPolicy: OnFailure
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: dbmanager-claim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: hdd-storage
+  resources:
+    requests:
+      storage: 5Mi

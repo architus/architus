@@ -19,6 +19,7 @@ def make_token_cookie_header(token: str, max_age: int) -> dict:
     '''creates a set-cookie header for storing the auth token'''
     cookie = f'token={token}; Max-Age={max_age}; Path=/; Domain={DOMAIN}; Secure; HttpOnly'
     if not is_prod:
+        cookie = 'dev-' + cookie
         cookie += '; SameSite=None'
     return {'Set-Cookie': cookie}
 

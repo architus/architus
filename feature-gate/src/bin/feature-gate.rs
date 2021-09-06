@@ -18,16 +18,12 @@ use std::env;
 use tokio::sync::mpsc;
 use tonic::{transport::Server, Request, Response, Status};
 
+use crate::rpc::feature_gate::feature_gate_server::{FeatureGate, FeatureGateServer};
+use crate::rpc::feature_gate::*;
 use backoff::future::FutureOperation;
 use backoff::ExponentialBackoff;
-use feature_gate::feature_gate_server::{FeatureGate, FeatureGateServer};
-use feature_gate::*;
 
 type RpcResponse<T> = Result<Response<T>, Status>;
-
-pub mod feature_gate {
-    include!("../../grpc/featuregate.rs");
-}
 
 /// Structure for handling all of the gRPC requests.
 /// Holds a connection pool that can issue RAII connection handles

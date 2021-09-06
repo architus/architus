@@ -8,7 +8,7 @@ from aio_pika import IncomingMessage
 from jwt.exceptions import InvalidTokenError
 
 from lib.config import which_shard, logger, is_prod, domain_name
-from lib.auth import JWT, gateway_authenticated as authenticated
+from lib.auth import JWT, gateway_authenticated as authenticated, get_valid_jwt
 from lib.ipc import manager_pb2_grpc
 from lib.ipc.grpc_client import get_async_client
 from lib.ipc.async_rpc_client import shardRPC
@@ -87,15 +87,14 @@ class CustomNamespace(socketio.AsyncNamespace):
     async def on_connect(self, sid: str, environ: dict):
         logger.debug(f"{environ['REMOTE_ADDR']} has connected with sid: {sid}")
         request = environ['aiohttp.request']
-        try:
-            jwt = JWT(token=request.cookies['token'])
-        except (InvalidTokenError, KeyError):
-            logger.info("No valid token found, logging into unprivileged gateway...")
-        else:
+        jwt = get_valid_jwt(request.cookies)
+        if jwt is not None:
             logger.info("Found valid token, logging into elevated gateway...")
             sio.enter_room(sid, f"{sid}_auth")
             async with sio.session(sid) as session:
                 session['jwt'] = jwt
+        else:
+            logger.info("No valid token found, logging into unprivileged gateway...")
 
     @authenticated(shard_client)
     async def on_pool_request(self, sid: str, data, jwt):

@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shard
+  labels:
+    app: shard
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: shard
+  template:
+    metadata:
+      labels:
+        app: shard
+    spec:
+      containers:
+        - name: shard
+          image: "{{prefix}}shard:{{tag}}"
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "1"
+          envFrom:
+          - secretRef:
+              name: architus-secret
+      imagePullSecrets:
+        - name: regcred

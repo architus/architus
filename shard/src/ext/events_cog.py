@@ -2,10 +2,8 @@ import datetime
 import discord
 import pytz
 import dateutil.parser
-import re
 import json
 from enum import IntEnum
-from unidecode import unidecode
 from contextlib import suppress
 from discord.ext.commands import Cog
 from discord.ext import commands

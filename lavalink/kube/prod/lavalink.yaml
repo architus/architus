@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lavalink
+  labels:
+    app: lavalink
+spec:
+  selector:
+    matchLabels:
+      app: lavalink
+  template:
+    metadata:
+      labels:
+        app: lavalink
+    spec:
+      containers:
+        - name: lavalink
+          image: "{{prefix}}lavalink:{{tag}}"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "1"
+          envFrom:
+            - secretRef:
+                name: architus-secret
+      imagePullSecrets:
+        - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lavalink
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: lavalink
+  ports:
+  - protocol: TCP
+    port: 2333
+    targetPort: 2333
