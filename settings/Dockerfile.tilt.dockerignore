@@ -1,0 +1,5 @@
+# Ignore all files in the context except for the service binary
+# Overrides /.dockerignore
+
+*
+!settings/target/debug/settings
