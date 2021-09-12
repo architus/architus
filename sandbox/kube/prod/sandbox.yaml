@@ -20,22 +20,19 @@ spec:
             limits:
               memory: "1Gi"
               cpu: "1"
-          envFrom:
-          - secretRef:
-              name: architus-secret
+          env:
+          - name: HTTP_PROXY
+            valueFrom:
+              configMapKeyRef:
+                name: sandbox-config
+                key: HTTP_PROXY
+          - name: HTTPS_PROXY
+            valueFrom:
+              configMapKeyRef:
+                name: sandbox-config
+                key: HTTPS_PROXY
       imagePullSecrets:
         - name: regcred
-      env:
-        - name: HTTP_PROXY
-          valueFrom:
-            configMapKeyRef:
-              name: sandbox-config
-              key: HTTP_PROXY
-        - name: HTTPS_PROXY
-          valueFrom:
-            configMapKeyRef:
-              name: sandbox-config
-              key: HTTPS_PROXY
 ---
 apiVersion: v1
 kind: Service
