@@ -1,0 +1,7 @@
+# Set these to the appropriate values and then change this files name to
+# bot_settings.toml
+
+architus_token = "PUT TOKEN HERE"
+
+# This is the number of threads to use for the tokio runtime
+tokio_threads = 4
