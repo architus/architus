@@ -8,12 +8,17 @@ use rocket::serde::{Deserialize, Serialize};
 
 const SECONDS_IN_DAY: u64 = 86_400;
 
+/// Timespan of events to look for. All values should be unix timestamps in MS.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Timespan(pub u64, pub u64);
 
+/// A unit of work to be done. It is either an audit log to scrape or a channel to scrape.
+/// An audit log will be a valid guild id with a zeroed channel id.
+/// A channel will be a valid guild and channel id.
 #[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub struct Work(pub GuildId, pub ChannelId, pub Timespan);
 
+/// A work struct that indicates there is no work to be done.
 pub const NULL_WORK: Work = Work(GuildId(0), ChannelId(0), Timespan(0, 0));
 
 impl Timespan {
@@ -110,11 +115,6 @@ impl WorkQueue {
     /// Pops a unit of work from the beginning of the queue.
     pub fn get_work(&mut self) -> Option<Work> {
         self.queue.pop_front()
-    }
-
-    /// Pushes a unit or work to the end of the queue.
-    pub fn queue_empty(&self) -> bool {
-        self.queue.len() == 0
     }
 
     /// Moves a guilds work to the front of the queue. If there is other work

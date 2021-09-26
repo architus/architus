@@ -13,6 +13,7 @@ tokio-postgres = "0.7"
 twilight-http = "0.6"
 twilight-model = "0.6"
 log = "0.4"
+config = '0.11'
 
 [dependencies.tokio]
 version = "1"
