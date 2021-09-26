@@ -1,4 +1,5 @@
 use std::time::{Duration, SystemTime};
+
 /// Utility module for dealing with discord snowflakes
 pub mod snowflake {
     pub const DISCORD_EPOCH_OFFSET: u64 = 1_420_070_400_000;
@@ -20,5 +21,11 @@ pub mod snowflake {
         let dur = Duration::from_millis(millis);
 
         SystemTime::UNIX_EPOCH + dur
+    }
+
+    /// Takes a unix timestamp and converts it to a basic snowflake that
+    /// can be used as a bound in requests.
+    pub fn bound_from_ts(timestamp: u64) -> u64 {
+        (timestamp - DISCORD_EPOCH_OFFSET) << TIMESTAMP_BIT_OFFSET
     }
 }
