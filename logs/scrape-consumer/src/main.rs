@@ -1,5 +1,7 @@
 mod scrape;
 
+use tokio::runtime::Builder;
+
 use twilight_http::Client;
 
 const TOKEN: &str = "PUT TOKEN HERE";
@@ -27,4 +29,8 @@ async fn main() {
         },
         Err(e) => println!("{:?}", e),
     };
+}
+
+async fn worker() {
+    loop {}
 }

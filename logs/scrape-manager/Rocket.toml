@@ -1,0 +1,20 @@
+[default]
+address = "0.0.0.0"
+port = 3030
+workers = 4
+keep_alive = 3
+ident = "scrape-manager"
+log_level = "normal"
+cli_colors = true
+
+[default.limits]
+forms = "1 kB"
+json = "1 kB"
+msgpack = "1 kB"
+"file/jpg" = "1 kB"
+
+[default.shutdown]
+ctrlc = true
+signals = ["term", "hup"]
+grace = 10
+mercy = 10

@@ -1,14 +1,13 @@
 //! Module for scraping audit log events from the discord http api.
 
+mod utils;
+
 use std::error::Error;
 use std::fmt;
 
 use twilight_http::Client;
 use twilight_model::id::GuildId;
 use twilight_model::guild::audit_log::AuditLog;
-
-/// Limit of how many guilds discord will send in response to asking which guilds we're in.
-const GUILD_REQUEST_LIMIT: u64 = 200;
 
 /// This is the max number of audit logs that can be returned from a request.
 const AUDIT_LOG_REQUEST_LIMIT: u64 = 100;
@@ -17,15 +16,12 @@ const AUDIT_LOG_REQUEST_LIMIT: u64 = 100;
 pub enum ScrapeError {
     /// An error occurred getting the audit logs from the given guild
     AuditLogGet(GuildId),
-    /// Unable to get a list of current guilds from architus
-    ListGuilds,
 }
 
 impl fmt::Display for ScrapeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ScrapeError::AuditLogGet(_) => write!(f, "failed to get audit logs for guild"),
-            ScrapeError::ListGuilds => write!(f, "failed to get architus guild from discord"),
         }
     }
 }
@@ -34,7 +30,6 @@ impl fmt::Debug for ScrapeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ScrapeError::AuditLogGet(g) => write!(f, "failed to get audit logs for guild {}", g.0),
-            ScrapeError::ListGuilds => write!(f, "failed to get architus guild from discord"),
         }
     }
 }
@@ -42,6 +37,17 @@ impl fmt::Debug for ScrapeError {
 impl Error for ScrapeError {}
 
 pub type ScrapeResult<T> = Result<T, ScrapeError>;
+
+pub async fn scrape_timespan(client: &Client, guild: GuildId, timespan: (u64, u64)) -> ScrapeResult<AuditLog> {
+    let mut logs = AuditLog {
+        entries: Vec::new(),
+        integrations: Vec::new(),
+        users: Vec::new(),
+        webhooks: Vec::new(),
+    };
+
+    let curr_event_batch = scrape_before(client, guild, utils::bound_from_ts(timespan.1)).await;
+}
 
 /// Gets up to 100 audit log events from `guild` before the event referenced by `event_id`
 /// occurred.
@@ -74,54 +80,4 @@ pub async fn scrape_before(client: &Client, guild: GuildId, event_id: Option<u64
         Ok(d) => Ok(d),
         Err(_) => Err(ScrapeError::AuditLogGet(guild)),
     }
-}
-
-/// Asks discord for a list of all of the guilds that architus is in.
-pub async fn get_guilds(client: &Client) -> ScrapeResult<Vec<GuildId>> {
-    // Architus is currently only in ~450 guilds. 1000 is a good number that
-    // allows room to grow. Also, a GuildId is just a newtype for a u64 so
-    // this shouldn't actually take up that much space (like 2 pages).
-    let mut architus_guilds: Vec<GuildId> = Vec::with_capacity(1000);
-
-    let request = client.current_user_guilds()
-        .limit(GUILD_REQUEST_LIMIT).expect("Will succeed as long as `GUILD_REQUEST_LIMIT` is kept up to date")
-        .exec().await;
-
-    let response = match request {
-        Ok(r) => r,
-        Err(_) => return Err(ScrapeError::ListGuilds),
-    };
-
-    let data = response.models().await;
-    let guilds = match data {
-        Ok(d) => d,
-        Err(_) => return Err(ScrapeError::ListGuilds),
-    };
-
-    for g in &guilds {
-        architus_guilds.push(g.id);
-    }
-
-    while guilds.len() >= (GUILD_REQUEST_LIMIT as usize) {
-        let request = client.current_user_guilds()
-            .limit(GUILD_REQUEST_LIMIT).expect("Will succeed as long as `GUILD_REQUEST_LIMIT` is kept up to date")
-            .exec().await;
-
-        let response = match request {
-            Ok(r) => r,
-            Err(_) => return Err(ScrapeError::ListGuilds),
-        };
-
-        let data = response.models().await;
-        let guilds = match data {
-            Ok(d) => d,
-            Err(_) => return Err(ScrapeError::ListGuilds),
-        };
-
-        for g in &guilds {
-            architus_guilds.push(g.id);
-        }
-    }
-
-    Ok(architus_guilds)
 }
