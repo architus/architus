@@ -41,7 +41,7 @@ impl FeatureGate for Gate {
     /// Adds a new feature to the feature database.
     ///
     /// If the feature is successfully added to the database a success is returned.
-    /// If the database is not able to be reached or any other error occurrs while
+    /// If the database is not able to be reached or any other error occurs while
     /// trying to add the feature, false will be returned to indicate the feature
     /// was not added.
     async fn create_feature(&self, request: Request<Feature>) -> RpcResponse<CreationResult> {

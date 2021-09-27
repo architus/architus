@@ -1,0 +1,10 @@
+syntax = "proto3";
+package logs_submission_schema;
+
+import "logs/event.proto";
+
+message StoredEvent {
+  string id = 1;
+  logs.event.Event inner = 2;
+  uint64 ingestion_timestamp = 3;
+}

@@ -3,9 +3,6 @@ package logs.event;
 
 // Event is the schema for the objects stored in elasticsearch for the logs services
 message Event {
-  // "lgev_" Prefixed ksuid ID
-  // using the *time that the event was received by wherever it's ingested*
-  string id = 1;
   // Unix timestamp of the *time of the underlying event* (if available),
   // else some meaningful timestamp describing when the event was ingested
   uint64 timestamp = 2;

@@ -7,6 +7,7 @@ fn main() -> anyhow::Result<()> {
         .build_server(false)
         .compile(&["logs/submission.proto"], &["../../lib/ipc/proto"])
         .context("compiling logs/submission.proto definitions")?;
+
     // Compile the gateway-queue-lib protobuf definitions
     tonic_build::configure()
         .build_client(false)

@@ -19,8 +19,9 @@ fn main() -> anyhow::Result<()> {
             ".logs.event.ContentMetadata",
             "#[derive(::serde::Serialize)]",
         )
-        .compile(&["logs/submission.proto"], &["../../lib/ipc/proto"])
-        .context("compiling logs/submission.proto definitions")?;
+        .type_attribute(".logs_submission_schema.StoredEvent", "#[derive(::serde::Serialize)]")
+        .compile(&["event.proto", "logs/submission.proto"], &["./schema", "../../lib/ipc/proto"])
+        .context("compiling proto definitions")?;
 
     Ok(())
 }

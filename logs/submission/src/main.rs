@@ -11,9 +11,10 @@ use crate::config::Configuration;
 use crate::rpc::logs::submission::submission_service_server::{
     SubmissionService, SubmissionServiceServer,
 };
-use crate::rpc::logs::submission::{SubmitIdempotentRequest, SubmitIdempotentResponse};
+use crate::rpc::logs::submission::{
+    EventDeterministicIdParams, SubmitIdempotentRequest, SubmitIdempotentResponse, SubmittedEvent,
+};
 use anyhow::Context;
-use bytes::Bytes;
 use elasticsearch::Elasticsearch;
 use futures::{try_join, StreamExt};
 use futures_batch::ChunksTimeoutStreamExt;
@@ -134,19 +135,27 @@ async fn submit_events(
             let config = Arc::clone(&config);
             let elasticsearch = Arc::clone(&elasticsearch);
             let batch_submit = submission::BatchSubmit::new(
-                events,
                 correlation_id,
                 config,
                 &logger,
                 elasticsearch,
             );
             async move {
-                batch_submit.run().await;
+                batch_submit.run(events).await;
             }
         })
         .await;
 
     Ok(())
+}
+
+/// Generates the log event ID from the ID parameters and event type,
+/// formatted to a canonical format.
+fn generate_id(id_params: EventDeterministicIdParams, event_type: i32) -> String {
+    return format!(
+        "lgev_t{:4x}_p{:8x}_s{:8x}",
+        event_type, id_params.primary_id, id_params.secondary_id
+    );
 }
 
 struct SubmissionServiceImpl {
@@ -175,80 +184,41 @@ impl SubmissionService for SubmissionServiceImpl {
         &self,
         request: Request<SubmitIdempotentRequest>,
     ) -> anyhow::Result<Response<SubmitIdempotentResponse>, tonic::Status> {
-        let timestamp = architus_id::millisecond_ts();
         let event = request
             .into_inner()
             .event
             .ok_or_else(|| Status::invalid_argument("no event given"))?;
 
-        // TODO consume additional metadata in SubmittedEvent message
-        //      and send to revision service
+        let SubmittedEvent {
+            inner,
+            channel_name,
+            agent_metadata,
+            subject_metadata,
+            auxiliary_metadata,
+            id_params,
+        } = event;
 
-        let mut inner = event
-            .inner
-            .ok_or_else(|| Status::invalid_argument("no inner event given"))?;
+        let inner = inner.ok_or_else(|| Status::invalid_argument("no inner event given"))?;
+        let id_params = id_params.ok_or_else(|| Status::invalid_argument("no id params given"))?;
 
         // guild_id is the only required field
         if inner.guild_id == 0 {
             return Err(Status::invalid_argument("missing guild_id on inner event"));
         }
 
-        // Add in a timestamp if needed
-        if inner.timestamp == 0 {
-            inner.timestamp = timestamp;
-        }
+        let id = generate_id(id_params, inner.r#type);
+        let logger = self.logger.new(slog::o!("event_id" => id.clone()));
 
-        // Provision an ID if needed
-        if inner.id == "" {
-            inner.id =
-                architus_id::with_ts(architus_id::Type::LogEvent, timestamp).map_err(|err| {
-                    slog::warn!(
-                        self.logger,
-                        "could not create ID for timestamp";
-                        "event" => ?inner,
-                        "timestamp" => timestamp,
-                        "error" => ?err,
-                    );
-                    Status::invalid_argument("invalid timestamp")
-                })?;
-        } else {
-            // Validate the ID given
-            if let Err(err) = architus_id::validate(architus_id::Type::LogEvent, &inner.id) {
-                slog::warn!(
-                    self.logger,
-                    "given ID was invalid";
-                    "event_id" => inner.id.clone(),
-                    "event" => ?inner,
-                    "timestamp" => timestamp,
-                    "error" => ?err,
-                );
-                return Err(Status::invalid_argument(format!(
-                    "invalid id given: {:?}",
-                    err
-                )));
-            }
-        }
-
-        // Serialize the inner event to JSON
-        let logger = self.logger.new(slog::o!("event_id" => inner.id.clone()));
-        let json = serde_json::to_vec(&inner).map_err(|err| {
-            slog::warn!(
-                logger,
-                "could not serialize event to JSON";
-                "event" => ?inner,
-                "error" => ?err,
-            );
-            Status::invalid_argument(format!("could not encode event to JSON: {:?}", err))
-        })?;
-        let json_body = Bytes::from(json);
+        // TODO consume additional metadata in SubmittedEvent message
+        //      and send to revision service
 
         // Create the one shot channel to wait on
-        let (oneshot_tx, oneshot_rx) = oneshot::channel::<submission::Result>();
+        let (oneshot_tx, oneshot_rx) = oneshot::channel::<submission::OperationResult>();
 
         // Post the event to the shared channel
         let event = submission::Event {
-            event_id: inner.id,
-            event_json: json_body,
+            id: id.clone(),
+            inner: Box::new(inner),
             notifier: oneshot_tx,
         };
         self.event_tx.send(event).map_err(|err| {
@@ -270,7 +240,7 @@ impl SubmissionService for SubmissionServiceImpl {
                             "confirmed durable submission of event";
                             "correlation_id" => correlation_id,
                         );
-                        Ok(Response::new(SubmitIdempotentResponse {}))
+                        Ok(Response::new(SubmitIdempotentResponse { id }))
                     }
                     Err(err) => {
                         slog::warn!(
