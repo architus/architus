@@ -31,6 +31,7 @@ backoff = { version = "0.3", features = ["tokio"] }
 bytes = "1.0"
 elasticsearch = "7.12.0-alpha.1"
 hyper = "0.14"
+thiserror = "1"
 
 [build-dependencies]
 tonic-build = "0.4"

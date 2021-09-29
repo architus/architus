@@ -3,7 +3,7 @@
 
 mod config;
 mod connect;
-mod elasticsearch_api;
+mod elasticsearch;
 mod rpc;
 mod submission;
 
@@ -15,7 +15,7 @@ use crate::rpc::logs::submission::{
     EventDeterministicIdParams, SubmitIdempotentRequest, SubmitIdempotentResponse, SubmittedEvent,
 };
 use anyhow::Context;
-use elasticsearch::Elasticsearch;
+use crate::elasticsearch::Client;
 use futures::{try_join, StreamExt};
 use futures_batch::ChunksTimeoutStreamExt;
 use slog::Logger;
@@ -117,7 +117,7 @@ async fn submit_events(
     config: Arc<Configuration>,
     logger: Logger,
     event_rx: mpsc::UnboundedReceiver<submission::Event>,
-    elasticsearch: Arc<Elasticsearch>,
+    elasticsearch: Arc<Client>,
 ) -> anyhow::Result<()> {
     let next_correlation_id = Arc::new(AtomicUsize::new(1));
 

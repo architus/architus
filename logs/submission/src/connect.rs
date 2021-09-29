@@ -2,9 +2,8 @@
 //! used during service initialization and during potential reconnection
 
 use crate::config::Configuration;
+use crate::elasticsearch::{Client, PingError};
 use anyhow::Context;
-use elasticsearch::http::transport::Transport;
-use elasticsearch::Elasticsearch;
 use slog::Logger;
 use std::sync::Arc;
 
@@ -13,42 +12,43 @@ use std::sync::Arc;
 pub async fn to_elasticsearch(
     config: Arc<Configuration>,
     logger: Logger,
-) -> anyhow::Result<Elasticsearch> {
-    let es_path = &config.services.elasticsearch;
-    let es_transport =
-        Transport::single_node(es_path).context("could not create elasticsearch client")?;
-    let elasticsearch = Elasticsearch::new(es_transport);
+) -> anyhow::Result<Client> {
+    let client = crate::elasticsearch::new_client(Arc::clone(&config), logger.clone())
+        .context("could not create elasticsearch client")?;
 
     let initialization_backoff = config.initialization_backoff.build();
     let ping_elasticsearch = || async {
-        elasticsearch
-            .ping()
-            .send()
-            .await
-            .map_err(|err| {
-                slog::warn!(
-                    logger,
-                    "pinging elasticsearch failed";
-                    "error" => ?err,
-                );
-                backoff::Error::Transient(err.into())
-            })?
-            .error_for_status_code()
-            .map_err(|err| {
-                slog::warn!(
-                    logger,
-                    "pinging elasticsearch returned non-success error code";
-                    "error" => ?err,
-                );
-                backoff::Error::Transient(err.into())
-            })?;
-        Ok::<(), backoff::Error<anyhow::Error>>(())
+        match client.ping().await {
+            Ok(_) => Ok(()),
+            Err(err) => match &err {
+                PingError::Failed(inner_err) => {
+                    slog::warn!(
+                        logger,
+                        "pinging elasticsearch failed";
+                        "error" => ?inner_err,
+                    );
+                    Err(backoff::Error::Transient(err))
+                }
+                PingError::ErrorStatusCode(status_code) => {
+                    slog::warn!(
+                        logger,
+                        "pinging elasticsearch failed with error status code";
+                        "status_code" => ?status_code,
+                    );
+                    Err(backoff::Error::Transient(err))
+                }
+            }
+        }
     };
 
     backoff::future::retry(initialization_backoff, ping_elasticsearch)
         .await
         .context("could not ping elasticsearch to verify reachability after retrying")?;
 
-    slog::info!(logger, "connected to Elasticsearch"; "path" => es_path);
-    Ok(elasticsearch)
+    slog::info!(
+        logger,
+        "connected to Elasticsearch";
+        "path" => &config.services.elasticsearch
+    );
+    Ok(client)
 }
