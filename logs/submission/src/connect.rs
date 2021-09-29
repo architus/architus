@@ -37,7 +37,7 @@ pub async fn to_elasticsearch(
                     );
                     Err(backoff::Error::Transient(err))
                 }
-            }
+            },
         }
     };
 

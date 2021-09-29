@@ -20,6 +20,21 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::oneshot;
 use tonic::Status;
 
+/// Argument type that is bundled with an Event
+/// and used to notify the original sender
+/// that an event was successfully submitted.
+pub type Notifier = oneshot::Sender<OperationResult>;
+
+/// Aggregate event struct that is sent on the shared channel
+#[derive(Debug)]
+pub struct Event {
+    pub id: String,
+    pub inner: Box<ProtoEvent>,
+    pub notifier: Notifier,
+}
+
+/// Public failure result variant,
+/// giving details on why event submission failed.
 #[derive(Debug, Clone)]
 pub struct Failure {
     pub status: Status,
@@ -30,25 +45,40 @@ pub struct Failure {
 /// Ok() contains the correlation id of the submission operation
 pub type OperationResult = Result<usize, Failure>;
 
-type Notifier = oneshot::Sender<OperationResult>;
-
-#[derive(Debug)]
-pub struct Event {
-    pub id: String,
-    pub inner: Box<ProtoEvent>,
-    pub notifier: Notifier,
+/// Convenience wrapper that attaches an `id` field to an existing type
+struct WithId<T> {
+    id: String,
+    inner: T,
 }
 
-#[derive(Debug, Clone)]
-struct InternalFailure {
-    pub status: Status,
-    pub internal_details: String,
+impl<T> WithId<T> {
+    fn new(inner: T, id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            inner,
+        }
+    }
+
+    /// Splits a `WithId` instance into its parts
+    #[allow(clippy::missing_const_for_fn)]
+    fn split(self) -> (String, T) {
+        (self.id, self.inner)
+    }
 }
 
+/// Internal version of `WithId<OperationResult>`
+/// that does not include `correlation_id`
 #[derive(Debug, Clone)]
 struct InternalResult {
     id: String,
     result: Result<(), InternalFailure>,
+}
+
+/// Internal version of `Failure` that does not include `correlation_id`
+#[derive(Debug, Clone)]
+struct InternalFailure {
+    pub status: Status,
+    pub internal_details: String,
 }
 
 /// Creates the Elasticsearch index before submitting any events
@@ -117,6 +147,9 @@ pub async fn create_index(
     Ok(())
 }
 
+/// Reads in the index settings file for the events index,
+/// ensuring that the file exists and contains valid JSON
+/// before returning the file's direct contents.
 async fn read_index_settings_file(path: impl AsRef<Path>) -> anyhow::Result<Bytes> {
     let path_ref = path.as_ref();
     let mut index_config_file = File::open(path_ref).context(format!(
@@ -152,25 +185,6 @@ pub struct BatchSubmit {
     attempted_count: usize,
 }
 
-struct WithId<T> {
-    id: String,
-    inner: T,
-}
-
-impl<T> WithId<T> {
-    fn new(inner: T, id: impl Into<String>) -> Self {
-        Self {
-            id: id.into(),
-            inner,
-        }
-    }
-
-    #[allow(clippy::missing_const_for_fn)]
-    fn split(self) -> (String, T) {
-        (self.id, self.inner)
-    }
-}
-
 impl BatchSubmit {
     pub fn new(
         correlation_id: usize,
@@ -203,6 +217,10 @@ impl BatchSubmit {
         self.notify_all(notifiers_and_results);
     }
 
+    /// Submits all events sent on the shared channel,
+    /// serializing them to JSON before using the Bulk Elasticsearch API
+    /// to index all documents in the same API request.
+    /// Once done (whether successful or not), returns a result for each document.
     async fn submit_events(&self, events: Vec<Event>) -> Vec<(Notifier, InternalResult)> {
         // Convert the events list to a list of the actual documents that will be stored
         // This is re-used between retries to prevent needing to clone the data.
@@ -228,7 +246,7 @@ impl BatchSubmit {
         self.join_notifiers_and_results(notifiers, results)
     }
 
-    /// Consumes the composite results for each
+    /// Consumes the composite results for each to notify the wakers.
     fn notify_all(&self, notifiers_and_results: Vec<(Notifier, InternalResult)>) {
         for (notifier, result) in notifiers_and_results {
             if let Err(send_err) = notifier.send(self.finalize_result(result)) {
@@ -241,6 +259,10 @@ impl BatchSubmit {
         }
     }
 
+    /// Takes in a list of wrapped `StorageEvent` structs,
+    /// attempting to submit them to Elasticsearch in a retry loop.
+    /// The `ingestion_timestamp` field is populated at each retry.
+    /// Returns a list of results, with one per submitted document.
     async fn submit_documents_with_retry(
         &self,
         stored_events: Vec<StoredEvent>,
@@ -306,6 +328,9 @@ impl BatchSubmit {
         }
     }
 
+    /// Tries once to submit all of the already-prepared bulk operations to Elasticsearch,
+    /// rolling their individual result items up into a list of `InternalResult`'s
+    /// if successful.
     async fn try_submit_all(
         &self,
         operations: Vec<WithId<BulkOperation>>,
@@ -355,6 +380,10 @@ impl BatchSubmit {
         Ok(results)
     }
 
+    /// Creates the individual `InternalResult` structs for every attempted log event
+    /// in the case of an overall failure.
+    /// These are only used if the retry was exhausted,
+    /// otherwise it will try again and the returned results are ignored.
     fn create_results_for_submission_failure(
         &self,
         err: &BulkError,
@@ -409,6 +438,8 @@ impl BatchSubmit {
         results
     }
 
+    /// Converts an `InternalResult` struct
+    /// to the public-facing `OperationResult` type
     #[allow(clippy::missing_const_for_fn)]
     fn finalize_result(&self, internal_result: InternalResult) -> OperationResult {
         match internal_result.result {
@@ -421,6 +452,9 @@ impl BatchSubmit {
         }
     }
 
+    /// Performs a join on the two id-including lists,
+    /// logging when mismatches are detected
+    /// (and adding fallback results where needed).
     fn join_notifiers_and_results(
         &self,
         notifiers: Vec<WithId<Notifier>>,
@@ -478,6 +512,10 @@ impl BatchSubmit {
     }
 }
 
+/// Constructs the bulk index bodies for each `StoredEvent` instance,
+/// updating the `ingestion_timestamp` for each event before serializing them.
+/// This treats each event individually; some events might fail serialization
+/// and will be returned in the second return value list.
 fn construct_bulk_bodies(
     stored_events_mut: &mut Vec<StoredEvent>,
 ) -> (Vec<WithId<BulkOperation>>, Vec<WithId<InternalFailure>>) {

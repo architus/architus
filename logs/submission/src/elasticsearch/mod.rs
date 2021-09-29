@@ -1,4 +1,5 @@
-/// Convenience wrappers around Elasticsearch
+//! Convenience wrappers around Elasticsearch
+
 pub mod api_bindings;
 
 use crate::config::Configuration;
@@ -13,11 +14,16 @@ use slog::Logger;
 use std::iter::IntoIterator;
 use thiserror::Error;
 
+/// Wrapped Elasticsearch client struct
 pub struct Client {
     inner: Elasticsearch,
     logger: Logger,
 }
 
+/// Instantiates a new client.
+/// Note: returning Ok(client) from this function
+/// does not guarantee that the server is reachable;
+/// client.ping() should be called to ensure this is the case.
 pub fn new_client(config: &Configuration, logger: Logger) -> Result<Client, LibError> {
     let es_path = &config.services.elasticsearch;
     let es_transport = Transport::single_node(es_path)?;
@@ -38,6 +44,8 @@ pub enum PingError {
 }
 
 impl Client {
+    /// Pings the remote Elasticsearch,
+    /// returning `Ok(())` if the ping was successful.
     pub async fn ping(&self) -> Result<(), PingError> {
         let response = self.inner.ping().send().await.map_err(PingError::Failed)?;
 
@@ -67,6 +75,9 @@ pub enum EnsureIndexExistsError {
 }
 
 impl Client {
+    /// Ensures that an Elasticsearch index exists,
+    /// also applying the given JSON settings (such as mappings, etc.).
+    /// Once this function returns Ok(_), the index exists on the remote server.
     pub async fn ensure_index_exists(
         &self,
         index: impl AsRef<str>,
@@ -130,6 +141,7 @@ pub enum MakeBulkOperationError {
 }
 
 impl BulkOperation {
+    /// Tries to create an index bulk operation instance for the given document/id
     pub fn index(
         id: impl Into<String>,
         document: impl Serialize,
@@ -160,6 +172,7 @@ impl BulkOperation {
     }
 }
 
+/// Convenience wrapper around `api_bindings::bulk::Response`
 #[derive(Clone, Debug)]
 pub struct BulkStatus {
     pub took: i64,
@@ -167,6 +180,7 @@ pub struct BulkStatus {
     pub items: Vec<BulkItem>,
 }
 
+/// Convenience wrapper around `api_bindings::bulk::ResultItem`
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum BulkItem {
@@ -177,6 +191,7 @@ pub enum BulkItem {
 }
 
 impl BulkItem {
+    /// Extracts the ID from a `BulkItem` instance.
     pub const fn id(&self) -> &String {
         match self {
             Self::Create(api_bindings::bulk::ResultItemAction { ref id, .. })
@@ -196,6 +211,10 @@ pub enum BulkError {
 }
 
 impl Client {
+    /// Submits a bulk operation API request,
+    /// which can include a mix of create, delete, index, and update operations.
+    /// Returns an aggregate status structure
+    /// containing errors and results for each operation.
     pub async fn bulk(
         &self,
         index: impl AsRef<str>,
@@ -230,6 +249,8 @@ impl Client {
         }
     }
 
+    /// Converts the raw JSON response struct from the bindings
+    /// to the convenience `BulkStatus` wrapper.
     fn convert_to_status(&self, response: api_bindings::bulk::Response) -> BulkStatus {
         let api_bindings::bulk::Response {
             took,

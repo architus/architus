@@ -8,14 +8,16 @@ mod rpc;
 mod submission;
 
 use crate::config::Configuration;
+use crate::elasticsearch::Client;
+use crate::rpc::logs::event::Event;
 use crate::rpc::logs::submission::submission_service_server::{
     SubmissionService, SubmissionServiceServer,
 };
 use crate::rpc::logs::submission::{
-    EventDeterministicIdParams, SubmitIdempotentRequest, SubmitIdempotentResponse, SubmittedEvent,
+    EntityRevisionMetadata, EventDeterministicIdParams, SubmitIdempotentRequest,
+    SubmitIdempotentResponse, SubmittedEvent,
 };
 use anyhow::Context;
-use crate::elasticsearch::Client;
 use futures::{try_join, StreamExt};
 use futures_batch::ChunksTimeoutStreamExt;
 use slog::Logger;
@@ -23,6 +25,7 @@ use sloggers::Config;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::transport::Server;
@@ -134,12 +137,8 @@ async fn submit_events(
             let correlation_id = next_correlation_id.fetch_add(1, Ordering::SeqCst);
             let config = Arc::clone(&config);
             let elasticsearch = Arc::clone(&elasticsearch);
-            let batch_submit = submission::BatchSubmit::new(
-                correlation_id,
-                config,
-                &logger,
-                elasticsearch,
-            );
+            let batch_submit =
+                submission::BatchSubmit::new(correlation_id, config, &logger, elasticsearch);
             async move {
                 batch_submit.run(events).await;
             }
@@ -158,10 +157,74 @@ fn generate_id(id_params: &EventDeterministicIdParams, event_type: i32) -> Strin
     );
 }
 
+/// Bundles together the data that is used to inform entity revision tracking
+#[derive(Clone, Debug)]
+struct RevisionMetadata {
+    channel_name: String,
+    agent_metadata: Option<EntityRevisionMetadata>,
+    subject_metadata: Option<EntityRevisionMetadata>,
+    auxiliary_metadata: Option<EntityRevisionMetadata>,
+}
+
 struct SubmissionServiceImpl {
     config: Arc<Configuration>,
     event_tx: mpsc::UnboundedSender<submission::Event>,
     logger: Logger,
+}
+
+#[tonic::async_trait]
+impl SubmissionService for SubmissionServiceImpl {
+    /// Submits a single log event that obtains an ID
+    /// deterministically based on the `id_params` argument.
+    /// Returns the ID generated for the log event.
+    /// When this RPC returns, the log event has been successfully indexed
+    /// in Elasticsearch.
+    async fn submit_idempotent(
+        &self,
+        request: Request<SubmitIdempotentRequest>,
+    ) -> anyhow::Result<Response<SubmitIdempotentResponse>, tonic::Status> {
+        let event = request
+            .into_inner()
+            .event
+            .ok_or_else(|| Status::invalid_argument("no event given"))?;
+
+        let SubmittedEvent {
+            inner,
+            id_params,
+            channel_name,
+            agent_metadata,
+            subject_metadata,
+            auxiliary_metadata,
+        } = event;
+
+        let inner = inner.ok_or_else(|| Status::invalid_argument("no inner event given"))?;
+        let id_params = id_params.ok_or_else(|| Status::invalid_argument("no id params given"))?;
+
+        // guild_id is the only required field
+        if inner.guild_id == 0 {
+            return Err(Status::invalid_argument("missing guild_id on inner event"));
+        }
+
+        let id = generate_id(&id_params, inner.r#type);
+
+        let metadata = RevisionMetadata {
+            channel_name,
+            agent_metadata,
+            subject_metadata,
+            auxiliary_metadata,
+        };
+        if let Err(err) = self.send_revision_metadata(&inner, metadata).await {
+            slog::warn!(
+                self.logger,
+                "failed to send revision metadata for event";
+                "error" => ?err,
+                "event_id" => id.clone(),
+            );
+        }
+
+        self.submit_event_inner(id.clone(), Box::new(inner)).await?;
+        Ok(Response::new(SubmitIdempotentResponse { id }))
+    }
 }
 
 impl SubmissionServiceImpl {
@@ -176,42 +239,48 @@ impl SubmissionServiceImpl {
             logger,
         }
     }
-}
 
-#[tonic::async_trait]
-impl SubmissionService for SubmissionServiceImpl {
-    async fn submit_idempotent(
+    /// Sends revision metadata to the revision microservice.
+    /// This is used to track entity revision metadata over time
+    /// to enhance the frontend's display of entities.
+    /// TODO: implement; this function is a stub
+    async fn send_revision_metadata(
         &self,
-        request: Request<SubmitIdempotentRequest>,
-    ) -> anyhow::Result<Response<SubmitIdempotentResponse>, tonic::Status> {
-        let event = request
-            .into_inner()
-            .event
-            .ok_or_else(|| Status::invalid_argument("no event given"))?;
+        _event: &Event,
+        metadata: RevisionMetadata,
+    ) -> anyhow::Result<()> {
+        let RevisionMetadata {
+            channel_name,
+            agent_metadata,
+            subject_metadata,
+            auxiliary_metadata,
+        } = metadata;
+        let channel_name = Some(channel_name).filter(String::is_empty);
 
-        let SubmittedEvent {
-            inner,
-            id_params,
-            ..
-            // channel_name,
-            // agent_metadata,
-            // subject_metadata,
-            // auxiliary_metadata,
-        } = event;
-
-        let inner = inner.ok_or_else(|| Status::invalid_argument("no inner event given"))?;
-        let id_params = id_params.ok_or_else(|| Status::invalid_argument("no id params given"))?;
-
-        // guild_id is the only required field
-        if inner.guild_id == 0 {
-            return Err(Status::invalid_argument("missing guild_id on inner event"));
+        if channel_name.is_some()
+            || agent_metadata.is_some()
+            || auxiliary_metadata.is_some()
+            || subject_metadata.is_some()
+        {
+            // TODO implement once revision service has been created
+            slog::debug!(
+                self.logger,
+                "event contained valid revision data";
+                "channel_name" => ?channel_name,
+                "agent_metadata" => ?agent_metadata,
+                "auxiliary_metadata" => ?auxiliary_metadata,
+                "subject_metadata" => ?subject_metadata,
+            );
         }
 
-        let id = generate_id(&id_params, inner.r#type);
-        let logger = self.logger.new(slog::o!("event_id" => id.clone()));
+        Ok(())
+    }
 
-        // TODO consume additional metadata in SubmittedEvent message
-        //      and send to revision service
+    /// Sends the given proto-submitted Event to the shared channel,
+    /// returning Ok(()) once the submission to Elasticsearch has been confirmed.
+    /// On failure, returns the appropriate gRPC status.
+    async fn submit_event_inner(&self, id: String, event: Box<Event>) -> Result<(), tonic::Status> {
+        let logger = self.logger.new(slog::o!("event_id" => id.clone()));
 
         // Create the one shot channel to wait on
         let (oneshot_tx, oneshot_rx) = oneshot::channel::<submission::OperationResult>();
@@ -219,7 +288,7 @@ impl SubmissionService for SubmissionServiceImpl {
         // Post the event to the shared channel
         let event = submission::Event {
             id: id.clone(),
-            inner: Box::new(inner),
+            inner: event,
             notifier: oneshot_tx,
         };
         self.event_tx.send(event).map_err(|err| {
@@ -231,46 +300,58 @@ impl SubmissionService for SubmissionServiceImpl {
             Status::internal("internal channel error")
         })?;
 
-        // Wait for the event to be submitted within a reasonable timeout
-        match tokio::time::timeout(self.config.submission_wait_timeout, oneshot_rx).await {
-            Ok(recv_result) => match recv_result {
-                Ok(submit_result) => match submit_result {
-                    Ok(correlation_id) => {
-                        slog::info!(
-                            logger,
-                            "confirmed durable submission of event";
-                            "correlation_id" => correlation_id,
-                        );
-                        Ok(Response::new(SubmitIdempotentResponse { id }))
-                    }
-                    Err(err) => {
-                        slog::warn!(
-                            logger,
-                            "submission failed for event";
-                            "details" => err.internal_details,
-                            "status" => ?err.status,
-                            "correlation_id" => err.correlation_id,
-                        );
-                        Err(err.status)
-                    }
-                },
-                Err(err) => {
-                    slog::error!(
+        let rx_timeout = self.config.submission_wait_timeout;
+        wait_for_notify(rx_timeout, oneshot_rx, logger).await?;
+        Ok(())
+    }
+}
+
+/// Waits for a notification to be sent on the given receiver,
+/// using a timeout to return early if durable submission can't be confirmed.
+/// On failure, returns the appropriate gRPC status.
+async fn wait_for_notify(
+    timeout: Duration,
+    receiver: oneshot::Receiver<submission::OperationResult>,
+    logger: Logger,
+) -> Result<(), tonic::Status> {
+    match tokio::time::timeout(timeout, receiver).await {
+        Ok(recv_result) => match recv_result {
+            Ok(submit_result) => match submit_result {
+                Ok(correlation_id) => {
+                    slog::info!(
                         logger,
-                        "receive error when waiting for durable submission";
-                        "error" => ?err,
+                        "confirmed durable submission of event";
+                        "correlation_id" => correlation_id,
                     );
-                    Err(Status::internal("internal channel error"))
+                    Ok(())
+                }
+                Err(err) => {
+                    slog::warn!(
+                        logger,
+                        "submission failed for event";
+                        "details" => err.internal_details,
+                        "status" => ?err.status,
+                        "correlation_id" => err.correlation_id,
+                    );
+                    Err(err.status)
                 }
             },
             Err(err) => {
                 slog::error!(
                     logger,
-                    "receive timed out when waiting for durable submission";
+                    "receive error when waiting for durable submission";
                     "error" => ?err,
                 );
-                Err(Status::deadline_exceeded("internal channel timed out"))
+                Err(Status::internal("internal channel error"))
             }
+        },
+        Err(err) => {
+            slog::error!(
+                logger,
+                "receive timed out when waiting for durable submission";
+                "error" => ?err,
+            );
+            Err(Status::deadline_exceeded("internal channel timed out"))
         }
     }
 }
