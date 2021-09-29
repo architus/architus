@@ -151,7 +151,7 @@ async fn submit_events(
 
 /// Generates the log event ID from the ID parameters and event type,
 /// formatted to a canonical format.
-fn generate_id(id_params: EventDeterministicIdParams, event_type: i32) -> String {
+fn generate_id(id_params: &EventDeterministicIdParams, event_type: i32) -> String {
     return format!(
         "lgev_t{:4x}_p{:8x}_s{:8x}",
         event_type, id_params.primary_id, id_params.secondary_id
@@ -191,11 +191,12 @@ impl SubmissionService for SubmissionServiceImpl {
 
         let SubmittedEvent {
             inner,
-            channel_name,
-            agent_metadata,
-            subject_metadata,
-            auxiliary_metadata,
             id_params,
+            ..
+            // channel_name,
+            // agent_metadata,
+            // subject_metadata,
+            // auxiliary_metadata,
         } = event;
 
         let inner = inner.ok_or_else(|| Status::invalid_argument("no inner event given"))?;
@@ -206,7 +207,7 @@ impl SubmissionService for SubmissionServiceImpl {
             return Err(Status::invalid_argument("missing guild_id on inner event"));
         }
 
-        let id = generate_id(id_params, inner.r#type);
+        let id = generate_id(&id_params, inner.r#type);
         let logger = self.logger.new(slog::o!("event_id" => id.clone()));
 
         // TODO consume additional metadata in SubmittedEvent message

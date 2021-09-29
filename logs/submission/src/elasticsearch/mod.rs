@@ -11,7 +11,6 @@ use bytes::Bytes;
 use serde::Serialize;
 use slog::Logger;
 use std::iter::IntoIterator;
-use std::sync::Arc;
 use thiserror::Error;
 
 pub struct Client {
@@ -19,7 +18,7 @@ pub struct Client {
     logger: Logger,
 }
 
-pub fn new_client(config: Arc<Configuration>, logger: Logger) -> Result<Client, LibError> {
+pub fn new_client(config: &Configuration, logger: Logger) -> Result<Client, LibError> {
     let es_path = &config.services.elasticsearch;
     let es_transport = Transport::single_node(es_path)?;
     let elasticsearch = Elasticsearch::new(es_transport);
@@ -154,7 +153,7 @@ impl BulkOperation {
             }
         };
 
-        Ok(BulkOperation {
+        Ok(Self {
             action: action_buf,
             source: Some(source_buf),
         })
@@ -168,6 +167,7 @@ pub struct BulkStatus {
     pub items: Vec<BulkItem>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub enum BulkItem {
     Create(api_bindings::bulk::ResultItemAction),
@@ -177,12 +177,12 @@ pub enum BulkItem {
 }
 
 impl BulkItem {
-    pub fn id(&self) -> &String {
+    pub const fn id(&self) -> &String {
         match self {
-            Self::Create(api_bindings::bulk::ResultItemAction { ref id, .. }) => id,
-            Self::Delete(api_bindings::bulk::ResultItemAction { ref id, .. }) => id,
-            Self::Index(api_bindings::bulk::ResultItemAction { ref id, .. }) => id,
-            Self::Update(api_bindings::bulk::ResultItemAction { ref id, .. }) => id,
+            Self::Create(api_bindings::bulk::ResultItemAction { ref id, .. })
+            | Self::Delete(api_bindings::bulk::ResultItemAction { ref id, .. })
+            | Self::Index(api_bindings::bulk::ResultItemAction { ref id, .. })
+            | Self::Update(api_bindings::bulk::ResultItemAction { ref id, .. }) => id,
         }
     }
 }
@@ -240,50 +240,37 @@ impl Client {
         let mut items = Vec::<BulkItem>::with_capacity(raw_items.len());
         for raw_item in raw_items {
             let mut already_had_action = false;
+            let mut more_than_one_action_check =
+                |items: &mut Vec<BulkItem>, action: &api_bindings::bulk::ResultItemAction| {
+                    if already_had_action {
+                        slog::warn!(
+                            self.logger,
+                            "bulk response from elasticsearch contained more than one action in an item";
+                            "last_action" => ?items.last(),
+                            "this_action" => ?action
+                        );
+                    }
+
+                    already_had_action = true;
+                };
+
             if let Some(create_action) = raw_item.create {
-                already_had_action = true;
+                more_than_one_action_check(&mut items, &create_action);
                 items.push(BulkItem::Create(create_action));
             }
 
             if let Some(delete_action) = raw_item.delete {
-                if already_had_action {
-                    slog::warn!(
-                        self.logger,
-                        "bulk response from elasticsearch contained more than one action in an item";
-                        "last_action" => ?items.last(),
-                        "this_action" => ?delete_action
-                    );
-                }
-
-                already_had_action = true;
+                more_than_one_action_check(&mut items, &delete_action);
                 items.push(BulkItem::Create(delete_action));
             }
 
             if let Some(index_action) = raw_item.index {
-                if already_had_action {
-                    slog::warn!(
-                        self.logger,
-                        "bulk response from elasticsearch contained more than one action in an item";
-                        "last_action" => ?items.last(),
-                        "this_action" => ?index_action
-                    );
-                }
-
-                already_had_action = true;
+                more_than_one_action_check(&mut items, &index_action);
                 items.push(BulkItem::Create(index_action));
             }
 
             if let Some(update_action) = raw_item.update {
-                if already_had_action {
-                    slog::warn!(
-                        self.logger,
-                        "bulk response from elasticsearch contained more than one action in an item";
-                        "last_action" => ?items.last(),
-                        "this_action" => ?update_action
-                    );
-                }
-
-                already_had_action = true;
+                more_than_one_action_check(&mut items, &update_action);
                 items.push(BulkItem::Create(update_action));
             }
         }

@@ -13,7 +13,7 @@ pub async fn to_elasticsearch(
     config: Arc<Configuration>,
     logger: Logger,
 ) -> anyhow::Result<Client> {
-    let client = crate::elasticsearch::new_client(Arc::clone(&config), logger.clone())
+    let client = crate::elasticsearch::new_client(&config, logger.clone())
         .context("could not create elasticsearch client")?;
 
     let initialization_backoff = config.initialization_backoff.build();
