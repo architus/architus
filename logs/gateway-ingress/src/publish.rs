@@ -158,19 +158,13 @@ impl Publisher {
     /// potentially indefinitely.
     /// This can cause events to start being dropped on the bounded queue.
     async fn publish_event(&self, event: Event) {
-        // Provision an ID and note the timestamp immediately
-        // (creating the ID from the timestamp can never fail
-        // unless the system time is past the maximum for ksuid, which is year ~2100)
+        // Note the timestamp immediately
         let timestamp = architus_id::millisecond_ts();
-        let id = architus_id::with_ts(architus_id::Type::LogEvent, timestamp).unwrap();
-        let logger = self.logger.new(slog::o!(
-            "event_timestamp" => timestamp,
-            "event_id" => id.clone(),
-        ));
+        let logger = self.logger.new(slog::o!("event_timestamp" => timestamp));
 
         // Create the `GatewayEvent` from the raw event
         let gateway_event =
-            if let Some(gateway_event) = convert_raw_event(event, timestamp, id, &logger) {
+            if let Some(gateway_event) = convert_raw_event(event, timestamp, &logger) {
                 gateway_event
             } else {
                 return;
@@ -656,12 +650,7 @@ async fn declare_event_queue(
 
 /// Attempts to synchronously convert a raw gateway event into our struct
 /// that will eventually be published to the gateway queue
-fn convert_raw_event(
-    event: Event,
-    timestamp: u64,
-    id: String,
-    logger: &Logger,
-) -> Option<GatewayEvent> {
+fn convert_raw_event(event: Event, timestamp: u64, logger: &Logger) -> Option<GatewayEvent> {
     if let Event::ShardPayload(Payload { bytes }) = event {
         let json = match std::str::from_utf8(&bytes) {
             Ok(json) => json,
@@ -735,7 +724,6 @@ fn convert_raw_event(
             );
 
             return Some(GatewayEvent {
-                id,
                 ingress_timestamp: timestamp,
                 inner: inner_json_bytes,
                 event_type: event_type_str.to_owned(),

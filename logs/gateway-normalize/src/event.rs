@@ -53,7 +53,7 @@ pub struct NormalizedEvent {
 /// but it must be deterministic and consistent
 /// **across all event normalizations/generations for that event type
 /// across the codebase**.
-#[allow(clippy::module_name_repetitions)]
+#[allow(dead_code)]
 #[derive(Clone, PartialEq, Debug)]
 pub enum IdParams {
     One(u64),
@@ -328,23 +328,6 @@ pub struct Content {
 }
 
 impl Content {
-    /// Constructs the content struct with empty inner content metadata.
-    /// It is the responsibility of the caller
-    /// to actually insert the content metadata as needed.
-    pub fn make<S: Into<String>>(inner: S) -> Self {
-        let inner = inner.into();
-        Self {
-            inner,
-            users_mentioned: Vec::new(),
-            channels_mentioned: Vec::new(),
-            roles_mentioned: Vec::new(),
-            emojis_used: Vec::new(),
-            custom_emojis_used: Vec::new(),
-            custom_emoji_names_used: Vec::new(),
-            url_stems: Vec::new(),
-        }
-    }
-
     #[allow(clippy::missing_const_for_fn)]
     fn split(self) -> (String, ContentMetadata) {
         (
@@ -369,20 +352,6 @@ pub struct Source {
     pub gateway: Option<serde_json::Value>,
     pub audit_log: Option<serde_json::Value>,
     pub internal: Option<serde_json::Value>,
-}
-
-impl Source {
-    /// Calculates the `EventOrigin` variant for this source object,
-    /// using the presence of the each sub-field to produce the result
-    #[must_use]
-    pub const fn origin(&self) -> EventOrigin {
-        match (&self.gateway, &self.audit_log) {
-            (Some(_), Some(_)) => EventOrigin::Hybrid,
-            (Some(_), None) => EventOrigin::Gateway,
-            (None, Some(_)) => EventOrigin::AuditLog,
-            (None, None) => EventOrigin::Internal,
-        }
-    }
 }
 
 impl From<Source> for EventSource {

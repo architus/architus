@@ -7,17 +7,16 @@ mod connect;
 mod emoji;
 mod event;
 mod gateway;
+mod reconnection;
 mod rpc;
 mod util;
 
 use crate::config::Configuration;
 use crate::event::NormalizedEvent;
-use crate::gateway::{EventWithSource, ProcessingError, ProcessorFleet};
+use crate::gateway::{EventWithSource, ProcessorFleet};
 use crate::rpc::gateway_queue_lib::GatewayEvent;
 use crate::rpc::logs::submission::Client as LogsImportClient;
 use anyhow::Context;
-use backoff::backoff::Backoff;
-use backoff::ExponentialBackoff;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use lapin::options::{BasicAckOptions, BasicConsumeOptions, BasicQosOptions, BasicRejectOptions};
 use lapin::types::FieldTable;
@@ -27,7 +26,6 @@ use slog::Logger;
 use sloggers::Config;
 use std::convert::{Into, TryInto};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 use tonic::IntoRequest;
 use twilight_http::Client;
 
@@ -119,7 +117,7 @@ async fn normalize_gateway_events(
     // If the backoff is exhausted or there is another error, then the entire future exits
     // (and the service will exit accordingly)
     let mut outer_rmq_connection = Some(queue_connection);
-    let mut reconnection_state = ReconnectionState::new(
+    let mut reconnection_state = reconnection::State::new(
         config.reconnection_backoff.build(),
         config.reconnection_backoff_reset_threshold,
     );
@@ -155,48 +153,6 @@ async fn normalize_gateway_events(
                 "error" => ?err,
             );
         }
-    }
-}
-
-/// Represents a reconnection backoff utility wrapper
-/// for a long-running task that should use an exponential backoff
-/// when multiple failures occur in short succession,
-/// but reset the backoff if the task has been running for a long time
-/// (greater than the threshold)
-#[derive(Debug)]
-struct ReconnectionState {
-    current: ExponentialBackoff,
-    last_start: Option<Instant>,
-    threshold: Duration,
-}
-
-impl ReconnectionState {
-    const fn new(source: ExponentialBackoff, threshold: Duration) -> Self {
-        Self {
-            current: source,
-            last_start: None,
-            threshold,
-        }
-    }
-
-    async fn wait(&mut self) -> anyhow::Result<()> {
-        if let Some(last_start) = self.last_start {
-            let running_time = Instant::now().duration_since(last_start);
-            if running_time > self.threshold {
-                // The running time was longer than the threshold to use the old backoff,
-                // so reset it with the source backoff (from the config)
-                self.current.reset();
-            }
-
-            match self.current.next_backoff() {
-                None => return Err(anyhow::anyhow!("reconnection backoff elapsed")),
-                Some(backoff) => tokio::time::sleep(backoff).await,
-            }
-        }
-
-        // Mark the start of the next iteration
-        self.last_start = Some(Instant::now());
-        Ok(())
     }
 }
 
@@ -327,7 +283,6 @@ async fn normalize(
 
     let logger = logger.new(slog::o!(
         "gateway_event_type" => event.event_type.clone(),
-        "event_id" => event.id.clone(),
         "guild_id" => event.guild_id,
     ));
 
@@ -360,12 +315,8 @@ async fn normalize(
         }
         // Reject the message with/without requeuing depending on the error
         // (poison messages will be handled by max retry policy for quorum queue)
-        let should_requeue = matches!(
-            err,
-            ProcessingError::FatalSourceError(_) | ProcessingError::NoAuditLogEntry(_)
-        );
         EventRejection {
-            should_requeue,
+            should_requeue: err.should_requeue(),
             source: err.into(),
         }
     })
