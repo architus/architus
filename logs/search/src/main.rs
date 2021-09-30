@@ -5,8 +5,8 @@ mod connect;
 mod elasticsearch_api;
 mod fairings;
 mod graphql;
-mod proto;
-mod stored_event;
+mod rpc;
+mod event;
 
 use crate::config::Configuration;
 use crate::graphql::SearchProvider;

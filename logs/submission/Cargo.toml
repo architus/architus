@@ -10,7 +10,6 @@ via a RabbtiMQ queue and  RMQ Logstash plugin.\
 license = "MIT"
 
 [dependencies]
-architus-id = { path = "../../lib/id-rs" }
 architus-config-backoff = { path = "../../lib/config-backoff-rs" }
 config = "0.11"
 slog = "2.7"

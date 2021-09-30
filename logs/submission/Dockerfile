@@ -1,6 +1,5 @@
 ARG REPO_ROOT=/opt/architus
 ARG SERVICE=logs/submission
-ARG LOGS_LIB=lib/id-rs
 ARG CONFIG_BACKOFF_LIB=lib/config-backoff-rs
 ARG PROTO=lib/ipc/proto
 
@@ -8,7 +7,6 @@ ARG PROTO=lib/ipc/proto
 FROM rust:1.48 as builder
 ARG REPO_ROOT
 ARG SERVICE
-ARG LOGS_LIB
 ARG CONFIG_BACKOFF_LIB
 ARG PROTO
 RUN rustup component add rustfmt
@@ -18,10 +16,6 @@ COPY $SERVICE/src src
 COPY $SERVICE/Cargo.lock .
 COPY $SERVICE/Cargo.toml .
 COPY $SERVICE/build.rs .
-# Copy shared id library
-WORKDIR $REPO_ROOT/$LOGS_LIB
-COPY $LOGS_LIB/src src
-COPY $LOGS_LIB/Cargo.toml .
 # Copy shared config backoff library
 WORKDIR $REPO_ROOT/$CONFIG_BACKOFF_LIB
 COPY $CONFIG_BACKOFF_LIB/src src

@@ -4,7 +4,7 @@ pub mod json;
 use crate::config::{Configuration, GraphQL as GraphQLConfig};
 use crate::elasticsearch_api::search::{HitsTotal, Response as SearchResponse};
 use crate::graphql::inputs::{EventFilterInput, EventSortInput};
-use crate::stored_event::StoredEvent;
+use crate::event::LogEvent;
 use elasticsearch::{Elasticsearch, SearchParts};
 use juniper::{graphql_value, EmptyMutation, EmptySubscription, FieldError, FieldResult, RootNode};
 use serde_json::json;
@@ -84,7 +84,7 @@ impl Query {
     // TODO add filter fields as individual parameters and then construct `EventFilterInput`
     /// Queries for a single event in the log store,
     /// returning the first event if found
-    fn event() -> FieldResult<Option<StoredEvent>> {
+    fn event() -> FieldResult<Option<LogEvent>> {
         unimplemented!("not yet implemented")
     }
 
@@ -192,7 +192,7 @@ impl Query {
 
         let response_body = response.json::<serde_json::Value>().await?;
         slog::debug!(context.logger, "received response from Elasticsearch"; "body" => ?response_body);
-        let search_result: SearchResponse<StoredEvent> = serde_json::from_value(response_body)?;
+        let search_result: SearchResponse<LogEvent> = serde_json::from_value(response_body)?;
         let total = search_result.hits.total;
         let nodes = search_result
             .hits
@@ -216,7 +216,7 @@ impl Query {
 /// Connection object that allows consumers to traverse the log graph
 pub struct EventConnection {
     total: HitsTotal,
-    nodes: Vec<StoredEvent>,
+    nodes: Vec<LogEvent>,
     previous_snapshot: Option<SnapshotToken>,
     query_time: u64,
     after: usize,
@@ -226,7 +226,7 @@ pub struct EventConnection {
 
 #[juniper::graphql_object]
 impl EventConnection {
-    fn nodes(&self) -> &Vec<StoredEvent> {
+    fn nodes(&self) -> &Vec<LogEvent> {
         &self.nodes
     }
 

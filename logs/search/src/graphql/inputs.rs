@@ -1,5 +1,5 @@
 use crate::graphql::{ElasticsearchParams, QueryInput};
-use crate::proto::logs::event::{AgentSpecialType, EntityType, EventOrigin, EventType};
+use crate::rpc::logs::event::{AgentSpecialType, EntityType, EventOrigin, EventType};
 use juniper::{graphql_value, FieldError, FieldResult};
 use serde_json::json;
 use std::str::FromStr;

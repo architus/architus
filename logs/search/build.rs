@@ -4,6 +4,7 @@ const SERDE_STRUCTS: &[&str] = &[
     ".logs.event.Event",
     ".logs.event.EventSource",
     ".logs.event.ContentMetadata",
+    ".logs_submission_schema.StoredEvent",
 ];
 
 const ENUMS: &[&str] = &[
@@ -41,7 +42,10 @@ fn main() -> anyhow::Result<()> {
     }
 
     builder
-        .compile(&["logs/event.proto"], &["../../lib/ipc/proto"])
+        .compile(
+            &["event.proto", "logs/event.proto"],
+            &["../submission/schema", "../../lib/ipc/proto"],
+        )
         .context("compiling logs/event.proto definitions")?;
 
     Ok(())
