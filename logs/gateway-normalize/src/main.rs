@@ -235,7 +235,6 @@ async fn run_consume(
                             let event_type_str = format!("{:?}", event.event_type);
                             let logger = logger.new(slog::o!(
                                 "event_type" => event_type_str,
-                                "event_id" => event.id.clone(),
                                 "guild_id" => event.guild_id,
                                 "event_timestamp" => event.timestamp,
                             ));
@@ -387,7 +386,8 @@ async fn submit_event(
     };
 
     match backoff::future::retry(config.rpc_backoff.build(), send).await {
-        Ok(_) => {
+        Ok(response) => {
+            let logger = logger.new(slog::o!("event_id" => response.id));
             slog::info!(logger, "submitted log event");
             slog::debug!(logger, "event dump"; "event" => ?event);
             Ok(())

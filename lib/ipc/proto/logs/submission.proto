@@ -42,14 +42,16 @@ message SubmittedEvent {
 
 // EventDeterministicIdParams contains fields
 // that are used to generate a deterministic composite ID
-// based on the IDs involved in the original action,
+// based on the IDs, timestamps, or digests involved in the original action,
 // in addition to the type of the event.
-// The meaning of each field (primary_id, secondary_id)
+// The meaning of each field and whether they are even specified
 // is EventType-specific and is documented at
 // https://docs.archit.us/internal/modules/logs/event-classifications/
 message EventDeterministicIdParams {
-  fixed64 primary_id = 1;
-  fixed64 secondary_id = 2;
+  fixed64 field1 = 1;
+  fixed64 field2 = 2;
+  fixed64 field3 = 3;
+  fixed64 field4 = 4;
 }
 
 // Used to control display-oriented data and update revision cache

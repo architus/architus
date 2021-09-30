@@ -21,10 +21,10 @@ pub fn register_all(fleet: &mut ProcessorFleet) {
 /// Defines processors for `MemberJoin` and `MemberLeave` events
 mod member {
     use super::{chain, extract, extract_id};
-    use crate::event::{Content, Entity, Nickname, UserLike};
+    use crate::event::{Content, Entity, IdParams, Nickname, UserLike};
     use crate::gateway::path::Path;
     use crate::gateway::source::{OnFailure, Source};
-    use crate::gateway::{Processor, ProcessorFleet};
+    use crate::gateway::{Processor, ProcessorFleet, SplitProcessor};
     use crate::rpc::logs::event::EventType;
     use chrono::DateTime;
     use lazy_static::lazy_static;
@@ -34,6 +34,7 @@ mod member {
 
     lazy_static! {
         static ref ID_PATH: Path = Path::from("user.id");
+        static ref JOINED_AT_PATH: Path = Path::from("joined_at");
         static ref USERNAME_PATH: Path = Path::from("user.username");
         static ref DISCRIMINATOR_PATH: Path = Path::from("user.discriminator");
         static ref NICKNAME_PATH: Path = Path::from("nick");
@@ -44,14 +45,26 @@ mod member {
         // Register MemberJoin processor
         fleet.register(
             GatewayEventType::MemberAdd,
-            Processor {
+            Processor::Split(SplitProcessor {
                 event_type: Source::Constant(EventType::MemberJoin),
                 audit_log: None,
+                id_params: Source::sync_fn(
+                    |ctx| {
+                        let user_id = ctx.gateway(&ID_PATH, extract_id)?;
+                        let joined_at = ctx.gateway(&JOINED_AT_PATH, extract::<String>)?;
+                        let joined_at_date = DateTime::parse_from_rfc3339(&joined_at)?;
+                        let joined_at_ms_timestamp =
+                            u64::try_from(joined_at_date.timestamp_millis())?;
+                        Ok(IdParams::Two(user_id, joined_at_ms_timestamp))
+                    },
+                    OnFailure::Abort,
+                ),
                 timestamp: Source::gateway(
                     Path::from("joined_at"),
                     chain(extract::<String>, |s, _ctx| {
                         let date = DateTime::parse_from_rfc3339(&s)?;
-                        Ok(u64::try_from(date.timestamp_millis()).unwrap_or(0))
+                        let ms_timestamp = u64::try_from(date.timestamp_millis())?;
+                        Ok(ms_timestamp)
                     }),
                     OnFailure::Abort,
                 ),
@@ -97,14 +110,22 @@ mod member {
                     },
                     OnFailure::Abort,
                 ),
-            },
+            }),
         );
         // Register MemberLeave processor
         fleet.register(
             GatewayEventType::MemberRemove,
-            Processor {
+            Processor::Split(SplitProcessor {
                 event_type: Source::Constant(EventType::MemberLeave),
                 audit_log: None,
+                id_params: Source::sync_fn(
+                    |ctx| {
+                        let user_id = ctx.gateway(&ID_PATH, extract_id)?;
+                        let ingress_timestamp = ctx.event.ingress_timestamp;
+                        Ok(IdParams::Two(user_id, ingress_timestamp))
+                    },
+                    OnFailure::Abort,
+                ),
                 timestamp: Source::sync_fn(|ctx| Ok(ctx.event.ingress_timestamp), OnFailure::Abort),
                 reason: Source::Constant(None),
                 channel: Source::Constant(None),
@@ -143,7 +164,7 @@ mod member {
                     },
                     OnFailure::Abort,
                 ),
-            },
+            }),
         );
     }
 
@@ -167,13 +188,15 @@ mod message {
     }
 }
 
+
+
 /// Defines processors for `ReactionAdd`, `ReactionRemove`, and `ReactionBulkRemove` events
 mod reaction {
     use super::{chain, extract, extract_id, extract_member};
-    use crate::event::{Agent, Channel, Content, Emoji, Entity, Message, Nickname, UserLike};
+    use crate::event::{Agent, Channel, Content, Emoji, Entity, IdParams, Message, Nickname, NormalizedEvent, Source as EventSource, UserLike};
     use crate::gateway::path::Path;
     use crate::gateway::source::{OnFailure, Source};
-    use crate::gateway::{Context, Processor, ProcessorFleet};
+    use crate::gateway::{Context, Processor, ProcessorFleet, SplitProcessor};
     use crate::rpc::logs::event::EventType;
     use lazy_static::lazy_static;
     use std::fmt::{self, Write as _};
@@ -182,6 +205,8 @@ mod reaction {
 
     lazy_static! {
         static ref USER_ID_PATH: Path = Path::from("user_id");
+        static ref MESSAGE_ID_PATH: Path = Path::from("message_id");
+        static ref CHANNEL_ID_PATH: Path = Path::from("channel_id");
         static ref MEMBER_PATH: Path = Path::from("member");
         static ref EMOJI_PATH: Path = Path::from("emoji");
     }
@@ -191,66 +216,73 @@ mod reaction {
         // Register ReactionAdd processor
         fleet.register(
             GatewayEventType::ReactionAdd,
-            Processor {
-                event_type: Source::Constant(EventType::ReactionAdd),
-                audit_log: None,
-                timestamp: Source::sync_fn(|ctx| Ok(ctx.event.ingress_timestamp), OnFailure::Abort),
-                reason: Source::Constant(None),
-                channel: Source::gateway(
-                    Path::from("channel_id"),
-                    chain(extract_id, |id, _ctx| {
-                        Ok(Some(Channel {
+            Processor::Direct(
+                |source| {
+                    let ctx = source.get_ctx();
+
+                    // Reaction add events include a partial member object that we can use
+                    let member_option = ctx.gateway(&MEMBER_PATH, extract_member).ok();
+                    let user = if let Some(member) = member_option {
+                        UserLike {
+                            id: member.user.id.0,
+                            name: Some(member.user.name.clone()),
+                            nickname: Some(Nickname::from(member.nick.clone())),
+                            discriminator: member.user.discriminator.parse::<u16>().ok(),
+                            ..UserLike::default()
+                        }
+                    } else {
+                        let id = ctx.gateway(&USER_ID_PATH, extract_id)?;
+                        UserLike {
                             id,
+                            ..UserLike::default()
+                        }
+                    };
+
+                    let reaction = ctx.gateway(&EMOJI_PATH, extract::<ReactionType>)?;
+                    let channel_id = ctx.gateway(&CHANNEL_ID_PATH, extract_id)?;
+                    let message_id = ctx.gateway(&MESSAGE_ID_PATH, extract_id)?;
+
+                    let source = EventSource {
+                        gateway: Some(source),
+                        ..EventSource::default()
+                    };
+
+                    Ok(NormalizedEvent {
+                        event_type: EventType::ReactionAdd,
+                        id_params: IdParams::Two(user.id, ctx.event.ingress_timestamp),
+                        timestamp: ctx.event.ingress_timestamp,
+                        guild_id: ctx.event.guild_id,
+                        reason: None,
+                        audit_log_id: None,
+                        channel: Some(Channel {
+                            id: channel_id,
                             ..Channel::default()
-                        }))
-                    }),
-                    OnFailure::Abort,
-                ),
-                agent: Source::sync_fn(
-                    |ctx| {
-                        // Reaction add events include a partial member object that we can use
-                        let member_option = ctx.gateway(&MEMBER_PATH, extract_member).ok();
-                        let user = if let Some(member) = member_option {
-                            UserLike {
-                                id: member.user.id.0,
-                                name: Some(member.user.name.clone()),
-                                nickname: Some(Nickname::from(member.nick.clone())),
-                                discriminator: member.user.discriminator.parse::<u16>().ok(),
-                                ..UserLike::default()
-                            }
-                        } else {
-                            let id = ctx.gateway(&USER_ID_PATH, extract_id)?;
-                            UserLike {
-                                id,
-                                ..UserLike::default()
-                            }
-                        };
-                        Ok(Some(Agent {
+                        }),
+                        agent: Some(Agent {
                             special_type: Agent::type_from_id(user.id, ctx.config),
                             entity: Entity::UserLike(user),
-                        }))
-                    },
-                    OnFailure::Abort,
-                ),
-                subject: Source::gateway(
-                    Path::from("message_id"),
-                    chain(extract_id, |id, _ctx| {
-                        Ok(Some(Entity::Message(Message { id })))
-                    }),
-                    OnFailure::Abort,
-                ),
-                auxiliary: Source::gateway(
-                    Path::from("emoji.id"),
-                    chain(extract_id, |id, _ctx| Ok(Some(Entity::Emoji(Emoji { id })))),
-                    OnFailure::Or(None),
-                ),
-                content: Source::sync_fn(format_content, OnFailure::Abort),
-            },
+                        }),
+                        subject: Some(Entity::Message(Message { id: message_id })),
+                        auxiliary: match reaction {
+                            ReactionType::Unicode { .. } => None,
+                            ReactionType::Custom { id, .. } => {
+                                Some(Entity::Emoji(Emoji { id: id.0 }))
+                            }
+                        },
+                        content: format_content(reaction, ctx)?,
+                        // source & origin require ctx to be dropped,
+                        // since its inner field borrows source.inner.
+                        origin: source.inner.origin(),
+                        source: source.inner,
+                    })
+                },
+                OnFailure::Abort,
+            ),
         );
         // Register ReactionRemove processor
         fleet.register(
             GatewayEventType::ReactionRemove,
-            Processor {
+            Processor::Split(SplitProcessor {
                 event_type: Source::Constant(EventType::ReactionRemove),
                 audit_log: None,
                 timestamp: Source::sync_fn(|ctx| Ok(ctx.event.ingress_timestamp), OnFailure::Abort),
@@ -291,12 +323,12 @@ mod reaction {
                     OnFailure::Or(None),
                 ),
                 content: Source::sync_fn(format_content, OnFailure::Abort),
-            },
+            }),
         );
         // Register ReactionBulkRemove processors
         fleet.register(
             GatewayEventType::ReactionRemoveEmoji,
-            Processor {
+            Processor::Split(SplitProcessor {
                 event_type: Source::Constant(EventType::ReactionBulkRemove),
                 audit_log: None,
                 timestamp: Source::sync_fn(|ctx| Ok(ctx.event.ingress_timestamp), OnFailure::Abort),
@@ -325,11 +357,11 @@ mod reaction {
                     OnFailure::Or(None),
                 ),
                 content: Source::sync_fn(format_content, OnFailure::Abort),
-            },
+            }),
         );
         fleet.register(
             GatewayEventType::ReactionRemoveAll,
-            Processor {
+            Processor::Split(SplitProcessor {
                 event_type: Source::Constant(EventType::ReactionBulkRemove),
                 audit_log: None,
                 timestamp: Source::sync_fn(|ctx| Ok(ctx.event.ingress_timestamp), OnFailure::Abort),
@@ -362,7 +394,7 @@ mod reaction {
                     },
                     OnFailure::Abort,
                 ),
-            },
+            }),
         );
     }
 
@@ -380,8 +412,10 @@ mod reaction {
     }
 
     /// Formats a reaction content block
-    pub fn format_content(ctx: Context<'_>) -> Result<Content, anyhow::Error> {
-        let reaction = ctx.gateway(&EMOJI_PATH, extract::<ReactionType>)?;
+    pub fn format_content(
+        reaction: ReactionType,
+        ctx: Context<'_>,
+    ) -> Result<Content, anyhow::Error> {
         let mut content = String::from("");
         match reaction {
             ReactionType::Unicode { name } => {

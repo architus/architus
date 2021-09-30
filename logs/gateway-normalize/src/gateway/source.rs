@@ -301,21 +301,34 @@ where
             Self::SyncFn(source) => source.consume(context),
             Self::AsyncFn(source) => source.consume(context).await,
             Self::Gateway(source) => source.consume(context.clone(), context.source),
-            Self::AuditLog(source) => {
-                let audit_log_entry = context.audit_log_entry.read().await;
-                match (audit_log_entry.as_ref(), &source.on_failure) {
-                    (Some(CombinedAuditLogEntry { json, .. }), _) => {
-                        // Consume using the normal JSON source using the audit log json
-                        source.consume(context.clone(), json)
-                    }
-                    (None, OnFailure::Abort) => Err(ProcessingError::NoAuditLogEntry(
-                        String::from(&context.event.event_type),
-                    )),
-                    (None, OnFailure::Drop) => Err(ProcessingError::Drop),
-                    (None, OnFailure::Or(t)) => Ok(t.clone()),
-                    (None, OnFailure::OrElse(func_t)) => Ok(func_t(context_copy)),
+            Self::AuditLog(source) => match context.audit_log_entry {
+                Some(ref reader) => {
+                    let audit_log_entry_option = reader.read().await;
+                    Self::consume_audit_log_src(source, context_copy, audit_log_entry_option.as_ref())
                 }
+                None => Self::consume_audit_log_src(source, context, None),
+            },
+        }
+    }
+
+    /// Consumes a JSON source against the audit log entry,
+    /// handling the case where no audit log entry exists.
+    fn consume_audit_log_src(
+        source: &inner::JsonSource<T>,
+        context: Context<'_>,
+        audit_log_entry: Option<&CombinedAuditLogEntry>,
+    ) -> Result<T, ProcessingError> {
+        match (audit_log_entry, &source.on_failure) {
+            (Some(CombinedAuditLogEntry { json, .. }), _) => {
+                // Consume using the normal JSON source using the audit log json
+                source.consume(context.clone(), json)
             }
+            (None, OnFailure::Abort) => Err(ProcessingError::NoAuditLogEntry(String::from(
+                &context.event.event_type,
+            ))),
+            (None, OnFailure::Drop) => Err(ProcessingError::Drop),
+            (None, OnFailure::Or(t)) => Ok(t.clone()),
+            (None, OnFailure::OrElse(func_t)) => Ok(func_t(context)),
         }
     }
 }

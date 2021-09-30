@@ -4,7 +4,9 @@ pub mod source;
 
 use crate::audit_log::SearchQuery;
 use crate::config::Configuration;
-use crate::event::{Agent, Channel, Content, Entity, NormalizedEvent, Source as EventSource};
+use crate::event::{
+    Agent, Channel, Content, Entity, IdParams, NormalizedEvent, Source as EventSource,
+};
 use crate::gateway::path::Path;
 use crate::gateway::source::{AuditLogSource, Source};
 use crate::rpc::gateway_queue_lib::GatewayEvent;
@@ -118,13 +120,7 @@ impl ProcessorFleet {
                 "event_guild_id" => event.inner.guild_id
             ));
             processor
-                .apply(
-                    event,
-                    &self.client,
-                    &self.config,
-                    &self.emojis,
-                    &logger,
-                )
+                .apply(event, &self.client, &self.config, &self.emojis, &logger)
                 .await
         } else {
             Err(ProcessingError::SubProcessorNotFound(
@@ -134,8 +130,48 @@ impl ProcessorFleet {
     }
 }
 
-pub struct Processor {
+pub enum Processor {
+    Split(SplitProcessor),
+    Direct(Source<NormalizedEvent>),
+}
+
+impl Processor {
+    /// Runs a single processor, attempting to create a Normalized Event as a result
+    pub async fn apply<'a>(
+        &self,
+        event: EventWithSource,
+        client: &'a Client,
+        config: &'a Configuration,
+        emojis: &'a crate::emoji::Db,
+        logger: &'a Logger,
+    ) -> Result<NormalizedEvent, ProcessingError> {
+        match self {
+            Self::Split(split) => split.apply(event, client, config, emojis, logger).await,
+            Self::Direct(direct_source) => {
+                let EventWithSource {
+                    inner: event,
+                    source,
+                } = event;
+
+                let ctx = Context {
+                    event: &event,
+                    source: &source,
+                    audit_log_entry: None,
+                    client,
+                    config,
+                    emojis,
+                    logger,
+                };
+
+                direct_source.consume(ctx).await
+            }
+        }
+    }
+}
+
+pub struct SplitProcessor {
     event_type: Source<EventType>,
+    id_params: Source<IdParams>,
     audit_log: Option<AuditLogSource>,
     timestamp: Source<u64>,
     reason: Source<Option<String>>,
@@ -149,7 +185,7 @@ pub struct Processor {
 // ProcessorFleet needs to be safe to share
 assert_impl_all!(Processor: Sync);
 
-impl Processor {
+impl SplitProcessor {
     /// Runs a single processor, attempting to create a Normalized Event as a result
     pub async fn apply<'a>(
         &self,
@@ -169,7 +205,7 @@ impl Processor {
         let ctx = Context {
             event: &event,
             source: &source,
-            audit_log_entry: LockReader::new(&audit_log_lock),
+            audit_log_entry: Some(LockReader::new(&audit_log_lock)),
             client,
             config,
             emojis,
@@ -185,9 +221,21 @@ impl Processor {
         };
 
         // Run each source in parallel
-        let (_, event_type, timestamp, reason, channel, agent, subject, auxiliary, content) = try_join!(
+        let (
+            _,
+            event_type,
+            id_params,
+            timestamp,
+            reason,
+            channel,
+            agent,
+            subject,
+            auxiliary,
+            content,
+        ) = try_join!(
             self.load_audit_log(write_lock, ctx.clone()),
             self.event_type.consume(ctx.clone()),
+            self.id_params.consume(ctx.clone()),
             self.timestamp.consume(ctx.clone()),
             self.reason.consume(ctx.clone()),
             self.channel.consume(ctx.clone()),
@@ -198,7 +246,6 @@ impl Processor {
         )?;
 
         drop(ctx);
-        let id = event.id;
         let guild_id = event.guild_id;
         let audit_log_entry = audit_log_lock.into_inner();
         let audit_log_id = audit_log_entry.as_ref().map(|combined| combined.entry.id.0);
@@ -211,7 +258,7 @@ impl Processor {
         let origin = source.origin();
 
         Ok(NormalizedEvent {
-            id,
+            id_params,
             timestamp,
             source,
             origin,
@@ -281,7 +328,7 @@ pub struct CombinedAuditLogEntry {
 pub struct Context<'a> {
     event: &'a GatewayEvent,
     source: &'a serde_json::Value,
-    audit_log_entry: LockReader<'a, Option<CombinedAuditLogEntry>>,
+    audit_log_entry: Option<LockReader<'a, Option<CombinedAuditLogEntry>>>,
     client: &'a Client,
     config: &'a Configuration,
     emojis: &'a crate::emoji::Db,
@@ -303,7 +350,12 @@ impl Context<'_> {
     where
         F: (Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync + 'static,
     {
-        let audit_log_read = self.audit_log_entry.read().await;
+        let audit_log_read = self
+            .audit_log_entry
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("no audit log reader lock"))?
+            .read()
+            .await;
         let audit_log_entry = audit_log_read.as_ref().ok_or_else(|| {
             anyhow::anyhow!(
                 "no audit log entry was parsed for event type {}",

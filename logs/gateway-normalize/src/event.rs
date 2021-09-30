@@ -4,7 +4,7 @@ use crate::rpc::logs::event::{
     EventType,
 };
 use crate::rpc::logs::submission::{
-    EntityRevisionMetadata, SubmitIdempotentRequest, SubmittedEvent,
+    EntityRevisionMetadata, EventDeterministicIdParams, SubmitIdempotentRequest, SubmittedEvent,
 };
 use std::convert::Into;
 use tonic::{IntoRequest, Request};
@@ -13,9 +13,13 @@ use tonic::{IntoRequest, Request};
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, PartialEq, Debug)]
 pub struct NormalizedEvent {
-    /// "lgev_" Prefixed ksuid ID,
-    /// using the *time that the event was received by wherever it's ingested*
-    pub id: String,
+    /// Fields used to deterministically generate the ID for this normalized event
+    /// (combined with the event type to produce a unique ID).
+    /// This can be any arbitrary data,
+    /// but it must be deterministic and consistent
+    /// **across all event normalizations/generations for that event type
+    /// across the codebase**.
+    pub id_params: IdParams,
     /// Unix timestamp of the *time of the underlying event* (if available)
     pub timestamp: u64,
     /// The source data, including the original gateway/audit log entries
@@ -43,6 +47,52 @@ pub struct NormalizedEvent {
     pub content: Content,
 }
 
+/// Fields used to deterministically generate the ID for this normalized event
+/// (combined with the event type to produce a unique ID).
+/// This can be any arbitrary data,
+/// but it must be deterministic and consistent
+/// **across all event normalizations/generations for that event type
+/// across the codebase**.
+#[allow(clippy::module_name_repetitions)]
+#[derive(Clone, PartialEq, Debug)]
+pub enum IdParams {
+    One(u64),
+    Two(u64, u64),
+    Three(u64, u64, u64),
+    Four(u64, u64, u64, u64),
+}
+
+impl From<IdParams> for EventDeterministicIdParams {
+    fn from(original: IdParams) -> Self {
+        match original {
+            IdParams::One(field1) => Self {
+                field1,
+                field2: 0,
+                field3: 0,
+                field4: 0,
+            },
+            IdParams::Two(field1, field2) => Self {
+                field1,
+                field2,
+                field3: 0,
+                field4: 0,
+            },
+            IdParams::Three(field1, field2, field3) => Self {
+                field1,
+                field2,
+                field3,
+                field4: 0,
+            },
+            IdParams::Four(field1, field2, field3, field4) => Self {
+                field1,
+                field2,
+                field3,
+                field4,
+            },
+        }
+    }
+}
+
 impl IntoRequest<SubmitIdempotentRequest> for NormalizedEvent {
     fn into_request(self) -> Request<SubmitIdempotentRequest> {
         Request::new(SubmitIdempotentRequest {
@@ -58,7 +108,6 @@ impl From<NormalizedEvent> for SubmittedEvent {
         let (content, content_metadata) = original.content.split();
         Self {
             inner: Some(LogEvent {
-                id: original.id,
                 timestamp: original.timestamp,
                 source: Some(original.source.into()),
                 origin: original.origin.into(),
@@ -114,6 +163,7 @@ impl From<NormalizedEvent> for SubmittedEvent {
                 .and_then(Entity::into_revision_metadata),
             subject_metadata: original.subject.and_then(Entity::into_revision_metadata),
             auxiliary_metadata: original.auxiliary.and_then(Entity::into_revision_metadata),
+            id_params: Some(original.id_params.into()),
         }
     }
 }
@@ -278,12 +328,13 @@ pub struct Content {
 }
 
 impl Content {
-    #[allow(dead_code)]
+    /// Constructs the content struct with empty inner content metadata.
+    /// It is the responsibility of the caller
+    /// to actually insert the content metadata as needed.
     pub fn make<S: Into<String>>(inner: S) -> Self {
         let inner = inner.into();
         Self {
             inner,
-            // TODO parse/extract mentions
             users_mentioned: Vec::new(),
             channels_mentioned: Vec::new(),
             roles_mentioned: Vec::new(),

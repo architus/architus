@@ -151,10 +151,25 @@ async fn submit_events(
 /// Generates the log event ID from the ID parameters and event type,
 /// formatted to a canonical format.
 fn generate_id(id_params: &EventDeterministicIdParams, event_type: i32) -> String {
-    return format!(
-        "lgev_t{:4x}_p{:8x}_s{:8x}",
-        event_type, id_params.primary_id, id_params.secondary_id
-    );
+    let event_type_bytes = event_type.to_be_bytes();
+    let fields_as_bytes = [
+        id_params.field1.to_be_bytes(),
+        id_params.field2.to_be_bytes(),
+        id_params.field3.to_be_bytes(),
+        id_params.field4.to_be_bytes(),
+    ];
+
+    // Join the event type and each field into a single buffer:
+    // {event_type}{field1}{field2}{field3}{field4}
+    let buffer_capacity =
+        std::mem::size_of::<i32>() + (std::mem::size_of::<u64>() * fields_as_bytes.len());
+    let mut buffer = Vec::with_capacity(buffer_capacity);
+    buffer.extend(&event_type_bytes);
+    for field in &fields_as_bytes {
+        buffer.extend(field);
+    }
+
+    return format!("lgev_{}", base_62::encode(&buffer));
 }
 
 /// Bundles together the data that is used to inform entity revision tracking
