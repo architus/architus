@@ -30,5 +30,9 @@ spec:
   selector:
     app: rabbit
   ports:
-  - port: 5672
+  - name: main
+    port: 5672
     targetPort: 5672
+  - name: admin
+    port: 8090
+    targetPort: 8090
