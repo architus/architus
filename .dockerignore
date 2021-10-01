@@ -9,6 +9,3 @@ tilt
 
 # Ignore the secrets file, ensuring that builds don't rely on it
 secret.yaml
-
-# Ignore Rust target directories
-feature-gate/target
