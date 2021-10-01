@@ -3,3 +3,4 @@
 
 *
 !feature-gate/target/debug/feature-gate
+!feature-gate/config.toml
