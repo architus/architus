@@ -4,7 +4,7 @@
 //! so that the feature server only has to deal with guild ids and
 //! feature names.
 
-#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+#![deny(clippy::all, clippy::pedantic, clippy::nursery)]
 
 pub mod config;
 pub mod models;

@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
 edition = "2018"
 description = """\
-Exposes a struct that can be used in a config to define a backoff::ExponentialBackoff behavior\
+Exposes a struct that can be used in a config to define backoff::ExponentialBackoff's behavior\
 """
 license = "MIT"
 

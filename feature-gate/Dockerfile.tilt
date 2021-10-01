@@ -9,4 +9,3 @@ RUN apt-get update -q \
 COPY feature-gate/target/debug/feature-gate /usr/bin/feature-gate
 COPY feature-gate/config.toml /etc/architus/config.toml
 ENV RUST_BACKTRACE=1
-CMD ["/usr/bin/feature-gate", "/etc/architus/config.toml"]

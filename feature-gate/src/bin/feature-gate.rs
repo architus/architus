@@ -326,13 +326,22 @@ async fn main() -> anyhow::Result<()> {
         .build_logger()
         .context("could not build logger from config values")?;
 
-    slog::info!(logger, "configuration loaded"; "path" => config_path);
+    slog::info!(
+        logger,
+        "starting service";
+        "config_path" => config_path,
+        "arguments" => ?std::env::args().collect::<Vec<_>>(),
+    );
     slog::debug!(logger, "configuration dump"; "config" => ?config);
 
     match run(config, logger.clone()).await {
         Ok(_) => slog::info!(logger, "service exited";),
         Err(err) => {
-            slog::error!(logger, "an error ocurred during service running"; "error" => ?err)
+            slog::error!(
+                logger,
+                "an error ocurred during service execution";
+                "error" => ?err,
+            );
         }
     }
     Ok(())
