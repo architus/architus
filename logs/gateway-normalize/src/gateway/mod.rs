@@ -103,6 +103,11 @@ impl ProcessorFleet {
     fn register(&mut self, event_type: GatewayEventType, processor: Processor) {
         let event_key = util::value_to_string(&event_type).unwrap();
         self.processors.insert(event_key, processor);
+        slog::info!(
+            self.logger,
+            "registered gateway event processor processor";
+            "event_type" => ?event_type,
+        );
     }
 
     /// Applies the main data-oriented workflow to the given JSON
@@ -131,10 +136,12 @@ type ProcessorResult = Result<NormalizedEvent, anyhow::Error>;
 type AsyncProcessorFuture<'a> = Box<dyn Future<Output = ProcessorResult> + Send + 'a>;
 
 pub enum Processor {
-    Sync(Box<dyn (Fn(ProcessorArgs<'_>) -> ProcessorResult) + Send + Sync>),
+    Sync(Box<dyn (Fn(ProcessorContext<'_>) -> ProcessorResult) + Send + Sync>),
 
     #[allow(dead_code)]
-    Async(Box<dyn (for<'a> Fn(ProcessorArgs<'a>) -> Pin<AsyncProcessorFuture<'a>>) + Send + Sync>),
+    Async(
+        Box<dyn (for<'a> Fn(ProcessorContext<'a>) -> Pin<AsyncProcessorFuture<'a>>) + Send + Sync>,
+    ),
 }
 
 // ProcessorFleet needs to be safe to share
@@ -143,7 +150,7 @@ assert_impl_all!(Processor: Sync);
 impl Processor {
     pub fn sync<F>(f: F) -> Self
     where
-        F: (Fn(ProcessorArgs<'_>) -> ProcessorResult) + Send + Sync + 'static,
+        F: (Fn(ProcessorContext<'_>) -> ProcessorResult) + Send + Sync + 'static,
     {
         Self::Sync(Box::new(f))
     }
@@ -151,7 +158,8 @@ impl Processor {
     #[allow(dead_code)]
     pub fn r#async<F>(f: F) -> Self
     where
-        for<'a> F: Fn(ProcessorArgs<'a>) -> Pin<AsyncProcessorFuture<'a>> + Sync + Send + 'static,
+        for<'a> F:
+            Fn(ProcessorContext<'a>) -> Pin<AsyncProcessorFuture<'a>> + Sync + Send + 'static,
     {
         Self::Async(Box::new(f))
     }
@@ -170,67 +178,43 @@ impl Processor {
             source,
         } = event;
 
-        let processor_args = ProcessorArgs {
+        let ctx = ProcessorContext {
+            event,
+            source,
             client,
             config,
             emojis,
             logger,
-            event,
-            inner: source,
         };
 
         let result = match self {
-            Self::Sync(f) => f(processor_args),
-            Self::Async(f) => f(processor_args).await,
+            Self::Sync(f) => f(ctx),
+            Self::Async(f) => f(ctx).await,
         };
 
         result.map_err(ProcessingError::FatalSourceError)
     }
 }
 
-pub struct ProcessorArgs<'a> {
-    event: GatewayEvent,
-    inner: serde_json::Value,
-    client: &'a Client,
-    config: &'a Configuration,
-    emojis: &'a crate::emoji::Db,
-    logger: &'a Logger,
-}
-
-impl<'a> ProcessorArgs<'a> {
-    fn context<'b: 'a>(&'b self) -> Context<'b> {
-        Context {
-            event: &self.event,
-            source: &self.inner,
-            client: self.client,
-            config: self.config,
-            emojis: self.emojis,
-            logger: self.logger,
-        }
-    }
-}
-
-/// Struct of borrows/references to various values
-/// that might be useful when normalizing an incoming event,
-/// including the source data.
-/// Can be cheaply cloned.
-#[derive(Clone, Debug)]
-pub struct Context<'a> {
-    event: &'a GatewayEvent,
-    source: &'a serde_json::Value,
-    client: &'a Client,
-    config: &'a Configuration,
-    emojis: &'a crate::emoji::Db,
-    logger: &'a Logger,
-}
-
 #[allow(dead_code)]
-impl Context<'_> {
+pub struct ProcessorContext<'a> {
+    event: GatewayEvent,
+    source: serde_json::Value,
+    client: &'a Client,
+    config: &'a Configuration,
+    emojis: &'a crate::emoji::Db,
+    logger: &'a Logger,
+}
+
+impl ProcessorContext<'_> {
     /// Attempts to extract a gateway value
     pub fn gateway<T, F>(&self, path: &Path, extractor: F) -> Result<T, anyhow::Error>
     where
-        F: (Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>) + Send + Sync + 'static,
+        F: (Fn(&Variable, &ProcessorContext<'_>) -> Result<T, anyhow::Error>)
+            + Send
+            + Sync
+            + 'static,
     {
-        path.extract(self.source, &extractor, self.clone())
+        path.extract(&self.source, &extractor, self)
     }
 }

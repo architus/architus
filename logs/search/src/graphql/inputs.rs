@@ -31,56 +31,56 @@ impl QueryInput for EventFilterInput {
         self.id.to_elasticsearch(params)?;
         self.timestamp
             .as_ref()
-            .map(|filter| filter.apply(params, "timestamp"))
+            .map(|filter| filter.apply(params, "inner.timestamp"))
             .transpose()?;
         self.origin
             .as_ref()
-            .map(|filter| filter.apply::<EventOrigin>(params, "origin"))
+            .map(|filter| filter.apply::<EventOrigin>(params, "inner.origin"))
             .transpose()?;
         self.r#type
             .as_ref()
-            .map(|filter| filter.apply::<EventType>(params, "type"))
+            .map(|filter| filter.apply::<EventType>(params, "inner.type"))
             .transpose()?;
         self.guild_id
             .as_ref()
-            .map(|filter| filter.apply(params, "guild_id"))
+            .map(|filter| filter.apply(params, "inner.guild_id"))
             .transpose()?;
         // TODO add reason filter application
         self.audit_log_id
             .as_ref()
-            .map(|filter| filter.apply(params, "audit_log_id"))
+            .map(|filter| filter.apply(params, "inner.audit_log_id"))
             .transpose()?;
         self.channel_id
             .as_ref()
-            .map(|filter| filter.apply(params, "channel_id"))
+            .map(|filter| filter.apply(params, "inner.channel_id"))
             .transpose()?;
         self.agent_id
             .as_ref()
-            .map(|filter| filter.apply(params, "agent_id"))
+            .map(|filter| filter.apply(params, "inner.agent_id"))
             .transpose()?;
         self.agent_type
             .as_ref()
-            .map(|filter| filter.apply::<EntityType>(params, "agent_type"))
+            .map(|filter| filter.apply::<EntityType>(params, "inner.agent_type"))
             .transpose()?;
         self.agent_special_type
             .as_ref()
-            .map(|filter| filter.apply::<AgentSpecialType>(params, "agent_special_type"))
+            .map(|filter| filter.apply::<AgentSpecialType>(params, "inner.agent_special_type"))
             .transpose()?;
         self.subject_id
             .as_ref()
-            .map(|filter| filter.apply(params, "subject_id"))
+            .map(|filter| filter.apply(params, "inner.subject_id"))
             .transpose()?;
         self.subject_type
             .as_ref()
-            .map(|filter| filter.apply::<EntityType>(params, "subject_type"))
+            .map(|filter| filter.apply::<EntityType>(params, "inner.subject_type"))
             .transpose()?;
         self.auxiliary_id
             .as_ref()
-            .map(|filter| filter.apply(params, "auxiliary_id"))
+            .map(|filter| filter.apply(params, "inner.auxiliary_id"))
             .transpose()?;
         self.auxiliary_type
             .as_ref()
-            .map(|filter| filter.apply::<EntityType>(params, "auxiliary_type"))
+            .map(|filter| filter.apply::<EntityType>(params, "inner.auxiliary_type"))
             .transpose()?;
         // TODO add content filter application
         // TODO add content metadata filter application

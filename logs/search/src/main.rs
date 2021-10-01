@@ -2,7 +2,7 @@
 
 mod config;
 mod connect;
-mod elasticsearch_api;
+mod elasticsearch;
 mod fairings;
 mod graphql;
 mod rpc;

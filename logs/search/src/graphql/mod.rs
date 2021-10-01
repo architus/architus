@@ -2,14 +2,14 @@ pub mod inputs;
 pub mod json;
 
 use crate::config::{Configuration, GraphQL as GraphQLConfig};
-use crate::elasticsearch_api::search::{HitsTotal, Response as SearchResponse};
-use crate::graphql::inputs::{EventFilterInput, EventSortInput};
+use crate::elasticsearch::api_bindings::search::{HitsTotal, Response as SearchResponse};
 use crate::event::LogEvent;
+use crate::graphql::inputs::{EventFilterInput, EventSortInput};
 use elasticsearch::{Elasticsearch, SearchParts};
 use juniper::{graphql_value, EmptyMutation, EmptySubscription, FieldError, FieldResult, RootNode};
 use serde_json::json;
 use slog::Logger;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -251,14 +251,10 @@ impl EventConnection {
     }
 
     fn snapshot(&self) -> SnapshotToken {
-        // Turn the query time Unix timestamp into a prefixed KSUID bound,
-        // and use that as an inclusive upper bound for the snapshot token
-        self.previous_snapshot.as_ref().cloned().unwrap_or_else(|| {
-            SnapshotToken(architus_id::upper_bound_from_ts(
-                architus_id::Type::LogEvent,
-                self.query_time,
-            ))
-        })
+        self.previous_snapshot
+            .as_ref()
+            .cloned()
+            .unwrap_or_else(|| SnapshotToken(self.query_time))
     }
 }
 
@@ -274,17 +270,16 @@ pub struct PageInfo {
     total_count: i32,
 }
 
-/// Represents an opaque snapshot token that just includes an inner ID.
+/// Represents an opaque snapshot token that just includes an inner timestamp.
 /// Used for stateless pagination sessions where we want some stability in the results,
-/// so it takes advantage of the chrono-sequential nature of KSUID-encoded IDs
-/// and the immutability of historical log entries to stabilize the results
-/// by only including entries with an ID less than or equal to the token (if given)
+/// so it takes advantage of the `ingestion_timestamp` field attached to each document
+/// by only including entries with an timestamp less than or equal to the token (if given)
 #[derive(Debug, Clone)]
-pub struct SnapshotToken(String);
+pub struct SnapshotToken(u64);
 
 impl fmt::Display for SnapshotToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &base64::encode(self.0.as_bytes()))
+        write!(f, "{}", &base64::encode(self.0.to_be_bytes()))
     }
 }
 
@@ -292,8 +287,8 @@ impl fmt::Display for SnapshotToken {
 pub enum SnapshotParsingError {
     #[error("could not decode snapshot token base64: {0}")]
     FailedBase64Decode(base64::DecodeError),
-    #[error("could not decode inner bytes to UTF-8: {0}")]
-    FailedUtf8Decode(std::string::FromUtf8Error),
+    #[error("could not decode inner bytes to u64: bad length (expected: 8, actual: {0})")]
+    FailedU64Decode(usize),
 }
 
 #[juniper::graphql_scalar(description = "SnapshotToken")]
@@ -321,8 +316,10 @@ impl FromStr for SnapshotToken {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let base64_bytes = base64::decode(s).map_err(SnapshotParsingError::FailedBase64Decode)?;
-        let id = String::from_utf8(base64_bytes).map_err(SnapshotParsingError::FailedUtf8Decode)?;
-        Ok(Self(id))
+        let u64_bytes = base64_bytes
+            .try_into()
+            .map_err(|original: Vec<u8>| SnapshotParsingError::FailedU64Decode(original.len()))?;
+        Ok(Self(u64::from_be_bytes(u64_bytes)))
     }
 }
 
@@ -384,10 +381,11 @@ impl ElasticsearchParams {
         }
     }
 
-    /// Adds a snapshot filter, only including items with an ID leq
-    /// to the given snapshot's inner value
+    /// Adds a snapshot filter, only including items
+    /// with an ingestion timestamp less than or equal to
+    /// the given snapshot's inner value
     fn add_snapshot_filter(&mut self, snapshot: &SnapshotToken) {
-        self.add_filter(json!({"range": {"id": {"lte": snapshot.0 }}}))
+        self.add_filter(json!({"range": {"ingestion_timestamp": {"lte": snapshot.0 }}}))
     }
 
     /// Converts the given input structs into the compound params

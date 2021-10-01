@@ -1,4 +1,4 @@
-use crate::gateway::Context;
+use crate::gateway::ProcessorContext;
 use anyhow::Context as _;
 use jmespath::{Expression, Rcvar, Variable};
 
@@ -28,8 +28,8 @@ impl Path {
     pub fn extract<'a, 'b, T>(
         &self,
         value: &'a serde_json::Value,
-        extractor: &'a dyn Fn(&Variable, Context<'_>) -> Result<T, anyhow::Error>,
-        ctx: Context<'b>,
+        extractor: &'a dyn Fn(&Variable, &ProcessorContext<'_>) -> Result<T, anyhow::Error>,
+        ctx: &ProcessorContext<'b>,
     ) -> Result<T, anyhow::Error> {
         self.search(value).and_then(|rc_var| {
             (extractor)(rc_var.as_ref(), ctx).with_context(|| {
@@ -42,3 +42,25 @@ impl Path {
         })
     }
 }
+
+/// Small utility macro that uses the `lazy_static` crate
+/// to create a static `Path` instance that is compiled when it is first used,
+/// and then shared after that.
+/// This panics (upon first use) if compilation of the path fails.
+macro_rules! json_path {
+    ($a:expr) => {{
+        ::lazy_static::lazy_static! {
+            static ref PATH_STATIC: Path = Path::from($a);
+        }
+
+        &PATH_STATIC
+    }};
+}
+
+// Thanks clippy :)
+#[allow(
+    clippy::useless_attribute,
+    clippy::redundant_pub_crate,
+    clippy::single_component_path_imports
+)]
+pub(crate) use json_path;
