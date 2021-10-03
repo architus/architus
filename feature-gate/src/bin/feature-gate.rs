@@ -12,8 +12,6 @@
 use crate::rpc::feature_gate::feature_gate_server::{FeatureGate, FeatureGateServer};
 use crate::rpc::feature_gate::*;
 use anyhow::Context as _;
-use backoff::future::FutureOperation;
-use backoff::ExponentialBackoff;
 use db::config::Configuration;
 use db::*;
 use diesel::r2d2::ConnectionManager;
@@ -24,6 +22,7 @@ use sloggers::Config;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{transport::Server, Request, Response, Status};
 
 type RpcResponse<T> = Result<Response<T>, Status>;
@@ -227,7 +226,7 @@ impl FeatureGate for Gate {
     }
 
     // A type association for doing a streaming response.
-    type GetFeaturesStream = mpsc::Receiver<Result<Feature, Status>>;
+    type GetFeaturesStream = ReceiverStream<Result<Feature, Status>>;
 
     /// Returns a stream of all of the features on the database.
     ///
@@ -246,7 +245,7 @@ impl FeatureGate for Gate {
             Err(_) => return Err(Status::internal("Database connection failed")),
         };
 
-        let (mut tx, rx) = mpsc::channel(8);
+        let (tx, rx) = mpsc::channel(8);
         tokio::spawn(async move {
             for feat in features {
                 match tx
@@ -262,12 +261,12 @@ impl FeatureGate for Gate {
             }
         });
 
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     // Stream type for returning a feature stream. Basically the same thing as for
     // the `get_features` stream.
-    type GetGuildFeaturesStream = mpsc::Receiver<Result<Feature, Status>>;
+    type GetGuildFeaturesStream = ReceiverStream<Result<Feature, Status>>;
 
     /// Sends all of the features associated with a guild.
     ///
@@ -289,7 +288,7 @@ impl FeatureGate for Gate {
             Err(_) => return Err(Status::internal("Database connection failed")),
         };
 
-        let (mut tx, rx) = mpsc::channel(8);
+        let (tx, rx) = mpsc::channel(8);
         tokio::spawn(async move {
             for feat in features {
                 match tx
@@ -305,7 +304,7 @@ impl FeatureGate for Gate {
             }
         });
 
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }
 
@@ -371,7 +370,7 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
             Ok(())
         }
     };
-    ping.retry(ExponentialBackoff::default()).await?;
+    backoff::future::retry(config.initialization_backoff.build(), ping).await?;
     slog::info!(
         logger,
         "connected to Postgres database";
