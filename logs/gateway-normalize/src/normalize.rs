@@ -70,7 +70,7 @@ impl Consumer {
             } else {
                 // This has an internal backoff loop,
                 // so if it fails, then exit the service entirely
-                connect::to_queue(Arc::clone(&self.config), self.logger.clone()).await?
+                connect::connect_to_queue(Arc::clone(&self.config), self.logger.clone()).await?
             };
 
             // Run the consumer until an error occurs
@@ -86,7 +86,7 @@ impl Consumer {
     }
 
     /// Creates and runs a consumer for the message queue,
-    /// stopping if the connection fails or there is a fatal normalization error
+    /// stopping if the connection fails
     async fn run_until_message_queue_error(
         &self,
         rmq_connection: Connection,
@@ -103,6 +103,13 @@ impl Consumer {
             )
             .await?;
         let event_try_stream = consumer.map(|result| result.map_err(anyhow::Error::new));
+
+        // Use try_for_each_concurrent to normalize each event coming from the message queue.
+        // Note: because we're using `try_for_each_concurrent`,
+        // it's possible for a future to only be partially awaited before being dropped.
+        // In this case, it's fine because the message queue has consumer acknowledgements,
+        // so normalization will be retried eventually,
+        // even if a normalization future was dropped without finishing.
         event_try_stream
             .try_for_each_concurrent(
                 Some(usize::from(self.config.queue_consumer_concurrency)),

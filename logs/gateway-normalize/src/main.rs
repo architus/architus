@@ -75,8 +75,10 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     };
 
     // Initialize connections to external services
-    let initial_rmq_connection = connect::to_queue(Arc::clone(&config), logger.clone()).await?;
-    let submission_client = connect::to_submission(Arc::clone(&config), logger.clone()).await?;
+    let initial_rmq_connection =
+        connect::connect_to_queue(Arc::clone(&config), logger.clone()).await?;
+    let submission_client =
+        connect::connect_to_submission(Arc::clone(&config), logger.clone()).await?;
 
     // Consume raw gateway events from the Rabbit MQ queue
     // and normalize them via the fleet of processors

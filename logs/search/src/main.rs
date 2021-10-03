@@ -3,10 +3,10 @@
 mod config;
 mod connect;
 mod elasticsearch;
+mod event;
 mod fairings;
 mod graphql;
 mod rpc;
-mod event;
 
 use crate::config::Configuration;
 use crate::graphql::SearchProvider;
@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
 async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     // Connect to Elasticsearch
     let elasticsearch =
-        Arc::new(connect::to_elasticsearch(Arc::clone(&config), logger.clone()).await?);
+        Arc::new(connect::connect_to_elasticsearch(Arc::clone(&config), logger.clone()).await?);
 
     let search = SearchProvider::new(&elasticsearch, Arc::clone(&config), logger.clone());
     rocket::custom(config.rocket.clone())

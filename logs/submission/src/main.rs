@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
 async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     // Connect to Elasticsearch
     let elasticsearch =
-        Arc::new(connect::to_elasticsearch(Arc::clone(&config), logger.clone()).await?);
+        Arc::new(connect::connect_to_elasticsearch(Arc::clone(&config), logger.clone()).await?);
 
     // Create the channel that acts as a stream source for event processing
     let (event_tx, event_rx) = mpsc::unbounded_channel::<submission::Event>();

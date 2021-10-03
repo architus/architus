@@ -9,7 +9,10 @@ use slog::Logger;
 use std::sync::Arc;
 
 /// Creates a new connection to Rabbit MQ
-pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<Connection> {
+pub async fn connect_to_queue(
+    config: Arc<Configuration>,
+    logger: Logger,
+) -> anyhow::Result<Connection> {
     let initialization_backoff = config.initialization_backoff.build();
     let rmq_url = config.services.gateway_queue.clone();
     let rmq_connect = || async {
@@ -33,7 +36,7 @@ pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> anyhow::Res
 }
 
 /// Creates a new connection to the logs/submission service
-pub async fn to_submission(
+pub async fn connect_to_submission(
     config: Arc<Configuration>,
     logger: Logger,
 ) -> anyhow::Result<LogsSubmissionClient> {

@@ -1,4 +1,3 @@
-
 #![allow(dead_code)]
 
 use backoff::backoff::Backoff;
@@ -243,7 +242,8 @@ where
                 }
 
                 // determine whether to continue
-                let oldest_timestamp = oldest.map_or(0, |i| architus_id::snowflake::extract_timestamp(i.0));
+                let oldest_timestamp =
+                    oldest.map_or(0, |i| architus_id::snowflake::extract_timestamp(i.0));
                 if (timing.target - oldest_timestamp) > time_threshold {
                     break;
                 }
