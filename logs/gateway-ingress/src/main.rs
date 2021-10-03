@@ -1,28 +1,25 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 #![allow(clippy::future_not_send)]
 
+mod active_guilds;
 mod config;
 mod connect;
+mod filter;
 mod publish;
+mod queue;
 mod rpc;
-#[cfg(test)]
-mod testutils;
-mod uptime;
 
+use crate::active_guilds::ActiveGuilds;
 use crate::config::Configuration;
-use crate::rpc::logs::uptime::Client as LogsUptimeClient;
-use crate::uptime::active_guilds::ActiveGuilds;
-use crate::uptime::connection::Tracker;
-use crate::uptime::{Event as UptimeEvent, UpdateMessage};
+use crate::rpc::feature_gate::Client as FeatureGateClient;
+use crate::rpc::gateway_queue_lib::GatewayEvent;
 use anyhow::Context;
-use futures::{try_join, FutureExt, Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt};
 use slog::Logger;
 use sloggers::Config;
-use std::future::Future;
+use std::convert::TryInto;
 use std::sync::Arc;
-use tokio::sync::mpsc::{self, UnboundedSender};
-use tokio_stream::wrappers::UnboundedReceiverStream;
-use tonic::Request;
+use std::time::{SystemTime, UNIX_EPOCH};
 use twilight_gateway::{Event, EventTypeFlags};
 
 /// Loads the config and bootstraps the service
@@ -56,264 +53,120 @@ async fn main() -> anyhow::Result<()> {
 
 /// Attempts to initialize the bot and listen for gateway events
 async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
-    // Create the tracker and its update message channel
-    let (connection_tracker, update_tx) = Tracker::new(Arc::clone(&config), logger.clone());
-
-    // Build an event type flags bitset of all events to receive from the gateway
-    let raw_events = EventTypeFlags::SHARD_PAYLOAD;
-    let lifecycle_events = EventTypeFlags::GATEWAY_HEARTBEAT_ACK
-        | EventTypeFlags::GUILD_CREATE
-        | EventTypeFlags::GUILD_DELETE
-        | EventTypeFlags::SHARD_CONNECTED
-        | EventTypeFlags::SHARD_DISCONNECTED;
-    let event_type_flags = lifecycle_events | raw_events;
-
     // Initialize connections to external services
-    let (_shard, events) =
-        connect::to_shard(Arc::clone(&config), logger.clone(), event_type_flags).await?;
-    let rmq_connection = connect::to_queue(Arc::clone(&config), logger.clone()).await?;
+    let (_shard, raw_event_stream) = connect::to_shard(
+        Arc::clone(&config),
+        logger.clone(),
+        EventTypeFlags::SHARD_PAYLOAD,
+    )
+    .await?;
+    let initial_rmq_connection = connect::to_queue(Arc::clone(&config), logger.clone()).await?;
     let feature_gate_client = connect::to_feature_gate(Arc::clone(&config), logger.clone()).await?;
-    let uptime_service_client =
-        connect::to_uptime_service(Arc::clone(&config), logger.clone()).await?;
 
-    // Split up the stream of gateway events into lifecycle & raw events
-    let (split_future, lifecycle_event_stream, raw_event_stream) =
-        split_gateway_events(events, lifecycle_events, logger.clone());
+    let active_guilds = Arc::new(ActiveGuilds::new(
+        feature_gate_client.clone(),
+        Arc::clone(&config),
+        logger.clone(),
+    ));
 
-    // Notify the connection tracker of the newly connected services
-    update_tx
-        .send(UpdateMessage::GatewayOnline)
-        .context("could not send gateway online update to uptime tracker")?;
-    update_tx
-        .send(UpdateMessage::QueueOnline)
-        .context("could not send queue online update to uptime tracker")?;
-
-    let (active_guilds, uptime_rx) =
-        ActiveGuilds::new(feature_gate_client, Arc::clone(&config), logger.clone());
+    let gateway_ingress = GatewayIngress::new(
+        logger.clone(),
+        Arc::clone(&config),
+        Arc::clone(&active_guilds),
+        feature_gate_client.clone(),
+    );
 
     // Listen to incoming gateway events and start re-publishing them on the queue
     // (performing the primary purpose of the service)
-    let publisher_instance = publish::Publisher::new(
-        rmq_connection,
-        active_guilds.clone(),
-        Arc::clone(&config),
-        logger.clone(),
-        update_tx.clone(),
-    );
-    let publish_sink = publisher_instance
-        .consume_events(raw_event_stream)
-        .map(|_| Ok::<(), anyhow::Error>(()));
-
-    // Listen for lifecycle events and send them to the uptime tracker
-    let lifecycle_event_listener =
-        process_lifecycle_events(lifecycle_event_stream, update_tx.clone());
-
-    // Pipe the uptime events from the tracker into the active guild handler
-    let logger_clone = logger.clone();
-    let uptime_events_stream = connection_tracker.stream_events().map(|event| {
-        slog::debug!(logger_clone, "uptime event from connection tracker"; "uptime_event" => ?event);
-        event
-    });
-    let unfiltered_uptime_pipe = active_guilds.pipe_uptime_events(uptime_events_stream);
-
-    // Sink all uptime events to the uptime tracking service
-    let uptime_events_sink = sink_uptime_events(
-        Arc::clone(&config),
-        logger,
-        uptime_service_client,
-        uptime_rx,
-    );
+    let handle_event_future =
+        gateway_ingress.handle_raw_events(raw_event_stream, initial_rmq_connection);
 
     // Continuously poll the set of active guilds
-    let active_guilds_poll = active_guilds.go_poll();
+    let active_guilds_poll_future = active_guilds.go_poll();
 
-    // Run all futures until an error is encountered
-    try_join!(
-        split_future.map(|_| Ok::<(), anyhow::Error>(())),
-        publish_sink,
-        lifecycle_event_listener,
-        unfiltered_uptime_pipe,
-        uptime_events_sink,
-        active_guilds_poll,
-    )?;
+    // Run all futures
+    futures::join!(handle_event_future, active_guilds_poll_future);
 
     Ok(())
 }
 
-/// Listens for lifecycle events from the Gateway and sends corresponding update messages
-///
-/// on the shard mpsc channel, updating the stateful uptime tracker
-async fn process_lifecycle_events(
-    in_stream: impl Stream<Item = Event>,
-    update_tx: UnboundedSender<UpdateMessage>,
-) -> anyhow::Result<()> {
-    type SendError = tokio::sync::mpsc::error::SendError<UpdateMessage>;
-    // Convert the stream into a TryStream
-    let try_stream = StreamExt::map(in_stream, Ok::<Event, SendError>);
-    try_stream
-        .try_for_each(move |event| {
-            let update_tx = update_tx.clone();
-            async move {
-                match event {
-                    Event::ShardConnected(_) => update_tx.send(UpdateMessage::GatewayOnline),
-                    Event::ShardDisconnected(_) => update_tx.send(UpdateMessage::GatewayOffline),
-                    Event::GuildCreate(guild_create) => {
-                        update_tx.send(UpdateMessage::GuildOnline(guild_create.id.0))
-                    }
-                    Event::GuildDelete(guild_delete) => {
-                        update_tx.send(UpdateMessage::GuildOffline(guild_delete.id.0))
-                    }
-                    // Send heartbeat updates whenever we get Discord Gateway acks
-                    // so that we know the connection is still alive
-                    // (and we're not sending heartbeats into the void)
-                    Event::GatewayHeartbeatAck => update_tx.send(UpdateMessage::GatewayHeartbeat),
-                    _ => Ok(()),
-                }
-            }
-        })
-        .await
-        .context("could not send update messages to uptime tracker")?;
-
-    Ok(())
-}
-
-/// Acts as a stream sink for uptime events,
-/// sending them to the uptime service
-async fn sink_uptime_events(
+struct GatewayIngress {
+    logger: Logger,
     config: Arc<Configuration>,
-    logger: Logger,
-    uptime_service_client: LogsUptimeClient,
-    in_stream: impl Stream<Item = UptimeEvent>,
-) -> anyhow::Result<()> {
-    // Generate a unique session ID that is used to detect downtime after a forced shutdown
-    let session: u64 = rand::random();
-    let logger = logger.new(slog::o!("session_id" => session));
-    slog::info!(logger, "generated random session ID for uptime events");
+    active_guilds: Arc<ActiveGuilds>,
+    feature_gate_client: FeatureGateClient,
+}
 
-    // Note: we don't exit the service if this part fails;
-    // this is an acceptable degradation
-    in_stream
-        .for_each_concurrent(None, move |event| {
-            let uptime_service_client = uptime_service_client.clone();
-            let config = Arc::clone(&config);
-            let logger = logger.clone();
-            async move {
-                let request = event.into_request(session);
-                slog::debug!(logger, "sending UptimeEvent to logs/uptime"; "request" => ?request);
-                let send = || async {
-                    let mut uptime_service_client = uptime_service_client.clone();
-                    let response = uptime_service_client
-                        .gateway_submit(Request::new(request.clone()))
-                        .await;
-                    rpc::into_backoff(response)
-                };
-                if let Err(err) = backoff::future::retry(config.rpc_backoff.build(), send).await {
-                    slog::warn!(logger, "submitting UptimeEvent to logs/uptime failed"; "error" => ?err);
+impl GatewayIngress {
+    fn new(
+        logger: Logger,
+        config: Arc<Configuration>,
+        active_guilds: Arc<ActiveGuilds>,
+        feature_gate_client: FeatureGateClient,
+    ) -> Self {
+        Self {
+            logger,
+            config,
+            active_guilds,
+            feature_gate_client,
+        }
+    }
+
+    /// Handles filtering, converting, and publishing events
+    /// to the durable message queue for later processing in the logs-gateway-normalize service
+    async fn handle_raw_events(
+        &self,
+        raw_event_stream: impl Stream<Item = Event>,
+        initial_rmq_connection: lapin::Connection,
+    ) {
+        // Converts the raw event to a partially-deserialized gateway event
+        let converted_event_stream = raw_event_stream.filter_map(|raw_event| async {
+            // Note the time of ingestion
+            let time_ms: u64 = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_millis()
+                .try_into()
+                .expect("System time could not fit into u64");
+
+            match crate::filter::try_convert_raw_event(raw_event, time_ms) {
+                Ok(event_option) => event_option,
+                Err(err) => {
+                    err.log(&self.logger);
+                    None
                 }
             }
-        })
-        .await;
+        });
 
-    Ok(())
-}
+        // Filter events by whether or not the guild has indexing enabled
+        // (which is the same as being considered "active")
+        let filtered_event_stream = converted_event_stream.filter(|event| {
+            let guild_id = event.guild_id;
+            let active_guilds = Arc::clone(&self.active_guilds);
+            async move { active_guilds.is_active(guild_id).await }
+        });
 
-/// Splits gateway events into two streams
-/// depending on whether they match the given event type flags filter.
-/// The future returned as the first return argument
-/// must be awaited for the splitting to occur.
-fn split_gateway_events(
-    in_stream: impl Stream<Item = Event>,
-    filter: EventTypeFlags,
-    logger: Logger,
-) -> (
-    impl Future<Output = ()>,
-    impl Stream<Item = Event>,
-    impl Stream<Item = Event>,
-) {
-    let (matches_tx, matches_rx) = mpsc::unbounded_channel::<Event>();
-    let (other_tx, other_rx) = mpsc::unbounded_channel::<Event>();
-    let split_future = async move {
-        in_stream
-            .for_each(|event| async {
-                let event_type: EventTypeFlags = event.kind().into();
-                let send_result = if filter.contains(event_type) {
-                    (matches_tx.send(event), "matches")
-                } else {
-                    (other_tx.send(event), "other")
-                };
-
-                if let (Err(send_err), side) = send_result {
-                    slog::warn!(
-                        logger,
-                        "sending to downstream split event stream failed";
-                        "side" => side,
-                        "error" => ?send_err,
-                    );
-                }
-            })
-            .await;
-    };
-
-    (
-        split_future,
-        UnboundedReceiverStream::new(matches_rx),
-        UnboundedReceiverStream::new(other_rx),
-    )
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::testutils;
-    use std::time::Duration;
-    use tokio::sync::mpsc;
-    use tokio_stream::wrappers::UnboundedReceiverStream;
-    use twilight_gateway::{Event, EventTypeFlags};
-    use twilight_model::gateway::payload::MessageDelete;
-
-    #[tokio::test]
-    async fn test_split_gateway_events() -> anyhow::Result<(), anyhow::Error> {
-        let logger = testutils::logger("test_split_gateway_events");
-        let (gateway_event_tx, gateway_event_rx) = mpsc::unbounded_channel::<Event>();
-
-        // Create the two sink streams & span the split future
-        let (split_future, split_a, split_b) = super::split_gateway_events(
-            UnboundedReceiverStream::new(gateway_event_rx),
-            EventTypeFlags::GUILD_CREATE | EventTypeFlags::MESSAGE_DELETE,
-            logger,
+        let (event_bounded_queue, bounded_event_stream) = queue::BoundedQueue::<GatewayEvent>::new(
+            queue::BoundedQueueConfig {
+                identifier: String::from("gateway events"),
+                max_size: self.config.raw_events.queue_length,
+                warning_threshold: self.config.raw_events.warn_threshold,
+                watch_size_interval: self.config.raw_events.watch_period,
+            },
+            &self.logger,
         );
-        tokio::spawn(split_future);
+        let watch_size_future = event_bounded_queue.watch_size();
+        let pipe_future = event_bounded_queue.pipe_in(filtered_event_stream);
 
-        // Create consumer channels to constantly poll the stream
-        let (consume_a, mut a_rx) = testutils::adapt_stream(split_a);
-        let (consume_b, mut b_rx) = testutils::adapt_stream(split_b);
-        tokio::spawn(consume_a);
-        tokio::spawn(consume_b);
-
-        // Send a volley of events
-        // Should go to channel a
-        let matching_filter_event = Event::MessageDelete(serde_json::from_value::<MessageDelete>(
-            serde_json::json!({
-                "channel_id": 0,
-                "id": 0,
-            }),
-        )?);
-        // Should go to channel b
-        let non_matching_event = Event::GatewayHeartbeat(1);
-        gateway_event_tx.send(matching_filter_event.clone())?;
-        gateway_event_tx.send(non_matching_event.clone())?;
-
-        // There should be exactly 1 event on each channel
-        assert_eq!(
-            tokio::time::timeout(Duration::from_millis(500), a_rx.recv()).await?,
-            Some(matching_filter_event),
+        let publisher = publish::Publisher::new(
+            initial_rmq_connection,
+            Arc::clone(&self.config),
+            self.logger.clone(),
         );
-        assert_eq!(
-            tokio::time::timeout(Duration::from_millis(500), b_rx.recv()).await?,
-            Some(non_matching_event),
-        );
-        testutils::assert_empty(&mut a_rx);
-        testutils::assert_empty(&mut b_rx);
 
-        Ok(())
+        // This blocks indefinitely
+        let consume_future = publisher.consume_events(bounded_event_stream);
+
+        futures::join!(watch_size_future, pipe_future, consume_future);
     }
 }

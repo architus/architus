@@ -30,7 +30,6 @@ features_to_components = {
         'logs-gateway-normalize',
         'logs-search',
         'logs-submission',
-        'logs-uptime',
         'elasticsearch',
         'rabbit',
         'db',
@@ -183,23 +182,6 @@ if 'logs-submission' in enabled:
         docker_build('logs-submission-image', '.', dockerfile='logs/submission/Dockerfile', ignore=["*", "!logs/submission/**", "!lib/**"])
     k8s_yaml('logs/submission/kube/dev/logs-submission.yaml')
     k8s_resource('logs-submission')
-
-if 'logs-uptime' in enabled:
-    if rust_hot_reload:
-        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
-        # Additionally, use hot reloading where the service process is restarted in-place upon rebuilds
-        # From https://docs.tilt.dev/example_go.html
-        if not os.path.exists('logs/uptime/config.toml'):
-            # Create a local copy of the config file if needed
-            local(['cp', 'logs/uptime/config.default.toml', 'logs/uptime/config.toml'])
-        local_resource('logs-uptime-compile', 'cargo build --manifest-path=logs/uptime/Cargo.toml',
-                       deps=['logs/uptime/Cargo.toml', 'logs/uptime/Cargo.lock', 'logs/uptime/build.rs', 'logs/uptime/src', 'lib/ipc/proto/logs/uptime.proto'])
-        docker_build_with_restart('logs-uptime-image', '.', dockerfile='logs/uptime/Dockerfile.tilt', only=["logs/uptime/target/debug/logs-uptime", "logs/uptime/config.toml"],
-                                  entrypoint=['/usr/bin/logs-uptime', '/etc/architus/config.toml'], live_update=[sync('logs/uptime/target/debug/logs-uptime', '/usr/bin/logs-uptime'), sync('logs/uptime/config.toml', '/etc/architus/config.toml')])
-    else:
-        docker_build('logs-uptime-image', '.', dockerfile='logs/uptime/Dockerfile', ignore=["*", "!logs/uptime/**", "!lib/**"])
-    k8s_yaml('logs/uptime/kube/dev/logs-uptime.yaml')
-    k8s_resource('logs-uptime')
 
 if 'logs-search' in enabled:
     if rust_hot_reload:

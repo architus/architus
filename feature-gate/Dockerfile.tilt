@@ -1,7 +1,7 @@
 # Create minimal deployment
 # with just the service binary included
 
-FROM debian:buster-slim
+FROM ubuntu:hirsute
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -q \
     && apt-get install -y -q "libssl1.1" "libpq-dev" \

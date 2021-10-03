@@ -1,0 +1,34 @@
+# The port that the gRPC server listens on
+port = 50555
+# Size of the database connection pool
+connection_pool_size = 16
+
+# Collection of values used to connect to the database
+[database]
+# This gets overridden via a secret mount from architus-secret
+# (in development, this is defined in secret.yaml at the repo root)
+user_name = ""
+# This gets overridden via a secret mount from architus-secret
+# (in development, this is defined in secret.yaml at the repo root)
+user_password = ""
+host = "postgres"
+port = 5432
+database_name = "autbot"
+
+# Parameters for the backoff used to connect to external services during initialization
+[initialization_backoff]
+initial_interval = "500ms"
+max_interval = "30s"
+duration = "2m"
+multiplier = 2.0
+
+# Logging configuration
+# https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html
+[logging]
+level = "info"
+format = "json"
+source_location = "file_and_line"
+timezone = "utc"
+destination = "stdout"
+channel_size = 2048
+overflow_strategy = "drop_and_report"

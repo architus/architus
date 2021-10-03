@@ -29,21 +29,19 @@ pub struct Configuration {
     pub gateway_queue: GatewayQueue,
     /// Config options for raw event publishing mechanisms
     pub raw_events: RawEvents,
-    /// Length of time that consecutive guild uptime events are grouped together in
-    #[serde(with = "humantime_serde")]
-    pub guild_uptime_debounce_delay: Duration,
     /// Size of the guild chunks to send to the feature-gate service to check their feature
     pub feature_gate_batch_check_size: usize,
-    /// How long to keep offline guilds in the active guild cache
-    /// (Allows for detecting guilds that enable/disable their indexing rapidly)
-    #[serde(with = "humantime_serde")]
-    pub active_guild_eviction_duration: Duration,
     /// The amount of time to wait between polls to the feature-gate service
     /// to retrieve the current status of all guilds and whether they have indexing enabled
     /// Lowering increases I/O on the feature-gate and lock contention on the processing hot-path
     /// while increasing response times for indexing enable/disable actions
     #[serde(with = "humantime_serde")]
     pub active_guilds_poll_interval: Duration,
+    /// The amount of time to wait between checking
+    /// whether a background loading of the is_active status for a guild has completed.
+    /// This should not be much higher than the expected latency of the feature gate service
+    #[serde(with = "humantime_serde")]
+    pub is_active_loading_poll_interval: Duration,
     /// Logging configuration (for service diagnostic logs, not Architus log events)
     pub logging: TerminalLoggerConfig,
 }
@@ -62,8 +60,6 @@ pub struct Services {
     pub gateway_queue: String,
     /// HTTP URL of the feature-gate service
     pub feature_gate: String,
-    /// HTTP URL of the logs/uptime service
-    pub logs_uptime: String,
 }
 
 /// Config options for raw event publishing mechanisms

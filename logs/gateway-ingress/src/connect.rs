@@ -2,9 +2,8 @@
 //! used during service initialization and during potential reconnection
 
 use crate::config::Configuration;
-use crate::publish::INTENTS;
+use crate::filter::INTENTS;
 use crate::rpc::feature_gate::Client as FeatureGateClient;
-use crate::rpc::logs::uptime::Client as LogsUptimeClient;
 use anyhow::Context;
 use lapin::{Connection, ConnectionProperties};
 use slog::Logger;
@@ -67,7 +66,9 @@ pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> anyhow::Res
 }
 
 /// Performs a single connection attempt to RabbitMQ
-pub async fn to_queue_attempt(config: Arc<Configuration>) -> anyhow::Result<Connection, lapin::Error> {
+pub async fn to_queue_attempt(
+    config: Arc<Configuration>,
+) -> anyhow::Result<Connection, lapin::Error> {
     let rmq_url = config.services.gateway_queue.clone();
     Connection::connect(&rmq_url, ConnectionProperties::default()).await
 }
@@ -97,33 +98,5 @@ pub async fn to_feature_gate(
         .await
         .context("could not connect to feature-gate")?;
     slog::info!(logger, "connected to feature-gate"; "feature_gate_url" => feature_gate_url);
-    Ok(connection)
-}
-
-/// Creates a new connection to the logs/uptime service
-pub async fn to_uptime_service(
-    config: Arc<Configuration>,
-    logger: Logger,
-) -> anyhow::Result<LogsUptimeClient> {
-    let initialization_backoff = config.initialization_backoff.build();
-    let uptime_url = config.services.logs_uptime.clone();
-    let connect = || async {
-        let conn = LogsUptimeClient::connect(uptime_url.clone())
-            .await
-            .map_err(|err| {
-                slog::warn!(
-                    logger,
-                    "couldn't connect to logs/uptime, retrying after backoff";
-                    "logs_uptime_url" => &uptime_url,
-                    "error" => ?err,
-                );
-                err
-            })?;
-        Ok(conn)
-    };
-    let connection = backoff::future::retry(initialization_backoff, connect)
-        .await
-        .context("could not connect to logs/uptime")?;
-    slog::info!(logger, "connected to logs/uptime"; "logs_uptime_url" => uptime_url);
     Ok(connection)
 }

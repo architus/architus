@@ -1,19 +1,21 @@
 //! Handles the core publishing logic for taking raw gateway events
-//! and sending them to RabbitMQ
+//! and sending them to RabbitMQ.
+//! The majority of the complexity of this module
+//! comes from the logic to handle having a fleet of background asynchronous tasks
+//! be able to acquire a valid lapin::Channel instance before publishing an event.
+//! If it is unable to do so, it will wait until a background task
+//! is able to re-establish a connection to RabbitMQ and wake up all waiters.
 
 use crate::config::Configuration;
 use crate::rpc::gateway_queue_lib::GatewayEvent;
-use crate::uptime::active_guilds::ActiveGuilds;
-use crate::uptime::UpdateMessage;
 use anyhow::{anyhow, Context};
 use architus_amqp_pool::{Manager, Pool, PoolError};
 use backoff::backoff::Backoff;
 use deadpool::Runtime;
-use futures::{join, try_join, FutureExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use lapin::options::{BasicPublishOptions, QueueDeclareOptions};
 use lapin::types::FieldTable;
 use lapin::{BasicProperties, Channel, Connection};
-use lazy_static::lazy_static;
 use prost::Message;
 use slog::Logger;
 use std::collections::BTreeMap;
@@ -21,11 +23,6 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc};
-use tokio_stream::wrappers::ReceiverStream;
-use twilight_gateway::{Event, EventType, Intents};
-use twilight_model::gateway::event::gateway::GatewayEventDeserializer;
-use twilight_model::gateway::event::shard::Payload;
-use twilight_model::gateway::OpCode;
 
 /// Shape of the message passed to the reconnection background coroutine
 /// to request that the handle factory be re-initialized with a valid connection.
@@ -42,7 +39,6 @@ struct ReconnectRequest {
 /// Ensures that temporary RabbitMQ availability errors
 /// do not result in a loss of raw events.
 pub struct Publisher {
-    active_guilds: ActiveGuilds,
     config: Arc<Configuration>,
     logger: Logger,
     handle_factory: Arc<HandleFactory>,
@@ -51,22 +47,14 @@ pub struct Publisher {
 
 impl Publisher {
     #[allow(clippy::needless_pass_by_value)]
-    pub fn new(
-        queue_connection: Connection,
-        active_guilds: ActiveGuilds,
-        config: Arc<Configuration>,
-        logger: Logger,
-        update_tx: mpsc::UnboundedSender<UpdateMessage>,
-    ) -> Self {
+    pub fn new(queue_connection: Connection, config: Arc<Configuration>, logger: Logger) -> Self {
         let logger = logger.new(slog::o!("max_queue_length" => config.raw_events.queue_length));
         let (reconnect_tx, reconnect_rx) = mpsc::unbounded_channel::<ReconnectRequest>();
         Self {
-            active_guilds,
             config: Arc::clone(&config),
             logger: logger.clone(),
             handle_factory: Arc::new(HandleFactory::new(
                 queue_connection,
-                update_tx,
                 logger,
                 config,
                 reconnect_tx,
@@ -75,29 +63,16 @@ impl Publisher {
         }
     }
 
-    /// Runs the publisher forever,
+    /// Runs the publisher indefinitely,
     /// which handles reporting when the queue is reaching its capacity.
     /// The internal `handle_factory` handles reconnecting to the queue when needed
     /// and ensuring that all enqueued messages (up to the channel's capacity)
     /// eventually get published even if transient errors occur reaching RabbitMQ.
-    pub async fn consume_events(
-        mut self,
-        raw_event_stream: impl Stream<Item = Event>,
-    ) -> Result<(), anyhow::Error> {
+    pub async fn consume_events(mut self, event_stream: impl Stream<Item = GatewayEvent>) {
         let reconnect_rx = self.reconnect_rx.take().unwrap();
 
-        // Create a backpressure-capable stream factory
-        // so that raw events piling up is caught and reported on
-        let (event_tx, event_rx) = mpsc::channel(self.config.raw_events.queue_length);
-        let queue_future = async {
-            let pipe_future = self.pipe_events_to_bounded_queue(raw_event_stream, event_tx.clone());
-            let watch_future = self
-                .watch_queue_length(|| self.config.raw_events.queue_length - event_tx.capacity());
-            join!(pipe_future, watch_future);
-        };
-
         // Consume each event from the stream in parallel
-        let consume_future = ReceiverStream::new(event_rx).for_each_concurrent(
+        let consume_future = event_stream.for_each_concurrent(
             Some(self.config.raw_events.publish_concurrency),
             |event| async { self.publish_event(event).await },
         );
@@ -105,96 +80,28 @@ impl Publisher {
         // Reconnect to the RabbitMQ instance in the background if it ever fails
         let reconnection_future = self.handle_factory.reconnect_background_loop(reconnect_rx);
 
-        try_join!(
-            queue_future.map(|_| Ok::<(), anyhow::Error>(())),
-            consume_future.map(|_| Ok::<(), anyhow::Error>(())),
-            reconnection_future
-        )?;
-        Ok(())
-    }
-
-    /// Performs the consumption on the raw event stream,
-    /// re-sending them to the bounded queue
-    /// or dropping them if the queue is full.
-    async fn pipe_events_to_bounded_queue(
-        &self,
-        raw_event_stream: impl Stream<Item = Event>,
-        event_tx: mpsc::Sender<Event>,
-    ) {
-        raw_event_stream
-            .for_each(|event| async {
-                if let Err(send_err) = event_tx.try_send(event) {
-                    slog::warn!(
-                        self.logger,
-                        "sending raw gateway event into shared channel failed; dropping";
-                        "error" => ?send_err
-                    );
-                }
-            })
-            .await;
-    }
-
-    /// Asynchronously watches the queue length to ensure
-    /// that it doesn't exceed a warning threshold.
-    /// This is useful for reporting before the queue starts dropping events.
-    async fn watch_queue_length(&self, check_length: impl Fn() -> usize) {
-        let mut interval = tokio::time::interval(self.config.raw_events.watch_period);
-        loop {
-            interval.tick().await;
-            let current_length = check_length();
-            if current_length > self.config.raw_events.warn_threshold {
-                slog::warn!(
-                    self.logger,
-                    "current queue length exceeds warning threshold";
-                    "current_queue_length" => current_length,
-                    "warn_threshold" => self.config.raw_events.warn_threshold
-                );
-            }
-        }
+        futures::join!(consume_future, reconnection_future);
     }
 
     /// Publishes a single event to the RabbitMQ message queue.
     /// Blocks until the event can be successfully published,
     /// potentially indefinitely.
     /// This can cause events to start being dropped on the bounded queue.
-    async fn publish_event(&self, event: Event) {
-        // Note the timestamp immediately
-        let timestamp = architus_id::millisecond_ts();
-        let logger = self.logger.new(slog::o!("event_timestamp" => timestamp));
-
-        // Create the `GatewayEvent` from the raw event
-        let gateway_event =
-            if let Some(gateway_event) = convert_raw_event(event, timestamp, &logger) {
-                gateway_event
-            } else {
-                return;
-            };
-
+    async fn publish_event(&self, event: GatewayEvent) {
         let logger = self.logger.new(slog::o!(
-            "guild_id" => gateway_event.guild_id,
+            "event_timestamp" => event.ingress_timestamp,
+            "guild_id" => event.guild_id,
         ));
 
         // Serialize the event to raw bytes
-        let mut raw_bytes = Vec::with_capacity(gateway_event.encoded_len());
-        if let Err(encode_err) = gateway_event.encode(&mut raw_bytes) {
+        let mut raw_bytes = Vec::with_capacity(event.encoded_len());
+        if let Err(encode_err) = event.encode(&mut raw_bytes) {
             slog::warn!(
                 logger,
                 "could not encode gateway event to bytes";
                 "error" => ?encode_err,
-                "event" => ?gateway_event
+                "event" => ?event,
             );
-            return;
-        }
-
-        // Print out the raw bytes for debugging
-        slog::debug!(
-            logger,
-            "raw event bytes";
-            "event_bytes" => base64::encode(&raw_bytes),
-        );
-
-        // Make sure the guild is active before forwarding
-        if !self.active_guilds.is_active(gateway_event.guild_id).await {
             return;
         }
 
@@ -241,7 +148,6 @@ enum HandleFactoryState {
 /// Handles reconnection logic for the message queue,
 /// and issuing of Handles for event publish attempts
 struct HandleFactory {
-    update_tx: mpsc::UnboundedSender<UpdateMessage>,
     logger: Logger,
     config: Arc<Configuration>,
     state: Mutex<HandleFactoryState>,
@@ -251,7 +157,6 @@ struct HandleFactory {
 impl HandleFactory {
     fn new(
         queue_connection: Connection,
-        update_tx: mpsc::UnboundedSender<UpdateMessage>,
         logger: Logger,
         config: Arc<Configuration>,
         reconnect_tx: mpsc::UnboundedSender<ReconnectRequest>,
@@ -270,7 +175,6 @@ impl HandleFactory {
         }
 
         Self {
-            update_tx,
             logger,
             config,
             state: Mutex::new(HandleFactoryState::Connecting {
@@ -329,7 +233,7 @@ impl HandleFactory {
     async fn reconnect_background_loop(
         &self,
         mut reconnect_rx: mpsc::UnboundedReceiver<ReconnectRequest>,
-    ) -> Result<(), anyhow::Error> {
+    ) {
         loop {
             // Get the next request from the shared channel
             let request = if let Some(next_request) = reconnect_rx.recv().await {
@@ -342,26 +246,15 @@ impl HandleFactory {
 
             let ReconnectRequest {
                 ready_tx,
-                connection: mut existing_connection,
+                connection: existing_connection,
                 next_generation,
             } = request;
 
-            // Reconnect to the Rabbit MQ instance if needed
-            let connection = if let Some(connection) = existing_connection.take() {
-                connection
-            } else {
-                // Continuously attempt to make the connection
-                let connection = self.reconnect().await;
-
-                // Notify the uptime tracker of the queue coming online
-                self.update_tx
-                    .send(UpdateMessage::QueueOnline)
-                    .context("could not send queue online update to uptime tracker")?;
-                connection
-            };
-
-            // Declare the RMQ queue to publish incoming events to
-            declare_event_queue(&connection, Arc::clone(&self.config), self.logger.clone()).await?;
+            // Ensure we have a valid connection,
+            // and declare the queue if needed.
+            let connection = self
+                .do_reconnect_and_declare_topology(existing_connection)
+                .await;
 
             // Create a pool for the RMQ channels
             let manager = Manager::new(connection);
@@ -369,58 +262,100 @@ impl HandleFactory {
             pool_config.runtime = Runtime::Tokio1;
             let channel_pool = Pool::from_config(manager, pool_config);
 
-            // Store the connection pool in the handle factory
-            // and notify all watchers that it is ready.
-            let mut state_handle = self
-                .state
-                .lock()
-                .expect("HandleFactory.state Mutex poisoned");
-            match &mut *state_handle {
-                HandleFactoryState::Connected { generation, .. } => {
-                    // This shouldn't be possible; just log and ignore
-                    let logger = self.logger.new(slog::o!(
-                        "planned_next_generation" => next_generation,
-                        "current_generation" => *generation,
-                    ));
+            self.notify_new_connection(channel_pool, ready_tx, next_generation);
+        }
+    }
+
+    async fn do_reconnect_and_declare_topology(
+        &self,
+        existing_connection: Option<Connection>,
+    ) -> Connection {
+        let mut existing_connection = existing_connection;
+
+        // Reconnect to the Rabbit MQ instance and ensure the queue has been declared
+        loop {
+            let connection = if let Some(connection) = existing_connection.take() {
+                connection
+            } else {
+                // Continuously attempt to make the connection
+                self.reconnect().await
+            };
+
+            // Declare the RMQ queue to publish incoming events to
+            let declare_future =
+                declare_event_queue(&connection, Arc::clone(&self.config), self.logger.clone());
+            match declare_future.await {
+                Ok(_) => return connection,
+                Err(err) => {
+                    slog::warn!(
+                        self.logger,
+                        "failed to declare event queue after successful reconnect";
+                        "error" => ?err,
+                    );
+
+                    tokio::time::sleep(Duration::from_secs(10)).await;
+                }
+            }
+        }
+    }
+
+    fn notify_new_connection(
+        &self,
+        channel_pool: Pool,
+        ready_tx: broadcast::Sender<()>,
+        next_generation: usize,
+    ) {
+        // Store the connection pool in the handle factory
+        // and notify all watchers that it is ready.
+        let mut state_handle = self
+            .state
+            .lock()
+            .expect("HandleFactory.state Mutex poisoned");
+        match &mut *state_handle {
+            HandleFactoryState::Connected { generation, .. } => {
+                // This shouldn't be possible; just log and ignore
+                let logger = self.logger.new(slog::o!(
+                    "planned_next_generation" => next_generation,
+                    "current_generation" => *generation,
+                ));
+                slog::warn!(
+                    logger,
+                    "invariant violated: HandleFactoryState marked as connected before background reconnect loop ready to signal reconnect";
+                );
+
+                // Sending is OK even with the lock is acquired,
+                // because listeners will re-acquire the lock before returning successfully
+                if let Err(send_err) = ready_tx.send(()) {
                     slog::warn!(
                         logger,
-                        "invariant violated: HandleFactoryState marked as connected before background reconnect loop ready to signal reconnect";
+                        "could not send ready message to listeners; all receivers dropped";
+                        "error" => ?send_err,
                     );
-
-                    // Sending is OK even with the lock is acquired,
-                    // because listeners will re-acquire the lock before returning successfully
-                    if let Err(send_err) = ready_tx.send(()) {
-                        slog::warn!(
-                            logger,
-                            "could not send ready message to listeners; all receivers dropped";
-                            "error" => ?send_err,
-                        );
-                    }
                 }
-                HandleFactoryState::Connecting { .. } => {
-                    let logger = self
-                        .logger
-                        .new(slog::o!("next_generation" => next_generation));
-                    slog::info!(
+            }
+            HandleFactoryState::Connecting { .. } => {
+                let logger = self
+                    .logger
+                    .new(slog::o!("next_generation" => next_generation));
+                slog::info!(
+                    logger,
+                    "reconnected to RabbitMQ; bumping generation and notifying listeners"
+                );
+
+                // Update the state
+                *state_handle = HandleFactoryState::Connected {
+                    pool: Arc::new(channel_pool),
+                    generation: next_generation,
+                };
+
+                // Sending is OK even with the lock is acquired,
+                // because listeners will re-acquire the lock before returning successfully
+                if let Err(send_err) = ready_tx.send(()) {
+                    slog::warn!(
                         logger,
-                        "reconnected to RabbitMQ; bumping generation and notifying listeners"
+                        "could not send ready message to listeners; all receivers dropped";
+                        "error" => ?send_err,
                     );
-
-                    // Update the state
-                    *state_handle = HandleFactoryState::Connected {
-                        pool: Arc::new(channel_pool),
-                        generation: next_generation,
-                    };
-
-                    // Sending is OK even with the lock is acquired,
-                    // because listeners will re-acquire the lock before returning successfully
-                    if let Err(send_err) = ready_tx.send(()) {
-                        slog::warn!(
-                            logger,
-                            "could not send ready message to listeners; all receivers dropped";
-                            "error" => ?send_err,
-                        );
-                    }
                 }
             }
         }
@@ -513,16 +448,6 @@ impl HandleFactory {
                 };
 
                 std::mem::drop(state_handle);
-
-                // Notify the uptime tracker that the queue is offline
-                if let Err(send_err) = self.update_tx.send(UpdateMessage::QueueOffline) {
-                    slog::error!(
-                        error.logger,
-                        "could not send QueueOffline message to uptime tracker";
-                        "error" => ?send_err,
-                        "generation" => error.generation,
-                    );
-                }
             }
         };
     }
@@ -646,193 +571,4 @@ async fn declare_event_queue(
         "rabbit_url" => &config.services.gateway_queue,
     );
     Ok(rmq_channel)
-}
-
-/// Attempts to synchronously convert a raw gateway event into our struct
-/// that will eventually be published to the gateway queue
-fn convert_raw_event(event: Event, timestamp: u64, logger: &Logger) -> Option<GatewayEvent> {
-    if let Event::ShardPayload(Payload { bytes }) = event {
-        let json = match std::str::from_utf8(&bytes) {
-            Ok(json) => json,
-            Err(err) => {
-                slog::warn!(
-                    logger,
-                    "an error occurred while deserializing gateway JSON";
-                    "error" => ?err
-                );
-                return None;
-            }
-        };
-
-        // Use twilight's fast pre-deserializer to determine the op type,
-        // and only deserialize it if it:
-        // - is a proper Gateway dispatch event
-        // - has a matching processor
-        let deserializer = GatewayEventDeserializer::from_json(json)?;
-        let (op, _, event_type) = deserializer.into_parts();
-        if op != OpCode::Event as u8 {
-            return None;
-        }
-
-        // Make sure we should forward the event
-        let event_type_str = event_type.as_deref()?;
-        let event_type =
-            serde_json::from_str::<EventType>(&format!(r#""{}""#, event_type_str)).ok();
-        if !should_forward(event_type) {
-            return None;
-        }
-
-        let value = serde_json::from_str::<serde_json::Value>(json).ok()?;
-        if let serde_json::Value::Object(mut map) = value {
-            // Attempt to find the ".d" value (contains the Gateway message payload)
-            // https://discord.com/developers/docs/topics/gateway#payloads-gateway-payload-structure
-            let inner_json = map.remove("d")?;
-
-            // Make sure the guild id can be extracted before forwarding
-            let guild_id_option = try_extract_guild_id(&inner_json, event_type);
-            let guild_id = if let Some(guild_id) = guild_id_option {
-                guild_id
-            } else {
-                slog::warn!(
-                    logger,
-                    "no guild id was extracted for event";
-                    "event_type" => event_type_str,
-                    "inner_json" => ?inner_json,
-                );
-                return None;
-            };
-
-            // Serialize the inner event to MessagePack
-            let inner_json_bytes = match rmp_serde::to_vec(&inner_json) {
-                Ok(buf) => buf,
-                Err(err) => {
-                    slog::warn!(
-                        logger,
-                        "could not serialize inner event JSON to MessagePack";
-                        "error" => ?err,
-                        "event_inner" => ?inner_json,
-                    );
-                    return None;
-                }
-            };
-
-            // Print out the raw bytes for debugging
-            slog::debug!(
-                logger,
-                "raw event inner bytes";
-                "event_inner_bytes" => base64::encode(&inner_json_bytes)
-            );
-
-            return Some(GatewayEvent {
-                ingress_timestamp: timestamp,
-                inner: inner_json_bytes,
-                event_type: event_type_str.to_owned(),
-                guild_id,
-            });
-        }
-    }
-
-    None
-}
-
-lazy_static! {
-    /// Includes all guild-related events that are processed.
-    /// Signals to Discord that we intend to receive and process them
-    pub static ref INTENTS: Intents = Intents::GUILD_MEMBERS
-        | Intents::GUILD_MESSAGES
-        | Intents::GUILD_MESSAGE_REACTIONS;
-}
-
-/// Determines whether the ingress shard should forward events to the queue
-/// (certain events, such as raw gateway lifecycle events, should not be forwarded)
-const fn should_forward(event_type_option: Option<EventType>) -> bool {
-    // Don't forward lifecycle events (or typing/presence updates):
-    // `https://discord.com/developers/docs/topics/gateway#commands-and-events-gateway-events`
-    // Default to forwarding an event if it is not identified
-    match event_type_option {
-        Some(event_type) => {
-            match event_type {
-                // Based on the available processors in:
-                // logs/gateway-normalize/src/gateway/processors.rs
-                EventType::MemberAdd
-                    | EventType::MemberRemove
-                    | EventType::MessageCreate
-                    | EventType::MessageUpdate
-                    | EventType::MessageDelete
-                    | EventType::MessageDeleteBulk
-                    | EventType::InteractionCreate
-                    | EventType::ReactionAdd
-                    | EventType::ReactionRemove
-                    | EventType::ReactionRemoveEmoji
-                    | EventType::ReactionRemoveAll => true,
-                EventType::GatewayHeartbeat
-                    | EventType::GatewayHeartbeatAck
-                    | EventType::GatewayHello
-                    | EventType::GatewayInvalidateSession
-                    | EventType::GatewayReconnect
-                    | EventType::GiftCodeUpdate
-                    | EventType::MemberChunk
-                    | EventType::PresenceUpdate
-                    | EventType::PresencesReplace
-                    | EventType::Ready
-                    | EventType::Resumed
-                    | EventType::ShardConnected
-                    | EventType::ShardConnecting
-                    | EventType::ShardDisconnected
-                    | EventType::ShardIdentifying
-                    | EventType::ShardReconnecting
-                    | EventType::ShardPayload
-                    | EventType::ShardResuming
-                    | EventType::TypingStart
-                    | EventType::UnavailableGuild
-                    | EventType::VoiceServerUpdate
-                    // Disable forwarding events for guilds coming off/online
-                    // Note: that means we'll have to have some other mechanism for logging bot joins/leaves
-                    | EventType::GuildCreate
-                    | EventType::GuildDelete
-                    // Disable forwarding events for those that are handled via the audit log
-                    | EventType::BanAdd
-                    | EventType::BanRemove
-                    | EventType::ChannelCreate
-                    | EventType::ChannelDelete
-                    | EventType::ChannelPinsUpdate
-                    | EventType::ChannelUpdate
-                    | EventType::GuildEmojisUpdate
-                    | EventType::GuildIntegrationsUpdate
-                    | EventType::GuildUpdate
-                    | EventType::IntegrationCreate
-                    | EventType::IntegrationDelete
-                    | EventType::IntegrationUpdate
-                    | EventType::StageInstanceCreate
-                    | EventType::StageInstanceDelete
-                    | EventType::StageInstanceUpdate
-                    | EventType::InviteCreate
-                    | EventType::InviteDelete
-                    | EventType::MemberUpdate
-                    | EventType::RoleCreate
-                    | EventType::RoleDelete
-                    | EventType::RoleUpdate
-                    | EventType::UserUpdate
-                    | EventType::VoiceStateUpdate
-                    | EventType::WebhooksUpdate => false,
-            }
-        }
-        // Forward events that couldn't be matched
-        None => true,
-    }
-}
-
-/// Attempts to extract a guild id from a partially-serialized gateway event
-fn try_extract_guild_id(
-    json_value: &serde_json::Value,
-    _event_type: Option<EventType>,
-) -> Option<u64> {
-    if let serde_json::Value::Object(map) = json_value {
-        if let Some(serde_json::Value::String(guild_id_string)) = map.get("guild_id") {
-            // Attempt to parse the guild id string to a u64
-            return guild_id_string.parse::<u64>().ok();
-        }
-    }
-
-    None
 }

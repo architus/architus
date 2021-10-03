@@ -8,16 +8,6 @@ pub mod feature_gate {
     pub type Client = feature_gate_client::FeatureGateClient<tonic::transport::Channel>;
 }
 
-pub mod logs {
-    // Ignore clippy linting on generated code
-    #[allow(clippy::all, clippy::pedantic, clippy::nursery)]
-    pub mod uptime {
-        tonic::include_proto!("logs.uptime");
-
-        pub type Client = uptime_service_client::UptimeServiceClient<tonic::transport::Channel>;
-    }
-}
-
 // Ignore clippy linting on generated code
 #[allow(clippy::all, clippy::pedantic, clippy::nursery)]
 pub mod gateway_queue_lib {
