@@ -12,7 +12,7 @@ use twilight_gateway::shard::Events;
 use twilight_gateway::{EventTypeFlags, Shard};
 
 /// Attempts to initialize a gateway connection
-pub async fn to_shard(
+pub async fn connect_to_shard(
     config: Arc<Configuration>,
     logger: Logger,
     events: EventTypeFlags,
@@ -43,19 +43,24 @@ pub async fn to_shard(
 }
 
 /// Creates a new connection to RabbitMQ
-pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<Connection> {
+pub async fn connect_to_queue(
+    config: Arc<Configuration>,
+    logger: Logger,
+) -> anyhow::Result<Connection> {
     let initialization_backoff = config.initialization_backoff.build();
     let rmq_url = config.services.gateway_queue.clone();
     let rmq_connect = || async {
-        let connection = to_queue_attempt(Arc::clone(&config)).await.map_err(|err| {
-            slog::warn!(
-                logger,
-                "couldn't connect to RabbitMQ, retrying after backoff";
-                "rabbit_url" => &rmq_url,
-                "error" => ?err,
-            );
-            err
-        })?;
+        let connection = connect_to_queue_attempt(Arc::clone(&config))
+            .await
+            .map_err(|err| {
+                slog::warn!(
+                    logger,
+                    "couldn't connect to RabbitMQ, retrying after backoff";
+                    "rabbit_url" => &rmq_url,
+                    "error" => ?err,
+                );
+                err
+            })?;
         Ok(connection)
     };
     let rmq_connection = backoff::future::retry(initialization_backoff, rmq_connect)
@@ -66,7 +71,7 @@ pub async fn to_queue(config: Arc<Configuration>, logger: Logger) -> anyhow::Res
 }
 
 /// Performs a single connection attempt to RabbitMQ
-pub async fn to_queue_attempt(
+pub async fn connect_to_queue_attempt(
     config: Arc<Configuration>,
 ) -> anyhow::Result<Connection, lapin::Error> {
     let rmq_url = config.services.gateway_queue.clone();
@@ -74,7 +79,7 @@ pub async fn to_queue_attempt(
 }
 
 /// Creates a new connection to the feature gate service
-pub async fn to_feature_gate(
+pub async fn connect_to_feature_gate(
     config: Arc<Configuration>,
     logger: Logger,
 ) -> anyhow::Result<FeatureGateClient> {

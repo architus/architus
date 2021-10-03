@@ -385,7 +385,7 @@ impl HandleFactory {
             }
 
             // Perform the connection attempt
-            let connect_future = crate::connect::to_queue_attempt(Arc::clone(&self.config));
+            let connect_future = crate::connect::connect_to_queue_attempt(Arc::clone(&self.config));
             match connect_future.await {
                 Ok(connection) => return connection,
                 Err(err) => {

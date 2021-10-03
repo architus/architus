@@ -163,8 +163,6 @@ impl ActiveGuilds {
     /// that is guaranteed to finish, whether or not the future returned by this function
     /// is polled to completion.
     pub async fn is_active(self: Arc<Self>, guild_id: u64) -> bool {
-        let logger = self.logger.new(slog::o!("guild_id" => guild_id));
-
         // Provide the opportunity to try again
         // if a non-connection error or data race is encountered,
         // or if we are waiting for a loading status to get loaded by another task.
@@ -237,7 +235,6 @@ impl ActiveGuilds {
         };
 
         let result = backoff::future::retry(self.config.rpc_backoff.build(), send).await;
-        let timestamp = architus_id::millisecond_ts();
         let is_active = match result {
             Ok(response) => response.has_feature,
             Err(err) => {

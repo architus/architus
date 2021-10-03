@@ -11,7 +11,6 @@ mod rpc;
 
 use crate::active_guilds::ActiveGuilds;
 use crate::config::Configuration;
-use crate::rpc::feature_gate::Client as FeatureGateClient;
 use crate::rpc::gateway_queue_lib::GatewayEvent;
 use anyhow::Context;
 use futures::{Stream, StreamExt};
@@ -54,14 +53,16 @@ async fn main() -> anyhow::Result<()> {
 /// Attempts to initialize the bot and listen for gateway events
 async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     // Initialize connections to external services
-    let (_shard, raw_event_stream) = connect::to_shard(
+    let (_shard, raw_event_stream) = connect::connect_to_shard(
         Arc::clone(&config),
         logger.clone(),
         EventTypeFlags::SHARD_PAYLOAD,
     )
     .await?;
-    let initial_rmq_connection = connect::to_queue(Arc::clone(&config), logger.clone()).await?;
-    let feature_gate_client = connect::to_feature_gate(Arc::clone(&config), logger.clone()).await?;
+    let initial_rmq_connection =
+        connect::connect_to_queue(Arc::clone(&config), logger.clone()).await?;
+    let feature_gate_client =
+        connect::connect_to_feature_gate(Arc::clone(&config), logger.clone()).await?;
 
     let active_guilds = Arc::new(ActiveGuilds::new(
         feature_gate_client.clone(),
@@ -73,7 +74,6 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
         logger.clone(),
         Arc::clone(&config),
         Arc::clone(&active_guilds),
-        feature_gate_client.clone(),
     );
 
     // Listen to incoming gateway events and start re-publishing them on the queue
@@ -94,21 +94,14 @@ struct GatewayIngress {
     logger: Logger,
     config: Arc<Configuration>,
     active_guilds: Arc<ActiveGuilds>,
-    feature_gate_client: FeatureGateClient,
 }
 
 impl GatewayIngress {
-    fn new(
-        logger: Logger,
-        config: Arc<Configuration>,
-        active_guilds: Arc<ActiveGuilds>,
-        feature_gate_client: FeatureGateClient,
-    ) -> Self {
+    fn new(logger: Logger, config: Arc<Configuration>, active_guilds: Arc<ActiveGuilds>) -> Self {
         Self {
             logger,
             config,
             active_guilds,
-            feature_gate_client,
         }
     }
 

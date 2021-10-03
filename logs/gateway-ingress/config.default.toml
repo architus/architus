@@ -1,17 +1,16 @@
 # Name of the feature that enables indexing on a guild
 indexing_feature = "beta/logs-indexing"
-# Length of time that consecutive guild uptime events are grouped together in
-guild_uptime_debounce_delay = "200ms"
 # Size of the guild chunks to send to the feature-gate service to check their feature
 feature_gate_batch_check_size = 256
-# How long to keep offline guilds in the active guild cache
-# (Allows for detecting guilds that enable/disable their indexing rapidly)
-active_guild_eviction_duration = "30m"
 # The amount of time to wait between polls to the feature-gate service
 # to retrieve the current status of all guilds and whether they have indexing enabled
 # Lowering increases I/O on the feature-gate and lock contention on the processing hot-path
 # while increasing response times for indexing enable/disable actions
 active_guilds_poll_interval = "1m"
+# The amount of time to wait between checking
+# whether a background loading of the is_active status for a guild has completed.
+# This should not be much higher than the expected latency of the feature gate service
+is_active_loading_poll_interval = "50ms"
 
 [services]
 # Full AMQP URL to connect to the gateway queue at
