@@ -16,6 +16,21 @@ spec:
       containers:
         - name: logs-gateway-normalize
           image: "{{prefix}}logs-gateway-normalize:{{tag}}"
-          envFrom:
-            - secretRef:
-                name: architus-secret
+          args: ["/etc/architus/config.d/service.toml"]
+          env:
+            - name: LOGS_GATEWAY_NORMALIZE_CONFIG_SECRETS__DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: bot_token
+          volumeMounts:
+            - name: config
+              mountPath: "/etc/architus/config.d"
+              readOnly: true
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: config
+          configMap:
+            name: logs-gateway-normalize-config
+

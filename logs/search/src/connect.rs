@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 /// Creates a new Elasticsearch client
 /// and pings it to ensure that the connection is live.
-pub async fn to_elasticsearch(
+pub async fn connect_to_elasticsearch(
     config: Arc<Configuration>,
     logger: Logger,
 ) -> anyhow::Result<Elasticsearch> {

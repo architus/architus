@@ -17,8 +17,6 @@ is_active_loading_poll_interval = "50ms"
 gateway_queue = "amqp://hello:hello@rabbit:5672/%2f"
 # HTTP URL of the feature-gate service
 feature_gate = "http://feature-gate:50555"
-# HTTP URL of the logs/uptime service
-logs_uptime = "http://logs-uptime:50281"
 
 # Config options related to the Gateway Queue
 [gateway_queue]
@@ -42,7 +40,7 @@ x-delivery-limit = { ShortUInt = "4" }
 # Configuration for the connection pool that sits in front of a connection to the gateway queue
 [gateway_queue.connection_pool]
 # Max number of active channels on a single AMQP connection
-max_size = 16
+max_size = 128
 # Timeouts on pool operations that will cause a re-connect if they elapse
 timeouts = { create = { secs = 5, nanos = 0 } }
 
@@ -67,11 +65,11 @@ max_interval = "1m"
 duration = "2m" # This is ignored
 multiplier = 2.0
 
-# Note: these should be specified using environment variables in production
-# For example, to specify `discord_token`,
-# give a value to the `LOGS_GATEWAY_INGRESS_SECRETS__DISCORD_TOKEN` variable
+# Collection of secret values used to connect to services
 [secrets]
 # Discord bot token
+# This gets overridden via a secret mount from architus-secret
+# (in development, this is defined in secret.yaml at the repo root)
 discord_token = ""
 
 # Logging configuration (for service diagnostic logs, not Architus log events)

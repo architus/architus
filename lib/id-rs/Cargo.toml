@@ -10,5 +10,3 @@ as well as a set of utility functions for dealing with Snowflakes.\
 license = "MIT"
 
 [dependencies]
-ksuid = "0.2"
-thiserror = "1.0"

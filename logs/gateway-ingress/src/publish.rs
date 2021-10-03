@@ -171,6 +171,7 @@ impl HandleFactory {
         };
         if reconnect_tx.send(request).is_err() {
             // This should never fail; fail fast
+            // TODO debug; i feel like i have seen this
             panic!("could not send initial ReconnectRequest: Receiver dropped");
         }
 

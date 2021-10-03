@@ -50,4 +50,5 @@ RUN apt-get update -q \
 COPY --from=builder /opt/logs-gateway-normalize /usr/bin/logs-gateway-normalize
 COPY $SERVICE/config.default.toml /etc/architus/config.toml
 ENV RUST_BACKTRACE=1
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-gateway-normalize", "/etc/architus/config.toml"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-gateway-normalize"]
+CMD ["/etc/architus/config.toml"]

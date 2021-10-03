@@ -16,6 +16,9 @@ spec:
       containers:
         - name: logs-gateway-ingress
           image: logs-gateway-ingress-image
-          envFrom:
-            - secretRef:
-                name: architus-secret
+          env:
+            - name: LOGS_GATEWAY_INGRESS_CONFIG_SECRETS__DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: bot_token

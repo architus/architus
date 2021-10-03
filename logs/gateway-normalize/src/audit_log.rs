@@ -2,7 +2,7 @@
 
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use twilight_http::error::ErrorType;
 use twilight_http::Client;

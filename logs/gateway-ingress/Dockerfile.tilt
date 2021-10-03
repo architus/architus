@@ -9,4 +9,3 @@ RUN apt-get update -q \
 COPY logs/gateway-ingress/target/debug/logs-gateway-ingress /usr/bin/logs-gateway-ingress
 COPY logs/gateway-ingress/config.toml /etc/architus/config.toml
 ENV RUST_BACKTRACE=1
-ENTRYPOINT ["/usr/bin/logs-gateway-ingress", "/etc/architus/config.toml"]

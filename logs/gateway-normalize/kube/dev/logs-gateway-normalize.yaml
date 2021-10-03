@@ -16,6 +16,10 @@ spec:
       containers:
         - name: logs-gateway-normalize
           image: logs-gateway-normalize-image
-          envFrom:
-            - secretRef:
-                name: architus-secret
+          env:
+            - name: LOGS_GATEWAY_NORMALIZE_CONFIG_SECRETS__DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: bot_token
+

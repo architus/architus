@@ -9,4 +9,3 @@ RUN apt-get update -q \
 COPY logs/gateway-normalize/target/debug/logs-gateway-normalize /usr/bin/logs-gateway-normalize
 COPY logs/gateway-normalize/config.toml /etc/architus/config.toml
 ENV RUST_BACKTRACE=1
-ENTRYPOINT ["/usr/bin/logs-gateway-normalize", "/etc/architus/config.toml"]

@@ -141,15 +141,15 @@ pub enum MakeBulkOperationError {
 }
 
 impl BulkOperation {
-    /// Tries to create an index bulk operation instance for the given document/id
-    pub fn index(
+    /// Tries to create a create bulk operation instance for the given document/id
+    pub fn create(
         id: impl Into<String>,
         document: impl Serialize,
     ) -> Result<Self, MakeBulkOperationError> {
         let id = id.into();
 
         // Create the "operation" JSON line using the ID
-        let operation_json_value = serde_json::json!({"index": {"_id": id }});
+        let operation_json_value = serde_json::json!({"create": {"_id": id }});
         let action_buf = match serde_json::to_vec(&operation_json_value) {
             Ok(vec) => Bytes::from(vec),
             Err(err) => {
@@ -262,7 +262,7 @@ impl Client {
         for raw_item in raw_items {
             let mut already_had_action = false;
             let mut more_than_one_action_check =
-                |items: &mut Vec<BulkItem>, action: &api_bindings::bulk::ResultItemAction| {
+                |items: &Vec<BulkItem>, action: &api_bindings::bulk::ResultItemAction| {
                     if already_had_action {
                         slog::warn!(
                             self.logger,
@@ -276,23 +276,23 @@ impl Client {
                 };
 
             if let Some(create_action) = raw_item.create {
-                more_than_one_action_check(&mut items, &create_action);
+                more_than_one_action_check(&items, &create_action);
                 items.push(BulkItem::Create(create_action));
             }
 
             if let Some(delete_action) = raw_item.delete {
-                more_than_one_action_check(&mut items, &delete_action);
-                items.push(BulkItem::Create(delete_action));
+                more_than_one_action_check(&items, &delete_action);
+                items.push(BulkItem::Delete(delete_action));
             }
 
             if let Some(index_action) = raw_item.index {
-                more_than_one_action_check(&mut items, &index_action);
-                items.push(BulkItem::Create(index_action));
+                more_than_one_action_check(&items, &index_action);
+                items.push(BulkItem::Index(index_action));
             }
 
             if let Some(update_action) = raw_item.update {
-                more_than_one_action_check(&mut items, &update_action);
-                items.push(BulkItem::Create(update_action));
+                more_than_one_action_check(&items, &update_action);
+                items.push(BulkItem::Update(update_action));
             }
         }
 

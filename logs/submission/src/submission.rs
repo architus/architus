@@ -219,7 +219,7 @@ impl BatchSubmit {
 
     /// Submits all events sent on the shared channel,
     /// serializing them to JSON before using the Bulk Elasticsearch API
-    /// to index all documents in the same API request.
+    /// to create all documents in the same API request.
     /// Once done (whether successful or not), returns a result for each document.
     async fn submit_events(&self, events: Vec<Event>) -> Vec<(Notifier, InternalResult)> {
         // Convert the events list to a list of the actual documents that will be stored
@@ -347,13 +347,15 @@ impl BatchSubmit {
         let mut results: Vec<InternalResult> = Vec::with_capacity(status.items.len());
         for response_item in status.items {
             match response_item {
-                BulkItem::Index(action) => {
+                BulkItem::Create(action) => {
                     if submitted_ids_set.contains(&action.id) {
                         // The returned ID is valid/expected
                         results.push(InternalResult {
                             id: action.id,
                             result: Ok(()),
                         });
+
+                        // TODO handle errors & "already-existed" notification
                     } else {
                         slog::warn!(
                             self.logger,
@@ -367,7 +369,7 @@ impl BatchSubmit {
                 _ => {
                     slog::warn!(
                         self.logger,
-                        "elasticsearch bulk API response contained non-index operation result";
+                        "elasticsearch bulk API response contained non-create operation result";
                         "document_id" => response_item.id(),
                         "operation_result" => ?response_item,
                         "submitted_count" => submitted_ids_set.len(),
@@ -512,7 +514,7 @@ impl BatchSubmit {
     }
 }
 
-/// Constructs the bulk index bodies for each `StoredEvent` instance,
+/// Constructs the bulk create bodies for each `StoredEvent` instance,
 /// updating the `ingestion_timestamp` for each event before serializing them.
 /// This treats each event individually; some events might fail serialization
 /// and will be returned in the second return value list.
@@ -534,7 +536,7 @@ fn construct_bulk_bodies(
         // Mutate the stored event in-place
         stored_event.ingestion_timestamp = time_ms;
 
-        match crate::elasticsearch::BulkOperation::index(&stored_event.id, &stored_event) {
+        match crate::elasticsearch::BulkOperation::create(&stored_event.id, &stored_event) {
             Ok(operation) => operations.push(WithId::new(operation, &stored_event.id)),
             Err(err) => {
                 // Create a failure based on the error type

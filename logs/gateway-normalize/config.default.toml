@@ -41,12 +41,12 @@ max_interval = "10s"
 duration = "2m"
 multiplier = 2.0
 
-# Note: these should be specified using environment variables in production
-# For example, to specify `discord_token`,
-# give a value to the `LOGS_GATEWAY_NORMALIZE_SECRETS__DISCORD_TOKEN` variable
+# Collection of secret values used to connect to services
 [secrets]
-# Discord API bot token
-discord_token = "REPLACE_ME"
+# Discord bot token
+# This gets overridden via a secret mount from architus-secret
+# (in development, this is defined in secret.yaml at the repo root)
+discord_token = ""
 
 # Logging configuration (for service diagnostic logs, not Architus log events)
 # https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html

@@ -34,7 +34,6 @@ COPY $CONFIG_BACKOFF_LIB/src src
 COPY $CONFIG_BACKOFF_LIB/Cargo.toml .
 # Copy protobuf definitions
 WORKDIR $REPO_ROOT/$PROTO
-COPY $PROTO/logs/uptime.proto logs/uptime.proto
 COPY $PROTO/feature-gate.proto .
 # Build via Cargo
 WORKDIR $REPO_ROOT/$SERVICE
@@ -51,4 +50,5 @@ RUN apt-get update -q \
 COPY --from=builder /opt/logs-gateway-ingress /usr/bin/logs-gateway-ingress
 COPY $SERVICE/config.default.toml /etc/architus/config.toml
 ENV RUST_BACKTRACE=1
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-gateway-ingress", "/etc/architus/config.toml"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/bin/logs-gateway-ingress"]
+CMD ["/etc/architus/config.toml"]
