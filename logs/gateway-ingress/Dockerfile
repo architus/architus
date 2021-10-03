@@ -1,7 +1,6 @@
 ARG REPO_ROOT=/opt/architus
 ARG SERVICE=logs/gateway-ingress
 ARG GATEWAY_QUEUE_LIB=logs/gateway-queue-lib
-ARG LOGS_LIB=lib/id-rs
 ARG AMQP_POOL_LIB=lib/amqp-pool-rs
 ARG CONFIG_BACKOFF_LIB=lib/config-backoff-rs
 ARG PROTO=lib/ipc/proto
@@ -25,10 +24,6 @@ COPY $SERVICE/build.rs .
 # Copy logs/gateway-gateway-lib protos
 WORKDIR $REPO_ROOT/$GATEWAY_QUEUE_LIB
 COPY $GATEWAY_QUEUE_LIB/proto proto
-# Copy shared id library
-WORKDIR $REPO_ROOT/$LOGS_LIB
-COPY $LOGS_LIB/src src
-COPY $LOGS_LIB/Cargo.toml .
 # Copy shared amqp pool library
 WORKDIR $REPO_ROOT/$AMQP_POOL_LIB
 COPY $AMQP_POOL_LIB/src src

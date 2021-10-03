@@ -13,6 +13,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
 /// Defines the context factory for search requests
@@ -187,7 +188,12 @@ impl Query {
             .search(SearchParts::Index(&index))
             .body(body)
             .send();
-        let query_time = architus_id::millisecond_ts();
+        let query_time: u64 = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_millis()
+            .try_into()
+            .expect("System time could not fit into u64");
         let response = send_future.await?;
 
         let response_body = response.json::<serde_json::Value>().await?;

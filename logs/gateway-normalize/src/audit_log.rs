@@ -3,7 +3,7 @@
 use backoff::backoff::Backoff;
 use backoff::ExponentialBackoff;
 use std::convert::TryFrom;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use twilight_http::error::ErrorType;
 use twilight_http::Client;
 use twilight_model::guild::audit_log::{AuditLog, AuditLogEntry, AuditLogEvent};
@@ -121,7 +121,13 @@ impl Strategy {
         match self {
             Self::First => true,
             Self::GrowingInterval { max } => {
-                let timestamp = architus_id::millisecond_ts();
+                let timestamp: u64 = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_millis()
+                    .try_into()
+                    .expect("System time could not fit into u64");
+
                 // Construct the interval based on how much time has elapsed
                 // since the start
                 let ratio: f64 = max.as_secs_f64() / search.max_duration().as_secs_f64();
@@ -148,8 +154,14 @@ pub async fn get_entry<P>(client: &Client, search: SearchQuery<P>) -> Result<Aud
 where
     P: Fn(&AuditLogEntry) -> bool,
 {
+    let start: u64 = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis()
+        .try_into()
+        .expect("System time could not fit into u64");
+
     let mut backoff = search.make_backoff();
-    let start = architus_id::millisecond_ts();
     let timing = SearchTiming {
         start,
         target: search.target_timestamp.unwrap_or(start),

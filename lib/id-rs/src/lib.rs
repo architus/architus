@@ -29,18 +29,6 @@ pub mod snowflake {
     }
 }
 
-/// Gives a millisecond Unix timestamp.
-/// Internally panics if the system time is past approximately year 584,556,019 :)
-#[must_use]
-pub fn millisecond_ts() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_millis()
-        .try_into()
-        .expect("System time past year 584,556,019")
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum Type {
     LogEvent,
@@ -113,7 +101,7 @@ fn ms_timestamp_to_ksuid_timestamp(ms_timestamp: u64) -> Result<u32, WithTsError
                 original: ms_timestamp,
                 converted_timestamp: ksuid_timestamp_u64,
             })?;
-        
+
     Ok(ksuid_timestamp)
 }
 

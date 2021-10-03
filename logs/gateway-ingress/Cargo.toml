@@ -10,7 +10,6 @@ and routes incoming messages to a durable queue backed by RabbitMQ\
 license = "MIT"
 
 [dependencies]
-architus-id = { path = "../../lib/id-rs" }
 architus-amqp-pool = { path = "../../lib/amqp-pool-rs" }
 architus-config-backoff = { path = "../../lib/config-backoff-rs" }
 config = "0.11"

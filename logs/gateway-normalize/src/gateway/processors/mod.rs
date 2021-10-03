@@ -23,13 +23,6 @@ pub fn register_all(fleet: &mut ProcessorFleet) {
     interaction::register_all(fleet);
 }
 
-/// u64 extractor that returns the underlying timestamp for a snowflake-encoded ID
-#[allow(clippy::unnecessary_wraps)]
-#[allow(dead_code)]
-const fn timestamp_from_id(id: u64, _ctx: &ProcessorContext<'_>) -> Result<u64, anyhow::Error> {
-    Ok(architus_id::snowflake::extract_timestamp(id))
-}
-
 /// Extractor function for a `u64` from a JSON string
 fn extract_id(variable: &Variable, _ctx: &ProcessorContext<'_>) -> Result<u64, anyhow::Error> {
     match variable {
