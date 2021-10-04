@@ -1,5 +1,5 @@
 # Elasticsearch index containing the stored log events
-log_index = "logs-events"
+log_index = "architus-logs-events"
 
 # Options related to the GraphQL search API
 [graphql]

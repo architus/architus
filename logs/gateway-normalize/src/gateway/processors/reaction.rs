@@ -69,6 +69,7 @@ fn reaction_add(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
         agent: Some(Agent {
             special_type: Agent::type_from_id(user.id, ctx.config),
             entity: Entity::UserLike(user),
+            webhook_username: None,
         }),
         subject: Some(Entity::Message(Message { id: message_id })),
         auxiliary: match reaction {
@@ -107,6 +108,7 @@ fn reaction_remove(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent>
                 id: user_id,
                 ..UserLike::default()
             }),
+            webhook_username: None,
         }),
         subject: Some(Entity::Message(Message { id: message_id })),
         auxiliary: match reaction {

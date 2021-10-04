@@ -132,14 +132,17 @@ impl Query {
         let mut elasticsearch_params = ElasticsearchParams::from_inputs(&filter, &sort)?;
 
         // Add in the guild id filter
-        elasticsearch_params.add_filter(json!({"match": {"guild_id": context.guild_id}}));
+        elasticsearch_params.add_filter(json!({"term": {"inner.guild_id": context.guild_id}}));
 
         // Add in the channel id filter
         if let Some(channel_id_allowlist) = context.channel_allowlist.as_ref() {
+            let channel_id_allowlist_dsl_should = channel_id_allowlist.iter().map(|channel_id| {
+                json!({"term": {"inner.channel_id": channel_id}})
+            }).collect::<Vec<_>>();
             elasticsearch_params.add_filter(json!({
                 "bool": {
                     "minimum_should_match": 1,
-                    "should": channel_id_allowlist.clone(),
+                    "should": channel_id_allowlist_dsl_should,
                 },
             }));
         }
@@ -400,7 +403,7 @@ impl ElasticsearchParams {
         sort: &Option<EventSortInput>,
     ) -> FieldResult<Self> {
         let mut params = Self::new();
-        params.add_sort(json!({"id": {"order": "desc"}}));
+        params.add_sort(json!({"inner.timestamp": {"order": "desc"}}));
         filter.to_elasticsearch(&mut params)?;
         sort.to_elasticsearch(&mut params)?;
         Ok(params)

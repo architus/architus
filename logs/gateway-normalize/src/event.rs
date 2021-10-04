@@ -8,6 +8,7 @@ use crate::rpc::logs::submission::{
 };
 use std::convert::Into;
 use tonic::{IntoRequest, Request};
+use twilight_model::user::User as DiscordUser;
 
 /// Normalized log event to send to log ingestion
 #[allow(clippy::module_name_repetitions)]
@@ -131,6 +132,11 @@ impl From<NormalizedEvent> for SubmittedEvent {
                     .as_ref()
                     .map_or(AgentSpecialType::Default, |a| a.special_type)
                     as i32,
+                agent_webhook_username: original
+                    .agent
+                    .as_ref()
+                    .and_then(|a| a.webhook_username.clone())
+                    .unwrap_or_else(|| String::from("")),
                 subject_id: original
                     .subject
                     .as_ref()
@@ -213,6 +219,7 @@ pub struct Emoji {
 pub struct Agent {
     pub entity: Entity,
     pub special_type: AgentSpecialType,
+    pub webhook_username: Option<String>,
 }
 
 impl Agent {
@@ -221,6 +228,20 @@ impl Agent {
     pub const fn type_from_id(id: u64, config: &Configuration) -> AgentSpecialType {
         if id == config.bot_user_id {
             AgentSpecialType::Architus
+        } else {
+            AgentSpecialType::Default
+        }
+    }
+
+    /// Attempts to resolve the special type of the agent based on the Discord user.
+    /// Checks to see if the user is the same as Architus
+    pub fn type_from_discord_user(user: &DiscordUser, config: &Configuration) -> AgentSpecialType {
+        if user.id.0 == config.bot_user_id {
+            AgentSpecialType::Architus
+        } else if user.system.unwrap_or(false) {
+            AgentSpecialType::System
+        } else if user.bot {
+            AgentSpecialType::Bot
         } else {
             AgentSpecialType::Default
         }

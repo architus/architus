@@ -57,6 +57,9 @@
           "agent_special_type": {
             "type": "integer"
           },
+          "agent_webhook_username": {
+            "type": "text"
+          },
           "subject_id": {
             "type": "unsigned_long"
           },

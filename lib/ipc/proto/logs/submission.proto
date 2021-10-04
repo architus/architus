@@ -15,7 +15,10 @@ message SubmitIdempotentRequest {
 }
 
 message SubmitIdempotentResponse {
+  // The ID of the submitted log event
   string id = 1;
+  // Whether or not the event already existed in the log event store
+  bool was_duplicate = 2;
 }
 
 message SubmittedEvent {

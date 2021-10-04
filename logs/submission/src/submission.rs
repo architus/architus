@@ -9,6 +9,7 @@ use crate::rpc::logs::event::Event as ProtoEvent;
 use crate::rpc::logs_submission_schema::StoredEvent;
 use anyhow::Context;
 use bytes::Bytes;
+use hyper::StatusCode;
 use slog::Logger;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryInto;
@@ -42,8 +43,16 @@ pub struct Failure {
     pub correlation_id: usize,
 }
 
+/// Public success result variant,
+/// giving details on the successful submission.
+#[derive(Debug, Clone)]
+pub struct Success {
+    pub was_duplicate: bool,
+    pub correlation_id: usize,
+}
+
 /// Ok() contains the correlation id of the submission operation
-pub type OperationResult = Result<usize, Failure>;
+pub type OperationResult = Result<Success, Failure>;
 
 /// Convenience wrapper that attaches an `id` field to an existing type
 struct WithId<T> {
@@ -71,7 +80,7 @@ impl<T> WithId<T> {
 #[derive(Debug, Clone)]
 struct InternalResult {
     id: String,
-    result: Result<(), InternalFailure>,
+    result: Result<InternalSuccess, InternalFailure>,
 }
 
 /// Internal version of `Failure` that does not include `correlation_id`
@@ -79,6 +88,12 @@ struct InternalResult {
 struct InternalFailure {
     pub status: Status,
     pub internal_details: String,
+}
+
+/// Internal version of `Success` that does not include `correlation_id`
+#[derive(Debug, Clone)]
+struct InternalSuccess {
+    pub was_duplicate: bool,
 }
 
 /// Creates the Elasticsearch index before submitting any events
@@ -350,12 +365,27 @@ impl BatchSubmit {
                 BulkItem::Create(action) => {
                     if submitted_ids_set.contains(&action.id) {
                         // The returned ID is valid/expected
+                        let was_duplicate = match action.status {
+                            StatusCode::CREATED => false,
+                            StatusCode::CONFLICT => true,
+                            _ => {
+                                slog::warn!(
+                                    self.logger,
+                                    "elasticsearch bulk API response returned unexpected status code for single operation";
+                                    "document_id" => action.id,
+                                    "status" => ?action.status,
+                                    "error" => ?action.error,
+                                    "submitted_count" => submitted_ids_set.len(),
+                                    "attempted_count" => self.attempted_count,
+                                );
+                                continue;
+                            }
+                        };
+
                         results.push(InternalResult {
                             id: action.id,
-                            result: Ok(()),
+                            result: Ok(InternalSuccess { was_duplicate }),
                         });
-
-                        // TODO handle errors & "already-existed" notification
                     } else {
                         slog::warn!(
                             self.logger,
@@ -445,7 +475,10 @@ impl BatchSubmit {
     #[allow(clippy::missing_const_for_fn)]
     fn finalize_result(&self, internal_result: InternalResult) -> OperationResult {
         match internal_result.result {
-            Ok(_) => Ok(self.correlation_id),
+            Ok(internal_success) => Ok(Success {
+                was_duplicate: internal_success.was_duplicate,
+                correlation_id: self.correlation_id,
+            }),
             Err(internal_failure) => Err(Failure {
                 status: internal_failure.status,
                 internal_details: internal_failure.internal_details,

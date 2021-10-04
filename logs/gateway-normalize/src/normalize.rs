@@ -168,7 +168,9 @@ impl Consumer {
 
         match backoff::future::retry(self.config.rpc_backoff.build(), send).await {
             Ok(response) => {
-                let logger = logger.new(slog::o!("event_id" => response.id));
+                let logger = logger.new(slog::o!(
+                    "event_id" => response.id,
+                    "was_duplicate" => response.was_duplicate));
                 slog::info!(logger, "submitted log event");
                 slog::debug!(logger, "event dump"; "event" => ?event);
                 Ok(())

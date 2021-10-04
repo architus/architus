@@ -247,8 +247,8 @@ impl SubmissionService for SubmissionServiceImpl {
             );
         }
 
-        self.submit_event_inner(id.clone(), Box::new(inner)).await?;
-        Ok(Response::new(SubmitIdempotentResponse { id }))
+        let was_duplicate = self.submit_event_inner(id.clone(), Box::new(inner)).await?;
+        Ok(Response::new(SubmitIdempotentResponse { id, was_duplicate }))
     }
 }
 
@@ -304,7 +304,8 @@ impl SubmissionServiceImpl {
     /// Sends the given proto-submitted Event to the shared channel,
     /// returning Ok(()) once the submission to Elasticsearch has been confirmed.
     /// On failure, returns the appropriate gRPC status.
-    async fn submit_event_inner(&self, id: String, event: Box<Event>) -> Result<(), tonic::Status> {
+/// On success, returns whether the event was duplicate.
+    async fn submit_event_inner(&self, id: String, event: Box<Event>) -> Result<bool, tonic::Status> {
         let logger = self.logger.new(slog::o!("event_id" => id.clone()));
 
         // Create the one shot channel to wait on
@@ -326,29 +327,31 @@ impl SubmissionServiceImpl {
         })?;
 
         let rx_timeout = self.config.submission_wait_timeout;
-        wait_for_notify(rx_timeout, oneshot_rx, logger).await?;
-        Ok(())
+        let was_duplicate = wait_for_notify(rx_timeout, oneshot_rx, logger).await?;
+        Ok(was_duplicate)
     }
 }
 
 /// Waits for a notification to be sent on the given receiver,
 /// using a timeout to return early if durable submission can't be confirmed.
 /// On failure, returns the appropriate gRPC status.
+/// On success, returns whether the event was duplicate.
 async fn wait_for_notify(
     timeout: Duration,
     receiver: oneshot::Receiver<submission::OperationResult>,
     logger: Logger,
-) -> Result<(), tonic::Status> {
+) -> Result<bool, tonic::Status> {
     match tokio::time::timeout(timeout, receiver).await {
         Ok(recv_result) => match recv_result {
             Ok(submit_result) => match submit_result {
-                Ok(correlation_id) => {
+                Ok(success) => {
                     slog::info!(
                         logger,
                         "confirmed durable submission of event";
-                        "correlation_id" => correlation_id,
+                        "correlation_id" => success.correlation_id,
+                        "was_duplicate" => success.was_duplicate,
                     );
-                    Ok(())
+                    Ok(success.was_duplicate)
                 }
                 Err(err) => {
                     slog::warn!(

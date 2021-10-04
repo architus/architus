@@ -44,6 +44,8 @@ message Event {
   // Additional metadata about the content that is indexed in ES
   // and is used to display and index the more structured components of the content
   ContentMetadata content_metadata = 18;
+  // Display username of the webhook that caused the event to occur, if applicable
+  string agent_webhook_username = 19;
 }
 
 // Represents a switchable enum for variably-typed fields in the Event struct

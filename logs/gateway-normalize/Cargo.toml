@@ -37,6 +37,9 @@ chrono = "0.4"
 lapin = "1.7"
 tokio-amqp = "1.0"
 reqwest = { version = "0.11", features = ["json"] }
+unic-segment = "0.9"
+fancy-regex = "0.7"
+url = "2.2"
 
 [dependencies.jmespath]
 git = "https://github.com/jmespath/jmespath.rs"
