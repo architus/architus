@@ -3,11 +3,13 @@
 pub mod api_bindings;
 
 use crate::config::Configuration;
-use ::elasticsearch::http::headers::HeaderMap;
-use ::elasticsearch::http::transport::Transport;
-use ::elasticsearch::http::{Method, StatusCode};
-use ::elasticsearch::indices::IndicesCreateParts;
-use ::elasticsearch::{BulkParts, Elasticsearch, Error as LibError};
+use anyhow::Context as _;
+use elasticsearch::auth::Credentials;
+use elasticsearch::http::headers::HeaderMap;
+use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
+use elasticsearch::http::{Url, Method, StatusCode};
+use elasticsearch::indices::IndicesCreateParts;
+use elasticsearch::{BulkParts, Elasticsearch, Error as LibError};
 use bytes::Bytes;
 use serde::Serialize;
 use slog::Logger;
@@ -24,10 +26,19 @@ pub struct Client {
 /// Note: returning Ok(client) from this function
 /// does not guarantee that the server is reachable;
 /// client.ping() should be called to ensure this is the case.
-pub fn new_client(config: &Configuration, logger: Logger) -> Result<Client, LibError> {
-    let es_path = &config.services.elasticsearch;
-    let es_transport = Transport::single_node(es_path)?;
-    let elasticsearch = Elasticsearch::new(es_transport);
+pub fn new_client(config: &Configuration, logger: Logger) -> anyhow::Result<Client> {
+    let url = &config.elasticsearch.url;
+    let parsed_url = Url::parse(url).context("could not parse Elasticsearch URL")?;
+    let connection_pool = SingleNodeConnectionPool::new(parsed_url);
+    let mut builder = TransportBuilder::new(connection_pool);
+
+    // Add in user authentication if configured
+    if !config.elasticsearch.auth_username.is_empty() {
+        builder = builder.auth(Credentials::Basic(config.elasticsearch.auth_username.clone(), config.elasticsearch.auth_password.clone()));
+    }
+
+    let transport = builder.build().context("could not build Elasticsearch transport")?;
+    let elasticsearch = Elasticsearch::new(transport);
 
     Ok(Client {
         inner: elasticsearch,

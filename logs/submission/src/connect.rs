@@ -49,7 +49,7 @@ pub async fn connect_to_elasticsearch(
     slog::info!(
         logger,
         "connected to Elasticsearch";
-        "path" => &config.services.elasticsearch
+        "url" => &config.elasticsearch.url
     );
     Ok(client)
 }

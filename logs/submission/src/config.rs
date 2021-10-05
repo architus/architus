@@ -13,16 +13,6 @@ use std::time::Duration;
 pub struct Configuration {
     /// The port that the gRPC server listens on
     pub port: u16,
-    /// Collection of external services that this service connects to
-    pub services: Services,
-    /// Parameters for the backoff used to connect to external services during initialization
-    pub initialization_backoff: Backoff,
-    /// Parameters for the backoff used to create the index
-    pub index_creation_backoff: Backoff,
-    /// Parameters for the backoff used to forward events to Elasticsearch
-    pub submission_backoff: Backoff,
-    /// Logging configuration (for service diagnostic logs, not Architus log events)
-    pub logging: TerminalLoggerConfig,
     /// How long to wait for durable submission confirmation
     /// before returning with "deadline exceeded" and encouraging retry
     #[serde(with = "humantime_serde")]
@@ -34,17 +24,37 @@ pub struct Configuration {
     /// that the entire batch will be submitted
     #[serde(with = "humantime_serde")]
     pub debounce_period: Duration,
-    /// Elasticsearch index containing the stored log events
-    pub elasticsearch_index: String,
-    /// Elasticsearch index settings file that corresponds to the logs index
-    pub elasticsearch_index_config_path: PathBuf,
+
+    /// Parameters for the database connection to Elasticsearch
+    pub elasticsearch: Elasticsearch,
+    /// Parameters for the backoff used to connect to external services during initialization
+    pub initialization_backoff: Backoff,
+    /// Parameters for the backoff used to create the index
+    pub index_creation_backoff: Backoff,
+    /// Parameters for the backoff used to forward events to Elasticsearch
+    pub submission_backoff: Backoff,
+    /// Logging configuration (for service diagnostic logs, not Architus log events)
+    pub logging: TerminalLoggerConfig,
 }
 
 /// Collection of external services that this service connects to
 #[derive(Debug, Deserialize, Clone)]
-pub struct Services {
+pub struct Elasticsearch {
     /// URL of the Elasticsearch instance to store log entries in
-    pub elasticsearch: String,
+    pub url: String,
+    /// Elasticsearch index containing the stored log events
+    pub index: String,
+    /// Elasticsearch index settings file that corresponds to the logs index
+    pub index_config_path: PathBuf,
+    /// Username to use when connecting to Elasticsearch.
+    /// If given, this user should have RBAC permissions for:
+    /// - create_doc (to submit log events) for the log event index
+    /// - create_index (to create and configure field mappings) for the log event index
+    /// If empty, then authentication is disabled.
+    pub auth_username: String,
+    /// Password to use when connecting to Elasticsearch.
+    /// Ignored if the user is empty.
+    pub auth_password: String,
 }
 
 impl Configuration {

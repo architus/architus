@@ -104,8 +104,8 @@ pub async fn create_index(
     logger: Logger,
     client: Arc<crate::elasticsearch::Client>,
 ) -> anyhow::Result<()> {
-    let path = &config.elasticsearch_index_config_path;
-    let index = &config.elasticsearch_index;
+    let path = &config.elasticsearch.index_config_path;
+    let index = &config.elasticsearch.index;
 
     slog::info!(
         logger,
@@ -135,14 +135,14 @@ pub async fn create_index(
             slog::info!(
                 logger,
                 "successfully created index in elasticsearch";
-                "elasticsearch_index" => #?&config.elasticsearch_index,
+                "elasticsearch_index" => #?&config.elasticsearch.index,
             );
         }
         Ok(IndexStatus::AlreadyExists) => {
             slog::info!(
                 logger,
                 "index already existed in elasticsearch";
-                "elasticsearch_index" => #?&config.elasticsearch_index,
+                "elasticsearch_index" => #?&config.elasticsearch.index,
             );
         }
         Err(EnsureIndexExistsError::Failed(err)) => {
@@ -334,7 +334,7 @@ impl BatchSubmit {
                     self.logger,
                     "sending to elasticsearch failed all retries";
                     "error" => ?err,
-                    "elasticsearch_index" => &self.config.elasticsearch_index,
+                    "elasticsearch_index" => &self.config.elasticsearch.index,
                     "attempted_count" => self.attempted_count,
                 );
 
@@ -356,7 +356,7 @@ impl BatchSubmit {
         let submitted_ids_set = submitting_ids.into_iter().collect::<BTreeSet<_>>();
         let bulk_future = self
             .elasticsearch
-            .bulk(&self.config.elasticsearch_index, &submitting_operations);
+            .bulk(&self.config.elasticsearch.index, &submitting_operations);
 
         let status = bulk_future.await?;
         let mut results: Vec<InternalResult> = Vec::with_capacity(status.items.len());
@@ -432,7 +432,7 @@ impl BatchSubmit {
                     self.logger,
                     "sending to elasticsearch failed";
                     "error" => ?err,
-                    "elasticsearch_index" => &self.config.elasticsearch_index,
+                    "elasticsearch_index" => &self.config.elasticsearch.index,
                     "submitted_count" => submitted_ids.len(),
                     "attempted_count" => self.attempted_count,
                 );
@@ -447,7 +447,7 @@ impl BatchSubmit {
                     self.logger,
                     "decoding response from elasticsearch failed";
                     "error" => ?err,
-                    "elasticsearch_index" => &self.config.elasticsearch_index,
+                    "elasticsearch_index" => &self.config.elasticsearch.index,
                     "submitted_count" => submitted_ids.len(),
                     "attempted_count" => self.attempted_count,
                 );

@@ -9,14 +9,24 @@ debounce_size = 32
 # The period of time since the oldest event in a batch was enqueued
 # that the entire batch will be submitted
 debounce_period = "100ms"
-# Elasticsearch index containing the stored log events
-elasticsearch_index = "architus-logs-events"
-# Elasticsearch index settings file that corresponds to the logs index
-elasticsearch_index_config_path = "/etc/architus/index_config.json"
 
-[services]
+# Parameters for the database connection to Elasticsearch
+[elasticsearch]
 # URL of the Elasticsearch instance to store log entries in
-elasticsearch = "http://elasticsearch:9200"
+url = "http://elasticsearch:9200"
+# Elasticsearch index containing the stored log events
+index = "architus-logs-events"
+# Elasticsearch index settings file that corresponds to the logs index
+index_config_path = "/etc/architus/index_config.json"
+# Username to use when connecting to Elasticsearch.
+# If given, this user should have RBAC permissions for:
+# - create_doc (to submit log events) for the log event index
+# - create_index (to create and configure field mappings) for the log event index
+# If empty, then authentication is disabled.
+auth_username = ""
+# Password to use when connecting to Elasticsearch.
+# Ignored if the user is empty.
+auth_password = ""
 
 # Parameters for the backoff used to connect to external services during initialization
 [initialization_backoff]
