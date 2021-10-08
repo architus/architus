@@ -3,7 +3,6 @@
 mod config;
 mod connect;
 mod elasticsearch;
-mod event;
 mod fairings;
 mod graphql;
 mod rpc;
@@ -64,7 +63,7 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     let elasticsearch =
         Arc::new(connect::connect_to_elasticsearch(Arc::clone(&config), logger.clone()).await?);
 
-    let search = SearchProvider::new(&elasticsearch, Arc::clone(&config), logger.clone());
+    let search = SearchProvider::new(Arc::clone(&elasticsearch), Arc::clone(&config));
     rocket::custom(config.rocket.clone())
         .manage(search)
         .mount("/", rocket::routes![playground, post_graphql, get_graphql])
@@ -93,11 +92,18 @@ async fn post_graphql(
     guild_id: u64,
     search: &State<SearchProvider>,
     request: Option<juniper_rocket::GraphQLRequest>,
+    logger: fairings::attach_logger::RequestLogger,
 ) -> Result<juniper_rocket::GraphQLResponse, BadRequest<Json<ApiError>>> {
     match request {
-        Some(request) => Ok(request
-            .execute(search.schema(), &search.context(guild_id, None))
-            .await),
+        Some(request) => {
+            let context = search.context(
+                guild_id,
+                None,
+                logger.0.new(slog::o!("guild_id" => guild_id)),
+            );
+            let response = request.execute(search.schema(), &context).await;
+            Ok(response)
+        }
         None => Err(BadRequest(Some(Json(ApiError {
             message: String::from("route requires JSON GraphQL request as body"),
         })))),
@@ -109,11 +115,18 @@ async fn get_graphql(
     guild_id: u64,
     search: &State<SearchProvider>,
     request: Option<juniper_rocket::GraphQLRequest>,
+    logger: fairings::attach_logger::RequestLogger,
 ) -> Result<juniper_rocket::GraphQLResponse, BadRequest<Json<ApiError>>> {
     match request {
-        Some(request) => Ok(request
-            .execute(search.schema(), &search.context(guild_id, None))
-            .await),
+        Some(request) => {
+            let context = search.context(
+                guild_id,
+                None,
+                logger.0.new(slog::o!("guild_id" => guild_id)),
+            );
+            let response = request.execute(search.schema(), &context).await;
+            Ok(response)
+        }
         None => Err(BadRequest(Some(Json(ApiError {
             message: String::from(
                 "route requires JSON GraphQL request as 'request?' query parameter",

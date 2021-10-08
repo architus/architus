@@ -42,7 +42,8 @@ pub struct Configuration {
 pub struct Elasticsearch {
     /// URL of the Elasticsearch instance to store log entries in
     pub url: String,
-    /// Elasticsearch index containing the stored log events
+    /// Elasticsearch index containing the stored log events.
+    /// If it doesn't exist, this service will automatically create/configure it.
     pub index: String,
     /// Elasticsearch index settings file that corresponds to the logs index
     pub index_config_path: PathBuf,

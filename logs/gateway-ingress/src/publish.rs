@@ -48,7 +48,6 @@ pub struct Publisher {
 impl Publisher {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(queue_connection: Connection, config: Arc<Configuration>, logger: Logger) -> Self {
-        let logger = logger.new(slog::o!("max_queue_length" => config.raw_events.queue_length));
         let (reconnect_tx, reconnect_rx) = mpsc::unbounded_channel::<ReconnectRequest>();
         Self {
             config: Arc::clone(&config),
@@ -90,6 +89,7 @@ impl Publisher {
     async fn publish_event(&self, event: GatewayEvent) {
         let logger = self.logger.new(slog::o!(
             "event_timestamp" => event.ingress_timestamp,
+            "event_type" => event.event_type.clone(),
             "guild_id" => event.guild_id,
         ));
 
@@ -315,32 +315,18 @@ impl HandleFactory {
         match &mut *state_handle {
             HandleFactoryState::Connected { generation, .. } => {
                 // This shouldn't be possible; just log and ignore
-                let logger = self.logger.new(slog::o!(
+                slog::warn!(
+                    self.logger,
+                    "invariant violated: HandleFactoryState marked as connected before background reconnect loop ready to signal reconnect";
                     "planned_next_generation" => next_generation,
                     "current_generation" => *generation,
-                ));
-                slog::warn!(
-                    logger,
-                    "invariant violated: HandleFactoryState marked as connected before background reconnect loop ready to signal reconnect";
                 );
-
-                // Sending is OK even with the lock is acquired,
-                // because listeners will re-acquire the lock before returning successfully
-                if let Err(send_err) = ready_tx.send(()) {
-                    slog::warn!(
-                        logger,
-                        "could not send ready message to listeners; all receivers dropped";
-                        "error" => ?send_err,
-                    );
-                }
             }
             HandleFactoryState::Connecting { .. } => {
-                let logger = self
-                    .logger
-                    .new(slog::o!("next_generation" => next_generation));
                 slog::info!(
-                    logger,
-                    "reconnected to RabbitMQ; bumping generation and notifying listeners"
+                    self.logger,
+                    "reconnected to RabbitMQ; bumping generation and notifying listeners";
+                    "next_generation" => next_generation,
                 );
 
                 // Update the state
@@ -348,18 +334,13 @@ impl HandleFactory {
                     pool: Arc::new(channel_pool),
                     generation: next_generation,
                 };
-
-                // Sending is OK even with the lock is acquired,
-                // because listeners will re-acquire the lock before returning successfully
-                if let Err(send_err) = ready_tx.send(()) {
-                    slog::warn!(
-                        logger,
-                        "could not send ready message to listeners; all receivers dropped";
-                        "error" => ?send_err,
-                    );
-                }
             }
         }
+
+        // Sending is OK even with the lock is acquired,
+        // because listeners will re-acquire the lock before returning successfully.
+        // Ignore the result; it's ok even if there are no listeners
+        let _ = ready_tx.send(());
     }
 
     /// Repeatedly attempts to reconnect to the message queue.
@@ -526,6 +507,7 @@ impl Handle {
                 inner: err,
             })?;
 
+        slog::info!(self.logger, "published event to gateway queue");
         Ok(())
     }
 }

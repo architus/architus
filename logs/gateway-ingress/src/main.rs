@@ -133,7 +133,27 @@ impl GatewayIngress {
                 .expect("System time could not fit into u64");
 
             match crate::filter::try_convert_raw_event(raw_event, time_ms) {
-                Ok(event_option) => event_option,
+                Ok(event_option) => {
+                    match &event_option {
+                        Some(event) => {
+                            slog::debug!(
+                                self.logger,
+                                "got event from gateway";
+                                "guild_id" => event.guild_id,
+                                "event_timestamp" => event.ingress_timestamp,
+                                "event_type" => &event.event_type,
+                            );
+                        },
+                        None => {
+                            slog::debug!(
+                                self.logger,
+                                "got event from gateway but dropping";
+                                "event_timestamp" => time_ms,
+                            );
+                        },
+                    }
+                    event_option
+                },
                 Err(err) => {
                     err.log(&self.logger);
                     None
@@ -143,10 +163,23 @@ impl GatewayIngress {
 
         // Filter events by whether or not the guild has indexing enabled
         // (which is the same as being considered "active")
-        let filtered_event_stream = converted_event_stream.filter(|event| {
-            let guild_id = event.guild_id;
+        let filtered_event_stream = converted_event_stream.filter_map(|event| async {
+            // ActiveGuilds::is_active requires `Arc<Self>` as the method target
+            // (to ensure a valid self-access even if this future is dropped),
+            // so we need to clone it before calling the method.
             let active_guilds = Arc::clone(&self.active_guilds);
-            async move { active_guilds.is_active(guild_id).await }
+            if active_guilds.is_active(event.guild_id).await {
+                Some(event)
+            } else {
+                slog::debug!(
+                    self.logger,
+                    "dropping event due to guild not being active";
+                    "guild_id" => event.guild_id,
+                    "event_timestamp" => event.ingress_timestamp,
+                    "event_type" => &event.event_type,
+                );
+                None
+            }
         });
 
         let (event_bounded_queue, bounded_event_stream) = queue::BoundedQueue::<GatewayEvent>::new(

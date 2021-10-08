@@ -1,5 +1,18 @@
-# Elasticsearch index containing the stored log events
-log_index = "architus-logs-events"
+# Parameters for the database connection to Elasticsearch
+[elasticsearch]
+# URL of the Elasticsearch instance to search log entries from
+url = "http://elasticsearch:9200"
+# Elasticsearch index containing the stored log events.
+# This should already exist; this service will not create it.
+index = "architus-logs-events"
+# Username to use when connecting to Elasticsearch.
+# If given, this user should have RBAC permissions for:
+# - read (to search log events) for the log event index
+# If empty, then authentication is disabled.
+auth_username = ""
+# Password to use when connecting to Elasticsearch.
+# Ignored if the user is empty.
+auth_password = ""
 
 # Options related to the GraphQL search API
 [graphql]
@@ -16,10 +29,6 @@ max_page_size = 500
 # This should be resolved via UX design on the frontend
 # https://www.elastic.co/guide/en/elasticsearch/reference/7.10/paginate-search-results.html
 max_pagination_amount = 5000
-
-[services]
-# URL of the Elasticsearch instance to search log entries from
-elasticsearch = "http://elasticsearch:9200"
 
 # Parameters for the backoff used to connect to external services during initialization
 [initialization_backoff]

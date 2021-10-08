@@ -9,10 +9,7 @@ use std::convert::TryFrom;
 #[allow(clippy::module_name_repetitions)]
 pub struct GraphQLJson(pub serde_json::Value);
 
-#[juniper::graphql_scalar(
-    name = "Json",
-    description = "An opaque identifier, represented as a string"
-)]
+#[juniper::graphql_scalar(name = "Json", description = "Arbitrary JSON content")]
 impl<S> GraphQLScalar for GraphQLJson
 where
     S: juniper::ScalarValue,

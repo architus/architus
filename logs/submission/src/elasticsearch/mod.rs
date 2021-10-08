@@ -4,13 +4,13 @@ pub mod api_bindings;
 
 use crate::config::Configuration;
 use anyhow::Context as _;
+use bytes::Bytes;
 use elasticsearch::auth::Credentials;
 use elasticsearch::http::headers::HeaderMap;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
-use elasticsearch::http::{Url, Method, StatusCode};
+use elasticsearch::http::{Method, StatusCode, Url};
 use elasticsearch::indices::IndicesCreateParts;
 use elasticsearch::{BulkParts, Elasticsearch, Error as LibError};
-use bytes::Bytes;
 use serde::Serialize;
 use slog::Logger;
 use std::iter::IntoIterator;
@@ -34,10 +34,15 @@ pub fn new_client(config: &Configuration, logger: Logger) -> anyhow::Result<Clie
 
     // Add in user authentication if configured
     if !config.elasticsearch.auth_username.is_empty() {
-        builder = builder.auth(Credentials::Basic(config.elasticsearch.auth_username.clone(), config.elasticsearch.auth_password.clone()));
+        builder = builder.auth(Credentials::Basic(
+            config.elasticsearch.auth_username.clone(),
+            config.elasticsearch.auth_password.clone(),
+        ));
     }
 
-    let transport = builder.build().context("could not build Elasticsearch transport")?;
+    let transport = builder
+        .build()
+        .context("could not build Elasticsearch transport")?;
     let elasticsearch = Elasticsearch::new(transport);
 
     Ok(Client {
@@ -248,15 +253,13 @@ impl Client {
             .bulk(BulkParts::Index(index_ref))
             .body(operations)
             .send();
-        match bulk_future.await {
-            Ok(response) => {
-                // Try to decode the response body using the hand-made bindings
-                match response.json::<api_bindings::bulk::Response>().await {
-                    Ok(response_struct) => Ok(self.convert_to_status(response_struct)),
-                    Err(decode_err) => return Err(BulkError::FailedToDecode(decode_err)),
-                }
-            }
-            Err(err) => return Err(BulkError::Failure(err)),
+
+        let response = bulk_future.await.map_err(BulkError::Failure)?;
+
+        // Try to decode the response body using the hand-made bindings
+        match response.json::<api_bindings::bulk::Response>().await {
+            Ok(response_struct) => Ok(self.convert_to_status(response_struct)),
+            Err(decode_err) => Err(BulkError::FailedToDecode(decode_err)),
         }
     }
 

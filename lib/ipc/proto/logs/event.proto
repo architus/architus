@@ -28,24 +28,24 @@ message Event {
   EntityType agent_type = 11;
   // Display type of the entity that caused the event to occur, if applicable
   AgentSpecialType agent_special_type = 12;
+  // Display username of the webhook that caused the event to occur, if applicable
+  string agent_webhook_username = 13;
   // Id of the entity that the event is about/affects, if applicable
-  fixed64 subject_id = 13;
+  fixed64 subject_id = 14;
   // Type of the entity wi1th the id in `subject_id`
-  EntityType subject_type = 14;
+  EntityType subject_type = 15;
   // Id of some other related entity involved in the event, if applicable
-  fixed64 auxiliary_id = 15;
+  fixed64 auxiliary_id = 16;
   // Type of the entity with the id in `auxiliary_id`
-  EntityType auxiliary_type = 16;
+  EntityType auxiliary_type = 17;
   // Rich-formatted content that includes markdown and mention-syntax,
   // also includes color-embed extension support.
   // Used in the frontend as the primary textual display of the event
   // Indexed in ES as text using the standard analyzer
-  string content = 17;
+  string content = 18;
   // Additional metadata about the content that is indexed in ES
   // and is used to display and index the more structured components of the content
-  ContentMetadata content_metadata = 18;
-  // Display username of the webhook that caused the event to occur, if applicable
-  string agent_webhook_username = 19;
+  ContentMetadata content_metadata = 19;
 }
 
 // Represents a switchable enum for variably-typed fields in the Event struct

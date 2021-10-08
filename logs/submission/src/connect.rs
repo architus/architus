@@ -1,5 +1,5 @@
 //! Contains utility functions that connect to external services,
-//! used during service initialization and during potential reconnection
+//! used during service initialization
 
 use crate::config::Configuration;
 use crate::elasticsearch::{Client, PingError};
@@ -16,7 +16,6 @@ pub async fn connect_to_elasticsearch(
     let client = crate::elasticsearch::new_client(&config, logger.clone())
         .context("could not create elasticsearch client")?;
 
-    // TODO configure elasticsearch password & permissions
     let initialization_backoff = config.initialization_backoff.build();
     let ping_elasticsearch = || async {
         match client.ping().await {

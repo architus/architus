@@ -248,7 +248,10 @@ impl SubmissionService for SubmissionServiceImpl {
         }
 
         let was_duplicate = self.submit_event_inner(id.clone(), Box::new(inner)).await?;
-        Ok(Response::new(SubmitIdempotentResponse { id, was_duplicate }))
+        Ok(Response::new(SubmitIdempotentResponse {
+            id,
+            was_duplicate,
+        }))
     }
 }
 
@@ -268,7 +271,6 @@ impl SubmissionServiceImpl {
     /// Sends revision metadata to the revision microservice.
     /// This is used to track entity revision metadata over time
     /// to enhance the frontend's display of entities.
-    /// TODO: implement; this function is a stub
     async fn send_revision_metadata(
         &self,
         _event: &Event,
@@ -287,7 +289,7 @@ impl SubmissionServiceImpl {
             || auxiliary_metadata.is_some()
             || subject_metadata.is_some()
         {
-            // TODO implement once revision service has been created
+            // TODO(jazevedo620) implement once revision service has been created
             slog::debug!(
                 self.logger,
                 "event contained valid revision data";
@@ -304,9 +306,18 @@ impl SubmissionServiceImpl {
     /// Sends the given proto-submitted Event to the shared channel,
     /// returning Ok(()) once the submission to Elasticsearch has been confirmed.
     /// On failure, returns the appropriate gRPC status.
-/// On success, returns whether the event was duplicate.
-    async fn submit_event_inner(&self, id: String, event: Box<Event>) -> Result<bool, tonic::Status> {
-        let logger = self.logger.new(slog::o!("event_id" => id.clone()));
+    /// On success, returns whether the event was duplicate.
+    async fn submit_event_inner(
+        &self,
+        id: String,
+        event: Box<Event>,
+    ) -> Result<bool, tonic::Status> {
+        let logger = self.logger.new(slog::o!(
+            "event_id" => id.clone(),
+            "event_timestamp" => event.timestamp,
+            "guild_id" => event.guild_id,
+            "event_type" => event.r#type,
+        ));
 
         // Create the one shot channel to wait on
         let (oneshot_tx, oneshot_rx) = oneshot::channel::<submission::OperationResult>();

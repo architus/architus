@@ -14,7 +14,8 @@ debounce_period = "100ms"
 [elasticsearch]
 # URL of the Elasticsearch instance to store log entries in
 url = "http://elasticsearch:9200"
-# Elasticsearch index containing the stored log events
+# Elasticsearch index containing the stored log events.
+# If it doesn't exist, this service will automatically create/configure it.
 index = "architus-logs-events"
 # Elasticsearch index settings file that corresponds to the logs index
 index_config_path = "/etc/architus/index_config.json"

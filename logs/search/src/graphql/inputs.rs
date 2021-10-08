@@ -1,104 +1,22 @@
-use crate::graphql::{ElasticsearchParams, QueryInput};
-use crate::rpc::logs::event::{AgentSpecialType, EntityType, EventOrigin, EventType};
+use crate::elasticsearch::filters::{
+    EmptyFilter, ExactSetFilter, IdFilter, IdSetFilter, RangeFilter, SetFilter, TermFilter,
+    TextFilter, WildcardFilter,
+};
+use crate::elasticsearch::SearchParams;
+use crate::graphql::enums::FilterableEnum;
 use juniper::{graphql_value, FieldError, FieldResult};
-use serde_json::json;
 use std::str::FromStr;
 
-/// Filter input object that allows for filtering the results of `allEvent`
-#[derive(juniper::GraphQLInputObject)]
-pub struct EventFilterInput {
-    id: Option<IdFilterInput>,
-    timestamp: Option<UIntStringFilterInput>,
-    origin: Option<EnumFilterInput>,
-    r#type: Option<EnumFilterInput>,
-    guild_id: Option<UIntStringFilterInput>,
-    reason: Option<TextOptionFilterInput>,
-    audit_log_id: Option<UIntStringOptionFilterInput>,
-    channel_id: Option<UIntStringOptionFilterInput>,
-    agent_id: Option<UIntStringOptionFilterInput>,
-    agent_type: Option<EnumFilterInput>,
-    agent_special_type: Option<EnumFilterInput>,
-    subject_id: Option<UIntStringOptionFilterInput>,
-    subject_type: Option<EnumFilterInput>,
-    auxiliary_id: Option<UIntStringOptionFilterInput>,
-    auxiliary_type: Option<EnumFilterInput>,
-    content: Option<TextOptionFilterInput>,
-    // TODO implement content metadata filter
+pub trait QueryInput {
+    fn to_elasticsearch(&self, params: &mut SearchParams) -> FieldResult<()>;
 }
 
-impl QueryInput for EventFilterInput {
-    fn to_elasticsearch(&self, params: &mut ElasticsearchParams) -> FieldResult<()> {
-        self.id.to_elasticsearch(params)?;
-        self.timestamp
-            .as_ref()
-            .map(|filter| filter.apply(params, "inner.timestamp"))
-            .transpose()?;
-        self.origin
-            .as_ref()
-            .map(|filter| filter.apply::<EventOrigin>(params, "inner.origin"))
-            .transpose()?;
-        self.r#type
-            .as_ref()
-            .map(|filter| filter.apply::<EventType>(params, "inner.type"))
-            .transpose()?;
-        self.guild_id
-            .as_ref()
-            .map(|filter| filter.apply(params, "inner.guild_id"))
-            .transpose()?;
-        // TODO add reason filter application
-        self.audit_log_id
-            .as_ref()
-            .map(|filter| filter.apply(params, "inner.audit_log_id"))
-            .transpose()?;
-        self.channel_id
-            .as_ref()
-            .map(|filter| filter.apply(params, "inner.channel_id"))
-            .transpose()?;
-        self.agent_id
-            .as_ref()
-            .map(|filter| filter.apply(params, "inner.agent_id"))
-            .transpose()?;
-        self.agent_type
-            .as_ref()
-            .map(|filter| filter.apply::<EntityType>(params, "inner.agent_type"))
-            .transpose()?;
-        self.agent_special_type
-            .as_ref()
-            .map(|filter| filter.apply::<AgentSpecialType>(params, "inner.agent_special_type"))
-            .transpose()?;
-        self.subject_id
-            .as_ref()
-            .map(|filter| filter.apply(params, "inner.subject_id"))
-            .transpose()?;
-        self.subject_type
-            .as_ref()
-            .map(|filter| filter.apply::<EntityType>(params, "inner.subject_type"))
-            .transpose()?;
-        self.auxiliary_id
-            .as_ref()
-            .map(|filter| filter.apply(params, "inner.auxiliary_id"))
-            .transpose()?;
-        self.auxiliary_type
-            .as_ref()
-            .map(|filter| filter.apply::<EntityType>(params, "inner.auxiliary_type"))
-            .transpose()?;
-        // TODO add content filter application
-        // TODO add content metadata filter application
+impl<T: QueryInput> QueryInput for Option<T> {
+    fn to_elasticsearch(&self, params: &mut SearchParams) -> FieldResult<()> {
+        if let Some(inner_value) = self {
+            inner_value.to_elasticsearch(params)?;
+        }
 
-        Ok(())
-    }
-}
-
-/// Sort input object that allows for sorting the results of `allEvent`
-#[derive(juniper::GraphQLInputObject)]
-pub struct EventSortInput {
-    // TODO use real input fields
-    id: Option<i32>,
-}
-
-impl QueryInput for EventSortInput {
-    fn to_elasticsearch(&self, _params: &mut ElasticsearchParams) -> FieldResult<()> {
-        // TODO implement
         Ok(())
     }
 }
@@ -118,6 +36,14 @@ fn parse_uint_string(s: impl AsRef<str>) -> FieldResult<u64> {
     })
 }
 
+/// Parses a slice of uint strings into the actual u64 values, or returns a `FieldError`
+fn parse_uint_string_slice(slice: &[impl AsRef<str>]) -> FieldResult<Vec<u64>> {
+    slice
+        .iter()
+        .map(parse_uint_string)
+        .collect::<FieldResult<Vec<_>>>()
+}
+
 /// Filter input object that allows for the filtering of an unsigned integer value
 /// (represented in the schema as a String)
 #[derive(juniper::GraphQLInputObject)]
@@ -129,101 +55,60 @@ pub struct UIntStringFilterInput {
     lt: Option<String>,
     lte: Option<String>,
     #[graphql(name = "in")]
-    in_set: Option<Vec<String>>,
+    r#in: Option<Vec<String>>,
     nin: Option<Vec<String>>,
 }
 
 impl UIntStringFilterInput {
-    fn apply(
-        &self,
-        params: &mut ElasticsearchParams,
-        field_name: impl AsRef<str>,
-    ) -> FieldResult<()> {
+    pub fn apply(&self, params: &mut SearchParams, field_name: impl AsRef<str>) -> FieldResult<()> {
         let field_name = field_name.as_ref();
-        if let Some(eq) = self.eq.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
-            params.add_filter(json!({
-                "term": {
-                    String::from(field_name): {
-                        "value": eq,
-                    }
-                }
-            }));
-        }
-        if let Some(ne) = self.ne.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
-            params.add_anti_filter(json!({
-                "term": {
-                    String::from(field_name): {
-                        "value": ne,
-                    }
-                }
-            }));
-        }
-        if let Some(gt) = self.gt.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    String::from(field_name): {
-                        "gt": gt,
-                    }
-                }
-            }));
-        }
-        if let Some(gte) = self.gte.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    String::from(field_name): {
-                        "gte": gte,
-                    }
-                }
-            }));
-        }
-        if let Some(lt) = self.lt.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    String::from(field_name): {
-                        "lt": lt,
-                    }
-                }
-            }));
-        }
-        if let Some(lte) = self.lte.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    String::from(field_name): {
-                        "lte": lte,
-                    }
-                }
-            }));
-        }
-        if let Some(in_set) = self.in_set.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
-            let in_set = in_set
-                .iter()
-                .map(parse_uint_string)
-                .collect::<FieldResult<Vec<_>>>()?;
-            params.add_filter(json!({
-                "terms": {
-                    String::from(field_name): in_set,
-                }
-            }));
-        }
-        if let Some(nin) = self.nin.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
-            let nin = nin
-                .iter()
-                .map(parse_uint_string)
-                .collect::<FieldResult<Vec<_>>>()?;
-            params.add_anti_filter(json!({
-                "terms": {
-                    String::from(field_name): nin,
-                }
-            }));
-        }
+
+        TermFilter::EqualTo.apply(
+            self.eq.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        TermFilter::NotEqualTo.apply(
+            self.ne.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        RangeFilter::GreaterThan.apply(
+            self.gt.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        RangeFilter::GreaterThanOrEqualTo.apply(
+            self.gte.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        RangeFilter::LessThan.apply(
+            self.lt.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        RangeFilter::LessThanOrEqualTo.apply(
+            self.lte.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        SetFilter::In.apply(
+            self.r#in
+                .as_ref()
+                .map(|v| parse_uint_string_slice(&v))
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+        SetFilter::NotIn.apply(
+            self.nin
+                .as_ref()
+                .map(|v| parse_uint_string_slice(&v))
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
 
         Ok(())
     }
@@ -235,128 +120,55 @@ impl UIntStringFilterInput {
 pub struct IdFilterInput {
     eq: Option<String>,
     ne: Option<String>,
-    gt: Option<String>,
-    gte: Option<String>,
-    lt: Option<String>,
-    lte: Option<String>,
     #[graphql(name = "in")]
-    in_set: Option<Vec<String>>,
+    r#in: Option<Vec<String>>,
     nin: Option<Vec<String>>,
 }
 
 impl QueryInput for IdFilterInput {
-    fn to_elasticsearch(&self, params: &mut ElasticsearchParams) -> FieldResult<()> {
-        if let Some(eq) = self.eq.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-ids-query.html
-            params.add_filter(json!({
-                "term": {
-                    "ids": {
-                        "values": [eq],
-                    }
-                }
-            }));
+    fn to_elasticsearch(&self, params: &mut SearchParams) -> FieldResult<()> {
+        // Ensure each filter doesn't contain empty values
+        if self.eq.as_ref().map(String::is_empty).unwrap_or(false) {
+            return Err(FieldError::new(
+                "id.eq filter cannot contain empty values",
+                graphql_value!({"source": "IdFilterInput"}),
+            ));
         }
-        if let Some(ne) = self.ne.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-ids-query.html
-            params.add_anti_filter(json!({
-                "term": {
-                    "ids": {
-                        "values": [ne],
-                    }
-                }
-            }));
+        if self.ne.as_ref().map(String::is_empty).unwrap_or(false) {
+            return Err(FieldError::new(
+                "id.ne filter cannot contain empty values",
+                graphql_value!({"source": "IdFilterInput"}),
+            ));
         }
-        if let Some(gt) = self.gt.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    "id": {
-                        "gt": gt,
-                    }
-                }
-            }));
+        if self
+            .r#in
+            .as_ref()
+            .map(|s| s.iter().any(String::is_empty))
+            .unwrap_or(false)
+        {
+            return Err(FieldError::new(
+                "id.in filter cannot contain empty values",
+                graphql_value!({"source": "IdFilterInput"}),
+            ));
         }
-        if let Some(gte) = self.gte.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    "id": {
-                        "gte": gte,
-                    }
-                }
-            }));
+        if self
+            .nin
+            .as_ref()
+            .map(|s| s.iter().any(String::is_empty))
+            .unwrap_or(false)
+        {
+            return Err(FieldError::new(
+                "id.nin filter cannot contain empty values",
+                graphql_value!({"source": "IdFilterInput"}),
+            ));
         }
-        if let Some(lt) = self.lt.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    "id": {
-                        "lt": lt,
-                    }
-                }
-            }));
-        }
-        if let Some(lte) = self.lte.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    "id": {
-                        "lte": lte,
-                    }
-                }
-            }));
-        }
-        if let Some(in_set) = self.in_set.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-ids-query.html
-            params.add_filter(json!({
-                "term": {
-                    "ids": {
-                        "values": in_set,
-                    }
-                }
-            }));
-        }
-        if let Some(nin) = self.nin.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-ids-query.html
-            params.add_anti_filter(json!({
-                "term": {
-                    "ids": {
-                        "values": nin,
-                    }
-                }
-            }));
-        }
+
+        IdFilter::EqualTo.apply(self.eq.clone(), params);
+        IdFilter::NotEqualTo.apply(self.ne.clone(), params);
+        IdSetFilter::In.apply(self.r#in.clone(), params);
+        IdSetFilter::NotIn.apply(self.nin.clone(), params);
 
         Ok(())
-    }
-}
-
-/// Represents a trait over the numeric cast for field-less enum discriminants
-trait FilterableEnum {
-    fn discriminant(&self) -> i32;
-}
-
-impl FilterableEnum for EventType {
-    fn discriminant(&self) -> i32 {
-        *self as i32
-    }
-}
-
-impl FilterableEnum for EventOrigin {
-    fn discriminant(&self) -> i32 {
-        *self as i32
-    }
-}
-
-impl FilterableEnum for EntityType {
-    fn discriminant(&self) -> i32 {
-        *self as i32
-    }
-}
-
-impl FilterableEnum for AgentSpecialType {
-    fn discriminant(&self) -> i32 {
-        *self as i32
     }
 }
 
@@ -367,7 +179,7 @@ pub struct EnumFilterInput {
     eq: Option<String>,
     ne: Option<String>,
     #[graphql(name = "in")]
-    in_set: Option<Vec<String>>,
+    r#in: Option<Vec<String>>,
     nin: Option<Vec<String>>,
 }
 
@@ -399,65 +211,51 @@ impl EnumFilterInput {
         }
     }
 
-    fn apply<T>(&self, params: &mut ElasticsearchParams, field_name: &str) -> FieldResult<()>
+    pub fn apply<T>(&self, params: &mut SearchParams, field_name: &str) -> FieldResult<()>
     where
         T: FilterableEnum + FromStr,
         <T as FromStr>::Err: std::fmt::Debug,
     {
-        if let Some(eq) = self
-            .eq
-            .as_ref()
-            .map(Self::try_convert::<_, T>)
-            .transpose()?
-        {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
-            params.add_filter(json!({
-                "term": {
-                    String::from(field_name): {
-                        "value": eq,
-                    }
-                }
-            }));
-        }
-        if let Some(ne) = self
-            .ne
-            .as_ref()
-            .map(Self::try_convert::<_, T>)
-            .transpose()?
-        {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
-            params.add_anti_filter(json!({
-                "term": {
-                    String::from(field_name): {
-                        "value": ne,
-                    }
-                }
-            }));
-        }
-        if let Some(in_set) = self.in_set.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
-            let in_set = in_set
-                .iter()
+        TermFilter::EqualTo.apply(
+            self.eq
+                .as_ref()
                 .map(Self::try_convert::<_, T>)
-                .collect::<FieldResult<Vec<_>>>()?;
-            params.add_filter(json!({
-                "terms": {
-                    String::from(field_name): in_set,
-                }
-            }));
-        }
-        if let Some(nin) = self.nin.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
-            let nin = nin
-                .iter()
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+        TermFilter::NotEqualTo.apply(
+            self.ne
+                .as_ref()
                 .map(Self::try_convert::<_, T>)
-                .collect::<FieldResult<Vec<_>>>()?;
-            params.add_anti_filter(json!({
-                "terms": {
-                    String::from(field_name): nin,
-                }
-            }));
-        }
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+        SetFilter::In.apply(
+            self.r#in
+                .as_ref()
+                .map(|v| {
+                    v.iter()
+                        .map(Self::try_convert::<_, T>)
+                        .collect::<FieldResult<Vec<_>>>()
+                })
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+        SetFilter::NotIn.apply(
+            self.nin
+                .as_ref()
+                .map(|v| {
+                    v.iter()
+                        .map(Self::try_convert::<_, T>)
+                        .collect::<FieldResult<Vec<_>>>()
+                })
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
 
         Ok(())
     }
@@ -474,133 +272,231 @@ pub struct UIntStringOptionFilterInput {
     lt: Option<String>,
     lte: Option<String>,
     #[graphql(name = "in")]
-    in_set: Option<Vec<String>>,
+    r#in: Option<Vec<String>>,
     nin: Option<Vec<String>>,
     present: Option<bool>,
     absent: Option<bool>,
 }
 
 impl UIntStringOptionFilterInput {
-    fn apply(
-        &self,
-        params: &mut ElasticsearchParams,
-        field_name: impl AsRef<str>,
-    ) -> FieldResult<()> {
+    pub fn apply(&self, params: &mut SearchParams, field_name: impl AsRef<str>) -> FieldResult<()> {
         let field_name = field_name.as_ref();
-        if let Some(eq) = self.eq.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
-            params.add_filter(json!({
-                "term": {
-                    String::from(field_name): {
-                        "value": eq,
-                    }
-                }
-            }));
-        }
-        if let Some(ne) = self.ne.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-term-query.html
-            params.add_anti_filter(json!({
-                "term": {
-                    String::from(field_name): {
-                        "value": ne,
-                    }
-                }
-            }));
-        }
-        if let Some(gt) = self.gt.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    String::from(field_name): {
-                        "gt": gt,
-                    }
-                }
-            }));
-        }
-        if let Some(gte) = self.gte.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    String::from(field_name): {
-                        "gte": gte,
-                    }
-                }
-            }));
-        }
-        if let Some(lt) = self.lt.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    String::from(field_name): {
-                        "lt": lt,
-                    }
-                }
-            }));
-        }
-        if let Some(lte) = self.lte.as_ref().map(parse_uint_string).transpose()? {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-range-query.html
-            params.add_filter(json!({
-                "range": {
-                    String::from(field_name): {
-                        "lte": lte,
-                    }
-                }
-            }));
-        }
-        if let Some(in_set) = self.in_set.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
-            let in_set = in_set
-                .iter()
-                .map(parse_uint_string)
-                .collect::<FieldResult<Vec<_>>>()?;
-            params.add_filter(json!({
-                "terms": {
-                    String::from(field_name): in_set,
-                }
-            }));
-        }
-        if let Some(nin) = self.nin.as_ref() {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-terms-query.html
-            let nin = nin
-                .iter()
-                .map(parse_uint_string)
-                .collect::<FieldResult<Vec<_>>>()?;
-            params.add_anti_filter(json!({
-                "terms": {
-                    String::from(field_name): nin,
-                }
-            }));
-        }
-        if let Some(present) = self.present {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-exists-query.html
-            if present {
-                params.add_filter(json!({
-                    "exists": {
-                        "field": String::from(field_name),
-                    }
-                }));
-            }
-        }
-        if let Some(absent) = self.absent {
-            // https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-exists-query.html
-            if absent {
-                params.add_anti_filter(json!({
-                    "exists": {
-                        "field": String::from(field_name),
-                    }
-                }));
-            }
-        }
+
+        TermFilter::EqualTo.apply(
+            self.eq.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        TermFilter::NotEqualTo.apply(
+            self.ne.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        RangeFilter::GreaterThan.apply(
+            self.gt.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        RangeFilter::GreaterThanOrEqualTo.apply(
+            self.gte.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        RangeFilter::LessThan.apply(
+            self.lt.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        RangeFilter::LessThanOrEqualTo.apply(
+            self.lte.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        SetFilter::In.apply(
+            self.r#in
+                .as_ref()
+                .map(|v| parse_uint_string_slice(&v))
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+        SetFilter::NotIn.apply(
+            self.nin
+                .as_ref()
+                .map(|v| parse_uint_string_slice(&v))
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+        TermFilter::EqualTo.apply(
+            self.present.filter(|b| *b).map(|_| 0_u64),
+            params,
+            &field_name,
+        )?;
+        TermFilter::NotEqualTo.apply(
+            self.absent.filter(|b| *b).map(|_| 0_u64),
+            params,
+            &field_name,
+        )?;
 
         Ok(())
     }
 }
 
-/// Filter input object that allows for the filtering of an optional text value
+/// Filter input object that allows for the filtering of a text value
+/// (a string that is analyzed in Elasticsearch using full-text analysis)
 #[derive(juniper::GraphQLInputObject)]
-pub struct TextOptionFilterInput {
-    present: Option<bool>,
-    absent: Option<bool>,
+pub struct TextFilterInput {
+    empty: Option<bool>,
+    non_empty: Option<bool>,
+    query: Option<String>,
+    r#match: Option<String>,
 }
 
-// TODO implement
+impl TextFilterInput {
+    pub fn apply(&self, params: &mut SearchParams, field_name: impl AsRef<str>) -> FieldResult<()> {
+        let field_name = field_name.as_ref();
+
+        TermFilter::EqualTo.apply(
+            self.empty.filter(|b| *b).map(|_| String::from("")),
+            params,
+            &field_name,
+        )?;
+        TermFilter::NotEqualTo.apply(
+            self.non_empty.filter(|b| *b).map(|_| String::from("")),
+            params,
+            &field_name,
+        )?;
+        TextFilter::Query.apply(self.query.clone(), params, &field_name);
+        TextFilter::Match.apply(self.r#match.clone(), params, &field_name);
+
+        Ok(())
+    }
+}
+
+/// Filter input object that allows for the filtering of a string value
+#[derive(juniper::GraphQLInputObject)]
+pub struct StringFilterInput {
+    eq: Option<String>,
+    ne: Option<String>,
+    r#in: Option<Vec<String>>,
+    nin: Option<Vec<String>>,
+    empty: Option<bool>,
+    non_empty: Option<bool>,
+    wildcard: Option<String>,
+}
+
+impl StringFilterInput {
+    pub fn apply(&self, params: &mut SearchParams, field_name: impl AsRef<str>) -> FieldResult<()> {
+        let field_name = field_name.as_ref();
+
+        TermFilter::EqualTo.apply(self.eq.clone(), params, &field_name)?;
+        TermFilter::NotEqualTo.apply(self.ne.clone(), params, &field_name)?;
+        SetFilter::In.apply(self.r#in.clone(), params, &field_name)?;
+        SetFilter::NotIn.apply(self.nin.clone(), params, &field_name)?;
+        TermFilter::EqualTo.apply(
+            self.empty.filter(|b| *b).map(|_| String::from("")),
+            params,
+            &field_name,
+        )?;
+        TermFilter::NotEqualTo.apply(
+            self.non_empty.filter(|b| *b).map(|_| String::from("")),
+            params,
+            &field_name,
+        )?;
+        WildcardFilter.apply(self.wildcard.clone(), params, &field_name);
+
+        Ok(())
+    }
+}
+
+/// Filter input object that allows for the filtering of a set of unsigned integer values
+/// (represented in the schema as Strings)
+#[derive(juniper::GraphQLInputObject)]
+pub struct UIntStringSetFilterInput {
+    empty: Option<bool>,
+    non_empty: Option<bool>,
+    contains: Option<String>,
+    does_not_contain: Option<String>,
+    contains_any: Option<Vec<String>>,
+    contains_none: Option<Vec<String>>,
+    contains_all: Option<Vec<String>>,
+}
+
+impl UIntStringSetFilterInput {
+    pub fn apply(&self, params: &mut SearchParams, field_name: impl AsRef<str>) -> FieldResult<()> {
+        let field_name = field_name.as_ref();
+
+        EmptyFilter::Empty.apply(self.empty.unwrap_or(false), params, &field_name);
+        EmptyFilter::NotEmpty.apply(self.non_empty.unwrap_or(false), params, &field_name);
+        TermFilter::EqualTo.apply(
+            self.contains.as_ref().map(parse_uint_string).transpose()?,
+            params,
+            &field_name,
+        )?;
+        TermFilter::NotEqualTo.apply(
+            self.does_not_contain
+                .as_ref()
+                .map(parse_uint_string)
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+        SetFilter::In.apply(
+            self.contains_any
+                .as_ref()
+                .map(|v| parse_uint_string_slice(&v))
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+        SetFilter::NotIn.apply(
+            self.contains_none
+                .as_ref()
+                .map(|v| parse_uint_string_slice(&v))
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+        ExactSetFilter::ContainsAll.apply(
+            self.contains_none
+                .as_ref()
+                .map(|v| parse_uint_string_slice(&v))
+                .transpose()?,
+            params,
+            &field_name,
+        )?;
+
+        Ok(())
+    }
+}
+
+/// Filter input object that allows for the filtering of a set of strings
+#[derive(juniper::GraphQLInputObject)]
+pub struct StringSetFilterInput {
+    empty: Option<bool>,
+    non_empty: Option<bool>,
+    contains: Option<String>,
+    does_not_contain: Option<String>,
+    contains_any: Option<Vec<String>>,
+    contains_none: Option<Vec<String>>,
+    contains_all: Option<Vec<String>>,
+    contains_wildcard: Option<String>,
+}
+
+impl StringSetFilterInput {
+    pub fn apply(&self, params: &mut SearchParams, field_name: impl AsRef<str>) -> FieldResult<()> {
+        let field_name = field_name.as_ref();
+
+        EmptyFilter::Empty.apply(self.empty.unwrap_or(false), params, &field_name);
+        EmptyFilter::NotEmpty.apply(self.non_empty.unwrap_or(false), params, &field_name);
+        TermFilter::EqualTo.apply(self.contains.clone(), params, &field_name)?;
+        TermFilter::NotEqualTo.apply(self.does_not_contain.clone(), params, &field_name)?;
+        SetFilter::In.apply(self.contains_any.clone(), params, &field_name)?;
+        SetFilter::NotIn.apply(self.contains_none.clone(), params, &field_name)?;
+        ExactSetFilter::ContainsAll.apply(self.contains_none.clone(), params, &field_name)?;
+        WildcardFilter.apply(self.contains_wildcard.clone(), params, &field_name);
+
+        Ok(())
+    }
+}

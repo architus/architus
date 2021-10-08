@@ -9,25 +9,34 @@ use sloggers::terminal::TerminalLoggerConfig;
 /// Configuration object loaded upon startup
 #[derive(Debug, Deserialize, Clone)]
 pub struct Configuration {
-    /// Collection of external services that this service connects to
-    pub services: Services,
-    /// Parameters for the backoff used to connect to external services during initialization
-    pub initialization_backoff: Backoff,
+    /// Parameters for the database connection to Elasticsearch
+    pub elasticsearch: Elasticsearch,
     /// Options related to the GraphQL search API
     pub graphql: GraphQL,
-    /// Elasticsearch index containing the stored log events
-    pub log_index: String,
+    /// Parameters for the backoff used to connect to external services during initialization
+    pub initialization_backoff: Backoff,
     /// Logging configuration (for service diagnostic logs, not Architus log events)
     pub logging: TerminalLoggerConfig,
     /// Configuration for Rocket, the HTTP framework
     pub rocket: rocket::Config,
 }
 
-/// Collection of external services that this service connects to
+/// Parameters for the database connection to Elasticsearch
 #[derive(Debug, Deserialize, Clone)]
-pub struct Services {
+pub struct Elasticsearch {
     /// URL of the Elasticsearch instance to search log entries from
-    pub elasticsearch: String,
+    pub url: String,
+    /// Elasticsearch index containing the stored log events.
+    /// This should already exist; this service will not create it.
+    pub index: String,
+    /// Username to use when connecting to Elasticsearch.
+    /// If given, this user should have RBAC permissions for:
+    /// - read (to search log events) for the log event index
+    /// If empty, then authentication is disabled.
+    pub auth_username: String,
+    /// Password to use when connecting to Elasticsearch.
+    /// Ignored if the user is empty.
+    pub auth_password: String,
 }
 
 /// Options related to the GraphQL search API
@@ -74,8 +83,16 @@ impl Configuration {
 /// Gets the `rocket::Config` default values as `config::Value` instance
 /// to be folded into a `config::Config` instance as a sub-key
 fn rocket_config_defaults() -> anyhow::Result<config::Value> {
-    config::Config::try_from(&rocket::Config::default())
-        .context("could not convert rocket::Config to config::Config")?
-        .try_into()
-        .context("could not convert config::Config to config::Value")
+    let default_rocket_config = rocket::Config::default();
+
+    // Create a `config::Config` from the rocket config spread as the root
+    let as_config = config::Config::try_from(&default_rocket_config)
+        .context("could not convert rocket::Config to config::Config")?;
+
+    // Convert the `config::Config` to a `config::Value`
+    let as_value = as_config
+        .try_into::<config::Value>()
+        .context("could not convert config::Config to config::Value")?;
+
+    Ok(as_value)
 }
