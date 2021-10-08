@@ -10,9 +10,10 @@ use crate::event::{
     UserLike,
 };
 use crate::gateway::path::{json_path, Path};
-use crate::gateway::{Processor, ProcessorContext, ProcessorFleet};
+use crate::gateway::{Processor, ProcessorContext, ProcessorError, ProcessorFleet};
+use crate::logs_lib;
 use crate::rpc::logs::event::{EventOrigin, EventType};
-use std::fmt::{self, Write as _};
+use std::fmt::Write as _;
 use twilight_model::channel::ReactionType;
 use twilight_model::gateway::event::EventType as GatewayEventType;
 
@@ -32,7 +33,7 @@ pub fn register_all(fleet: &mut ProcessorFleet) {
     );
 }
 
-fn reaction_add(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
+fn reaction_add(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, ProcessorError> {
     // Reaction add events include a partial member object that we can use
     let member_option = ctx.gateway(json_path!("member"), extract_member).ok();
     let user = if let Some(member) = member_option {
@@ -44,16 +45,24 @@ fn reaction_add(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
             ..UserLike::default()
         }
     } else {
-        let id = ctx.gateway(json_path!("user_id"), extract_id)?;
+        let id = ctx
+            .gateway(json_path!("user_id"), extract_id)
+            .map_err(ProcessorError::Fatal)?;
         UserLike {
             id,
             ..UserLike::default()
         }
     };
 
-    let reaction = ctx.gateway(json_path!("emoji"), extract::<ReactionType>)?;
-    let channel_id = ctx.gateway(json_path!("channel_id"), extract_id)?;
-    let message_id = ctx.gateway(json_path!("message_id"), extract_id)?;
+    let reaction = ctx
+        .gateway(json_path!("emoji"), extract::<ReactionType>)
+        .map_err(ProcessorError::Fatal)?;
+    let channel_id = ctx
+        .gateway(json_path!("channel_id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
+    let message_id = ctx
+        .gateway(json_path!("message_id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
 
     Ok(NormalizedEvent {
         event_type: EventType::ReactionAdd,
@@ -76,7 +85,7 @@ fn reaction_add(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
             ReactionType::Unicode { .. } => None,
             ReactionType::Custom { id, .. } => Some(Entity::Emoji(Emoji { id: id.0 })),
         },
-        content: format_content(reaction, &ctx)?,
+        content: format_content(reaction, &ctx).map_err(ProcessorError::Fatal)?,
         origin: EventOrigin::Gateway,
         source: Source {
             gateway: Some(ctx.source),
@@ -85,11 +94,19 @@ fn reaction_add(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
     })
 }
 
-fn reaction_remove(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
-    let user_id = ctx.gateway(json_path!("user_id"), extract_id)?;
-    let reaction = ctx.gateway(json_path!("emoji"), extract::<ReactionType>)?;
-    let channel_id = ctx.gateway(json_path!("channel_id"), extract_id)?;
-    let message_id = ctx.gateway(json_path!("message_id"), extract_id)?;
+fn reaction_remove(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, ProcessorError> {
+    let user_id = ctx
+        .gateway(json_path!("user_id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
+    let reaction = ctx
+        .gateway(json_path!("emoji"), extract::<ReactionType>)
+        .map_err(ProcessorError::Fatal)?;
+    let channel_id = ctx
+        .gateway(json_path!("channel_id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
+    let message_id = ctx
+        .gateway(json_path!("message_id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
 
     Ok(NormalizedEvent {
         event_type: EventType::ReactionRemove,
@@ -115,7 +132,7 @@ fn reaction_remove(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent>
             ReactionType::Unicode { .. } => None,
             ReactionType::Custom { id, .. } => Some(Entity::Emoji(Emoji { id: id.0 })),
         },
-        content: format_content(reaction, &ctx)?,
+        content: format_content(reaction, &ctx).map_err(ProcessorError::Fatal)?,
         origin: EventOrigin::Gateway,
         source: Source {
             gateway: Some(ctx.source),
@@ -124,10 +141,16 @@ fn reaction_remove(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent>
     })
 }
 
-fn reaction_remove_emoji(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
-    let reaction = ctx.gateway(json_path!("emoji"), extract::<ReactionType>)?;
-    let channel_id = ctx.gateway(json_path!("channel_id"), extract_id)?;
-    let message_id = ctx.gateway(json_path!("message_id"), extract_id)?;
+fn reaction_remove_emoji(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, ProcessorError> {
+    let reaction = ctx
+        .gateway(json_path!("emoji"), extract::<ReactionType>)
+        .map_err(ProcessorError::Fatal)?;
+    let channel_id = ctx
+        .gateway(json_path!("channel_id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
+    let message_id = ctx
+        .gateway(json_path!("message_id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
 
     Ok(NormalizedEvent {
         event_type: EventType::ReactionBulkRemove,
@@ -146,7 +169,7 @@ fn reaction_remove_emoji(ctx: ProcessorContext<'_>) -> anyhow::Result<Normalized
             ReactionType::Unicode { .. } => None,
             ReactionType::Custom { id, .. } => Some(Entity::Emoji(Emoji { id: id.0 })),
         },
-        content: format_content(reaction, &ctx)?,
+        content: format_content(reaction, &ctx).map_err(ProcessorError::Fatal)?,
         origin: EventOrigin::Gateway,
         source: Source {
             gateway: Some(ctx.source),
@@ -155,9 +178,13 @@ fn reaction_remove_emoji(ctx: ProcessorContext<'_>) -> anyhow::Result<Normalized
     })
 }
 
-fn reaction_remove_all(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
-    let channel_id = ctx.gateway(json_path!("channel_id"), extract_id)?;
-    let message_id = ctx.gateway(json_path!("message_id"), extract_id)?;
+fn reaction_remove_all(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, ProcessorError> {
+    let channel_id = ctx
+        .gateway(json_path!("channel_id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
+    let message_id = ctx
+        .gateway(json_path!("message_id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
 
     Ok(NormalizedEvent {
         event_type: EventType::ReactionBulkRemove,
@@ -185,19 +212,6 @@ fn reaction_remove_all(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEv
     })
 }
 
-/// Writes an embedded emoji that will be displayed using rich formatting.
-/// If a name is not supplied, then the embed will still work in the logs UI
-pub fn write_emoji_mention(
-    writer: &mut impl fmt::Write,
-    name: Option<&str>,
-    id: u64,
-    animated: bool,
-) -> Result<(), fmt::Error> {
-    let animated_prefix = if animated { "a" } else { "" };
-    let name = name.unwrap_or("");
-    write!(writer, "<{}:{}:{}>", animated_prefix, name, id)
-}
-
 /// Formats a reaction content block
 pub fn format_content(
     reaction: ReactionType,
@@ -219,7 +233,7 @@ pub fn format_content(
             })
         }
         ReactionType::Custom { id, animated, name } => {
-            write_emoji_mention(&mut content, name.as_deref(), id.0, animated)?;
+            logs_lib::write_custom_emoji(&mut content, id.0, name.as_deref(), animated)?;
             if let Some(name) = name {
                 write!(content, " :{}:", name)?;
                 Ok(Content {

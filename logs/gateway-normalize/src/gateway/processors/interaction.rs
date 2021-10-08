@@ -2,7 +2,7 @@
 //! - `InteractionCreate` (from `GatewayEventType::InteractionCreate`)
 
 use crate::event::NormalizedEvent;
-use crate::gateway::{Processor, ProcessorContext, ProcessorFleet};
+use crate::gateway::{Processor, ProcessorContext, ProcessorError, ProcessorFleet};
 use twilight_model::gateway::event::EventType as GatewayEventType;
 
 pub fn register_all(fleet: &mut ProcessorFleet) {
@@ -13,7 +13,7 @@ pub fn register_all(fleet: &mut ProcessorFleet) {
 }
 
 /// Handles `GatewayEventType::InteractionCreate`
-fn interaction_create(_ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
+fn interaction_create(_ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, ProcessorError> {
     // TODO implement
-    Err(anyhow::anyhow!("InteractionCreate not implemented"))
+    Err(ProcessorError::Drop)
 }

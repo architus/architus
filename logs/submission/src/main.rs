@@ -9,7 +9,7 @@ mod submission;
 
 use crate::config::Configuration;
 use crate::elasticsearch::Client;
-use crate::rpc::logs::event::Event;
+use crate::rpc::logs::event::{Event, EventType};
 use crate::rpc::logs::submission::submission_service_server::{
     SubmissionService, SubmissionServiceServer,
 };
@@ -312,11 +312,12 @@ impl SubmissionServiceImpl {
         id: String,
         event: Box<Event>,
     ) -> Result<bool, tonic::Status> {
+        let event_type = EventType::from_i32(event.r#type).unwrap_or(EventType::Unknown);
         let logger = self.logger.new(slog::o!(
             "event_id" => id.clone(),
             "event_timestamp" => event.timestamp,
             "guild_id" => event.guild_id,
-            "event_type" => event.r#type,
+            "event_type" => format!("{:?}", event_type),
         ));
 
         // Create the one shot channel to wait on

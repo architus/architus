@@ -7,6 +7,7 @@ mod connect;
 mod emoji;
 mod event;
 mod gateway;
+mod logs_lib;
 mod normalize;
 mod reconnection;
 mod rpc;

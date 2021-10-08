@@ -5,11 +5,11 @@
 use super::{extract, extract_id};
 use crate::event::{Content, Entity, IdParams, Nickname, NormalizedEvent, Source, UserLike};
 use crate::gateway::path::{json_path, Path};
-use crate::gateway::{Processor, ProcessorContext, ProcessorFleet};
+use crate::gateway::{Processor, ProcessorContext, ProcessorError, ProcessorFleet};
+use crate::logs_lib;
 use crate::rpc::logs::event::{EventOrigin, EventType};
 use chrono::DateTime;
 use std::convert::TryFrom;
-use std::fmt;
 use twilight_model::gateway::event::EventType as GatewayEventType;
 
 pub fn register_all(fleet: &mut ProcessorFleet) {
@@ -21,8 +21,10 @@ pub fn register_all(fleet: &mut ProcessorFleet) {
 }
 
 /// Handles `GatewayEventType::MemberAdd`
-fn member_add(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
-    let user_id = ctx.gateway(json_path!("user.id"), extract_id)?;
+fn member_add(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, ProcessorError> {
+    let user_id = ctx
+        .gateway(json_path!("user.id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
     let username = ctx
         .gateway(json_path!("user.username"), extract::<String>)
         .ok();
@@ -34,12 +36,17 @@ fn member_add(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
         .gateway(json_path!("nick"), extract::<Option<String>>)
         .ok()
         .map(Nickname::from);
-    let joined_at = ctx.gateway(json_path!("joined_at"), extract::<String>)?;
-    let joined_at_date = DateTime::parse_from_rfc3339(&joined_at)?;
-    let joined_at_ms_timestamp = u64::try_from(joined_at_date.timestamp_millis())?;
+    let joined_at = ctx
+        .gateway(json_path!("joined_at"), extract::<String>)
+        .map_err(ProcessorError::Fatal)?;
+    let joined_at_date = DateTime::parse_from_rfc3339(&joined_at)
+        .map_err(|err| ProcessorError::Fatal(err.into()))?;
+    let joined_at_ms_timestamp = u64::try_from(joined_at_date.timestamp_millis())
+        .map_err(|err| ProcessorError::Fatal(err.into()))?;
 
     let mut content = String::from("");
-    write_user_mention(&mut content, user_id)?;
+    logs_lib::write_user_mention(&mut content, user_id)
+        .map_err(|err| ProcessorError::Fatal(err.into()))?;
     content.push_str(" joined");
 
     Ok(NormalizedEvent {
@@ -73,8 +80,10 @@ fn member_add(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
 }
 
 /// Handles `GatewayEventType::MemberRemove`
-fn member_remove(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
-    let user_id = ctx.gateway(json_path!("user.id"), extract_id)?;
+fn member_remove(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, ProcessorError> {
+    let user_id = ctx
+        .gateway(json_path!("user.id"), extract_id)
+        .map_err(ProcessorError::Fatal)?;
     let username = ctx
         .gateway(json_path!("user.username"), extract::<String>)
         .ok();
@@ -84,7 +93,8 @@ fn member_remove(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
         .and_then(|d| d.parse::<u16>().ok());
 
     let mut content = String::from("");
-    write_user_mention(&mut content, user_id)?;
+    logs_lib::write_user_mention(&mut content, user_id)
+        .map_err(|err| ProcessorError::Fatal(err.into()))?;
     content.push_str(" left");
 
     Ok(NormalizedEvent {
@@ -114,9 +124,4 @@ fn member_remove(ctx: ProcessorContext<'_>) -> anyhow::Result<NormalizedEvent> {
             ..Source::default()
         },
     })
-}
-
-/// Writes a user mention that will be displayed using rich formatting
-pub fn write_user_mention(writer: &mut impl fmt::Write, id: u64) -> Result<(), fmt::Error> {
-    write!(writer, "<@{}>", id)
 }

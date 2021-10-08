@@ -38,29 +38,25 @@ impl TryFrom<GatewayEvent> for EventWithSource {
 
 /// Enumerates the various errors that can occur during event processing
 /// that cause it to halt
-#[allow(dead_code)]
 #[derive(Error, Debug)]
-pub enum ProcessingError {
+pub enum ProcessorError {
     #[error("no sub-processor found for event type {0}")]
     SubProcessorNotFound(String),
-    #[error("fatal sourcing error encountered: {0}")]
-    FatalSourceError(anyhow::Error),
+    #[error("fatal normalization error encountered: {0}")]
+    Fatal(#[source] anyhow::Error),
     #[error("dropping original gateway event")]
     Drop,
 }
 
-impl ProcessingError {
+impl ProcessorError {
     /// Whether the error occurs in a non-nominal case that should be logged
     pub const fn is_unexpected(&self) -> bool {
-        matches!(
-            self,
-            Self::SubProcessorNotFound(_) | Self::FatalSourceError(_)
-        )
+        matches!(self, Self::SubProcessorNotFound(_) | Self::Fatal(_))
     }
 
     /// Whether the error should result in a re-queue
     pub const fn should_requeue(&self) -> bool {
-        !matches!(self, Self::FatalSourceError(_))
+        !matches!(self, Self::Fatal(_))
     }
 }
 
@@ -114,7 +110,7 @@ impl ProcessorFleet {
     pub async fn normalize(
         &self,
         event: EventWithSource,
-    ) -> Result<NormalizedEvent, ProcessingError> {
+    ) -> Result<NormalizedEvent, ProcessorError> {
         if let Some(processor) = self.processors.get(&event.inner.event_type) {
             let logger = self.logger.new(slog::o!(
                 "event_ingress_timestamp" => event.inner.ingress_timestamp,
@@ -125,14 +121,12 @@ impl ProcessorFleet {
                 .apply(event, &self.client, &self.config, &self.emojis, &logger)
                 .await
         } else {
-            Err(ProcessingError::SubProcessorNotFound(
-                event.inner.event_type,
-            ))
+            Err(ProcessorError::SubProcessorNotFound(event.inner.event_type))
         }
     }
 }
 
-type ProcessorResult = Result<NormalizedEvent, anyhow::Error>;
+type ProcessorResult = Result<NormalizedEvent, ProcessorError>;
 type AsyncProcessorFuture<'a> = Box<dyn Future<Output = ProcessorResult> + Send + 'a>;
 
 pub enum Processor {
@@ -172,7 +166,7 @@ impl Processor {
         config: &'a Configuration,
         emojis: &'a crate::emoji::Db,
         logger: &'a Logger,
-    ) -> Result<NormalizedEvent, ProcessingError> {
+    ) -> Result<NormalizedEvent, ProcessorError> {
         let EventWithSource {
             inner: event,
             source,
@@ -187,12 +181,10 @@ impl Processor {
             logger,
         };
 
-        let result = match self {
+        match self {
             Self::Sync(f) => f(ctx),
             Self::Async(f) => f(ctx).await,
-        };
-
-        result.map_err(ProcessingError::FatalSourceError)
+        }
     }
 }
 
