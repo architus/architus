@@ -24,6 +24,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "alloc-no-stdlib"
+version = "2.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35ef4730490ad1c4eae5c4325b2a95f521d023e5c885853ff7aca0a6a1631db3"
+
+[[package]]
+name = "alloc-stdlib"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "697ed7edc0f1711de49ce108c541623a0af97c6c60b2f6e2b65229847ac843c2"
+dependencies = [
+ "alloc-no-stdlib",
+]
+
+[[package]]
 name = "amq-protocol"
 version = "6.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -93,6 +108,22 @@ dependencies = [
 [[package]]
 name = "architus-id"
 version = "0.1.0"
+
+[[package]]
+name = "architus-logs-lib"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fancy-regex",
+ "lazy_static",
+ "prost",
+ "serde 1.0.126",
+ "serde_json",
+ "tonic",
+ "tonic-build",
+ "twilight-model",
+ "url",
+]
 
 [[package]]
 name = "arrayvec"
@@ -215,6 +246,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
 dependencies = [
  "generic-array",
+]
+
+[[package]]
+name = "brotli"
+version = "3.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71cb90ade945043d3d53597b2fc359bb063db8ade2bcffe7997351d0756e9d50"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
+ "brotli-decompressor",
+]
+
+[[package]]
+name = "brotli-decompressor"
+version = "2.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59ad2d4653bf5ca36ae797b1f4bb4dbddb60ce49ca4aed8a2ce4829f60425b80"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
 ]
 
 [[package]]
@@ -737,6 +789,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyper-timeout"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbb958482e8c7be4bc3cf272a766a2b0bf1a6755e7a6ae777f017a31d11b13b1"
+dependencies = [
+ "hyper",
+ "pin-project-lite",
+ "tokio",
+ "tokio-io-timeout",
+]
+
+[[package]]
 name = "hyper-tls"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -796,9 +860,9 @@ checksum = "47be2f14c678be2fdcab04ab1171db51b2762ce6f0a8ee87c8dd4a04ed216135"
 
 [[package]]
 name = "itertools"
-version = "0.9.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "284f18f85651fe11e8a991b2adb42cb078325c996ed026d994719efcfca1d54b"
+checksum = "69ddb889f9d0d08a67338271fa9b62996bc788c7796a5c18cf057420aaed5eaf"
 dependencies = [
  "either",
 ]
@@ -933,6 +997,7 @@ dependencies = [
  "anyhow",
  "architus-config-backoff",
  "architus-id",
+ "architus-logs-lib",
  "backoff",
  "chrono",
  "config",
@@ -1293,9 +1358,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e6984d2f1a23009bd270b8bb56d0926810a3d483f59c987d77969e9d8e840b2"
+checksum = "de5e2533f59d08fcf364fd374ebda0692a70bd6d7e66ef97f306f45c6c5d8020"
 dependencies = [
  "bytes",
  "prost-derive",
@@ -1303,9 +1368,9 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32d3ebd75ac2679c2af3a92246639f9fcc8a442ee420719cc4fe195b98dd5fa3"
+checksum = "355f634b43cdd80724ee7848f95770e7e70eefa6dcf14fea676216573b8fd603"
 dependencies = [
  "bytes",
  "heck",
@@ -1321,9 +1386,9 @@ dependencies = [
 
 [[package]]
 name = "prost-derive"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "169a15f3008ecb5160cba7d37bcd690a7601b6d30cfb87a117d45e59d52af5d4"
+checksum = "600d2f334aa05acb02a755e217ef1ab6dea4d51b58b7846588b747edec04efba"
 dependencies = [
  "anyhow",
  "itertools",
@@ -1334,9 +1399,9 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b518d7cdd93dab1d1122cf07fa9a60771836c668dde9d9e2a139f957f0d9f1bb"
+checksum = "603bbd6394701d13f3f25aada59c7de9d35a6a5887cfc156181234a44002771b"
 dependencies = [
  "bytes",
  "prost",
@@ -2004,6 +2069,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-io-timeout"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "90c49f106be240de154571dd31fbe48acb10ba6c6dd6f6517ad603abffa42de9"
+dependencies = [
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "tokio-macros"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2088,9 +2163,9 @@ dependencies = [
 
 [[package]]
 name = "tonic"
-version = "0.4.3"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ac42cd97ac6bd2339af5bcabf105540e21e45636ec6fa6aae5e85d44db31be0"
+checksum = "796c5e1cd49905e65dd8e700d4cb1dffcbfdb4fc9d017de08c1a537afd83627c"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2102,6 +2177,7 @@ dependencies = [
  "http",
  "http-body",
  "hyper",
+ "hyper-timeout",
  "percent-encoding",
  "pin-project",
  "prost",
@@ -2110,6 +2186,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util",
  "tower",
+ "tower-layer",
  "tower-service",
  "tracing",
  "tracing-futures",
@@ -2117,9 +2194,9 @@ dependencies = [
 
 [[package]]
 name = "tonic-build"
-version = "0.4.2"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c695de27302f4697191dda1c7178131a8cb805463dda02864acb80fe1322fdcf"
+checksum = "12b52d07035516c2b74337d2ac7746075e7dcae7643816c1b12c5ff8a7484c08"
 dependencies = [
  "proc-macro2",
  "prost-build",
@@ -2252,22 +2329,21 @@ dependencies = [
 
 [[package]]
 name = "twilight-cache-inmemory"
-version = "0.5.0"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8628d24fc974de83deff3cbef6bd39c394f8a3542f742c0c73c525b52109b8b9"
+checksum = "ac0cd25d0a7ddeade9bcb2065d67cba1611b631c9d3db794005cb73e7eac74a2"
 dependencies = [
  "bitflags",
  "dashmap",
  "serde 1.0.126",
- "tracing",
  "twilight-model",
 ]
 
 [[package]]
 name = "twilight-gateway"
-version = "0.5.0"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc6cf18f7af995b6a54c6206d965f72eb1591fa6f38fd5299eb5bd26590115e6"
+checksum = "3d0495761099f21c92050486717b3ccd8b3cd137626a511c0694d32edd92511b"
 dependencies = [
  "bitflags",
  "flate2",
@@ -2286,9 +2362,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-gateway-queue"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "202e427dafd0a2116020faaaa81ecae1728e40f8a8993968ac5087a60b1ab646"
+checksum = "5f45ea68d917d5fbbfe739be9ace81d6824518262feb7a9139552bab64811f5a"
 dependencies = [
  "tokio",
  "tracing",
@@ -2297,10 +2373,11 @@ dependencies = [
 
 [[package]]
 name = "twilight-http"
-version = "0.5.0"
+version = "0.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbf82e562cd78153bc5b9415784e6ef05a843dda23ff2ae9e7a62381765c283a"
+checksum = "08ef176da0d6a25e7f6b69d6efddacc215ac62313596047566726360ec6cf438"
 dependencies = [
+ "brotli",
  "hyper",
  "hyper-rustls",
  "percent-encoding",
@@ -2313,9 +2390,9 @@ dependencies = [
 
 [[package]]
 name = "twilight-model"
-version = "0.5.0"
+version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2492e1842faceec7c84d25469382a3bc80104884a1637f4e5cb818fda7fbd6e8"
+checksum = "d7d27af7e29d24bdf4f7e2511b36cc571fb5613b5ca5726ca0da36f55d76668a"
 dependencies = [
  "bitflags",
  "serde 1.0.126",

@@ -1,12 +1,12 @@
 use crate::config::Configuration;
 use crate::connect;
-use crate::event::NormalizedEvent;
 use crate::gateway::{EventWithSource, ProcessorFleet};
 use crate::reconnection;
 use crate::rpc;
 use crate::rpc::gateway_queue_lib::GatewayEvent;
-use crate::rpc::logs::submission::Client as LogsImportClient;
+use architus_logs_lib::submission::Client as LogsSubmissionClient;
 use anyhow::Context;
+use architus_logs_lib::event::NormalizedEvent;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use lapin::options::{BasicAckOptions, BasicConsumeOptions, BasicQosOptions, BasicRejectOptions};
 use lapin::types::FieldTable;
@@ -26,7 +26,7 @@ struct Rejection {
 }
 
 pub struct Consumer {
-    submission_client: LogsImportClient,
+    submission_client: LogsSubmissionClient,
     processor: Arc<ProcessorFleet>,
     config: Arc<Configuration>,
     logger: Logger,
@@ -34,7 +34,7 @@ pub struct Consumer {
 
 impl Consumer {
     pub fn new(
-        submission_client: LogsImportClient,
+        submission_client: LogsSubmissionClient,
         processor: Arc<ProcessorFleet>,
         config: Arc<Configuration>,
         logger: Logger,

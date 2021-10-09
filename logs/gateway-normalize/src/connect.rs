@@ -2,7 +2,7 @@
 //! used during service initialization and during potential reconnection
 
 use crate::config::Configuration;
-use crate::rpc::logs::submission::Client as LogsSubmissionClient;
+use architus_logs_lib::submission::Client as LogsSubmissionClient;
 use anyhow::Context;
 use lapin::{Connection, ConnectionProperties};
 use slog::Logger;

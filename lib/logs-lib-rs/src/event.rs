@@ -1,8 +1,3 @@
-use crate::config::Configuration;
-use crate::rpc::logs::event::{
-    AgentSpecialType, ContentMetadata, EntityType, Event as LogEvent, EventOrigin, EventSource,
-    EventType,
-};
 use crate::rpc::logs::submission::{
     EntityRevisionMetadata, EventDeterministicIdParams, SubmitIdempotentRequest, SubmittedEvent,
 };
@@ -10,7 +5,16 @@ use std::convert::Into;
 use tonic::{IntoRequest, Request};
 use twilight_model::user::User as DiscordUser;
 
-/// Normalized log event to send to log ingestion
+// Re-export enums from `crate::rpc::logs::event` as their direct names.
+pub use crate::rpc::logs::event::{AgentSpecialType, EntityType, EventOrigin, EventType};
+// Re-export structs from `crate::rpc::logs::event` with `Proto` added in the front
+// to mark them as the non-ergonomic versions.
+pub use crate::rpc::logs::event::{
+    ContentMetadata as ProtoContentMetadata, Event as ProtoEvent, EventSource as ProtoEventSource,
+};
+
+/// Normalized log event to send to log ingestion.
+/// This is a utility wrapper around `Event` to provide a more ergonomic API.
 #[allow(clippy::module_name_repetitions)]
 #[derive(Clone, PartialEq, Debug)]
 pub struct NormalizedEvent {
@@ -60,7 +64,6 @@ pub enum IdParams {
     One(u64),
     Two(u64, u64),
     Three(u64, u64, u64),
-    Four(u64, u64, u64, u64),
 }
 
 impl From<IdParams> for EventDeterministicIdParams {
@@ -70,25 +73,16 @@ impl From<IdParams> for EventDeterministicIdParams {
                 field1,
                 field2: 0,
                 field3: 0,
-                field4: 0,
             },
             IdParams::Two(field1, field2) => Self {
                 field1,
                 field2,
                 field3: 0,
-                field4: 0,
             },
             IdParams::Three(field1, field2, field3) => Self {
                 field1,
                 field2,
                 field3,
-                field4: 0,
-            },
-            IdParams::Four(field1, field2, field3, field4) => Self {
-                field1,
-                field2,
-                field3,
-                field4,
             },
         }
     }
@@ -105,10 +99,10 @@ impl IntoRequest<SubmitIdempotentRequest> for NormalizedEvent {
 impl From<NormalizedEvent> for SubmittedEvent {
     fn from(original: NormalizedEvent) -> Self {
         // Convert the normalized event struct (specific to this service)
-        // into the `LogEvent` struct, which is the gRPC-serializable struct
+        // into the `ProtoEvent` struct, which is the gRPC-serializable struct
         let (content, content_metadata) = original.content.split();
         Self {
-            inner: Some(LogEvent {
+            inner: Some(ProtoEvent {
                 timestamp: original.timestamp,
                 source: Some(original.source.into()),
                 origin: original.origin.into(),
@@ -225,8 +219,8 @@ pub struct Agent {
 impl Agent {
     /// Attempts to resolve the special type of the agent based on their ID.
     /// Checks to see if the user is the same as Architus
-    pub const fn type_from_id(id: u64, config: &Configuration) -> AgentSpecialType {
-        if id == config.bot_user_id {
+    pub fn type_from_id(id: u64, bot_user_id: Option<u64>) -> AgentSpecialType {
+        if bot_user_id.map(|i| i == id).unwrap_or(false) {
             AgentSpecialType::Architus
         } else {
             AgentSpecialType::Default
@@ -235,8 +229,11 @@ impl Agent {
 
     /// Attempts to resolve the special type of the agent based on the Discord user.
     /// Checks to see if the user is the same as Architus
-    pub fn type_from_discord_user(user: &DiscordUser, config: &Configuration) -> AgentSpecialType {
-        if user.id.0 == config.bot_user_id {
+    pub fn type_from_discord_user(
+        user: &DiscordUser,
+        bot_user_id: Option<u64>,
+    ) -> AgentSpecialType {
+        if bot_user_id.map(|i| i == user.id.0).unwrap_or(false) {
             AgentSpecialType::Architus
         } else if user.system.unwrap_or(false) {
             AgentSpecialType::System
@@ -350,10 +347,10 @@ pub struct Content {
 
 impl Content {
     #[allow(clippy::missing_const_for_fn)]
-    fn split(self) -> (String, ContentMetadata) {
+    fn split(self) -> (String, ProtoContentMetadata) {
         (
             self.inner,
-            ContentMetadata {
+            ProtoContentMetadata {
                 users_mentioned: self.users_mentioned,
                 channels_mentioned: self.channels_mentioned,
                 roles_mentioned: self.roles_mentioned,
@@ -375,7 +372,7 @@ pub struct Source {
     pub internal: Option<serde_json::Value>,
 }
 
-impl From<Source> for EventSource {
+impl From<Source> for ProtoEventSource {
     fn from(original: Source) -> Self {
         Self {
             gateway: original

@@ -6,12 +6,11 @@
 //! - `MessageBulkDelete` (from `GatewayEventType::MessageDeleteBulk`,
 //!    using audit log info to form a hybrid event)
 
-use crate::event::{
-    Agent, Channel, Content, Entity, IdParams, Message, Nickname, NormalizedEvent, Source, UserLike,
-};
 use crate::gateway::{Processor, ProcessorContext, ProcessorError, ProcessorFleet};
-use crate::logs_lib;
-use crate::rpc::logs::event::{AgentSpecialType, EventOrigin, EventType};
+use architus_logs_lib::event::{
+    Agent, AgentSpecialType, Channel, Content, Entity, EventOrigin, EventType, IdParams, Message,
+    Nickname, NormalizedEvent, Source, UserLike,
+};
 use chrono::DateTime;
 use std::collections::BTreeSet;
 use std::convert::TryFrom;
@@ -215,7 +214,7 @@ fn construct_agent(
     nickname: Option<Nickname>,
 ) -> Agent {
     Agent {
-        special_type: Agent::type_from_discord_user(author, &ctx.config),
+        special_type: Agent::type_from_discord_user(author, Some(ctx.config.bot_user_id)),
         entity: Entity::UserLike(UserLike {
             id: author.id.0,
             name: Some(author.name.clone()),
@@ -247,11 +246,11 @@ fn find_unicode_emojis(content: &str, emoji_db: &crate::emoji::Db) -> Vec<String
 }
 
 pub fn source_content(ctx: &ProcessorContext<'_>, message_content: String) -> Content {
-    let custom_emojis = logs_lib::find_custom_emoji_uses(&message_content);
+    let custom_emojis = architus_logs_lib::extract::find_custom_emoji_uses(&message_content);
     Content {
-        users_mentioned: logs_lib::find_user_mentions(&message_content),
-        roles_mentioned: logs_lib::find_role_mentions(&message_content),
-        channels_mentioned: logs_lib::find_channel_mentions(&message_content),
+        users_mentioned: architus_logs_lib::extract::find_user_mentions(&message_content),
+        roles_mentioned: architus_logs_lib::extract::find_role_mentions(&message_content),
+        channels_mentioned: architus_logs_lib::extract::find_channel_mentions(&message_content),
         emojis_used: find_unicode_emojis(&message_content, &ctx.emojis),
         custom_emojis_used: custom_emojis.ids,
         custom_emoji_names_used: custom_emojis
@@ -259,7 +258,9 @@ pub fn source_content(ctx: &ProcessorContext<'_>, message_content: String) -> Co
             .into_iter()
             .map(String::from)
             .collect::<Vec<_>>(),
-        url_stems: logs_lib::collect_url_stems(logs_lib::find_urls(&message_content)),
+        url_stems: architus_logs_lib::extract::collect_url_stems(
+            architus_logs_lib::extract::find_urls(&message_content),
+        ),
         inner: message_content,
     }
 }

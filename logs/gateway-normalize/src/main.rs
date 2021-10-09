@@ -5,9 +5,7 @@ mod audit_log;
 mod config;
 mod connect;
 mod emoji;
-mod event;
 mod gateway;
-mod logs_lib;
 mod normalize;
 mod reconnection;
 mod rpc;
@@ -65,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
 /// before forwarding them to the submission service
 async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     // Create a Discord API client
-    let client = Client::new(&config.secrets.discord_token);
+    let client = Client::new(config.secrets.discord_token.clone());
 
     // Load the emoji database
     let emojis = Arc::new(emoji::Db::load(&config.emoji_db_url).await?);

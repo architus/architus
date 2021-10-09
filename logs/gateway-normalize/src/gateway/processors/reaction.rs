@@ -5,14 +5,12 @@
 //!    and `GatewayEventType::ReactionRemoveAll`)
 
 use super::{extract, extract_id, extract_member};
-use crate::event::{
-    Agent, Channel, Content, Emoji, Entity, IdParams, Message, Nickname, NormalizedEvent, Source,
-    UserLike,
-};
 use crate::gateway::path::{json_path, Path};
 use crate::gateway::{Processor, ProcessorContext, ProcessorError, ProcessorFleet};
-use crate::logs_lib;
-use crate::rpc::logs::event::{EventOrigin, EventType};
+use architus_logs_lib::event::{
+    Agent, Channel, Content, Emoji, Entity, EventOrigin, EventType, IdParams, Message, Nickname,
+    NormalizedEvent, Source, UserLike,
+};
 use std::fmt::Write as _;
 use twilight_model::channel::ReactionType;
 use twilight_model::gateway::event::EventType as GatewayEventType;
@@ -76,7 +74,7 @@ fn reaction_add(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, ProcessorE
             ..Channel::default()
         }),
         agent: Some(Agent {
-            special_type: Agent::type_from_id(user.id, ctx.config),
+            special_type: Agent::type_from_id(user.id, Some(ctx.config.bot_user_id)),
             entity: Entity::UserLike(user),
             webhook_username: None,
         }),
@@ -120,7 +118,7 @@ fn reaction_remove(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, Process
             ..Channel::default()
         }),
         agent: Some(Agent {
-            special_type: Agent::type_from_id(user_id, ctx.config),
+            special_type: Agent::type_from_id(user_id, Some(ctx.config.bot_user_id)),
             entity: Entity::UserLike(UserLike {
                 id: user_id,
                 ..UserLike::default()
@@ -233,7 +231,12 @@ pub fn format_content(
             })
         }
         ReactionType::Custom { id, animated, name } => {
-            logs_lib::write_custom_emoji(&mut content, id.0, name.as_deref(), animated)?;
+            architus_logs_lib::write::write_custom_emoji(
+                &mut content,
+                id.0,
+                name.as_deref(),
+                animated,
+            )?;
             if let Some(name) = name {
                 write!(content, " :{}:", name)?;
                 Ok(Content {

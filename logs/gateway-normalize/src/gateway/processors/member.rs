@@ -3,11 +3,11 @@
 //! - `MemberLeave` (from `GatewayEventType::MemberRemove`)
 
 use super::{extract, extract_id};
-use crate::event::{Content, Entity, IdParams, Nickname, NormalizedEvent, Source, UserLike};
 use crate::gateway::path::{json_path, Path};
 use crate::gateway::{Processor, ProcessorContext, ProcessorError, ProcessorFleet};
-use crate::logs_lib;
-use crate::rpc::logs::event::{EventOrigin, EventType};
+use architus_logs_lib::event::{
+    Content, Entity, IdParams, Nickname, NormalizedEvent, Source, UserLike, EventOrigin, EventType,
+};
 use chrono::DateTime;
 use std::convert::TryFrom;
 use twilight_model::gateway::event::EventType as GatewayEventType;
@@ -45,7 +45,7 @@ fn member_add(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, ProcessorErr
         .map_err(|err| ProcessorError::Fatal(err.into()))?;
 
     let mut content = String::from("");
-    logs_lib::write_user_mention(&mut content, user_id)
+    architus_logs_lib::write::write_user_mention(&mut content, user_id)
         .map_err(|err| ProcessorError::Fatal(err.into()))?;
     content.push_str(" joined");
 
@@ -93,7 +93,7 @@ fn member_remove(ctx: ProcessorContext<'_>) -> Result<NormalizedEvent, Processor
         .and_then(|d| d.parse::<u16>().ok());
 
     let mut content = String::from("");
-    logs_lib::write_user_mention(&mut content, user_id)
+    architus_logs_lib::write::write_user_mention(&mut content, user_id)
         .map_err(|err| ProcessorError::Fatal(err.into()))?;
     content.push_str(" left");
 

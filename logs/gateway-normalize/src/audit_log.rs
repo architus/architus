@@ -5,15 +5,16 @@ use backoff::ExponentialBackoff;
 use std::convert::{TryFrom, TryInto};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use twilight_http::error::ErrorType;
+use twilight_http::response::DeserializeBodyError;
 use twilight_http::Client;
-use twilight_model::guild::audit_log::{AuditLog, AuditLogEntry, AuditLogEvent};
+use twilight_model::guild::audit_log::{AuditLog, AuditLogEntry, AuditLogEventType};
 use twilight_model::id::{AuditLogEntryId, GuildId, UserId};
 
 /// Aggregate options struct for performing a resilient search
 /// on the audit logs of a guild
 pub struct SearchQuery<P: Fn(&AuditLogEntry) -> bool> {
     pub guild_id: u64,
-    pub entry_type: Option<AuditLogEvent>,
+    pub entry_type: Option<AuditLogEventType>,
     pub target_timestamp: Option<u64>,
     pub strategy: Strategy,
     pub matches: P,
@@ -74,6 +75,8 @@ type TwilightError = twilight_http::Error;
 pub enum Error {
     #[error("an error occurred while using the Discord API")]
     Twilight(#[source] TwilightError),
+    #[error("an error occurred while decoding the response sent by the Discord API")]
+    DecodeError(#[source] DeserializeBodyError),
     #[error("the bot does not have access to the audit log")]
     Unauthorized,
     #[error("no audit log entry could be found during the search")]
@@ -231,19 +234,20 @@ where
         if let Some(user_id) = search.user_id {
             get_audit_log = get_audit_log.user_id(UserId(user_id));
         }
-        let entries_option = get_audit_log.await.map_err(Error::Twilight)?;
+        let entries_option = get_audit_log
+            .exec()
+            .await
+            .map_err(Error::Twilight)?
+            .model()
+            .await
+            .map_err(Error::DecodeError)?;
 
         match entries_option {
-            None => break,
-            Some(AuditLog {
-                audit_log_entries, ..
-            }) if audit_log_entries.is_empty() => break,
-            Some(AuditLog {
-                audit_log_entries, ..
-            }) => {
+            AuditLog { entries, .. } if entries.is_empty() => break,
+            AuditLog { entries, .. } => {
                 // attempt to find the desired matching entry
                 let mut oldest: Option<AuditLogEntryId> = None;
-                for entry in audit_log_entries {
+                for entry in entries {
                     if (search.matches)(&entry) && search.strategy.matches(timing, &entry, search) {
                         return Ok(entry);
                     }

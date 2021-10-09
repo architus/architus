@@ -1,0 +1,23 @@
+[package]
+name = "architus-logs-lib"
+version = "0.1.0"
+authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
+edition = "2018"
+description = """\
+A common utility wrapper for emitting and processing Architus log events.\
+"""
+license = "MIT"
+
+[dependencies]
+fancy-regex = "0.7"
+url = "2.2"
+lazy_static = "1.4"
+tonic = "0.5"
+prost = "0.8"
+twilight-model = "0.6"
+serde = "1.0"
+serde_json = "1.0"
+
+[build-dependencies]
+tonic-build = "0.5"
+anyhow = "1.0"

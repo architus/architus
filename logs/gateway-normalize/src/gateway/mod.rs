@@ -2,10 +2,10 @@ pub mod path;
 pub mod processors;
 
 use crate::config::Configuration;
-use crate::event::NormalizedEvent;
 use crate::gateway::path::Path;
 use crate::rpc::gateway_queue_lib::GatewayEvent;
 use crate::util;
+use architus_logs_lib::event::NormalizedEvent;
 use jmespath::Variable;
 use slog::Logger;
 use static_assertions::assert_impl_all;
