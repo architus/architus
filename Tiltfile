@@ -108,11 +108,37 @@ if 'feature-gate' in enabled:
         # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         # Additionally, use hot reloading where the service process is restarted in-place upon rebuilds
         # From https://docs.tilt.dev/example_go.html
-        local_resource('feature-gate-compile', 'cargo build --manifest-path=feature-gate/Cargo.toml',
-                       deps=['feature-gate/Cargo.toml', 'feature-gate/Cargo.lock', 'feature-gate/build.rs', 'feature-gate/src'])
-        docker_build_with_restart('feature-gate-image', '.', dockerfile='feature-gate/Dockerfile.tilt', only=["feature-gate/target/debug/feature-gate"],
-                                  entrypoint='/usr/bin/feature-gate', live_update=[sync('feature-gate/target/debug/feature-gate', '/usr/bin/feature-gate')])
+        copy_example(path='feature-gate/config.toml', example_path='feature-gate/config.default.toml')
+        local_resource(
+            name='feature-gate-compile',
+            cmd='cargo build --manifest-path=feature-gate/Cargo.toml',
+            deps=[
+                'feature-gate/Cargo.toml',
+                'feature-gate/Cargo.lock',
+                'feature-gate/build.rs',
+                'feature-gate/src',
+            ],
+        )
+        docker_build_with_restart(
+            ref='feature-gate-image',
+            context='.',
+            dockerfile='feature-gate/Dockerfile.tilt',
+            only=[
+                "feature-gate/target/debug/feature-gate",
+                "feature-gate/config.toml",
+            ],
+            entrypoint=['/usr/bin/feature-gate', '/etc/architus/config.toml'],
+            live_update=[
+                sync('feature-gate/target/debug/feature-gate', '/usr/bin/feature-gate'),
+                sync('feature-gate/config.toml', '/etc/architus/config.toml'),
+            ],
+        )
     else:
-        docker_build('feature-gate-image', '.', dockerfile='feature-gate/Dockerfile', ignore=["*", "!feature-gate/**", "!lib/**"])
+        docker_build(
+            ref='feature-gate-image',
+            context='.',
+            dockerfile='feature-gate/Dockerfile',
+            ignore=["*", "!feature-gate/**","!lib/**"],
+        )
     k8s_yaml('feature-gate/kube/dev/feature-gate.yaml')
     k8s_resource('feature-gate')

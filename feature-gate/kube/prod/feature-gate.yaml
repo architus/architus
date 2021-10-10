@@ -16,11 +16,28 @@ spec:
       containers:
         - name: feature-gate
           image: "{{prefix}}feature-gate:{{tag}}"
-          envFrom:
-            - secretRef:
-                name: architus-secret
+          args: ["/etc/architus/config.d/service.toml"]
+          env:
+            - name: FEATURE_GATE_CONFIG_DATABASE__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: db_user
+            - name: FEATURE_GATE_CONFIG_DATABASE__USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: db_pass
+          volumeMounts:
+          - name: config
+            mountPath: "/etc/architus/config.d"
+            readOnly: true
       imagePullSecrets:
         - name: regcred
+      volumes:
+      - name: config
+        configMap:
+          name: feature-gate-config
 ---
 apiVersion: v1
 kind: Service

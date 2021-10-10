@@ -9,25 +9,28 @@
 
 #![deny(clippy::all)]
 
+use crate::rpc::feature_gate::feature_gate_server::{FeatureGate, FeatureGateServer};
+use crate::rpc::feature_gate::*;
+use anyhow::Context as _;
+use db::config::Configuration;
 use db::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::{Connection, PgConnection};
-use log::{info, warn};
 use r2d2::PooledConnection;
-use std::env;
+use slog::Logger;
+use sloggers::Config;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::Arc;
 use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{transport::Server, Request, Response, Status};
-
-use crate::rpc::feature_gate::feature_gate_server::{FeatureGate, FeatureGateServer};
-use crate::rpc::feature_gate::*;
-use backoff::future::FutureOperation;
-use backoff::ExponentialBackoff;
 
 type RpcResponse<T> = Result<Response<T>, Status>;
 
 /// Structure for handling all of the gRPC requests.
 /// Holds a connection pool that can issue RAII connection handles
 pub struct Gate {
+    logger: Logger,
     connection_pool: r2d2::Pool<ConnectionManager<PgConnection>>,
 }
 
@@ -58,10 +61,11 @@ impl FeatureGate for Gate {
 
         match result {
             Ok(_) => {
-                info!(
-                    "Added feature {} which is {}",
-                    feature.name,
-                    if feature.open { "open" } else { "closed" }
+                slog::info!(
+                    self.logger,
+                    "created new feature";
+                    "feature_name" => feature.name,
+                    "is_open" => feature.open,
                 );
                 success
             }
@@ -106,9 +110,11 @@ impl FeatureGate for Gate {
         let result = insert_guild_feature(&conn, addition.guild_id as i64, &addition.feature_name);
         match result {
             Ok(()) => {
-                info!(
-                    "Added feature {} to guild {}",
-                    addition.feature_name, addition.guild_id
+                slog::info!(
+                    self.logger,
+                    "added feature to guild";
+                    "feature_name" => addition.feature_name,
+                    "guild_id" => addition.guild_id,
                 );
                 success
             }
@@ -134,9 +140,11 @@ impl FeatureGate for Gate {
         let result = remove_guild_feature(&conn, removal.guild_id as i64, &removal.feature_name);
         match result {
             Ok(()) => {
-                info!(
-                    "Removed feature {} from guild {}",
-                    removal.feature_name, removal.guild_id
+                slog::info!(
+                    self.logger,
+                    "removed feature from guild";
+                    "feature_name" => removal.feature_name,
+                    "guild_id" => removal.guild_id,
                 );
                 success
             }
@@ -218,7 +226,7 @@ impl FeatureGate for Gate {
     }
 
     // A type association for doing a streaming response.
-    type GetFeaturesStream = mpsc::Receiver<Result<Feature, Status>>;
+    type GetFeaturesStream = ReceiverStream<Result<Feature, Status>>;
 
     /// Returns a stream of all of the features on the database.
     ///
@@ -237,7 +245,7 @@ impl FeatureGate for Gate {
             Err(_) => return Err(Status::internal("Database connection failed")),
         };
 
-        let (mut tx, rx) = mpsc::channel(8);
+        let (tx, rx) = mpsc::channel(8);
         tokio::spawn(async move {
             for feat in features {
                 match tx
@@ -253,12 +261,12 @@ impl FeatureGate for Gate {
             }
         });
 
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     // Stream type for returning a feature stream. Basically the same thing as for
     // the `get_features` stream.
-    type GetGuildFeaturesStream = mpsc::Receiver<Result<Feature, Status>>;
+    type GetGuildFeaturesStream = ReceiverStream<Result<Feature, Status>>;
 
     /// Sends all of the features associated with a guild.
     ///
@@ -280,7 +288,7 @@ impl FeatureGate for Gate {
             Err(_) => return Err(Status::internal("Database connection failed")),
         };
 
-        let (mut tx, rx) = mpsc::channel(8);
+        let (tx, rx) = mpsc::channel(8);
         tokio::spawn(async move {
             for feat in features {
                 match tx
@@ -296,53 +304,93 @@ impl FeatureGate for Gate {
             }
         });
 
-        Ok(Response::new(rx))
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }
 
+/// Loads the config and bootstraps the service
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Need to limit to Level or above to prevent tonic from bombarding the logs with
-    // hundreds of lines of debug output.
-    simple_logger::init_with_level(log::Level::Info).unwrap();
-    let db_usr = env::var("db_user").expect("Need to have an architus.env file");
-    let db_pass = env::var("db_pass").expect("Need to have an architus.env file");
-    let db_host = "postgres";
-    let db_port = 5432_u16;
-    let db_name = "autbot";
+async fn main() -> anyhow::Result<()> {
+    // Parse the config
+    let config_path = std::env::args().nth(1).context(
+        "no config path given \
+        \nUsage: \
+        \nfeature-gate [config-path]",
+    )?;
+    let config = Arc::new(Configuration::try_load(&config_path)?);
+
+    // Set up the logger from the config
+    let logger = config
+        .logging
+        .build_logger()
+        .context("could not build logger from config values")?;
+
+    slog::info!(
+        logger,
+        "starting service";
+        "config_path" => config_path,
+        "arguments" => ?std::env::args().collect::<Vec<_>>(),
+    );
+    slog::debug!(logger, "configuration dump"; "config" => ?config);
+
+    match run(config, logger.clone()).await {
+        Ok(_) => slog::info!(logger, "service exited";),
+        Err(err) => {
+            slog::error!(
+                logger,
+                "an error ocurred during service execution";
+                "error" => ?err,
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Attempts to initialize the bot and listen for gateway events
+async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     let database_url = format!(
         "postgresql://{}:{}@{}:{}/{}",
-        db_usr, db_pass, db_host, db_port, db_name
+        config.database.user_name,
+        config.database.user_password,
+        config.database.host,
+        config.database.port,
+        config.database.database_name,
     );
 
     // First, establish a stable connection with the database before creating the connection pool
     let ping = || async {
         if let Err(err) = PgConnection::establish(&database_url) {
-            log::warn!(
-                "Couldn't connect to the Postgres database; retrying after a backoff: {:?}",
-                err
+            slog::warn!(
+                logger,
+                "couldn't connect to the Postgres database; retrying after a backoff";
+                "error" => ?err,
             );
             Err(backoff::Error::Transient(err))
         } else {
             Ok(())
         }
     };
-    ping.retry(ExponentialBackoff::default()).await?;
-    log::info!(
-        "Connected to Postgres database at postgresql://***:***@{}:{}/{}",
-        db_host,
-        db_port,
-        db_name
+    backoff::future::retry(config.initialization_backoff.build(), ping).await?;
+    slog::info!(
+        logger,
+        "connected to Postgres database";
+        "connection_url" => format!(
+            "postgresql://***:***@{}:{}/{}",
+            config.database.host,
+            config.database.port,
+            config.database.database_name,
+        ),
     );
 
-    let addr = "0.0.0.0:50555".parse()?;
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), config.port);
     let manager: ConnectionManager<PgConnection> = ConnectionManager::new(database_url);
     let pool = r2d2::Pool::builder()
-        .max_size(16)
+        .max_size(config.connection_pool_size)
         .build(manager)
-        .expect("Could not build connection pool");
+        .context("could not build connection pool")?;
     let gate = Gate {
         connection_pool: pool,
+        logger: logger.clone(),
     };
 
     Server::builder()
@@ -350,6 +398,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .serve(addr)
         .await?;
 
-    warn!("Server exited mainloop");
     Ok(())
 }
