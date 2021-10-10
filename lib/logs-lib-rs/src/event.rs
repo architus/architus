@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions)]
+
 use crate::rpc::logs::submission::{
     EntityRevisionMetadata, EventDeterministicIdParams, SubmitIdempotentRequest, SubmittedEvent,
 };
@@ -219,6 +221,7 @@ pub struct Agent {
 impl Agent {
     /// Attempts to resolve the special type of the agent based on their ID.
     /// Checks to see if the user is the same as Architus
+    #[must_use]
     pub fn type_from_id(id: u64, bot_user_id: Option<u64>) -> AgentSpecialType {
         if bot_user_id.map(|i| i == id).unwrap_or(false) {
             AgentSpecialType::Architus
@@ -229,6 +232,7 @@ impl Agent {
 
     /// Attempts to resolve the special type of the agent based on the Discord user.
     /// Checks to see if the user is the same as Architus
+    #[must_use]
     pub fn type_from_discord_user(
         user: &DiscordUser,
         bot_user_id: Option<u64>,
@@ -281,6 +285,7 @@ impl From<Nickname> for Option<String> {
 }
 
 impl Entity {
+    #[must_use]
     pub const fn id(&self) -> Option<u64> {
         match self {
             Self::UserLike(UserLike { id, .. })
@@ -291,6 +296,7 @@ impl Entity {
         }
     }
 
+    #[must_use]
     pub const fn r#type(&self) -> EntityType {
         match self {
             Self::UserLike { .. } => EntityType::UserLike,
@@ -301,6 +307,7 @@ impl Entity {
         }
     }
 
+    #[must_use]
     pub fn into_revision_metadata(self) -> Option<EntityRevisionMetadata> {
         match self {
             Self::UserLike(UserLike {
@@ -347,6 +354,7 @@ pub struct Content {
 
 impl Content {
     #[allow(clippy::missing_const_for_fn)]
+    #[must_use]
     fn split(self) -> (String, ProtoContentMetadata) {
         (
             self.inner,

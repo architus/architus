@@ -1,5 +1,3 @@
-//! TODO move to own crate
-
 use fancy_regex::Regex;
 use lazy_static::lazy_static;
 use std::collections::BTreeSet;
@@ -9,15 +7,14 @@ use url::Url;
 /// in the given content string.
 /// Each mention regex should have a single capture group
 /// that contains the numeric ID.
+#[must_use]
 fn find_mentions(content: &str, regex: &Regex) -> Vec<u64> {
     // Use a set to de-duplicate mentions
     let mut mention_set = BTreeSet::<u64>::new();
-    for maybe_capture in regex.captures_iter(content) {
-        if let Ok(capture) = maybe_capture {
-            if let Some(id_capture) = capture.get(1) {
-                if let Ok(id) = id_capture.as_str().parse::<u64>() {
-                    mention_set.insert(id);
-                }
+    for capture in regex.captures_iter(content).flatten() {
+        if let Some(id_capture) = capture.get(1) {
+            if let Ok(id) = id_capture.as_str().parse::<u64>() {
+                mention_set.insert(id);
             }
         }
     }
@@ -30,7 +27,7 @@ fn find_mentions(content: &str, regex: &Regex) -> Vec<u64> {
 /// which get converted to the interact-able mention element
 /// in both the Discord client and the Architus logs web dashboard.
 ///
-/// See https://docs.archit.us/internal/modules/logs/rich-content/
+/// See <https://docs.archit.us/internal/modules/logs/rich-content/>
 ///
 /// ### Note
 /// This function finds mentions in code blocks as well as in the rest of the contents.
@@ -41,6 +38,7 @@ fn find_mentions(content: &str, regex: &Regex) -> Vec<u64> {
 /// as having a mention even if it is in a code block,
 /// simply because it is easier to implement
 /// and results in marginally more complete indexed log data.
+#[must_use]
 pub fn find_user_mentions(content: &str) -> Vec<u64> {
     lazy_static! {
         static ref USER_MENTION_REGEX: Regex = Regex::new(r#"<@([0-9]+)>"#).unwrap();
@@ -54,7 +52,7 @@ pub fn find_user_mentions(content: &str) -> Vec<u64> {
 /// which get converted to the interact-able mention element
 /// in both the Discord client and the Architus logs web dashboard.
 ///
-/// See https://docs.archit.us/internal/modules/logs/rich-content/
+/// See <https://docs.archit.us/internal/modules/logs/rich-content/>
 ///
 /// ### Note
 /// This function finds mentions in code blocks as well as in the rest of the contents.
@@ -65,6 +63,7 @@ pub fn find_user_mentions(content: &str) -> Vec<u64> {
 /// as having a mention even if it is in a code block,
 /// simply because it is easier to implement
 /// and results in marginally more complete indexed log data.
+#[must_use]
 pub fn find_role_mentions(content: &str) -> Vec<u64> {
     lazy_static! {
         static ref ROLE_MENTION_REGEX: Regex = Regex::new(r#"<@&([0-9]+)>"#).unwrap();
@@ -78,7 +77,7 @@ pub fn find_role_mentions(content: &str) -> Vec<u64> {
 /// which get converted to the interact-able mention element
 /// in both the Discord client and the Architus logs web dashboard.
 ///
-/// See https://docs.archit.us/internal/modules/logs/rich-content/
+/// See <https://docs.archit.us/internal/modules/logs/rich-content/>
 ///
 /// ### Note
 /// This function finds mentions in code blocks as well as in the rest of the contents.
@@ -89,6 +88,7 @@ pub fn find_role_mentions(content: &str) -> Vec<u64> {
 /// as having a mention even if it is in a code block,
 /// simply because it is easier to implement
 /// and results in marginally more complete indexed log data.
+#[must_use]
 pub fn find_channel_mentions(content: &str) -> Vec<u64> {
     lazy_static! {
         static ref CHANNEL_MENTION_REGEX: Regex = Regex::new(r#"<#([0-9]+)>"#).unwrap();
@@ -108,7 +108,7 @@ pub struct CustomEmojiUsages<'a> {
 /// Custom emoji uses look like `<:architus:792017989583110154>` in Discord rich content,
 /// which get converted to the interact-able emoji element
 /// in both the Discord client and the Architus logs web dashboard.
-/// See https://docs.archit.us/internal/modules/logs/rich-content/
+/// See <https://docs.archit.us/internal/modules/logs/rich-content/>
 ///
 /// ### Note
 /// This function finds custom emoji uses in code blocks as well as in the rest of the contents.
@@ -125,6 +125,7 @@ pub struct CustomEmojiUsages<'a> {
 /// where custom emoji can be missing their name
 /// (and only contain the id, as in `<a::814220915033899059>`
 /// or `<::792017989583110154>`)
+#[must_use]
 pub fn find_custom_emoji_uses<'a>(content: &'a str) -> CustomEmojiUsages<'a> {
     lazy_static! {
         static ref CUSTOM_EMOJI_MENTION_REGEX: Regex =
@@ -134,18 +135,16 @@ pub fn find_custom_emoji_uses<'a>(content: &'a str) -> CustomEmojiUsages<'a> {
     // Use sets to de-duplicate ids/names
     let mut mentioned_ids = BTreeSet::<u64>::new();
     let mut mentioned_names = BTreeSet::<&'a str>::new();
-    for maybe_capture in CUSTOM_EMOJI_MENTION_REGEX.captures_iter(content) {
-        if let Ok(capture) = maybe_capture {
-            if let Some(id_capture) = capture.get(2) {
-                if let Ok(id) = id_capture.as_str().parse::<u64>() {
-                    mentioned_ids.insert(id);
-                }
+    for capture in CUSTOM_EMOJI_MENTION_REGEX.captures_iter(content).flatten() {
+        if let Some(name_capture) = capture.get(1) {
+            if !name_capture.as_str().is_empty() {
+                mentioned_names.insert(name_capture.as_str());
             }
+        }
 
-            if let Some(name_capture) = capture.get(1) {
-                if !name_capture.as_str().is_empty() {
-                    mentioned_names.insert(name_capture.as_str());
-                }
+        if let Some(id_capture) = capture.get(2) {
+            if let Ok(id) = id_capture.as_str().parse::<u64>() {
+                mentioned_ids.insert(id);
             }
         }
     }
@@ -158,13 +157,14 @@ pub fn find_custom_emoji_uses<'a>(content: &'a str) -> CustomEmojiUsages<'a> {
 
 /// Scans a content string for alL URL-like strings.
 /// This includes:
-/// - www.google.com
-/// - https://docs.archit.us/
-/// - http://archit.us/app?code=XXX
+/// - `www.google.com`
+/// - `https://docs.archit.us/`
+/// - `http://archit.us/app?code=XXX`
+#[must_use]
 pub fn find_urls(content: &str) -> Vec<&str> {
     // Thank you Stack Overflow :)
     // https://stackoverflow.com/a/17773849/13192375
-    const URL_REGEX_RAW: &'static str = r#"(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})"#;
+    const URL_REGEX_RAW: &str = r#"(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})"#;
 
     lazy_static! {
         static ref URL_REGEX: Regex = Regex::new(URL_REGEX_RAW).unwrap();
@@ -172,11 +172,9 @@ pub fn find_urls(content: &str) -> Vec<&str> {
 
     // Use sets to de-duplicate urls
     let mut urls = BTreeSet::<&str>::new();
-    for maybe_capture in URL_REGEX.captures_iter(content) {
-        if let Ok(capture) = maybe_capture {
-            if let Some(whole_match) = capture.get(0) {
-                urls.insert(whole_match.as_str());
-            }
+    for capture in URL_REGEX.captures_iter(content).flatten() {
+        if let Some(whole_match) = capture.get(0) {
+            urls.insert(whole_match.as_str());
         }
     }
 
@@ -187,12 +185,13 @@ pub fn find_urls(content: &str) -> Vec<&str> {
 /// These are substrings of the URL's domain
 /// where each possible hierarchical subdomain is considered as a url stem.
 /// For example, the following URLs:
-/// - www.google.com
-/// - https://docs.archit.us/
-/// - http://archit.us/app?code=XXX
+/// - `www.google.com`
+/// - `https://docs.archit.us/`
+/// - `http://archit.us/app?code=XXX`
 ///
 /// will return a vector that contains:
 /// `["www.google.com", "google.com", "docs.archit.us", "archit.us"]`
+#[must_use]
 pub fn collect_url_stems<'a>(urls: impl IntoIterator<Item = &'a str>) -> Vec<String> {
     // Use sets to de-duplicate url stems
     let mut url_stems = BTreeSet::<String>::new();
@@ -216,18 +215,19 @@ pub fn collect_url_stems<'a>(urls: impl IntoIterator<Item = &'a str>) -> Vec<Str
 /// where each possible hierarchical subdomain is considered as a url stem.
 /// For example, an input url of `https://api.develop.archit.us/guild_count`
 /// would return `Some(["api.develop.archit.us", "develop.archit.us", "archit.us"])`
+#[must_use]
 pub fn get_url_stems(raw_url: impl AsRef<str>) -> Option<Vec<String>> {
     let parsed_url = Url::parse(raw_url.as_ref()).ok()?;
     let domain = parsed_url.host_str()?;
 
-    let mut segments_reversed = domain.split(".").collect::<Vec<_>>();
+    let mut segments_reversed = domain.split('.').collect::<Vec<_>>();
     segments_reversed.reverse();
     if segments_reversed.len() < 2 {
         return None;
     }
 
     let (first, rest) = segments_reversed.as_slice().split_at(1);
-    let mut accum = first.into_iter().collect::<Vec<_>>();
+    let mut accum = first.iter().collect::<Vec<_>>();
     let mut url_stems = Vec::<String>::new();
     for segment in rest {
         accum.push(segment);
@@ -246,8 +246,6 @@ pub fn get_url_stems(raw_url: impl AsRef<str>) -> Option<Vec<String>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::extract::CustomEmojiUsages;
-
     #[test]
     fn test_find_user_mentions() {
         use super::find_user_mentions;
@@ -443,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_find_custom_emoji_uses() {
-        use super::find_custom_emoji_uses;
+        use super::{find_custom_emoji_uses, CustomEmojiUsages};
 
         // The function should find only the custom emoji uses
         // among all other rich content syntax.

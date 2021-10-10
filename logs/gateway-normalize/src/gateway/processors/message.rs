@@ -246,11 +246,11 @@ fn find_unicode_emojis(content: &str, emoji_db: &crate::emoji::Db) -> Vec<String
 }
 
 pub fn source_content(ctx: &ProcessorContext<'_>, message_content: String) -> Content {
-    let custom_emojis = architus_logs_lib::extract::find_custom_emoji_uses(&message_content);
+    let custom_emojis = architus_logs_lib::content::find_custom_emoji_uses(&message_content);
     Content {
-        users_mentioned: architus_logs_lib::extract::find_user_mentions(&message_content),
-        roles_mentioned: architus_logs_lib::extract::find_role_mentions(&message_content),
-        channels_mentioned: architus_logs_lib::extract::find_channel_mentions(&message_content),
+        users_mentioned: architus_logs_lib::content::find_user_mentions(&message_content),
+        roles_mentioned: architus_logs_lib::content::find_role_mentions(&message_content),
+        channels_mentioned: architus_logs_lib::content::find_channel_mentions(&message_content),
         emojis_used: find_unicode_emojis(&message_content, &ctx.emojis),
         custom_emojis_used: custom_emojis.ids,
         custom_emoji_names_used: custom_emojis
@@ -258,8 +258,8 @@ pub fn source_content(ctx: &ProcessorContext<'_>, message_content: String) -> Co
             .into_iter()
             .map(String::from)
             .collect::<Vec<_>>(),
-        url_stems: architus_logs_lib::extract::collect_url_stems(
-            architus_logs_lib::extract::find_urls(&message_content),
+        url_stems: architus_logs_lib::content::collect_url_stems(
+            architus_logs_lib::content::find_urls(&message_content),
         ),
         inner: message_content,
     }

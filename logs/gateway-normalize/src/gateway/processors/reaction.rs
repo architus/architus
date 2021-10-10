@@ -231,7 +231,7 @@ pub fn format_content(
             })
         }
         ReactionType::Custom { id, animated, name } => {
-            architus_logs_lib::write::write_custom_emoji(
+            architus_logs_lib::content::write_custom_emoji(
                 &mut content,
                 id.0,
                 name.as_deref(),
