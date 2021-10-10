@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# Create Rabbitmq user( \
+# Create Rabbitmq user
+( \
 echo "*** Starting RabbitMQ server and waiting to configure. ***" ; \
 sleep 12 ; \
 echo "*** Starting to configure RabbitMQ server. ***" ; \
