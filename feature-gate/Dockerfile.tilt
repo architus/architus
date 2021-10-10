@@ -7,5 +7,5 @@ RUN apt-get update -q \
     && apt-get install -y -q "libssl1.1" "libpq-dev" \
     && rm -rf /var/lib/apt/lists/*
 COPY feature-gate/target/debug/feature-gate /usr/bin/feature-gate
+COPY feature-gate/config.toml /etc/architus/config.toml
 ENV RUST_BACKTRACE=1
-ENTRYPOINT ["/usr/bin/feature-gate"]

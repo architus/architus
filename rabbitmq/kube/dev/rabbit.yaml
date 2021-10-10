@@ -36,3 +36,6 @@ spec:
   - name: web
     port: 15672
     targetPort: 15672
+  - name: admin
+    port: 8090
+    targetPort: 8090
