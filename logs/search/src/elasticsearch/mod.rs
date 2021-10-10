@@ -11,7 +11,6 @@ use elasticsearch::http::{StatusCode, Url};
 use elasticsearch::{Elasticsearch, Error as LibError, SearchParts};
 use serde::de::DeserializeOwned;
 use slog::Logger;
-use thiserror::Error;
 
 /// Wrapped Elasticsearch client struct
 pub struct Client {
@@ -48,7 +47,7 @@ pub fn new_client(config: &Configuration, logger: Logger) -> anyhow::Result<Clie
     })
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum PingError {
     #[error("pinging elasticsearch failed")]
     Failed(#[source] LibError),
@@ -127,7 +126,7 @@ impl SearchParams {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum SearchError {
     #[error("performing search operation failed")]
     Failure(#[source] LibError),

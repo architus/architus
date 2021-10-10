@@ -1,6 +1,0 @@
-# Ignore all files in the context except for the service binary
-# Overrides /.dockerignore
-
-*
-!feature-gate/target/debug/feature-gate
-!feature-gate/config.toml

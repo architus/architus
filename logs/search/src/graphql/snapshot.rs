@@ -1,7 +1,6 @@
 use std::convert::TryInto;
 use std::fmt;
 use std::str::FromStr;
-use thiserror::Error;
 
 /// Represents an opaque snapshot token that just includes an inner timestamp.
 /// Used for stateless pagination sessions where we want some stability in the results,
@@ -16,7 +15,7 @@ impl fmt::Display for Token {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ParsingError {
     #[error("could not decode snapshot token base64: {0}")]
     FailedBase64Decode(base64::DecodeError),

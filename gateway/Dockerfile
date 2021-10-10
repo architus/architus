@@ -16,7 +16,7 @@ RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
 RUN apk del python3-dev
 
 COPY ./gateway/ /app/
-COPY ./lib /app/lib
+COPY ./lib/python-common /app/lib
 
 EXPOSE 6000
 

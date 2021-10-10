@@ -8,13 +8,16 @@ use bytes::Bytes;
 use elasticsearch::auth::Credentials;
 use elasticsearch::http::headers::HeaderMap;
 use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
-use elasticsearch::http::{Method, StatusCode, Url};
+use elasticsearch::http::{Method, Url};
 use elasticsearch::indices::IndicesCreateParts;
 use elasticsearch::{BulkParts, Elasticsearch, Error as LibError};
 use serde::Serialize;
 use slog::Logger;
 use std::iter::IntoIterator;
-use thiserror::Error;
+
+// Re-export `elasticsearch::http::StatusCode`
+// (which itself is a re-export of `hyper::http::StatusCode`).
+pub use elasticsearch::http::StatusCode;
 
 /// Wrapped Elasticsearch client struct
 pub struct Client {
@@ -51,7 +54,7 @@ pub fn new_client(config: &Configuration, logger: Logger) -> anyhow::Result<Clie
     })
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum PingError {
     #[error("pinging elasticsearch failed")]
     Failed(#[source] LibError),
@@ -80,7 +83,7 @@ pub enum IndexStatus {
     AlreadyExists,
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum EnsureIndexExistsError {
     #[error("ensuring the index exists failed")]
     Failed(#[source] LibError),
@@ -145,7 +148,7 @@ pub struct BulkOperation {
     source: Option<Bytes>,
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum MakeBulkOperationError {
     #[error("failed to serialize action JSON object")]
     ActionSerializationFailure(#[source] serde_json::Error),
@@ -215,7 +218,7 @@ impl BulkItem {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum BulkError {
     #[error("performing bulk operation failed")]
     Failure(#[source] LibError),

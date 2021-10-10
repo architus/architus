@@ -18,7 +18,7 @@ RUN python3 -m pip install --trusted-host pypi.python.org -r requirements.txt
 RUN apk del build-base python3-dev
 
 COPY ./manager /app/
-COPY ./lib /app/lib
+COPY ./lib/python-common /app/lib
 
 ENV NUM_SHARDS=1
 CMD ["python3", "-u", "manager_server.py"]

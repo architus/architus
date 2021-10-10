@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 /// Creates a new Elasticsearch client
 /// and pings it to ensure that the connection is live.
+#[allow(clippy::module_name_repetitions)]
 pub async fn connect_to_elasticsearch(
     config: Arc<Configuration>,
     logger: Logger,

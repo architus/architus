@@ -3,7 +3,9 @@
 
 pub mod bulk {
     // Source: `https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#bulk-api-response-body`
+
     use serde::{Deserialize, Serialize};
+    use elasticsearch::http::StatusCode;
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Response {
@@ -39,28 +41,31 @@ pub mod bulk {
         #[serde(rename = "_primary_term")]
         pub primary_term: Option<i64>,
         #[serde(with = "serde_status_code")]
-        pub status: hyper::StatusCode,
+        pub status: StatusCode,
         pub error: Option<Error>,
     }
 
     /// Defines a `serde(with)` combination of (de)serialize functions
-    /// that convert between `u16` integers and instances of `hyper::http::StatusCode` values.
+    /// that convert between `u16` integers and instances of `elasticsearch::http::StatusCode`
+    /// (a re-export of `hyper::http::StatusCode`) values.
     /// This is used to make consuming their values more ergonomic
     /// and combine the conversion into the rest of the decoding.
     mod serde_status_code {
+        use elasticsearch::http::StatusCode;
+
         use serde::Deserialize;
 
-        pub fn deserialize<'de, D>(deserializer: D) -> Result<hyper::http::StatusCode, D::Error>
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<StatusCode, D::Error>
         where
             D: serde::Deserializer<'de>,
         {
-            hyper::StatusCode::from_u16(u16::deserialize(deserializer)?)
+            StatusCode::from_u16(u16::deserialize(deserializer)?)
                 .map_err(serde::de::Error::custom)
         }
 
         #[allow(clippy::trivially_copy_pass_by_ref)]
         pub fn serialize<S>(
-            status_code: &hyper::StatusCode,
+            status_code: &StatusCode,
             serializer: S,
         ) -> Result<S::Ok, S::Error>
         where

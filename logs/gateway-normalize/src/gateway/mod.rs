@@ -14,7 +14,6 @@ use std::convert::TryFrom;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use thiserror::Error;
 use twilight_http::Client;
 use twilight_model::gateway::event::EventType as GatewayEventType;
 
@@ -38,7 +37,7 @@ impl TryFrom<GatewayEvent> for EventWithSource {
 
 /// Enumerates the various errors that can occur during event processing
 /// that cause it to halt
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ProcessorError {
     #[error("no sub-processor found for event type {0}")]
     SubProcessorNotFound(String),

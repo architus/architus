@@ -64,7 +64,7 @@ async fn main() -> anyhow::Result<()> {
         Err(err) => {
             slog::error!(
                 logger,
-                "an error ocurred during service execution";
+                "an error occurred during service execution";
                 "error" => ?err,
             );
         }

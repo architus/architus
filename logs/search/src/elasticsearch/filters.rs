@@ -1,8 +1,7 @@
 use crate::elasticsearch::SearchParams;
 use serde::Serialize;
-use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum FilterApplyError {
     #[error("serializing the given value to JSON failed for filter type {filter_type} on field {field_name}")]
     ValueSerializationError {

@@ -197,7 +197,7 @@ impl Consumer {
                     "error" => ?err,
                 );
 
-                // Reject the message without requeuing
+                // Reject the message without requeueing
                 return Err(Rejection {
                     should_requeue: false,
                     source: err.into(),
@@ -220,7 +220,7 @@ impl Consumer {
                     "error" => ?err,
                 );
 
-                // Reject the message without requeuing
+                // Reject the message without requeueing
                 return Err(Rejection {
                     should_requeue: false,
                     source: err.into(),
@@ -240,7 +240,7 @@ impl Consumer {
                         "error" => ?err,
                     );
                 }
-                // Reject the message with/without requeuing depending on the error
+                // Reject the message with/without requeueing depending on the error
                 // (poison messages will be handled by max retry policy for quorum queue)
                 Rejection {
                     should_requeue: err.should_requeue(),

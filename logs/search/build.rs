@@ -1,6 +1,6 @@
 use anyhow::Context;
 
-const SERDE_STRUCTS: &[&str] = &[
+const MESSAGES: &[&str] = &[
     ".logs.event.Event",
     ".logs.event.EventSource",
     ".logs.event.ContentMetadata",
@@ -15,24 +15,23 @@ const ENUMS: &[&str] = &[
 ];
 
 fn main() -> anyhow::Result<()> {
-    // Compile the logs/event protobuf definitions
+    // Compile the logs/event protobuf definitions,
+    // adding serde, serde_repr, strum, and juniper derives as needed.
     let mut builder = tonic_build::configure()
         .build_client(false)
         .build_server(false);
 
-    for &struct_path in SERDE_STRUCTS {
-        builder = builder.type_attribute(struct_path, "#[derive(::serde::Deserialize)]");
+    for &message_path in MESSAGES {
+        builder = builder.type_attribute(message_path, "#[derive(::serde::Deserialize)]");
     }
 
     for &enum_path in ENUMS {
+        builder = builder.type_attribute(enum_path, "#[derive(::serde_repr::Deserialize_repr)]");
+
         // Note: we have to hope (and pray) that the strum serializations are the same as the juniper ones
         // The book (https://graphql-rust.github.io/juniper/current/types/enums.html#enums) is wrong
         // when it says they are uppercase; they should be SCREAMING_SNAKE_CASE in juniper as well
         builder = builder
-            .type_attribute(
-                enum_path,
-                "#[derive(::serde_repr::Serialize_repr, ::serde_repr::Deserialize_repr)]",
-            )
             .type_attribute(enum_path, "#[derive(::juniper::GraphQLEnum)]")
             .type_attribute(enum_path, "#[derive(::strum::EnumString)]")
             .type_attribute(
@@ -46,7 +45,7 @@ fn main() -> anyhow::Result<()> {
             &["event.proto", "logs/event.proto"],
             &["../submission/schema", "../../lib/ipc/proto"],
         )
-        .context("compiling logs/event.proto definitions")?;
+        .context("compiling proto definitions")?;
 
     Ok(())
 }

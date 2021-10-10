@@ -264,7 +264,7 @@ pub fn set_feature_openness(conn: &PgConnection, feature: &str, openness: bool) 
 
 /// Check to see if a feature is open or closed.
 ///
-/// If the feature does not exist in the database, an unknown feature errror will
+/// If the feature does not exist in the database, an unknown feature error will
 /// be returned. Any other error should be interpreted as the database having failed
 /// in some way.
 ///
@@ -274,7 +274,7 @@ pub fn set_feature_openness(conn: &PgConnection, feature: &str, openness: bool) 
 ///
 /// # Errors
 /// * `DatabaseError::UnknownFeature` - Feature name not found in database
-/// * `DatabaseError::Queyr` - Database qeury failed
+/// * `DatabaseError::Query` - Database query failed
 pub fn get_feature_openness(conn: &PgConnection, feature: &str) -> DbResult<bool> {
     let feature_id = get_feature_id(conn, feature)?;
 
@@ -286,7 +286,7 @@ pub fn get_feature_openness(conn: &PgConnection, feature: &str) -> DbResult<bool
 
     match result {
         // Can just blindly remove the first element because we know that it will
-        // be there if no error occurrs. The id fetch returned true so the feature
+        // be there if no error occurs. The id fetch returned true so the feature
         // is there. Therefore it must have an open value that can be returned.
         Ok(mut v) => Ok(v.remove(0)),
         Err(_) => Err(DatabaseError::Query),

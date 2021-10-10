@@ -3,14 +3,13 @@
 
 use crate::config::Configuration;
 use crate::elasticsearch::{
-    BulkError, BulkItem, BulkOperation, EnsureIndexExistsError, IndexStatus, MakeBulkOperationError,
+    BulkError, BulkItem, BulkOperation, EnsureIndexExistsError, IndexStatus, MakeBulkOperationError, StatusCode,
 };
 use crate::rpc::logs::event::Event as ProtoEvent;
 use crate::rpc::logs_submission_schema::StoredEvent;
 use crate::timeout::TimeoutOr;
 use anyhow::Context;
 use bytes::Bytes;
-use hyper::StatusCode;
 use slog::Logger;
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryInto;
@@ -37,7 +36,7 @@ pub struct Event {
 
 /// Public failure result variant,
 /// giving details on why event submission failed.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Failure {
     pub status: Status,
     pub internal_details: String,
@@ -78,14 +77,14 @@ impl<T> WithId<T> {
 
 /// Internal version of `WithId<OperationResult>`
 /// that does not include `correlation_id`
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct InternalResult {
     id: String,
     result: Result<InternalSuccess, InternalFailure>,
 }
 
 /// Internal version of `Failure` that does not include `correlation_id`
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct InternalFailure {
     pub status: Status,
     pub internal_details: String,
@@ -115,8 +114,8 @@ pub async fn create_index(
         "elasticsearch_index" => &index,
     );
 
-    // Load in the file from the file system
-    let index_settings = read_index_settings_file(path).await?;
+    // Synchronously load in the file from the file system
+    let index_settings = read_index_settings_file(path)?;
 
     // Send the index config bytes to Elasticsearch
     let initialization_backoff = config.initialization.backoff.build();
@@ -166,16 +165,20 @@ pub async fn create_index(
     Ok(())
 }
 
-/// Reads in the index settings file for the events index,
+/// Synchronously reads in the index settings file for the events index,
 /// ensuring that the file exists and contains valid JSON
 /// before returning the file's direct contents.
-async fn read_index_settings_file(path: impl AsRef<Path>) -> anyhow::Result<Bytes> {
+fn read_index_settings_file(path: impl AsRef<Path>) -> anyhow::Result<Bytes> {
     let path_ref = path.as_ref();
     let mut index_config_file = File::open(path_ref).context(format!(
         "could not open index settings file at '{:#?}'",
         path_ref
     ))?;
 
+    // Use synchronous file I/O.
+    // The file is small, and this is only done once at service startup
+    // (and importantly not when serving requests),
+    // so this shouldn't be a problem.
     let mut file_contents = Vec::new();
     index_config_file
         .read_to_end(&mut file_contents)
@@ -428,10 +431,12 @@ impl BatchSubmit {
     ) -> Vec<InternalResult> {
         let mut results: Vec<InternalResult> = Vec::with_capacity(submitted_ids.len());
 
-        // Create a failure that can be re-used for each submitted document ID.
-        // This failure is only used if the retry was exhausted,
+        // Create the params for the failure that will be created for each submitted document ID.
+        // These failures will only used if the retry was exhausted,
         // otherwise it will try again.
-        let failure = match &err {
+        // Note: we create the params and not the failure struct itself
+        // because we can't clone `Failure`'s (as a result of `tonic::Status: !Clone`)
+        let (status_code, status_message, internal_details) = match &err {
             TimeoutOr::Other(BulkError::Failure(err)) => {
                 slog::warn!(
                     self.logger,
@@ -442,10 +447,11 @@ impl BatchSubmit {
                     "attempted_count" => self.attempted_count,
                 );
 
-                InternalFailure {
-                    status: Status::unavailable("Elasticsearch was unavailable"),
-                    internal_details: format!("{:?}", err),
-                }
+                (
+                    tonic::Code::Unavailable,
+                    "Elasticsearch was unavailable",
+                    format!("{:?}", err),
+                )
             }
             TimeoutOr::Other(BulkError::FailedToDecode(err)) => {
                 slog::warn!(
@@ -457,10 +463,11 @@ impl BatchSubmit {
                     "attempted_count" => self.attempted_count,
                 );
 
-                InternalFailure {
-                    status: Status::unavailable("Elasticsearch sent malformed response"),
-                    internal_details: format!("{:?}", err),
-                }
+                (
+                    tonic::Code::Unavailable,
+                    "Elasticsearch sent malformed response",
+                    format!("{:?}", err),
+                )
             }
             TimeoutOr::Timeout(timeout) => {
                 slog::warn!(
@@ -472,18 +479,22 @@ impl BatchSubmit {
                     "attempted_count" => self.attempted_count,
                 );
 
-                InternalFailure {
-                    status: Status::unavailable("Elasticsearch did not respond within deadline"),
-                    internal_details: format!("operation timed out after {:?}", timeout),
-                }
+                (
+                    tonic::Code::Unavailable,
+                    "Elasticsearch did not respond within deadline",
+                    format!("operation timed out after {:?}", timeout),
+                )
             }
         };
 
-        // Clone the failure for each submitted document ID.
+        // Construct the failure for each submitted document ID.
         for submitted_id in submitted_ids {
             results.push(InternalResult {
                 id: submitted_id,
-                result: Err(failure.clone()),
+                result: Err(InternalFailure {
+                    status: Status::new(status_code, String::from(status_message)),
+                    internal_details: internal_details.clone(),
+                }),
             });
         }
 

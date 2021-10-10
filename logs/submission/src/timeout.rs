@@ -1,13 +1,12 @@
 //! Small utility to handle timeouts in async operations
 
-// #![allow(clippy::future_not_send)]
-
 use std::error::Error;
 use std::fmt::Debug;
 use std::future::Future;
 use std::time::Duration;
 
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::module_name_repetitions)]
 pub enum TimeoutOr<T>
 where
     T: Error,
