@@ -1,1 +1,3 @@
+# Stop clippy from suggesting that "gRPC" belongs in backticks
+# whenever it appears inside of doc comments
 doc-valid-idents = ["gRPC"]

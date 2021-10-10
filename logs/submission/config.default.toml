@@ -29,25 +29,31 @@ auth_username = ""
 # Ignored if the user is empty.
 auth_password = ""
 
-# Parameters for the backoff used to connect to external services during initialization
-[initialization_backoff]
+# The timeout/backoff used to connect to external services during initialization
+[initialization]
+attempt_timeout = "2s"
+[initialization.backoff]
 initial_interval = "500ms"
 max_interval = "30s"
 duration = "2m"
 multiplier = 2.0
 
-# Parameters for the backoff used to create the index
-[index_creation_backoff]
+# The timeout/backoff used to create the logs index
+[index_creation]
+attempt_timeout = "2s"
+[index_creation.backoff]
 initial_interval = "100ms"
 max_interval = "10s"
 duration = "2m"
 multiplier = 2.0
 
-# Parameters for the backoff used to forward events to Elasticsearch
-[submission_backoff]
+# The timeout/backoff used to forward events to Elasticsearch
+[submission]
+attempt_timeout = "10s"
+[submission.backoff]
 initial_interval = "50ms"
 max_interval = "500ms"
-duration = "2s"
+duration = "20s"
 multiplier = 2.0
 
 # Logging configuration (for service diagnostic logs, not Architus log events)

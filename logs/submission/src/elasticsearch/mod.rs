@@ -124,11 +124,8 @@ impl Client {
                         .map_err(EnsureIndexExistsError::BodyReadFailure)?;
 
                     // Check to see if the index already existed (if so, it's fine)
-                    let is_exist_error = if status_code == StatusCode::BAD_REQUEST {
-                        content.contains("resource_already_exists_exception")
-                    } else {
-                        false
-                    };
+                    let is_exist_error = status_code == StatusCode::BAD_REQUEST
+                        && content.contains("resource_already_exists_exception");
 
                     if is_exist_error {
                         Ok(IndexStatus::AlreadyExists)

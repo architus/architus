@@ -27,14 +27,22 @@ pub struct Configuration {
 
     /// Parameters for the database connection to Elasticsearch
     pub elasticsearch: Elasticsearch,
-    /// Parameters for the backoff used to connect to external services during initialization
-    pub initialization_backoff: Backoff,
-    /// Parameters for the backoff used to create the index
-    pub index_creation_backoff: Backoff,
-    /// Parameters for the backoff used to forward events to Elasticsearch
-    pub submission_backoff: Backoff,
+    /// The timeout/backoff used to connect to external services during initialization
+    pub initialization: BackoffAndTimeout,
+    /// The timeout/backoff used to create the logs index
+    pub index_creation: BackoffAndTimeout,
+    /// The timeout/backoff used to forward events to Elasticsearch
+    pub submission: BackoffAndTimeout,
     /// Logging configuration (for service diagnostic logs, not Architus log events)
     pub logging: TerminalLoggerConfig,
+}
+
+/// Combination of backoff and timeout config for a class of RPC's
+#[derive(Debug, Deserialize, Clone)]
+pub struct BackoffAndTimeout {
+    #[serde(with = "humantime_serde")]
+    pub attempt_timeout: Duration,
+    pub backoff: Backoff,
 }
 
 /// Collection of external services that this service connects to

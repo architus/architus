@@ -7,6 +7,7 @@ use crate::elasticsearch::{
 };
 use crate::rpc::logs::event::Event as ProtoEvent;
 use crate::rpc::logs_submission_schema::StoredEvent;
+use crate::timeout::TimeoutOr;
 use anyhow::Context;
 use bytes::Bytes;
 use hyper::StatusCode;
@@ -118,13 +119,13 @@ pub async fn create_index(
     let index_settings = read_index_settings_file(path).await?;
 
     // Send the index config bytes to Elasticsearch
-    let initialization_backoff = config.initialization_backoff.build();
+    let initialization_backoff = config.initialization.backoff.build();
+    let timeout = config.initialization.attempt_timeout;
     let try_ensure_index_exists = || async {
         // Cloning this is cheap
         let index_settings = index_settings.clone();
 
-        client
-            .ensure_index_exists(index, index_settings)
+        crate::timeout::timeout(timeout, client.ensure_index_exists(index, index_settings))
             .await
             .map_err(backoff::Error::Transient)
     };
@@ -145,13 +146,16 @@ pub async fn create_index(
                 "elasticsearch_index" => #?&config.elasticsearch.index,
             );
         }
-        Err(EnsureIndexExistsError::Failed(err)) => {
+        Err(err @ TimeoutOr::Timeout(_)) => {
+            return Err(err).context("could not create index on elasticsearch: server timed out");
+        }
+        Err(TimeoutOr::Other(EnsureIndexExistsError::Failed(err))) => {
             return Err(err).context("could not create index on elasticsearch");
         }
-        Err(EnsureIndexExistsError::BodyReadFailure(err)) => {
+        Err(TimeoutOr::Other(EnsureIndexExistsError::BodyReadFailure(err))) => {
             return Err(err).context("could not read response body from elasticsearch");
         }
-        Err(EnsureIndexExistsError::ErrorStatusCode(status_code)) => {
+        Err(TimeoutOr::Other(EnsureIndexExistsError::ErrorStatusCode(status_code))) => {
             return Err(anyhow::anyhow!(format!(
                 "could not create index on elasticsearch; server responded with {:?}",
                 status_code
@@ -284,7 +288,8 @@ impl BatchSubmit {
     ) -> Vec<InternalResult> {
         let mut stored_events = stored_events;
 
-        let submission_backoff = self.config.submission_backoff.build();
+        let submission_backoff = self.config.submission.backoff.build();
+        let timeout = self.config.submission.attempt_timeout;
         let send_to_elasticsearch = || {
             // Construct the bodies on each iteration
             // so that they have current ingestion timestamps
@@ -310,7 +315,7 @@ impl BatchSubmit {
                     .map(|op| op.id.clone())
                     .collect::<Vec<_>>();
 
-                match self.try_submit_all(operations).await {
+                match crate::timeout::timeout(timeout, self.try_submit_all(operations)).await {
                     Ok(mut submission_results) => {
                         results.append(&mut submission_results);
                         Ok(results)
@@ -418,7 +423,7 @@ impl BatchSubmit {
     /// otherwise it will try again and the returned results are ignored.
     fn create_results_for_submission_failure(
         &self,
-        err: &BulkError,
+        err: &TimeoutOr<BulkError>,
         submitted_ids: Vec<String>,
     ) -> Vec<InternalResult> {
         let mut results: Vec<InternalResult> = Vec::with_capacity(submitted_ids.len());
@@ -427,7 +432,7 @@ impl BatchSubmit {
         // This failure is only used if the retry was exhausted,
         // otherwise it will try again.
         let failure = match &err {
-            BulkError::Failure(err) => {
+            TimeoutOr::Other(BulkError::Failure(err)) => {
                 slog::warn!(
                     self.logger,
                     "sending to elasticsearch failed";
@@ -442,7 +447,7 @@ impl BatchSubmit {
                     internal_details: format!("{:?}", err),
                 }
             }
-            BulkError::FailedToDecode(err) => {
+            TimeoutOr::Other(BulkError::FailedToDecode(err)) => {
                 slog::warn!(
                     self.logger,
                     "decoding response from elasticsearch failed";
@@ -455,6 +460,21 @@ impl BatchSubmit {
                 InternalFailure {
                     status: Status::unavailable("Elasticsearch sent malformed response"),
                     internal_details: format!("{:?}", err),
+                }
+            }
+            TimeoutOr::Timeout(timeout) => {
+                slog::warn!(
+                    self.logger,
+                    "sending to elasticsearch timed out";
+                    "timeout" => ?timeout,
+                    "elasticsearch_index" => &self.config.elasticsearch.index,
+                    "submitted_count" => submitted_ids.len(),
+                    "attempted_count" => self.attempted_count,
+                );
+
+                InternalFailure {
+                    status: Status::unavailable("Elasticsearch did not respond within deadline"),
+                    internal_details: format!("operation timed out after {:?}", timeout),
                 }
             }
         };

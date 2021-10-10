@@ -6,6 +6,7 @@ mod connect;
 mod elasticsearch;
 mod rpc;
 mod submission;
+mod timeout;
 
 use crate::config::Configuration;
 use crate::elasticsearch::Client;
@@ -17,8 +18,9 @@ use crate::rpc::logs::submission::{
     EntityRevisionMetadata, EventDeterministicIdParams, SubmitIdempotentRequest,
     SubmitIdempotentResponse, SubmittedEvent,
 };
+use crate::timeout::TimeoutOr;
 use anyhow::Context;
-use futures::{try_join, StreamExt};
+use futures::{Stream, StreamExt, try_join};
 use futures_batch::ChunksTimeoutStreamExt;
 use slog::Logger;
 use sloggers::Config;
@@ -90,7 +92,7 @@ async fn run(config: Arc<Configuration>, logger: Logger) -> anyhow::Result<()> {
     let event_sink_future = submit_events(
         Arc::clone(&config),
         logger.clone(),
-        event_rx,
+        UnboundedReceiverStream::new(event_rx),
         Arc::clone(&elasticsearch),
     );
 
@@ -129,7 +131,7 @@ async fn serve_grpc(
 async fn submit_events(
     config: Arc<Configuration>,
     logger: Logger,
-    event_rx: mpsc::UnboundedReceiver<submission::Event>,
+    event_in_stream: impl Stream<Item = submission::Event>,
     elasticsearch: Arc<Client>,
 ) -> anyhow::Result<()> {
     let next_correlation_id = Arc::new(AtomicUsize::new(1));
@@ -141,7 +143,7 @@ async fn submit_events(
         "debounce_size" => config.debounce_size,
         "debounce_period" => ?config.debounce_period
     );
-    UnboundedReceiverStream::new(event_rx)
+    event_in_stream
         .chunks_timeout(config.debounce_size, config.debounce_period)
         .for_each_concurrent(None, move |events| {
             let correlation_id = next_correlation_id.fetch_add(1, Ordering::SeqCst);
@@ -166,7 +168,6 @@ fn generate_id(id_params: &EventDeterministicIdParams, event_type: i32) -> Strin
         id_params.field1.to_be_bytes(),
         id_params.field2.to_be_bytes(),
         id_params.field3.to_be_bytes(),
-        id_params.field4.to_be_bytes(),
     ];
 
     // Join the event type and each field into a single buffer:
@@ -304,7 +305,7 @@ impl SubmissionServiceImpl {
     }
 
     /// Sends the given proto-submitted Event to the shared channel,
-    /// returning Ok(()) once the submission to Elasticsearch has been confirmed.
+    /// returning Ok(_) once the submission to Elasticsearch has been confirmed.
     /// On failure, returns the appropriate gRPC status.
     /// On success, returns whether the event was duplicate.
     async fn submit_event_inner(
@@ -353,39 +354,38 @@ async fn wait_for_notify(
     receiver: oneshot::Receiver<submission::OperationResult>,
     logger: Logger,
 ) -> Result<bool, tonic::Status> {
-    match tokio::time::timeout(timeout, receiver).await {
-        Ok(recv_result) => match recv_result {
-            Ok(submit_result) => match submit_result {
-                Ok(success) => {
-                    slog::info!(
-                        logger,
-                        "confirmed durable submission of event";
-                        "correlation_id" => success.correlation_id,
-                        "was_duplicate" => success.was_duplicate,
-                    );
-                    Ok(success.was_duplicate)
-                }
-                Err(err) => {
-                    slog::warn!(
-                        logger,
-                        "submission failed for event";
-                        "details" => err.internal_details,
-                        "status" => ?err.status,
-                        "correlation_id" => err.correlation_id,
-                    );
-                    Err(err.status)
-                }
-            },
-            Err(err) => {
-                slog::error!(
+    // Awaiting the receiver waits for a message
+    match crate::timeout::timeout(timeout, receiver).await {
+        Ok(received_value) => match received_value {
+            Ok(success) => {
+                slog::info!(
                     logger,
-                    "receive error when waiting for durable submission";
-                    "error" => ?err,
+                    "confirmed durable submission of event";
+                    "correlation_id" => success.correlation_id,
+                    "was_duplicate" => success.was_duplicate,
                 );
-                Err(Status::internal("internal channel error"))
+                Ok(success.was_duplicate)
+            }
+            Err(err) => {
+                slog::warn!(
+                    logger,
+                    "submission failed for event";
+                    "details" => err.internal_details,
+                    "status" => ?err.status,
+                    "correlation_id" => err.correlation_id,
+                );
+                Err(err.status)
             }
         },
-        Err(err) => {
+        Err(TimeoutOr::Other(err)) => {
+            slog::error!(
+                logger,
+                "receive error when waiting for durable submission";
+                "error" => ?err,
+            );
+            Err(Status::internal("internal channel error"))
+        },
+        Err(TimeoutOr::Timeout(err)) => {
             slog::error!(
                 logger,
                 "receive timed out when waiting for durable submission";

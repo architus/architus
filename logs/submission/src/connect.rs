@@ -3,6 +3,7 @@
 
 use crate::config::Configuration;
 use crate::elasticsearch::{Client, PingError};
+use crate::timeout::TimeoutOr;
 use anyhow::Context;
 use slog::Logger;
 use std::sync::Arc;
@@ -16,28 +17,37 @@ pub async fn connect_to_elasticsearch(
     let client = crate::elasticsearch::new_client(&config, logger.clone())
         .context("could not create elasticsearch client")?;
 
-    let initialization_backoff = config.initialization_backoff.build();
+    let initialization_backoff = config.initialization.backoff.build();
+    let timeout = config.initialization.attempt_timeout;
     let ping_elasticsearch = || async {
-        match client.ping().await {
+        match crate::timeout::timeout(timeout, client.ping()).await {
             Ok(_) => Ok(()),
-            Err(err) => match &err {
-                PingError::Failed(inner_err) => {
-                    slog::warn!(
-                        logger,
-                        "pinging elasticsearch failed";
-                        "error" => ?inner_err,
-                    );
-                    Err(backoff::Error::Transient(err))
+            Err(err) => {
+                match &err {
+                    TimeoutOr::Timeout(timeout) => {
+                        slog::warn!(
+                            logger,
+                            "pinging elasticsearch timed out";
+                            "timeout" => ?timeout,
+                        );
+                    }
+                    TimeoutOr::Other(PingError::Failed(inner_err)) =>  {
+                            slog::warn!(
+                                logger,
+                                "pinging elasticsearch failed";
+                                "error" => ?inner_err,
+                            );
+                    }
+                    TimeoutOr::Other(PingError::ErrorStatusCode(status_code)) => {
+                        slog::warn!(
+                            logger,
+                            "pinging elasticsearch failed with error status code";
+                            "status_code" => ?status_code,
+                        );
+                    }
                 }
-                PingError::ErrorStatusCode(status_code) => {
-                    slog::warn!(
-                        logger,
-                        "pinging elasticsearch failed with error status code";
-                        "status_code" => ?status_code,
-                    );
-                    Err(backoff::Error::Transient(err))
-                }
-            },
+                Err(backoff::Error::Transient(err))
+            }
         }
     };
 
