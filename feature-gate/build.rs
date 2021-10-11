@@ -3,7 +3,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_build::configure()
         .build_client(false)
         .build_server(true)
-        .compile(&["feature-gate.proto"], &["../lib/ipc/proto"])?;
+        .compile(&["feature-gate.proto"], &["../lib/proto"])?;
 
     Ok(())
 }
