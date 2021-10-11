@@ -9,8 +9,8 @@ RUN mkdir /app/current_migration
 VOLUME /app/current_migration
 
 WORKDIR /app
-COPY ./dbmanager.py .
-COPY ./migrations ./migrations
-COPY ./cleanup ./cleanup
+COPY dbmanager/dbmanager.py .
+COPY dbmanager/migrations ./migrations
+COPY dbmanager/cleanup ./cleanup
 
 ENTRYPOINT ["python3", "-u", "dbmanager.py"]
