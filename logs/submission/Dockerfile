@@ -2,7 +2,8 @@ ARG REPO_ROOT=/opt/architus
 ARG SERVICE=logs/submission
 
 # Build service
-FROM rust:1.48 as builder
+FROM rust:1.51 as builder
+RUN rustup component add rustfmt
 ARG REPO_ROOT
 ARG SERVICE
 # Copy all files in the build context to the container.

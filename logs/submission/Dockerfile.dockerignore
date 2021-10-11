@@ -9,8 +9,8 @@
 !logs/submission/config.default.toml
 
 # Include protobuf definitions
-!lib/proto/event.proto
-!lib/proto/submission.proto
+!lib/proto/logs/event.proto
+!lib/proto/logs/submission.proto
 
 # Include config-backoff-rs
 !lib/config-backoff-rs/src

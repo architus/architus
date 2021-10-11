@@ -2,7 +2,7 @@ ARG REPO_ROOT=/opt/architus
 ARG SERVICE=logs/gateway-ingress
 
 # Build service
-FROM rust:1.52 as builder
+FROM rust:1.51 as builder
 RUN rustup component add rustfmt
 ARG REPO_ROOT
 ARG SERVICE

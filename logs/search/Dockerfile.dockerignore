@@ -9,7 +9,7 @@
 !logs/search/config.default.toml
 
 # Include protobuf definitions
-!lib/proto/event.proto
+!lib/proto/logs/event.proto
 
 # Include config-backoff-rs
 !lib/config-backoff-rs/src
