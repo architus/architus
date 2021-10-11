@@ -27,8 +27,10 @@ create_user() {
     log "Log in the WebUI at port 15672 (example: http:/localhost:15672)"
 }
 
-try_create_user() (
-    # Runs in its own sub-shell (note the parens around the function)
+try_create_user() {
+    # Tries to create the RabbitMQ user once.
+    # If successful, returns a zero exit code.
+    # Otherwise, it should be retried.
     # Usage:
     # try_create_user [user] [password]
 
@@ -43,7 +45,7 @@ try_create_user() (
     rabbitmqctl add_user "$user" "$password" 2>/dev/null &&\
     rabbitmqctl set_user_tags "$user" administrator &&\
     rabbitmqctl set_permissions -p / "$password" ".*" ".*" ".*"
-)
+}
 
 # $@ is used to pass arguments to the rabbitmq-server command.
 # For example if you use it like this: docker run -d rabbitmq arg1 arg2,
