@@ -105,7 +105,10 @@ impl ProcessorFleet {
         );
     }
 
-    /// Applies the main data-oriented workflow to the given JSON
+    /// Attempts to run the raw gateway event through the appropriate sub-processor,
+    /// returning the result once finished.
+    /// If there is no corresponding sub-processor,
+    /// then this returns `Err(ProcessorError::SubProcessorNotFound(_))`.
     pub async fn normalize(
         &self,
         event: EventWithSource,
