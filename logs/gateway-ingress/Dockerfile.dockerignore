@@ -1,0 +1,23 @@
+# Ignore everything
+**
+
+# Include this service's source
+!logs/gateway-ingress/src
+!logs/gateway-ingress/Cargo.lock
+!logs/gateway-ingress/Cargo.toml
+!logs/gateway-ingress/build.rs
+!logs/gateway-ingress/config.default.toml
+
+# Include protobuf definitions
+!lib/proto/feature-gate.proto
+
+# Include amqp-pool-rs
+!lib/amqp-pool-rs/src
+!lib/amqp-pool-rs/Cargo.toml
+
+# Include config-backoff-rs
+!lib/config-backoff-rs/src
+!lib/config-backoff-rs/Cargo.toml
+
+# Include logs/gateway-queue-lib
+!logs/gateway-queue-lib/proto

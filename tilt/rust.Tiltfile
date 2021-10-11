@@ -1,9 +1,10 @@
 load('ext://restart_process', 'docker_build_with_restart')
 
 __DEV_BASE_IMAGE = "ubuntu:hirsute"
+__DEBUG = False
 
 
-def rust_local_binary(*, crate_path, local_crate_dependencies = [], additional_dependencies = []):
+def rust_local_binary(*, crate_path, additional_dependencies = []):
     """
     Compiles a Rust binary using the cargo toolchain installed on the local computer.
     Always run using the dev profile (non-`--release`).
@@ -11,12 +12,40 @@ def rust_local_binary(*, crate_path, local_crate_dependencies = [], additional_d
     Arguments:
     - `crate_path` - the local path (from the root of the repo)
       to the crate parent folder (where the `Cargo.toml` file is located).
-    - `local_crate_dependencies` - additional crate paths for local crates
-      that the main crate depends on. These are included as additional dependencies
-      for the build.
     - `additional_dependencies` - additional file dependencies
     """
 
+    abs_crate_manifest_path = os.path.abspath(os.path.join(crate_path, 'Cargo.toml'))
+
+    # Set up logging
+    log = lambda m: print('[rust--%s] %s' % (crate_path, m))
+
+    # Get the crate's metadata using `cargo metadata`
+    metadata = __crate_metadata(crate_path=crate_path)
+
+    # Search through the list of packages, looking for both:
+    # - the current crate (to find its name)
+    # - all local crate dependencies for the current crate
+    #   (this is defined as crates with manifest paths
+    #   starting at the Tiltfile parent directory's path
+    #   (that are also not the current crate))
+    current_crate_metadata = None
+    local_crate_dependencies = []
+    log("Detecting local dependencies:")
+    for package in metadata["packages"]:
+        manifest_path = package["manifest_path"]
+        if abs_crate_manifest_path == manifest_path:
+            current_crate_metadata = package
+        elif manifest_path.startswith(config.main_dir):
+            relative_package_path = os.path.relpath(os.path.dirname(manifest_path))
+            local_crate_dependencies.append(relative_package_path)
+            log(' => %s (%s)' % (package["name"], relative_package_path))
+    if not current_crate_metadata:
+        fail('%s Could not find current crate\'s package entry in $(cargo metadata)')
+    if not local_crate_dependencies:
+        log(' (None)')
+
+    # Compile the crate with the inferred and explicit dependencies
     local_resource(
         name='%s-compile' % crate_path.replace('/', '-'),
         cmd=[
@@ -31,37 +60,50 @@ def rust_local_binary(*, crate_path, local_crate_dependencies = [], additional_d
         ),
     )
 
-    return rust_local_binary_path(crate_path=crate_path)
+    # Infer the expected path of the binary file
+    target_dir = metadata['target_directory']
+    binary_filename = current_crate_metadata["name"]
+    expected_binary_path = os.path.relpath(os.path.join(target_dir, 'debug', binary_filename))
+    log('Expected binary path is: %s' % expected_binary_path)
+    return expected_binary_path
 
 
-def rust_local_binary_path(*, crate_path):
+def __crate_metadata(*, crate_path):
+    return decode_json(local(
+        command=[
+            'cargo',
+            'metadata',
+            '--manifest-path=%s' % os.path.join(crate_path, 'Cargo.toml'),
+            '--format-version=1',
+        ],
+        quiet=True,
+        echo_off=not __DEBUG,
+    ))
+
+
+def __binary_path(*, target_dir):
     """
     Finds the local path of an already-compiled Rust binary crate.
     Only works on Unix-like systems
     (please stop using Windows for development).
     """
 
-    metadata = decode_json(local(
+    find_output = str(local(
         command=[
-            'cargo',
-            'metadata',
-            '--manifest-path=%s/Cargo.toml' % crate_path,
-            '--format-version=1',
+            'find',
+            target_dir,
+            '-maxdepth', '2',
+            '-type', 'f',
+            '-executable',
+            '-print',
         ],
         quiet=True,
+        echo_off=not __DEBUG,
     ))
-    target_dir = metadata['target_directory']
-    executable_files = str(local(command=[
-        'find',
-        target_dir,
-        '-maxdepth', '2',
-        '-type', 'f',
-        '-executable',
-        '-print',
-    ])).rstrip('\n').split('\n')
+    executable_files = find_output.rstrip('\n').split('\n')
 
     if not executable_files:
-        fail('no executable found in Rust crate path "%s"' % crate_path)
+        return None
     return executable_files[0]
 
 
@@ -89,7 +131,6 @@ def rust_hot_reload_docker_build(*, ref, binary_path, apt_packages=[], file_sync
     use `additional_arguments`.
     """
 
-    binary_path = os.path.relpath(binary_path)
     binary_path_filename = os.path.basename(binary_path)
     binary_path_in_container = '/usr/bin/%s' % binary_path_filename
 

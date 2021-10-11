@@ -8,7 +8,7 @@ use ref_cast::RefCast;
 use serde::Deserialize;
 
 /// Wrapper around the JSON-serializable version of the stored Elasticsearch log event
-/// See lib/ipc/proto/logs/event.proto for the original definition of this struct
+/// See lib/protos/event.proto for the original definition of this struct
 #[allow(clippy::module_name_repetitions)]
 #[derive(Debug, Deserialize)]
 #[serde(transparent)]

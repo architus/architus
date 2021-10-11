@@ -5,7 +5,7 @@ fn main() -> anyhow::Result<()> {
     tonic_build::configure()
         .build_client(true)
         .build_server(false)
-        .compile(&["logs/submission.proto"], &["../../lib/ipc/proto"])
+        .compile(&["logs/submission.proto"], &["../../lib/proto"])
         .context("compiling logs/submission.proto definitions")?;
 
     Ok(())

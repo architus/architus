@@ -1,7 +1,0 @@
-# Ignore all files in the context except for the service binary and config
-# Overrides /.dockerignore
-
-*
-!logs/submission/target/debug/logs-submission
-!logs/submission/config.toml
-!logs/submission/schema/index_config.json

@@ -43,7 +43,7 @@ fn main() -> anyhow::Result<()> {
     builder
         .compile(
             &["event.proto", "logs/event.proto"],
-            &["../submission/schema", "../../lib/ipc/proto"],
+            &["../submission/schema", "../../lib/proto"],
         )
         .context("compiling proto definitions")?;
 

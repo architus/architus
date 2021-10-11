@@ -9,7 +9,7 @@
 !feature-gate/config.default.toml
 
 # Include protobuf definitions
-!lib/ipc/proto/feature-gate.proto
+!lib/proto/feature-gate.proto
 
 # Include config-backoff-rs
 !lib/config-backoff-rs/src

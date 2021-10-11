@@ -5,7 +5,7 @@ fn main() -> anyhow::Result<()> {
     tonic_build::configure()
         .build_client(true)
         .build_server(false)
-        .compile(&["feature-gate.proto"], &["../../lib/ipc/proto"])
+        .compile(&["feature-gate.proto"], &["../../lib/proto"])
         .context("compiling feature-gate.proto definitions")?;
 
     // Compile the gateway-queue-lib protobuf definitions
