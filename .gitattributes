@@ -5,10 +5,8 @@
 # https://docs.tilt.dev/extensions.html
 tilt_modules/** linguist-vendored
 
-# Dockerfile.* files should be considered custom Dockerfiles,
-# except for Dockerfile.*.dockerignore, which are docker ignore files
-**/Dockerfile.* linguist-language=Dockerfile
-**/Dockerfile.*.dockerignore linguist-language=Ignore-List
+# *.dockerignore files should be considered scoped docker ignore files
+**/*.dockerignore linguist-language=Ignore-List
 
 # *.Tiltfile files should be considered Tiltfile (Starlark) libraries
 **/*.Tiltfile linguist-language=Starlark

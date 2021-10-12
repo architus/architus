@@ -2,10 +2,11 @@ load('ext://restart_process', 'docker_build_with_restart')
 load('ext://configmap', 'configmap_create')
 load ('./tilt/features.Tiltfile', 'get_enabled_components')
 load ('./tilt/config.Tiltfile', 'copy_example')
-load('./tilt/rust.Tiltfile', 'rust_local_binary', 'rust_hot_reload_docker_build', 'rust_file_sync')
+load('./tilt/rust_local_binary.Tiltfile', 'rust_local_binary')
+load('./tilt/hot_reload.Tiltfile', 'rust_hot_reload_docker_build', 'file_sync')
 
 # Define how higher-level 'features' to map onto lower-level 'components'
-# that are dependened on by potentially more than one feature.
+# that are depended on by potentially more than one feature.
 # 'all' is a special built-in feature that causes all other features
 # to be considered enabled no matter what the other enabled features are.
 features_to_components = {
@@ -117,8 +118,8 @@ if 'redis' in enabled:
 
 if 'feature-gate' in enabled:
     if rust_hot_reload:
-        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         copy_example(path='feature-gate/config.toml', example_path='feature-gate/config.default.toml')
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         binary_path = rust_local_binary(
             crate_path='feature-gate',
             additional_dependencies=['lib/proto/feature-gate.proto'],
@@ -127,8 +128,8 @@ if 'feature-gate' in enabled:
             ref='feature-gate-image',
             binary_path=binary_path,
             apt_packages=['libpq-dev', 'libssl1.1'],
-            file_syncs=[rust_file_sync('feature-gate/config.toml', '/etc/architus/config.toml')],
-            additional_arguments=['/etc/architus/config.toml'],
+            file_syncs=[file_sync('feature-gate/config.toml', '/etc/architus/config.toml')],
+            arguments=['/etc/architus/config.toml'],
         )
     else:
         docker_build('feature-gate-image', '.', dockerfile='feature-gate/Dockerfile')
@@ -141,8 +142,8 @@ if 'elasticsearch' in enabled:
 
 if 'logs-gateway-ingress' in enabled:
     if rust_hot_reload:
-        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         copy_example(path='logs/gateway-ingress/config.toml', example_path='logs/gateway-ingress/config.default.toml')
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         binary_path = rust_local_binary(
             crate_path='logs/gateway-ingress',
             additional_dependencies=['lib/proto/feature-gate.proto', 'logs/gateway-queue-lib/proto'],
@@ -151,7 +152,7 @@ if 'logs-gateway-ingress' in enabled:
             ref='logs-gateway-ingress-image',
             binary_path=binary_path,
             apt_packages=['ca-certificates', 'libssl1.1'],
-            file_syncs=[rust_file_sync('logs/gateway-ingress/config.toml', '/etc/architus/config.toml')],
+            file_syncs=[file_sync('logs/gateway-ingress/config.toml', '/etc/architus/config.toml')],
             additional_arguments=['/etc/architus/config.toml'],
         )
     else:
@@ -161,8 +162,8 @@ if 'logs-gateway-ingress' in enabled:
 
 if 'logs-gateway-normalize' in enabled:
     if rust_hot_reload:
-        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         copy_example(path='logs/gateway-normalize/config.toml', example_path='logs/gateway-normalize/config.default.toml')
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         binary_path = rust_local_binary(
             crate_path='logs/gateway-normalize',
             additional_dependencies=[
@@ -177,7 +178,7 @@ if 'logs-gateway-normalize' in enabled:
             ref='logs-gateway-normalize-image',
             binary_path=binary_path,
             apt_packages=['ca-certificates', 'libssl1.1'],
-            file_syncs=[rust_file_sync('logs/gateway-normalize/config.toml', '/etc/architus/config.toml')],
+            file_syncs=[file_sync('logs/gateway-normalize/config.toml', '/etc/architus/config.toml')],
             additional_arguments=['/etc/architus/config.toml'],
         )
     else:
@@ -187,8 +188,8 @@ if 'logs-gateway-normalize' in enabled:
 
 if 'logs-submission' in enabled:
     if rust_hot_reload:
-        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         copy_example(path='logs/submission/config.toml', example_path='logs/submission/config.default.toml')
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         binary_path = rust_local_binary(
             crate_path='logs/submission',
             additional_dependencies=[
@@ -202,8 +203,8 @@ if 'logs-submission' in enabled:
             binary_path=binary_path,
             apt_packages=['libssl1.1'],
             file_syncs=[
-                rust_file_sync('logs/submission/config.toml', '/etc/architus/config.toml'),
-                rust_file_sync('logs/submission/schema/index_config.json', '/etc/architus/index_config.json'),
+                file_sync('logs/submission/config.toml', '/etc/architus/config.toml'),
+                file_sync('logs/submission/schema/index_config.json', '/etc/architus/index_config.json'),
             ],
             additional_arguments=['/etc/architus/config.toml'],
         )
@@ -214,8 +215,8 @@ if 'logs-submission' in enabled:
 
 if 'logs-search' in enabled:
     if rust_hot_reload:
-        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         copy_example(path='logs/search/config.toml', example_path='logs/search/config.default.toml')
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         binary_path = rust_local_binary(
             crate_path='logs/search',
             additional_dependencies=['logs/submission/schema/event.proto', 'lib/proto/event.proto'],
@@ -224,7 +225,7 @@ if 'logs-search' in enabled:
             ref='logs-search-image',
             binary_path=binary_path,
             apt_packages=['libssl1.1'],
-            file_syncs=[rust_file_sync('logs/search/config.toml', '/etc/architus/config.toml')],
+            file_syncs=[file_sync('logs/search/config.toml', '/etc/architus/config.toml')],
             additional_arguments=['/etc/architus/config.toml'],
         )
     else:

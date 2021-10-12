@@ -44,7 +44,7 @@ RUN python3.8 -m pip install --trusted-host pypi.python.org -r requirements.txt
 ENV PYTHONIOENCODING UTF-8
 
 # Copy the current directory contents into the container at /app
-COPY ./shard/ /app/
+COPY  ./shard/ /app/
 COPY ./lib/python-common /app/lib
 
 # Run app.py when the container launches

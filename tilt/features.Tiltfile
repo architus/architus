@@ -5,10 +5,19 @@ def get_enabled_components(features_to_components, enabled_features_list):
     """
     Resolves a list of enabled 'features' to the set of 'components' that should be enabled.
     This allows higher-level 'features' to map onto lower-level 'components'
-    that are dependened on by potentially more than one feature.
+    that are depended on by potentially more than one feature.
 
     'all' is a special built-in feature that causes all other features
-     to be considered enabled no matter what the other enabled features are.
+    to be considered enabled no matter what the other enabled features are.
+
+    Arguments:
+    - `features_to_components` - a dictionary mapping feature names
+    to the list of components that they require.
+    - `enabled_features_list` - a list of all enabled feature names,
+    which can also include `'all'` as described earlier.
+
+    Returns:
+    A "set" (dictionary where each value is `True`) of all enabled components.
     """
 
     # Use a dict of key -> True as a set
