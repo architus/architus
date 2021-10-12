@@ -26,6 +26,10 @@ features_to_components = {
     ],
     'gateway': ['gateway'],
     'api': ['api'],
+    'logs': [
+        'logs-submission',
+        'elasticsearch',
+    ]
 }
 
 config.define_bool("no-core")
@@ -124,3 +128,34 @@ if 'feature-gate' in enabled:
         docker_build('feature-gate-image', '.', dockerfile='feature-gate/Dockerfile')
     k8s_yaml('feature-gate/kube/dev/feature-gate.yaml')
     k8s_resource('feature-gate')
+
+if 'elasticsearch' in enabled:
+    k8s_yaml('elasticsearch/kube/dev/elasticsearch.yaml')
+    k8s_resource('elasticsearch', port_forwards=[9200, 9300])
+
+if 'logs-submission' in enabled:
+    if rust_hot_reload:
+        copy_example(path='logs/submission/config.toml', example_path='logs/submission/config.default.toml')
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
+        binary_path = rust_local_binary(
+            crate_path='logs/submission',
+            additional_dependencies=[
+                'logs/submission/schema/event.proto',
+                'lib/proto/event.proto',
+                'lib/proto/submission.proto',
+            ],
+        )
+        rust_hot_reload_docker_build(
+            ref='logs-submission-image',
+            binary_path=binary_path,
+            apt_packages=['libssl1.1'],
+            file_syncs=[
+                file_sync('logs/submission/config.toml', '/etc/architus/config.toml'),
+                file_sync('logs/submission/schema/index_config.json', '/etc/architus/index_config.json'),
+            ],
+            additional_arguments=['/etc/architus/config.toml'],
+        )
+    else:
+        docker_build('logs-submission-image', '.', dockerfile='logs/submission/Dockerfile')
+    k8s_yaml('logs/submission/kube/dev/logs-submission.yaml')
+    k8s_resource('logs-submission')
