@@ -2,10 +2,11 @@ load('ext://restart_process', 'docker_build_with_restart')
 load('ext://configmap', 'configmap_create')
 load ('./tilt/features.Tiltfile', 'get_enabled_components')
 load ('./tilt/config.Tiltfile', 'copy_example')
-load('./tilt/rust.Tiltfile', 'rust_local_binary', 'rust_hot_reload_docker_build', 'rust_file_sync')
+load('./tilt/rust_local_binary.Tiltfile', 'rust_local_binary')
+load('./tilt/hot_reload.Tiltfile', 'rust_hot_reload_docker_build', 'file_sync')
 
 # Define how higher-level 'features' to map onto lower-level 'components'
-# that are dependened on by potentially more than one feature.
+# that are depended on by potentially more than one feature.
 # 'all' is a special built-in feature that causes all other features
 # to be considered enabled no matter what the other enabled features are.
 features_to_components = {
@@ -106,8 +107,8 @@ if 'redis' in enabled:
 
 if 'feature-gate' in enabled:
     if rust_hot_reload:
-        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         copy_example(path='feature-gate/config.toml', example_path='feature-gate/config.default.toml')
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
         binary_path = rust_local_binary(
             crate_path='feature-gate',
             additional_dependencies=['lib/proto/feature-gate.proto'],
@@ -116,8 +117,8 @@ if 'feature-gate' in enabled:
             ref='feature-gate-image',
             binary_path=binary_path,
             apt_packages=['libpq-dev', 'libssl1.1'],
-            file_syncs=[rust_file_sync('feature-gate/config.toml', '/etc/architus/config.toml')],
-            additional_arguments=['/etc/architus/config.toml'],
+            file_syncs=[file_sync('feature-gate/config.toml', '/etc/architus/config.toml')],
+            arguments=['/etc/architus/config.toml'],
         )
     else:
         docker_build('feature-gate-image', '.', dockerfile='feature-gate/Dockerfile')
