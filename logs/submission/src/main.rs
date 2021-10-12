@@ -20,7 +20,7 @@ use crate::rpc::logs::submission::{
 };
 use crate::timeout::TimeoutOr;
 use anyhow::Context;
-use futures::{Stream, StreamExt, try_join};
+use futures::{try_join, Stream, StreamExt};
 use futures_batch::ChunksTimeoutStreamExt;
 use slog::Logger;
 use sloggers::Config;
@@ -384,7 +384,7 @@ async fn wait_for_notify(
                 "error" => ?err,
             );
             Err(Status::internal("internal channel error"))
-        },
+        }
         Err(TimeoutOr::Timeout(err)) => {
             slog::error!(
                 logger,

@@ -32,12 +32,12 @@ pub async fn connect_to_elasticsearch(
                             "timeout" => ?timeout,
                         );
                     }
-                    TimeoutOr::Other(PingError::Failed(inner_err)) =>  {
-                            slog::warn!(
-                                logger,
-                                "pinging elasticsearch failed";
-                                "error" => ?inner_err,
-                            );
+                    TimeoutOr::Other(PingError::Failed(inner_err)) => {
+                        slog::warn!(
+                            logger,
+                            "pinging elasticsearch failed";
+                            "error" => ?inner_err,
+                        );
                     }
                     TimeoutOr::Other(PingError::ErrorStatusCode(status_code)) => {
                         slog::warn!(

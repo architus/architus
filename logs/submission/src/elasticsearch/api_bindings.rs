@@ -4,8 +4,8 @@
 pub mod bulk {
     // Source: `https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-bulk.html#bulk-api-response-body`
 
-    use serde::{Deserialize, Serialize};
     use elasticsearch::http::StatusCode;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Response {
@@ -59,15 +59,11 @@ pub mod bulk {
         where
             D: serde::Deserializer<'de>,
         {
-            StatusCode::from_u16(u16::deserialize(deserializer)?)
-                .map_err(serde::de::Error::custom)
+            StatusCode::from_u16(u16::deserialize(deserializer)?).map_err(serde::de::Error::custom)
         }
 
         #[allow(clippy::trivially_copy_pass_by_ref)]
-        pub fn serialize<S>(
-            status_code: &StatusCode,
-            serializer: S,
-        ) -> Result<S::Ok, S::Error>
+        pub fn serialize<S>(status_code: &StatusCode, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: serde::Serializer,
         {

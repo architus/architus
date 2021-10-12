@@ -3,7 +3,8 @@
 
 use crate::config::Configuration;
 use crate::elasticsearch::{
-    BulkError, BulkItem, BulkOperation, EnsureIndexExistsError, IndexStatus, MakeBulkOperationError, StatusCode,
+    BulkError, BulkItem, BulkOperation, EnsureIndexExistsError, IndexStatus,
+    MakeBulkOperationError, StatusCode,
 };
 use crate::rpc::logs::event::Event as ProtoEvent;
 use crate::rpc::logs_submission_schema::StoredEvent;
