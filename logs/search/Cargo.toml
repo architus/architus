@@ -1,0 +1,37 @@
+[package]
+name = "logs-search"
+version = "0.1.0"
+authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
+edition = "2018"
+description = """\
+Provides a GraphQL API in front of the logs feature where logs are stored in Elasticsearch\
+"""
+license = "MIT"
+
+[dependencies]
+architus-config-backoff = { path = "../../lib/config-backoff-rs" }
+config = "0.11"
+slog = "2.7"
+sloggers = { version = "2.0", features = ["json"] }
+anyhow = "1.0"
+thiserror = "1.0"
+tonic = "0.4"
+prost = "0.7"
+futures = "0.3"
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "time", "macros"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_repr = "0.1"
+elasticsearch = "7.12.0-alpha.1"
+base64 = "0.13"
+juniper = "0.15"
+juniper_rocket = "0.8"
+rocket = { version = "0.5.0-rc.1", features = ["json"] }
+strum = { version = "0.21", features = ["derive"] }
+ref-cast = "1.0"
+lazy_static = "1.4"
+backoff = { version = "0.3", features = ["tokio"] }
+
+[build-dependencies]
+tonic-build = "0.4"
+anyhow = "1.0"

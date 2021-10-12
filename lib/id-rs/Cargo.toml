@@ -1,0 +1,12 @@
+[package]
+name = "architus-id"
+version = "0.1.0"
+authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
+edition = "2018"
+description = """\
+A thin wrapper around ksuid for generating IDs,\
+as well as a set of utility functions for dealing with Snowflakes.\
+"""
+license = "MIT"
+
+[dependencies]

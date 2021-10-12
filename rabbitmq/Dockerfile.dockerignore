@@ -1,0 +1,5 @@
+# Ignore everything
+**
+
+# Include start command
+!rabbitmq/init.sh

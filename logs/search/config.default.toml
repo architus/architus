@@ -1,0 +1,56 @@
+# Parameters for the database connection to Elasticsearch
+[elasticsearch]
+# URL of the Elasticsearch instance to search log entries from
+url = "http://elasticsearch:9200"
+# Elasticsearch index containing the stored log events.
+# This should already exist; this service will not create it.
+index = "architus-logs-events"
+# Username to use when connecting to Elasticsearch.
+# If given, this user should have RBAC permissions for:
+# - read (to search log events) for the log event index
+# If empty, then authentication is disabled.
+auth_username = ""
+# Password to use when connecting to Elasticsearch.
+# Ignored if the user is empty.
+auth_password = ""
+
+# Options related to the GraphQL search API
+[graphql]
+# Default limit of items to fetch in a single page if none is given
+default_page_size = 100
+# Limit on a single page's size
+# This is important large pages greatly increase resource utilization
+# https://www.elastic.co/guide/en/elasticsearch/reference/7.10/paginate-search-results.html
+max_page_size = 500
+# Limit on overall pagination size.
+# This is important because of the way Elasticsearch works;
+# deep pagination requires ignored pages to still be loaded,
+# so we limit then to avoid this restriction.
+# This should be resolved via UX design on the frontend
+# https://www.elastic.co/guide/en/elasticsearch/reference/7.10/paginate-search-results.html
+max_pagination_amount = 5000
+
+# Parameters for the backoff used to connect to external services during initialization
+[initialization_backoff]
+initial_interval = "500ms"
+max_interval = "30s"
+duration = "2m"
+multiplier = 2.0
+
+# Logging configuration (for service diagnostic logs, not Architus log events)
+# https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html
+[logging]
+level = "debug"
+format = "full"
+source_location = "file_and_line"
+timezone = "utc"
+destination = "stdout"
+channel_size = 2048
+overflow_strategy = "drop_and_report"
+
+# Configuration for Rocket, the HTTP framework
+# See https://rocket.rs/v0.5-rc/guide/configuration/
+[rocket]
+address = "0.0.0.0"
+port = 8174
+log_level = "critical"

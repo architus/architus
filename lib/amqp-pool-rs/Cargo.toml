@@ -1,0 +1,15 @@
+[package]
+name = "architus-amqp-pool"
+version = "0.1.0"
+authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
+edition = "2018"
+description = """\
+Handles a simple deadpool of AMQP channels for a single lapin connection\
+"""
+license = "MIT"
+
+[dependencies]
+lapin = "1.7"
+anyhow = "1.0"
+deadpool = { version = "0.8", features = ["rt_tokio_1"] }
+async-trait = "0.1"

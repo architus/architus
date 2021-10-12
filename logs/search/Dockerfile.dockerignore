@@ -1,0 +1,19 @@
+# Ignore everything
+**
+
+# Include this service's source
+!logs/search/src
+!logs/search/Cargo.lock
+!logs/search/Cargo.toml
+!logs/search/build.rs
+!logs/search/config.default.toml
+
+# Include protobuf definitions
+!lib/proto/logs/event.proto
+
+# Include config-backoff-rs
+!lib/config-backoff-rs/src
+!lib/config-backoff-rs/Cargo.toml
+
+# Include logs/submission/schema/event.proto
+!logs/submission/schema/event.proto

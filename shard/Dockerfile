@@ -45,7 +45,7 @@ ENV PYTHONIOENCODING UTF-8
 
 # Copy the current directory contents into the container at /app
 COPY  ./shard/ /app/
-COPY ./lib /app/lib
+COPY ./lib/python-common /app/lib
 
 # Run app.py when the container launches
 ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"

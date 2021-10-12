@@ -1,0 +1,27 @@
+# Ignore everything
+**
+
+# Include this service's source
+!logs/gateway-normalize/src
+!logs/gateway-normalize/Cargo.lock
+!logs/gateway-normalize/Cargo.toml
+!logs/gateway-normalize/build.rs
+!logs/gateway-normalize/config.default.toml
+
+# Include config-backoff-rs
+!lib/config-backoff-rs/src
+!lib/config-backoff-rs/Cargo.toml
+
+# Include id-rs
+!lib/id-rs/src
+!lib/id-rs/Cargo.toml
+
+# Include logs-lib-rs and transitive dependencies
+!lib/logs-lib-rs/src
+!lib/logs-lib-rs/Cargo.toml
+!lib/logs-lib-rs/build.rs
+!lib/proto/logs/event.proto
+!lib/proto/logs/submission.proto
+
+# Include logs/gateway-queue-lib
+!logs/gateway-queue-lib/proto

@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logs-submission
+  labels:
+    app: logs-submission
+spec:
+  selector:
+    matchLabels:
+      app: logs-submission
+  template:
+    metadata:
+      labels:
+        app: logs-submission
+    spec:
+      containers:
+        - name: logs-submission
+          image: logs-submission-image
+          envFrom:
+            - secretRef:
+                name: architus-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logs-submission
+  namespace: default
+spec:
+  type: NodePort
+  selector:
+    app: logs-submission
+  ports:
+    - port: 50282
+      targetPort: 50282

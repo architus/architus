@@ -1,0 +1,107 @@
+{
+  "mappings": {
+    "properties": {
+      "id": {
+        "type": "keyword"
+      },
+      "ingestion_timestamp": {
+        "type": "date",
+        "format": "epoch_millis"
+      },
+      "inner": {
+        "properties": {
+          "timestamp": {
+            "type": "date",
+            "format": "epoch_millis"
+          },
+          "source": {
+            "properties": {
+              "gateway": {
+                "type": "keyword",
+                "index": false
+              },
+              "audit_log": {
+                "type": "keyword",
+                "index": false
+              },
+              "internal": {
+                "type": "keyword",
+                "index": false
+              }
+            }
+          },
+          "origin": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "integer"
+          },
+          "guild_id": {
+            "type": "unsigned_long"
+          },
+          "reason": {
+            "type": "text"
+          },
+          "audit_log_id": {
+            "type": "unsigned_long"
+          },
+          "channel_id": {
+            "type": "unsigned_long"
+          },
+          "agent_id": {
+            "type": "unsigned_long"
+          },
+          "agent_type": {
+            "type": "integer"
+          },
+          "agent_special_type": {
+            "type": "integer"
+          },
+          "agent_webhook_username": {
+            "type": "text"
+          },
+          "subject_id": {
+            "type": "unsigned_long"
+          },
+          "subject_type": {
+            "type": "integer"
+          },
+          "auxiliary_id": {
+            "type": "unsigned_long"
+          },
+          "auxiliary_type": {
+            "type": "integer"
+          },
+          "content": {
+            "type": "text"
+          },
+          "content_metadata": {
+            "properties": {
+              "users_mentioned": {
+                "type": "unsigned_long"
+              },
+              "channels_mentioned": {
+                "type": "unsigned_long"
+              },
+              "roles_mentioned": {
+                "type": "unsigned_long"
+              },
+              "emojis_used": {
+                "type": "keyword"
+              },
+              "custom_emojis_used": {
+                "type": "unsigned_long"
+              },
+              "custom_emoji_names_used": {
+                "type": "keyword"
+              },
+              "url_stems": {
+                "type": "keyword"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

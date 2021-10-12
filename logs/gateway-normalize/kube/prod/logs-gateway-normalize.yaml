@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logs-gateway-normalize
+  labels:
+    app: logs-gateway-normalize
+spec:
+  selector:
+    matchLabels:
+      app: logs-gateway-normalize
+  template:
+    metadata:
+      labels:
+        app: logs-gateway-normalize
+    spec:
+      containers:
+        - name: logs-gateway-normalize
+          image: "{{prefix}}logs-gateway-normalize:{{tag}}"
+          args: ["/etc/architus/config.d/service.toml"]
+          env:
+            - name: LOGS_GATEWAY_NORMALIZE_CONFIG_SECRETS__DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: bot_token
+          volumeMounts:
+            - name: config
+              mountPath: "/etc/architus/config.d"
+              readOnly: true
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: config
+          configMap:
+            name: logs-gateway-normalize-config
+
