@@ -76,7 +76,7 @@ if 'sandbox' in enabled:
 if 'rabbit' in enabled:
     docker_build('rabbit-image', '.', dockerfile='rabbitmq/Dockerfile', ignore=["*", "!rabbitmq/*", "!lib/**"])
     k8s_yaml('rabbitmq/kube/dev/rabbit.yaml')
-    k8s_resource('rabbit', port_forwards=8090)
+    k8s_resource('rabbit', port_forwards=[8090, 15672])
 
 if 'dbmanager' in enabled:
     docker_build('dbmanager-image', 'dbmanager', dockerfile='dbmanager/Dockerfile')
