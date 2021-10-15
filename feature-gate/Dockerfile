@@ -1,7 +1,7 @@
 ARG REPO_ROOT=/opt/architus
 ARG SERVICE=feature-gate
 ARG CONFIG_BACKOFF_LIB=lib/config-backoff-rs
-ARG PROTO=lib/ipc/proto
+ARG PROTO=lib/proto
 
 # Build service
 FROM rust:1.50 as builder
