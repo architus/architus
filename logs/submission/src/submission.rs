@@ -3,7 +3,8 @@
 
 use crate::config::Configuration;
 use crate::elasticsearch::{
-    BulkError, BulkItem, BulkOperation, EnsureIndexExistsError, IndexStatus, MakeBulkOperationError, StatusCode,
+    BulkError, BulkItem, BulkOperation, EnsureIndexExistsError, IndexStatus,
+    MakeBulkOperationError, StatusCode,
 };
 use crate::rpc::logs::event::Event as ProtoEvent;
 use crate::rpc::logs_submission_schema::StoredEvent;
@@ -43,11 +44,25 @@ pub struct Failure {
     pub correlation_id: usize,
 }
 
+/// Result enum for whether a submission was duplicate or not.
+/// Used to act as a more explicit/easier-to-read boolean.
+#[derive(Debug, Clone, PartialEq)]
+pub enum WasDuplicate {
+    True,
+    False,
+}
+
+impl From<WasDuplicate> for bool {
+    fn from(w: WasDuplicate) -> Self {
+        w == WasDuplicate::True
+    }
+}
+
 /// Public success result variant,
 /// giving details on the successful submission.
 #[derive(Debug, Clone)]
 pub struct Success {
-    pub was_duplicate: bool,
+    pub was_duplicate: WasDuplicate,
     pub correlation_id: usize,
 }
 
@@ -93,7 +108,7 @@ struct InternalFailure {
 /// Internal version of `Success` that does not include `correlation_id`
 #[derive(Debug, Clone)]
 struct InternalSuccess {
-    pub was_duplicate: bool,
+    pub was_duplicate: WasDuplicate,
 }
 
 /// Creates the Elasticsearch index before submitting any events
@@ -374,8 +389,8 @@ impl BatchSubmit {
                     if submitted_ids_set.contains(&action.id) {
                         // The returned ID is valid/expected
                         let was_duplicate = match action.status {
-                            StatusCode::CREATED => false,
-                            StatusCode::CONFLICT => true,
+                            StatusCode::CREATED => WasDuplicate::False,
+                            StatusCode::CONFLICT => WasDuplicate::True,
                             _ => {
                                 slog::warn!(
                                     self.logger,

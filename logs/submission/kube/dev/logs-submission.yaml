@@ -16,9 +16,6 @@ spec:
       containers:
         - name: logs-submission
           image: logs-submission-image
-          envFrom:
-            - secretRef:
-                name: architus-secret
 ---
 apiVersion: v1
 kind: Service

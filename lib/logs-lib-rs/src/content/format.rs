@@ -39,6 +39,20 @@ pub fn write_channel_mention(writer: &mut impl Write, id: u64) -> Result<(), fmt
     write!(writer, "<#{}>", id)
 }
 
+/// Inclusion/non-inclusion of the name of the emoji
+#[derive(Debug, Clone, PartialEq)]
+pub enum EmojiName<'a> {
+    Unknown,
+    Known(&'a str),
+}
+
+/// Type of the custom emoji to render a mention for.
+#[derive(Debug, Clone, PartialEq)]
+pub enum EmojiType {
+    Static,
+    Animated,
+}
+
 /// Writes a channel mention that will be displayed using rich formatting.
 /// Channel mentions look like `<#641064458843586562>` in Discord rich content,
 /// which get converted to the interact-able mention element
@@ -48,14 +62,21 @@ pub fn write_channel_mention(writer: &mut impl Write, id: u64) -> Result<(), fmt
 ///
 /// # Errors
 /// - `std::fmt::Error` if the write to the given writer fails
+#[allow(clippy::needless_pass_by_value)]
 pub fn write_custom_emoji(
     writer: &mut impl Write,
     id: u64,
-    name: Option<&str>,
-    animated: bool,
+    name: EmojiName<'_>,
+    kind: EmojiType,
 ) -> Result<(), fmt::Error> {
-    let animated_prefix = if animated { "a" } else { "" };
-    let maybe_name = name.unwrap_or("");
+    let animated_prefix = match kind {
+        EmojiType::Static => "",
+        EmojiType::Animated => "a",
+    };
+    let maybe_name = match name {
+        EmojiName::Unknown => "",
+        EmojiName::Known(name) => name,
+    };
     write!(writer, "<{}:{}:{}>", animated_prefix, maybe_name, id)
 }
 
@@ -123,26 +144,46 @@ mod tests {
 
     #[test]
     fn test_write_custom_emoji() {
-        use super::write_custom_emoji;
+        use super::{write_custom_emoji, EmojiName, EmojiType};
 
         assert_eq!(
-            write_to_string(
-                |s| write_custom_emoji(s, 814220915033899059, Some("catKiss"), true).unwrap()
-            ),
+            write_to_string(|s| write_custom_emoji(
+                s,
+                814220915033899059,
+                EmojiName::Known("catKiss"),
+                EmojiType::Animated
+            )
+            .unwrap()),
             String::from("<a:catKiss:814220915033899059>"),
         );
         assert_eq!(
-            write_to_string(|s| write_custom_emoji(s, 814220915033899059, None, true).unwrap()),
+            write_to_string(|s| write_custom_emoji(
+                s,
+                814220915033899059,
+                EmojiName::Unknown,
+                EmojiType::Animated
+            )
+            .unwrap()),
             String::from("<a::814220915033899059>"),
         );
         assert_eq!(
-            write_to_string(
-                |s| write_custom_emoji(s, 792017989583110154, Some("architus"), false).unwrap()
-            ),
+            write_to_string(|s| write_custom_emoji(
+                s,
+                792017989583110154,
+                EmojiName::Known("architus"),
+                EmojiType::Static
+            )
+            .unwrap()),
             String::from("<:architus:792017989583110154>"),
         );
         assert_eq!(
-            write_to_string(|s| write_custom_emoji(s, 792017989583110154, None, false).unwrap()),
+            write_to_string(|s| write_custom_emoji(
+                s,
+                792017989583110154,
+                EmojiName::Unknown,
+                EmojiType::Static
+            )
+            .unwrap()),
             String::from("<::792017989583110154>"),
         );
     }

@@ -1,5 +1,5 @@
-mod format;
 mod extract;
+mod format;
 
-pub use format::*;
 pub use extract::*;
+pub use format::*;

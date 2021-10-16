@@ -16,9 +16,17 @@ spec:
       containers:
         - name: logs-submission
           image: "{{prefix}}logs-submission:{{tag}}"
-          envFrom:
-            - secretRef:
-                name: architus-secret
+          args: ["/etc/architus/config.d/service.toml"]
+          volumeMounts:
+          - name: config
+            mountPath: "/etc/architus/config.d"
+            readOnly: true
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+      - name: config
+        configMap:
+          name: logs-submission-config
 ---
 apiVersion: v1
 kind: Service

@@ -121,20 +121,12 @@ enum EventOrigin {
   EventOriginAuditLog = 2;
   // Gateway events that also incorporate a corresponding audit log entry
   EventOriginHybrid = 3;
-  // Action originated from a scheduled recovery job where the bot knew it had
-  // ingestion downtime and ran a recovery job to collect all relevant origin/update events
-  EventOriginScheduledRecovery = 4;
-  // Action originated from an unscheduled recovery job where the bot was
-  // scanning history and verifying that the logs have the up-to-date state
-  EventOriginUnscheduledRecovery = 5;
-  // Action comes from some other internal process
-  EventOriginInternal = 6;
 }
 
 enum EventType {
   EventTypeUnknown = 0;
 
-  // Special (ScheduledRecovery) Events
+  // Special Events
   EventTypeGuildCreate = 2000;
 
   // Gateway Events
@@ -186,21 +178,5 @@ enum EventType {
   EventTypeIntegrationCreate = 80;
   EventTypeIntegrationUpdate = 81;
   EventTypeIntegrationDelete = 82;
-
-  // Internal Events
-  EventTypeAutoResponseCreate = 3100;
-  EventTypeAutoResponseUpdate = 3101;
-  EventTypeAutoResponseDelete = 3102;
-  EventTypeAutoResponseTrigger = 3103;
-  EventTypeCustomEmojiCreate = 3300;
-  EventTypeCustomEmojiUpdate = 3301;
-  EventTypeCustomEmojiDelete = 3302;
-  EventTypeCustomEmojiUse = 3303;
-  EventTypeCustomEmojiCache = 3304;
-  EventTypeCustomEmojiLoad = 3305;
-  EventTypeSettingsUpdate = 3400;
-  EventTypeArchitusJoin = 4000;
-  EventTypeArchitusLeave = 4001;
-  EventTypeUserPrivacyUpdate = 4002;
 }
 

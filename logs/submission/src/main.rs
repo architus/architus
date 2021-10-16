@@ -18,9 +18,10 @@ use crate::rpc::logs::submission::{
     EntityRevisionMetadata, EventDeterministicIdParams, SubmitIdempotentRequest,
     SubmitIdempotentResponse, SubmittedEvent,
 };
+use crate::submission::WasDuplicate;
 use crate::timeout::TimeoutOr;
 use anyhow::Context;
-use futures::{Stream, StreamExt, try_join};
+use futures::{try_join, Stream, StreamExt};
 use futures_batch::ChunksTimeoutStreamExt;
 use slog::Logger;
 use sloggers::Config;
@@ -171,7 +172,7 @@ fn generate_id(id_params: &EventDeterministicIdParams, event_type: i32) -> Strin
     ];
 
     // Join the event type and each field into a single buffer:
-    // {event_type}{field1}{field2}{field3}{field4}
+    // {event_type}{field1}{field2}{field3}
     let buffer_capacity =
         std::mem::size_of::<i32>() + (std::mem::size_of::<u64>() * fields_as_bytes.len());
     let mut buffer = Vec::with_capacity(buffer_capacity);
@@ -251,7 +252,7 @@ impl SubmissionService for SubmissionServiceImpl {
         let was_duplicate = self.submit_event_inner(id.clone(), Box::new(inner)).await?;
         Ok(Response::new(SubmitIdempotentResponse {
             id,
-            was_duplicate,
+            was_duplicate: bool::from(was_duplicate),
         }))
     }
 }
@@ -312,7 +313,7 @@ impl SubmissionServiceImpl {
         &self,
         id: String,
         event: Box<Event>,
-    ) -> Result<bool, tonic::Status> {
+    ) -> Result<WasDuplicate, tonic::Status> {
         let event_type = EventType::from_i32(event.r#type).unwrap_or(EventType::Unknown);
         let logger = self.logger.new(slog::o!(
             "event_id" => id.clone(),
@@ -353,7 +354,7 @@ async fn wait_for_notify(
     timeout: Duration,
     receiver: oneshot::Receiver<submission::OperationResult>,
     logger: Logger,
-) -> Result<bool, tonic::Status> {
+) -> Result<WasDuplicate, tonic::Status> {
     // Awaiting the receiver waits for a message
     match crate::timeout::timeout(timeout, receiver).await {
         Ok(received_value) => match received_value {
@@ -362,7 +363,7 @@ async fn wait_for_notify(
                     logger,
                     "confirmed durable submission of event";
                     "correlation_id" => success.correlation_id,
-                    "was_duplicate" => success.was_duplicate,
+                    "was_duplicate" => ?success.was_duplicate,
                 );
                 Ok(success.was_duplicate)
             }
@@ -384,7 +385,7 @@ async fn wait_for_notify(
                 "error" => ?err,
             );
             Err(Status::internal("internal channel error"))
-        },
+        }
         Err(TimeoutOr::Timeout(err)) => {
             slog::error!(
                 logger,
