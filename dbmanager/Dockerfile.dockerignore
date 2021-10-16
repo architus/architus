@@ -1,0 +1,7 @@
+# Ignore everything
+**
+
+# Include database manager source files
+!dbmanager/dbmanager.py
+!dbmanager/migrations
+!dbmanager/cleanup
