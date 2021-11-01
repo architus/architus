@@ -1,0 +1,193 @@
+syntax = "proto3";
+package logs.event;
+
+// Event is the schema for the objects stored in elasticsearch for the logs
+// services
+message Event {
+  // (required) Unix timestamp of the *time of the underlying event* (if
+  // available), else some meaningful timestamp describing when the event was
+  // ingested
+  uint64 timestamp = 1;
+  // (required) The type of action the event is
+  EventType type = 2;
+  // (required) The origin type of the event
+  EventOrigin origin = 3;
+  // (required) ID of the guild the event occurred in
+  fixed64 guild_id = 4;
+  // (required) Rich-formatted content that includes markdown and
+  // mention-syntax, also includes color-embed extension support. Used in the
+  // web dashboard as the primary textual display of the event. Indexed in ES as
+  // text using the standard analyzer
+  string content = 5;
+
+  // (optional) Additional metadata about the content that is indexed in ES
+  // and is used to display and index the more structured components of the
+  // content
+  ContentMetadata content_metadata = 6;
+  // (optional) The source data; including the original gateway/audit log
+  // entries Not indexed but still stored in ES
+  EventSource source = 7;
+  // (optional) Reason for the log event (can attach additional info here)
+  string reason = 8;
+  // (optional) Id of the corresponding audit log entry this event corresponds
+  // to; if any (included for indexing purposes)
+  fixed64 audit_log_id = 9;
+  // (optional) The channel that the event occurred in, if applicable
+  fixed64 channel_id = 10;
+  // (optional) Id of the entity that caused the event to occur, if applicable
+  fixed64 agent_id = 11;
+  // (optional) Type of the entity that caused the event to occur, if applicable
+  EntityType agent_type = 12;
+  // (optional) Display type of the entity that caused the event to occur, if
+  // applicable
+  AgentSpecialType agent_special_type = 13;
+  // (optional) Display username of the webhook that caused the event to occur,
+  // if applicable
+  string agent_webhook_username = 14;
+  // (optional) Id of the entity that the event is about/affects, if applicable
+  fixed64 subject_id = 15;
+  // (optional) Type of the entity wi1th the id in `subject_id`
+  EntityType subject_type = 16;
+  // (optional) Id of some other related entity involved in the event, if
+  // applicable
+  fixed64 auxiliary_id = 17;
+  // (optional) Type of the entity with the id in `auxiliary_id`
+  EntityType auxiliary_type = 18;
+}
+
+// Represents a switchable enum for variably-typed fields in the Event struct
+enum EntityType {
+  EntityTypeNone = 0;
+  // User-like entity that has a concrete user/member object,
+  // and a username, nickname, and color that is stored in the revision cache
+  EntityTypeUserLike = 1;
+  // Message entity
+  EntityTypeMessage = 2;
+  // Role entity, has a name and color that is stored in the revision cache
+  EntityTypeRole = 3;
+  // Channel entity, has a name that is stored in the revision cache
+  EntityTypeChannel = 4;
+  // Emoji entity
+  EntityTypeEmoji = 5;
+}
+
+// The type of agent that caused the original event to occur.
+// Results in small badges next to agents in the UI and adds a filterable option
+enum AgentSpecialType {
+  // No special display (used for normal users)
+  AgentSpecialTypeDefault = 0;
+  // Adds a "bot" badge next to the agent in the web dashboard
+  AgentSpecialTypeBot = 1;
+  // Adds a "webhook" badge next to the agent in the web dashboard
+  AgentSpecialTypeWebhook = 2;
+  // Adds a "system" badge next to the agent in the web dashboard, used for
+  // Discord messages
+  AgentSpecialTypeSystem = 3;
+  // Adds a special display that overrides the normal display
+  AgentSpecialTypeArchitus = 4;
+}
+
+// Additional metadata about the content that is indexed in ES
+// and is used to display and index the more structured components of the
+// content. Each field is optional, and only needs to be included if the
+// content contained the corresponding mentions
+message ContentMetadata {
+  // (optional) The user ID of all users mentioned in the content
+  repeated fixed64 users_mentioned = 1;
+  // (optional) The channel ID of all channels mentioned in the content
+  repeated fixed64 channels_mentioned = 2;
+  // (optional) The role ID of all roles mentioned in the content
+  repeated fixed64 roles_mentioned = 3;
+  // (optional) The normalized shortcode of all standard emojis used in the
+  // content
+  repeated string emojis_used = 4;
+  // (optional) The emoji ID of all custom emojis used in the content
+  repeated fixed64 custom_emojis_used = 5;
+  // (optional) The emoji shortcodes of all custom emojis used in the content
+  repeated string custom_emoji_names_used = 6;
+  // (optional) The url stems of all urls in the content, including all
+  // intermediate subdomains eg. https://www.google.com/ results in
+  // `www.google.com` and `google.com`
+  repeated string url_stems = 7;
+}
+
+// The backing JSON that represents the source of the event.
+// Note that this message does not use the generic Struct message
+// (from the Google well-known types) because it only supports f64 numbers,
+// which may cause problems in the future.
+// Instead, the internal JSON is sent as a string
+message EventSource {
+  // (optional) Source gateway event inner object
+  string gateway = 1;
+  // (optional) Source audit log entry entity object
+  string audit_log = 2;
+  // (optional) Source internal data object
+  string internal = 3;
+}
+
+enum EventOrigin {
+  EventOriginUnknown = 0;
+  // Action originated from the gateway and was caught as it originated
+  EventOriginGateway = 1;
+  // Action originated from the audit log
+  EventOriginAuditLog = 2;
+  // Gateway events that also incorporate a corresponding audit log entry
+  EventOriginHybrid = 3;
+}
+
+enum EventType {
+  EventTypeUnknown = 0;
+
+  // Special Events
+  EventTypeGuildCreate = 2000;
+
+  // Gateway Events
+  EventTypeMemberJoin = 2001;
+  EventTypeMemberLeave = 2002;
+  EventTypeMessageSend = 2003;
+  EventTypeMessageReply = 2004;
+  EventTypeMessageEdit = 2005;
+  EventTypeReactionAdd = 2006;
+  EventTypeReactionRemove = 2007;
+  EventTypeReactionBulkRemove = 2008;
+  EventTypeInteractionCreate = 2009;
+
+  // Hybrid Events
+  EventTypeMessageDelete = 72;
+  EventTypeMessageBulkDelete = 73;
+
+  // Audit Log Events
+  EventTypeGuildUpdate = 1;
+  EventTypeChannelCreate = 10;
+  EventTypeChannelUpdate = 11;
+  EventTypeChannelDelete = 12;
+  EventTypeChannelOverwriteCreate = 13;
+  EventTypeChannelOverwriteUpdate = 14;
+  EventTypeChannelOverwriteDelete = 15;
+  EventTypeMemberKick = 20;
+  EventTypeMemberPrune = 21;
+  EventTypeMemberBanAdd = 22;
+  EventTypeMemberBanRemove = 23;
+  EventTypeMemberUpdate = 24;
+  EventTypeMemberRoleUpdate = 25;
+  EventTypeMemberVoiceMove = 26;
+  EventTypeMemberVoiceKick = 27;
+  EventTypeBotAdd = 28;
+  EventTypeRoleCreate = 30;
+  EventTypeRoleUpdate = 31;
+  EventTypeRoleDelete = 32;
+  EventTypeInviteCreate = 40;
+  EventTypeInviteUpdate = 41;
+  EventTypeInviteDelete = 42;
+  EventTypeWebhookCreate = 50;
+  EventTypeWebhookUpdate = 51;
+  EventTypeWebhookDelete = 52;
+  EventTypeEmojiCreate = 60;
+  EventTypeEmojiUpdate = 61;
+  EventTypeEmojiDelete = 62;
+  EventTypeMessagePin = 74;
+  EventTypeMessageUnpin = 75;
+  EventTypeIntegrationCreate = 80;
+  EventTypeIntegrationUpdate = 81;
+  EventTypeIntegrationDelete = 82;
+}

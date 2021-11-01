@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logs-submission
+  labels:
+    app: logs-submission
+spec:
+  selector:
+    matchLabels:
+      app: logs-submission
+  template:
+    metadata:
+      labels:
+        app: logs-submission
+    spec:
+      containers:
+        - name: logs-submission
+          image: "{{prefix}}logs-submission:{{tag}}"
+          args: ["/etc/architus/config.d/service.toml"]
+          volumeMounts:
+          - name: config
+            mountPath: "/etc/architus/config.d"
+            readOnly: true
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+      - name: config
+        configMap:
+          name: logs-submission-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logs-submission
+  namespace: default
+spec:
+  type: ClusterIP
+  selector:
+    app: logs-submission
+  ports:
+    - protocol: TCP
+      port: 50282
+      targetPort: 50282

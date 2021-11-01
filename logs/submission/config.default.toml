@@ -1,0 +1,68 @@
+# The port that the gRPC server listens on
+port = 50282
+# How long to wait for durable submission confirmation
+# before returning with "deadline exceeded" and encouraging retry
+submission_wait_timeout = "2s"
+# The number of events that will trigger an immediate batch submit
+# even if the event submission debounce period has not elapsed
+debounce_size = 32
+# The period of time since the oldest event in a batch was enqueued
+# that the entire batch will be submitted
+debounce_period = "100ms"
+
+# Parameters for the database connection to Elasticsearch
+[elasticsearch]
+# URL of the Elasticsearch instance to store log entries in
+url = "http://elasticsearch:9200"
+# Elasticsearch index containing the stored log events.
+# If it doesn't exist, this service will automatically create/configure it.
+index = "architus-logs-events"
+# Elasticsearch index settings file that corresponds to the logs index
+index_config_path = "/etc/architus/index_config.json"
+# Username to use when connecting to Elasticsearch.
+# If given, this user should have RBAC permissions for:
+# - create_doc (to submit log events) for the log event index
+# - create_index (to create and configure field mappings) for the log event index
+# If empty, then authentication is disabled.
+auth_username = ""
+# Password to use when connecting to Elasticsearch.
+# Ignored if the user is empty.
+auth_password = ""
+
+# The timeout/backoff used to connect to external services during initialization
+[initialization]
+attempt_timeout = "2s"
+[initialization.backoff]
+initial_interval = "500ms"
+max_interval = "30s"
+duration = "2m"
+multiplier = 2.0
+
+# The timeout/backoff used to create the logs index
+[index_creation]
+attempt_timeout = "2s"
+[index_creation.backoff]
+initial_interval = "100ms"
+max_interval = "10s"
+duration = "2m"
+multiplier = 2.0
+
+# The timeout/backoff used to forward events to Elasticsearch
+[submission]
+attempt_timeout = "10s"
+[submission.backoff]
+initial_interval = "50ms"
+max_interval = "500ms"
+duration = "20s"
+multiplier = 2.0
+
+# Logging configuration (for service diagnostic logs, not Architus log events)
+# https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html
+[logging]
+level = "info"
+format = "full"
+source_location = "file_and_line"
+timezone = "utc"
+destination = "stdout"
+channel_size = 2048
+overflow_strategy = "drop_and_report"
