@@ -227,9 +227,23 @@ impl SubmissionService for SubmissionServiceImpl {
         let inner = inner.ok_or_else(|| Status::invalid_argument("no inner event given"))?;
         let id_params = id_params.ok_or_else(|| Status::invalid_argument("no id params given"))?;
 
-        // guild_id is the only required field
+        // Check for required fields on the inner event:
+        if inner.timestamp == 0 {
+            return Err(Status::invalid_argument("missing timestamp on inner event"));
+        }
+        if inner.r#type == 0 {
+            return Err(Status::invalid_argument("missing type on inner event"));
+        }
+        if inner.origin == 0 {
+            return Err(Status::invalid_argument("missing origin on inner event"));
+        }
         if inner.guild_id == 0 {
             return Err(Status::invalid_argument("missing guild_id on inner event"));
+        }
+        if inner.content.is_empty() {
+            return Err(Status::invalid_argument(
+                "missing or empty content on inner event",
+            ));
         }
 
         let id = generate_id(&id_params, inner.r#type);
