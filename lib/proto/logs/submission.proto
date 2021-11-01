@@ -7,12 +7,11 @@ service SubmissionService {
   // Submits a single log event to be imported into the Elasticsearch database.
   // If the ID already exists, then no event is imported.
   // Requires a valid ID, Guild ID, and timestamp.
-  rpc submit_idempotent(SubmitIdempotentRequest) returns (SubmitIdempotentResponse) {}
+  rpc submit_idempotent(SubmitIdempotentRequest)
+      returns (SubmitIdempotentResponse) {}
 }
 
-message SubmitIdempotentRequest {
-  SubmittedEvent event = 1;
-}
+message SubmitIdempotentRequest { SubmittedEvent event = 1; }
 
 message SubmitIdempotentResponse {
   // The ID of the submitted log event
@@ -22,25 +21,25 @@ message SubmitIdempotentResponse {
 }
 
 message SubmittedEvent {
-  // The log event being submitted.
+  // (required) The log event being submitted.
   // Indexed and stored in ES as-is
   logs.event.Event inner = 1;
-  // Name of the channel that the event occurred in (used in the frontend).
-  // Providing it will automatically update the revision store
-  // (if the inner.channel_id field is non-zero).
+  // (required) Parameters used to generate a deterministic composite ID
+  EventDeterministicIdParams id_params = 2;
+
+  // (optional) Name of the channel that the event occurred in (used in the
+  // web dashboard). Providing it will automatically update the revision store
+  // (if the inner.channel_id field is non-zero). Not indexed or stored in ES
+  string channel_name = 3;
+  // (optional) Display-oriented metadata about the agent entity
   // Not indexed or stored in ES
-  string channel_name = 2;
-  // Display-oriented metadata about the agent entity
+  EntityRevisionMetadata agent_metadata = 4;
+  // (optional) Display-oriented metadata about the subject entity
   // Not indexed or stored in ES
-  EntityRevisionMetadata agent_metadata = 3;
-  // Display-oriented metadata about the subject entity
+  EntityRevisionMetadata subject_metadata = 5;
+  // (optional) Display-oriented metadata about the auxiliary entity
   // Not indexed or stored in ES
-  EntityRevisionMetadata subject_metadata = 4;
-  // Display-oriented metadata about the auxiliary entity
-  // Not indexed or stored in ES
-  EntityRevisionMetadata auxiliary_metadata = 5;
-  // Parameters used to generate a deterministic composite ID
-  EventDeterministicIdParams id_params = 6;
+  EntityRevisionMetadata auxiliary_metadata = 6;
 }
 
 // EventDeterministicIdParams contains fields
@@ -58,24 +57,27 @@ message EventDeterministicIdParams {
 
 // Used to control display-oriented data and update revision cache
 // If provided and the type is a channel, role, or user-like,
-// then the data is used to update the revision cache and removed before storing in ES.
-// On other entity types, the data is ignored.
-// Fully default-values for all fields represents no metadata provided
+// then the data is used to update the revision cache and removed before storing
+// in ES. On other entity types, the data is ignored. Fully default-values for
+// all fields represents no metadata provided
 message EntityRevisionMetadata {
-  // If empty, then ignored
+  // (optional) If empty, then ignored
   string name = 1;
-  // Only used when the entity type is a role or a user-like.
+  // (optional) Only used when the entity type is a role or a user-like.
   // If 0 (full black), then ignored
   // Note that this is the same way Discord handles null color values
-  uint32 color = 6;
+  uint32 color = 2;
 
-  // The next group of fields are only used when the entity type is user-like
-  bool has_nickname = 2;
-  // If has_nickname is set, then this field has the following behavior:
+  // (optional) The next group of fields are only used when the entity type is
+  // user-like
+  bool has_nickname = 3;
+  // (optional) If has_nickname is set, then this field has the following
+  // behavior:
   // - empty nickname represents no nickname,
-  //   but still an authoritative statement that the user-like *has* no nickname
-  // - non-empty nickname represents an authoritative statement that the user-like has that nickname
-  string nickname = 3;
-  bool has_discriminator = 4;
-  uint32 discriminator = 5;
+  //   but still an authoritative statement that the user-like has no nickname
+  // - non-empty nickname represents an authoritative statement that the
+  //   user-like has that nickname
+  string nickname = 4;
+  bool has_discriminator = 5;
+  uint32 discriminator = 6;
 }
