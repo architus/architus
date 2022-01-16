@@ -16,9 +16,17 @@ spec:
       containers:
         - name: feature-gate
           image: feature-gate-image
-          envFrom:
-            - secretRef:
-                name: architus-secret
+          env:
+            - name: FEATURE_GATE_CONFIG_DATABASE__USER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: db_user
+            - name: FEATURE_GATE_CONFIG_DATABASE__USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: db_pass
 ---
 apiVersion: v1
 kind: Service
@@ -26,7 +34,7 @@ metadata:
   name: feature-gate
   namespace: default
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: feature-gate
   ports:
