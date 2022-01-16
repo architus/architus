@@ -201,6 +201,16 @@ class Emoji(CustomResource):
     def delete(self, guild_id: int, emoji_id: int, jwt: JWT):
         return self.shard.delete_emoji(guild_id, emoji_id, jwt.id, routing_guild=guild_id)
 
+class EmojiConf(CustomResource):
+    @authenticated(member=True)
+    def get(self, guild_id: int, jwt: JWT):
+        return self.shard.emoji_manager_conf(guild_id, jwt.id, None, routing_guild=guild_id)
+
+    @reqparams(enabled=bool)
+    @authenticated(admin=True)
+    def post(self, guild_id: int, enabled: bool, jwt: JWT):
+        return self.shard.emoji_manager_conf(guild_id, jwt.id, enabled, routing_guild=guild_id)
+
 
 class ListGuilds(CustomResource):
     @authenticated()
@@ -270,6 +280,7 @@ def app_factory():
     api.add_resource(Stats, "/stats/<int:guild_id>")
     api.add_resource(Music, "/music/<int:guild_id>")
     api.add_resource(Emoji, "/emojis/<int:emoji_id>", "/emojis/<int:guild_id>/<int:emoji_id>")
+    api.add_resource(EmojiConf, "/emojis/<int:guild_id>/conf")
     api.add_resource(AdminEmojis, "/admin/emojis/<int:guild_id>")
     api.add_resource(AutoResponses, "/responses/<int:guild_id>")
     api.add_resource(Logs, "/logs/<int:guild_id>")

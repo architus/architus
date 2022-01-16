@@ -12,12 +12,12 @@ spec:
           - secretRef:
               name: architus-secret
           volumeMounts:
-            - name: dbm-persistent-storage
+            - name: "dbm-persistent-storage{{pv-suffix}}"
               mountPath: /app/current_migration
       imagePullSecrets:
         - name: regcred
       volumes:
-        - name: dbm-persistent-storage
+        - name: "dbm-persistent-storage{{pv-suffix}}"
           persistentVolumeClaim:
             claimName: dbmanager-claim
       restartPolicy: OnFailure

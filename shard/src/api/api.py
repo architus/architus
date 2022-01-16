@@ -1,5 +1,5 @@
 import secrets
-from typing import List
+from typing import List, Optional
 from asyncio import create_task
 import re
 
@@ -238,24 +238,56 @@ class Api(Cog):
         return {'emojis': [e.as_dict() for e in emojis]}, sc.OK_200
 
     @fetch_guild
+    async def emoji_manager_conf(self, guild: discord.Guild, member_id: int, enabled: Optional[bool] = None):
+        emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        settings = self.bot.settings[guild]
+        if enabled is not None and member_id in settings.admin_ids:
+            settings.manage_emojis = bool(enabled)
+        return {
+            'enabled': settings.manage_emojis,
+            'architus_limit': 'unlimited',
+            'discord_limit': emoji_manager.max_emojis
+        }, sc.OK_200
+
+    @fetch_guild
     async def load_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
         emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        settings = self.bot.settings[guild]
         emoji = emoji_manager.find_emoji(a_id=emoji_id)
+        is_admin = member_id in settings.admin_ids
+        member = guild.get_member(member_id)
+
+        if not settings.manage_emojis:
+            return {'message': "emoji manager disabled"}, sc.BAD_REQUEST_400
+
         if emoji is None:
             return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
-        await emoji_manager.load_emoji(emoji)
-        return {'message': "successfully loaded"}, sc.OK_200
+
+        if member.guild_permissions.manage_emojis or is_admin:
+            new_emoji = await emoji_manager.load_emoji(emoji)
+            return {'emoji': new_emoji.as_dict()}, sc.OK_200
+        return {'message': "unauthorized"}, sc.UNAUTHORIZED_401
 
     @fetch_guild
     async def cache_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):
         emoji_manager = self.bot.cogs['Emoji Manager'].managers[guild.id]
+        settings = self.bot.settings[guild]
         emoji = emoji_manager.find_emoji(a_id=emoji_id)
-        if member_id not in self.bot.settings[guild].admin_ids:
-            return {'message': "only admins may manually cache emoji"}, sc.UNAUTHORIZED_401
+        is_admin = member_id in settings.admin_ids
+        member = guild.get_member(member_id)
+
+        if not settings.manage_emojis:
+            return {'message': "emoji manager disabled"}, sc.BAD_REQUEST_400
+
         if emoji is None:
             return {'message': "unknown emoji"}, sc.BAD_REQUEST_400
-        await emoji_manager.cache_emoji(emoji)
-        return {'message': "successfully cached"}, sc.OK_200
+
+        if (member.guild_permissions.manage_emojis and emoji.author_id == member_id) or is_admin:
+            new_emoji = await emoji_manager.cache_emoji(emoji)
+            if new_emoji is None:
+                return {'message': "already loaded", 'emoji': new_emoji.as_dict()}, sc.BAD_REQUEST_400
+            return {'emoji': new_emoji.as_dict()}, sc.OK_200
+        return {'message': "unauthorized"}, sc.UNAUTHORIZED_401
 
     @fetch_guild
     async def delete_emoji(self, guild: discord.Guild, emoji_id: int, member_id: int):

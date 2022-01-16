@@ -17,3 +17,5 @@ tags
 .idea/*
 www
 secret.yaml
+*.secret.yaml
+deploy/*

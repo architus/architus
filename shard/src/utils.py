@@ -51,6 +51,7 @@ def guild_to_dict(guild: discord.Guild) -> dict:
     )
     data = {p: getattr(guild, p) for p in params}
     data['id'] = str(data['id'])
+    data['region'] = None  # deprecated
     return data
 
 

@@ -52,22 +52,27 @@ class shardRPC:
         self.futures[correlation_id] = future
         if self.channel is None:
             await self.connect()
+        try:
+            await self.channel.default_exchange.publish(
+                Message(
+                    json.dumps(
+                        {
+                            'method': method,
+                            'args': args,
+                            'kwargs': kwargs,
+                        }
+                    ).encode(),
+                    content_type='text/plain',
+                    correlation_id=correlation_id,
+                    reply_to=self.callback_queue.name,
+                ),
+                routing_key=routing_key,
+            )
+        except Exception as e:
+            logger.exception("rabbit seems to have disconnected. trying to reconnect...")
+            await self.connect()
+            await self.call(method, *args, routing_key=routing_key, **kwargs)
 
-        await self.channel.default_exchange.publish(
-            Message(
-                json.dumps(
-                    {
-                        'method': method,
-                        'args': args,
-                        'kwargs': kwargs,
-                    }
-                ).encode(),
-                content_type='text/plain',
-                correlation_id=correlation_id,
-                reply_to=self.callback_queue.name,
-            ),
-            routing_key=routing_key,
-        )
         try:
             return await asyncio.wait_for(future, timeout=5)
         except asyncio.TimeoutError as e:

@@ -189,7 +189,7 @@ class EmojiManager:
         except Exception:
             logger.exception('')
 
-    async def cache_emoji(self, emoji: ArchitusEmoji) -> None:
+    async def cache_emoji(self, emoji: ArchitusEmoji) -> ArchitusEmoji:
         """remove an emoji from the guild"""
         if not self.settings.manage_emojis:
             logger.warning(
@@ -197,12 +197,14 @@ class EmojiManager:
             return
         discord_emoji = self.bot.get_emoji(emoji.discord_id)
         if discord_emoji is None:
-            return
+            emoji.cache()
+            return emoji
 
         logger.debug(f"cache {emoji} from {self.guild.name}")
         await discord_emoji.delete(reason="cached")
         emoji.cache()
         # no need to update the db here cause we're about to trigger the on_emoji_removed event
+        return emoji
 
     async def load_max_emojis(self):
         if not self.settings.manage_emojis:
