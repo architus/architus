@@ -1,0 +1,17 @@
+discord_app_id = 0
+discord_token = ""
+
+comic_description = """\
+The funnies hot off the press! Get the latest \
+comics from the webs hottest comic artists."""
+
+# Logging configuration (for service diagnostic logs, not Architus log events)
+# https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html
+[logging]
+level = "info"
+format = "full"
+source_location = "file_and_line"
+timezone = "utc"
+destination = "stdout"
+channel_size = 2048
+overflow_strategy = "drop_and_report"
