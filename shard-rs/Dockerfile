@@ -2,7 +2,7 @@ ARG REPO_ROOT=/opt/architus
 ARG SERVICE=shard-rs
 
 # Build service
-FROM rust:1.51 as builder
+FROM rust:1.58 as builder
 RUN rustup component add rustfmt
 ARG REPO_ROOT
 ARG SERVICE

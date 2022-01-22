@@ -9,7 +9,7 @@ from werkzeug.wsgi import FileWrapper
 from lib.status_codes import StatusCodes
 from lib.config import logger, client_id, domain_name as DOMAIN, REDIRECT_URI, is_prod, which_shard
 # from lib.models import Log # , Emojis
-from lib.auth import JWT, flask_authenticated as authenticated, verify_twitch_hub
+from lib.auth import JWT, flask_authenticated as authenticated, verify_twitch_event
 from lib.discord_requests import list_guilds_request
 from lib.pool_types import PoolType
 
@@ -224,10 +224,10 @@ class ListGuilds(CustomResource):
 
 class Twitch(CustomResource):
     def get(self):
-        challenge = request.args.get("hub.challenge")
+        challenge = request.args.get("challenge")
         return make_response(challenge, StatusCodes.OK_200)
 
-    @verify_twitch_hub
+    @verify_twitch_event
     def post(self):
         if request.json is None or 'data' not in request.json:
             return StatusCodes.BAD_REQUEST_400

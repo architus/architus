@@ -87,15 +87,18 @@ def gateway_authenticated(shard, member=False):
     return decorator
 
 
-def verify_twitch_hub(func):
+def verify_twitch_event(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         try:
-            signature = request.headers['x-hub-signature'].split('=')
-            digest = hmac.new(twitch_hub_secret.encode(), msg=request.data, digestmod=hashlib.sha256).hexdigest()
-            if not hmac.compare_digest(digest, signature[1]):
+            msg_id = request.headers['Twitch-Eventsub-Message-Id']
+            timestamp = request.headers['Twitch-Eventsub-Message-Timestamp']
+            body = request.data
+            signature = request.headers['Twitch-Eventsub-Message-Signature']
+            digest = hmac.new(twitch_hub_secret.encode(), msg=msg_id + timestamp + body, digestmod=hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(digest, signature):
                 logger.info("Request had invalid signature")
-                return ({'message': "Invalid Signature"}, StatusCodes.UNAUTHORIZED_401)
+                return ({'message': "Invalid Signature"}, StatusCodes.FORBIDDEN_403)
         except KeyError:
             return ({'message': "Signature Required"}, StatusCodes.UNAUTHORIZED_401)
         except Exception:
