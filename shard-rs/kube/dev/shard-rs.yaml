@@ -16,3 +16,14 @@ spec:
       containers:
         - name: shard-rs
           image: shard-rs-image
+          env:
+            - name: SHARD_RS_CONFIG_DISCORD_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: client_id
+            - name: SHARD_RS_CONFIG_DISCORD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: client_secret

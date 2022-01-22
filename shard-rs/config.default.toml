@@ -1,4 +1,8 @@
-discord_app_id = 0
+# This gets overridden via a secret mount from architus-secret
+# (in development, this is defined in secret.yaml at the repo root)
+discord_app_id = 1
+# This gets overridden via a secret mount from architus-secret
+# (in development, this is defined in secret.yaml at the repo root)
 discord_token = ""
 
 comic_description = """\
