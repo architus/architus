@@ -1,6 +1,7 @@
 //! Module for scraping audit log events from the discord http api.
 
-mod utils;
+use crate::utils;
+use crate::convert::parse_audit_logs;
 
 use std::error::Error;
 use std::fmt;
@@ -38,15 +39,11 @@ impl Error for ScrapeError {}
 
 pub type ScrapeResult<T> = Result<T, ScrapeError>;
 
+/// Retrieve all audit log events within a timespan
 pub async fn scrape_timespan(client: &Client, guild: GuildId, timespan: (u64, u64)) -> ScrapeResult<AuditLog> {
-    let mut logs = AuditLog {
-        entries: Vec::new(),
-        integrations: Vec::new(),
-        users: Vec::new(),
-        webhooks: Vec::new(),
-    };
-
-    let curr_event_batch = scrape_before(client, guild, utils::bound_from_ts(timespan.1)).await;
+    let mut curr_event_batch = scrape_before(client, guild, Some(utils::snowflake::bound_from_ts(timespan.1))).await?;
+    curr_event_batch.entries.retain(|e| e.id.0 > timespan.0);
+    Ok(curr_event_batch)
 }
 
 /// Gets up to 100 audit log events from `guild` before the event referenced by `event_id`

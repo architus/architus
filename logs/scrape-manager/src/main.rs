@@ -1,4 +1,6 @@
 #![deny(clippy::all, clippy::pedantic, clippy::nursery)]
+#![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::too_many_lines)]
 
 //! Implements an HTTP api for getting and setting scrape work that needs to be
 //! done by the consumer.

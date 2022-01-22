@@ -1,7 +1,8 @@
-use std::time::{Duration, SystemTime};
+pub const SOMETHING: u8 = 2;
 
 /// Utility module for dealing with discord snowflakes
 pub mod snowflake {
+    use std::time::{Duration, SystemTime};
     pub const DISCORD_EPOCH_OFFSET: u64 = 1_420_070_400_000;
 
     pub const TIMESTAMP_BIT_OFFSET: usize = 22;

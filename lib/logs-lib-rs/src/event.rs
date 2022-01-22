@@ -257,6 +257,7 @@ pub enum Entity {
     Channel(Channel),
     Message(Message),
     Emoji(Emoji),
+    Guild(u64),
 }
 
 /// Represents an authoritative nickname value set

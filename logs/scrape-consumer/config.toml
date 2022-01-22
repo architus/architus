@@ -1,5 +1,6 @@
 # Update these parameters before starting service
 work_api_url = "scrape-manager"
 work_api_port = 3030
+autbot_id = 0
 
 architus_token = "TOKEN HERE"
