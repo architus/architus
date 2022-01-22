@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shard-rs
+  labels:
+    app: shard-rs
+spec:
+  selector:
+    matchLabels:
+      app: shard-rs
+  template:
+    metadata:
+      labels:
+        app: shard-rs
+    spec:
+      containers:
+        - name: shard-rs
+          image: "{{prefix}}shard-rs:{{tag}}"
+          args: ["/etc/architus/config.d/service.toml"]
+          volumeMounts:
+            - name: config
+              mountPath: "/etc/architus/config.d"
+              readOnly: true
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: config
+          configMap:
+            name: shard-rs-config

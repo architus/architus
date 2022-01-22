@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shard-rs
+  labels:
+    app: shard-rs
+spec:
+  selector:
+    matchLabels:
+      app: shard-rs
+  template:
+    metadata:
+      labels:
+        app: shard-rs
+    spec:
+      containers:
+        - name: shard-rs
+          image: shard-rs-image
