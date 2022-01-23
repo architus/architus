@@ -5,17 +5,49 @@ discord_app_id = 1
 # (in development, this is defined in secret.yaml at the repo root)
 discord_token = ""
 
+temp_test_guild = 607637793107345431
+
 comic_description = """\
-The funnies hot off the press! Get the latest \
-comics from the webs hottest comic artists."""
+The funnies hot off the press! \
+Get the latest comics from the webs hottest comic artists."""
+
+gulag_description = """\
+Send them to the gulag! \
+Start a vote to gulag (mute) a user."""
+
+default_gulag_severity = 5
+default_gulag_threshold = 5
+
+architus_user_id = 607637793107345431
+
+# The timeout/backoff used to connect to external services during initialization
+[initialization]
+attempt_timeout = "2s"
+[initialization.backoff]
+initial_interval = "500ms"
+max_interval = "30s"
+duration = "2m"
+multiplier = 2.0
 
 # Logging configuration (for service diagnostic logs, not Architus log events)
 # https://docs.rs/sloggers/2.0.0/sloggers/terminal/struct.TerminalLoggerBuilder.html
 [logging]
-level = "info"
+level = "debug"
 format = "full"
 source_location = "file_and_line"
 timezone = "utc"
 destination = "stdout"
 channel_size = 2048
 overflow_strategy = "drop_and_report"
+
+# https://docs.rs/deadpool-postgres/latest/deadpool_postgres/struct.Config.html
+[database]
+# This gets overridden via a secret mount from architus-secret
+# (in development, this is defined in secret.yaml at the repo root)
+user = ""
+# This gets overridden via a secret mount from architus-secret
+# (in development, this is defined in secret.yaml at the repo root)
+password = ""
+dbname = "autbot"
+host = "postgres"
+port = 5432
