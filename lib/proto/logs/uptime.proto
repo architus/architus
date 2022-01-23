@@ -1,0 +1,22 @@
+syntax = "proto3";
+package logs.uptime;
+
+service UptimeService {
+  rpc GatewaySubmit(GatewaySubmitRequest) returns (GatewaySubmitResponse);
+}
+
+message GatewaySubmitRequest {
+  GatewaySubmitType type = 1;
+  repeated fixed64 guilds = 2;
+  uint64 timestamp = 3;
+  uint64 session = 4;
+}
+
+enum GatewaySubmitType {
+  GatewaySubmitTypeUnknown = 0;
+  GatewaySubmitTypeOnline = 1;
+  GatewaySubmitTypeOffline = 2;
+  GatewaySubmitTypeHeartbeat = 3;
+}
+
+message GatewaySubmitResponse {}

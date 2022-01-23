@@ -11,7 +11,7 @@ from lib.aiomodels import TbUsageAnalytics
 from lib.ipc import async_rpc_server
 from lib.ipc.async_emitter import Emitter
 from lib.hoar_frost import HoarFrostGenerator
-from lib.ipc import grpc_client, sandbox_pb2_grpc, manager_pb2_grpc, manager_pb2 as message
+from lib.ipc import grpc_client, starlark_reactor_pb2_grpc, manager_pb2_grpc, manager_pb2 as message
 
 
 class Architus(Bot):
@@ -53,7 +53,7 @@ class Architus(Bot):
         )
 
         self.manager_client = grpc_client.get_async_client('manager:50051', manager_pb2_grpc.ManagerStub)
-        self.sandbox_client = grpc_client.get_async_client('sandbox:1337', sandbox_pb2_grpc.SandboxStub)
+        self.starlark_reactor_client = grpc_client.get_async_client('starlark-reactor:1337', starlark_reactor_pb2_grpc.StarlarkReactorStub)
 
         self.loop.create_task(self.emitter.connect())
 

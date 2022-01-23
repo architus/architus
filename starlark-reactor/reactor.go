@@ -24,7 +24,7 @@ import (
     grpc "google.golang.org/grpc";
     keepalive "google.golang.org/grpc/keepalive";
 
-    rpc "archit.us/sandbox";
+    rpc "archit.us/starlarkreactor";
 )
 
 const MaxMessageSize = 1000000;
@@ -454,8 +454,8 @@ def get(url, headers=None):
     }, nil;
 }
 
-func newServer() *Sandbox {
-    return &Sandbox{};
+func newServer() *StarlarkReactor {
+    return &StarlarkReactor{};
 }
 
 func main() {

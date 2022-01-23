@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logs-gateway-normalize
+  labels:
+    app: logs-gateway-normalize
+spec:
+  selector:
+    matchLabels:
+      app: logs-gateway-normalize
+  template:
+    metadata:
+      labels:
+        app: logs-gateway-normalize
+    spec:
+      containers:
+        - name: logs-gateway-normalize
+          image: "{{prefix}}logs-gateway-normalize:{{tag}}"
+          envFrom:
+            - secretRef:
+                name: architus-secret

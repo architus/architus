@@ -1,9 +1,9 @@
-import string
 from contextlib import suppress
 from typing import Optional, Tuple
 from random import choice
 from asyncio import sleep
 import json
+import string
 
 from discord import Message, Guild, Member, AllowedMentions
 
@@ -12,7 +12,7 @@ from lib.reggy.reggy import Reggy
 from lib.response_grammar.response import parse as parse_response, NodeType
 from lib.config import logger
 from lib.aiomodels import TbAutoResponses
-from lib.ipc import sandbox_pb2 as message
+from lib.ipc import starlark_reactor_pb2 as message
 
 
 class DefaultUser:

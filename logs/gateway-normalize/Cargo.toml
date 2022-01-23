@@ -1,0 +1,47 @@
+[package]
+name = "logs-gateway-normalize"
+version = "0.1.0"
+authors = ["Joseph Azevedo <joseph.az@gatech.edu>"]
+edition = "2018"
+description = """\
+Normalizes Gateway events from the RabbitMQ queue and consumes them,\
+submitting them to the submission service for eventual insertion into the logs store\
+"""
+license = "MIT"
+
+[dependencies]
+architus-id = { path = "../../lib/id-rs" }
+architus-config-backoff = { path = "../../lib/config-backoff-rs" }
+config = "0.11"
+slog = "2.7"
+sloggers = { version = "2.0", features = ["json"] }
+static_assertions = "1.1"
+lazy_static = "1.4"
+anyhow = "1.0"
+thiserror = "1.0.22"
+tonic = "0.4"
+prost = "0.7"
+futures = "0.3"
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros"] }
+tokio-stream = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-humantime = "0.1"
+rmp-serde = "0.15"
+twilight-gateway = "0.5"
+twilight-model = "0.5"
+twilight-http = "0.5"
+twilight-cache-inmemory = "0.5"
+backoff = { version = "0.3", features = ["tokio"] }
+chrono = "0.4"
+lapin = "1.7"
+tokio-amqp = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+
+[dependencies.jmespath]
+git = "https://github.com/jmespath/jmespath.rs"
+features = ["sync"]
+
+[build-dependencies]
+tonic-build = "0.4"
+anyhow = "1.0"

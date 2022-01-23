@@ -1,0 +1,13 @@
+# Create minimal deployment
+# with just the service binary included
+
+FROM debian:buster-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -q \
+    && apt-get install -y -q "libssl1.1" "tini" \
+    && rm -rf /var/lib/apt/lists/*
+COPY logs/submission/target/debug/logs-submission /usr/bin/logs-submission
+COPY logs/submission/config.toml /etc/architus/config.toml
+COPY logs/submission/schema/index_config.json /etc/architus/index_config.json
+ENV RUST_BACKTRACE=1
+ENTRYPOINT ["/usr/bin/logs-submission", "/etc/architus/config.toml"]

@@ -1,0 +1,8 @@
+.github
+.idea
+.vscode
+.git
+logs/**/target
+lib/*-rs/target
+feature-gate/target
+architus.env

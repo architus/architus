@@ -14,10 +14,14 @@ shard/res/meme.png
 tags
 .vs/*
 .vscode/*
+<<<<<<< HEAD
 .idea/*
 www
 secret.yaml
 *.secret.yaml
 deploy/*
+.idea
+www
+secret.yaml
 tilt_modules
 **/target

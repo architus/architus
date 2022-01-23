@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logs-gateway-ingress
+  labels:
+    app: logs-gateway-ingress
+spec:
+  selector:
+    matchLabels:
+      app: logs-gateway-ingress
+  template:
+    metadata:
+      labels:
+        app: logs-gateway-ingress
+    spec:
+      containers:
+        - name: logs-gateway-ingress
+          image: logs-gateway-ingress-image
+          envFrom:
+            - secretRef:
+                name: architus-secret

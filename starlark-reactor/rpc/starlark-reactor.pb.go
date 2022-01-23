@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.26.0
 // 	protoc        v3.6.1
-// source: sandbox.proto
+// source: lib/ipc/proto/starlark-reactor.proto
 
-package sandbox
+package starlarkreactor
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -39,7 +39,7 @@ type StarlarkScript struct {
 func (x *StarlarkScript) Reset() {
 	*x = StarlarkScript{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sandbox_proto_msgTypes[0]
+		mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -52,7 +52,7 @@ func (x *StarlarkScript) String() string {
 func (*StarlarkScript) ProtoMessage() {}
 
 func (x *StarlarkScript) ProtoReflect() protoreflect.Message {
-	mi := &file_sandbox_proto_msgTypes[0]
+	mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -65,7 +65,7 @@ func (x *StarlarkScript) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StarlarkScript.ProtoReflect.Descriptor instead.
 func (*StarlarkScript) Descriptor() ([]byte, []int) {
-	return file_sandbox_proto_rawDescGZIP(), []int{0}
+	return file_lib_ipc_proto_starlark_reactor_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *StarlarkScript) GetScript() string {
@@ -144,7 +144,7 @@ type ScriptOutput struct {
 func (x *ScriptOutput) Reset() {
 	*x = ScriptOutput{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sandbox_proto_msgTypes[1]
+		mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -157,7 +157,7 @@ func (x *ScriptOutput) String() string {
 func (*ScriptOutput) ProtoMessage() {}
 
 func (x *ScriptOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_sandbox_proto_msgTypes[1]
+	mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -170,7 +170,7 @@ func (x *ScriptOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScriptOutput.ProtoReflect.Descriptor instead.
 func (*ScriptOutput) Descriptor() ([]byte, []int) {
-	return file_sandbox_proto_rawDescGZIP(), []int{1}
+	return file_lib_ipc_proto_starlark_reactor_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ScriptOutput) GetOutput() string {
@@ -206,7 +206,7 @@ type Channel struct {
 func (x *Channel) Reset() {
 	*x = Channel{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sandbox_proto_msgTypes[2]
+		mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -219,7 +219,7 @@ func (x *Channel) String() string {
 func (*Channel) ProtoMessage() {}
 
 func (x *Channel) ProtoReflect() protoreflect.Message {
-	mi := &file_sandbox_proto_msgTypes[2]
+	mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -232,7 +232,7 @@ func (x *Channel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Channel.ProtoReflect.Descriptor instead.
 func (*Channel) Descriptor() ([]byte, []int) {
-	return file_sandbox_proto_rawDescGZIP(), []int{2}
+	return file_lib_ipc_proto_starlark_reactor_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Channel) GetId() uint64 {
@@ -268,7 +268,7 @@ type Author struct {
 func (x *Author) Reset() {
 	*x = Author{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sandbox_proto_msgTypes[3]
+		mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -281,7 +281,7 @@ func (x *Author) String() string {
 func (*Author) ProtoMessage() {}
 
 func (x *Author) ProtoReflect() protoreflect.Message {
-	mi := &file_sandbox_proto_msgTypes[3]
+	mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -294,7 +294,7 @@ func (x *Author) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Author.ProtoReflect.Descriptor instead.
 func (*Author) Descriptor() ([]byte, []int) {
-	return file_sandbox_proto_rawDescGZIP(), []int{3}
+	return file_lib_ipc_proto_starlark_reactor_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Author) GetId() uint64 {
@@ -373,7 +373,7 @@ type Message struct {
 func (x *Message) Reset() {
 	*x = Message{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_sandbox_proto_msgTypes[4]
+		mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -386,7 +386,7 @@ func (x *Message) String() string {
 func (*Message) ProtoMessage() {}
 
 func (x *Message) ProtoReflect() protoreflect.Message {
-	mi := &file_sandbox_proto_msgTypes[4]
+	mi := &file_lib_ipc_proto_starlark_reactor_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -399,7 +399,7 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Message.ProtoReflect.Descriptor instead.
 func (*Message) Descriptor() ([]byte, []int) {
-	return file_sandbox_proto_rawDescGZIP(), []int{4}
+	return file_lib_ipc_proto_starlark_reactor_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Message) GetId() uint64 {
@@ -490,13 +490,13 @@ var file_sandbox_proto_rawDesc = []byte{
 }
 
 var (
-	file_sandbox_proto_rawDescOnce sync.Once
-	file_sandbox_proto_rawDescData = file_sandbox_proto_rawDesc
+	file_lib_ipc_proto_starlark_reactor_proto_rawDescOnce sync.Once
+	file_lib_ipc_proto_starlark_reactor_proto_rawDescData = file_lib_ipc_proto_starlark_reactor_proto_rawDesc
 )
 
-func file_sandbox_proto_rawDescGZIP() []byte {
-	file_sandbox_proto_rawDescOnce.Do(func() {
-		file_sandbox_proto_rawDescData = protoimpl.X.CompressGZIP(file_sandbox_proto_rawDescData)
+func file_lib_ipc_proto_starlark_reactor_proto_rawDescGZIP() []byte {
+	file_lib_ipc_proto_starlark_reactor_proto_rawDescOnce.Do(func() {
+		file_lib_ipc_proto_starlark_reactor_proto_rawDescData = protoimpl.X.CompressGZIP(file_lib_ipc_proto_starlark_reactor_proto_rawDescData)
 	})
 	return file_sandbox_proto_rawDescData
 }
@@ -523,13 +523,13 @@ var file_sandbox_proto_depIdxs = []int32{
 	0, // [0:4] is the sub-list for field type_name
 }
 
-func init() { file_sandbox_proto_init() }
-func file_sandbox_proto_init() {
-	if File_sandbox_proto != nil {
+func init() { file_lib_ipc_proto_starlark_reactor_proto_init() }
+func file_lib_ipc_proto_starlark_reactor_proto_init() {
+	if File_lib_ipc_proto_starlark_reactor_proto != nil {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_sandbox_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_lib_ipc_proto_starlark_reactor_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*StarlarkScript); i {
 			case 0:
 				return &v.state
@@ -541,7 +541,7 @@ func file_sandbox_proto_init() {
 				return nil
 			}
 		}
-		file_sandbox_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_lib_ipc_proto_starlark_reactor_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*ScriptOutput); i {
 			case 0:
 				return &v.state
@@ -553,7 +553,7 @@ func file_sandbox_proto_init() {
 				return nil
 			}
 		}
-		file_sandbox_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_lib_ipc_proto_starlark_reactor_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Channel); i {
 			case 0:
 				return &v.state
@@ -565,7 +565,7 @@ func file_sandbox_proto_init() {
 				return nil
 			}
 		}
-		file_sandbox_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_lib_ipc_proto_starlark_reactor_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Author); i {
 			case 0:
 				return &v.state
@@ -577,7 +577,7 @@ func file_sandbox_proto_init() {
 				return nil
 			}
 		}
-		file_sandbox_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+		file_lib_ipc_proto_starlark_reactor_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Message); i {
 			case 0:
 				return &v.state
@@ -594,18 +594,18 @@ func file_sandbox_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: file_sandbox_proto_rawDesc,
+			RawDescriptor: file_lib_ipc_proto_starlark_reactor_proto_rawDesc,
 			NumEnums:      0,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_sandbox_proto_goTypes,
-		DependencyIndexes: file_sandbox_proto_depIdxs,
-		MessageInfos:      file_sandbox_proto_msgTypes,
+		GoTypes:           file_lib_ipc_proto_starlark_reactor_proto_goTypes,
+		DependencyIndexes: file_lib_ipc_proto_starlark_reactor_proto_depIdxs,
+		MessageInfos:      file_lib_ipc_proto_starlark_reactor_proto_msgTypes,
 	}.Build()
-	File_sandbox_proto = out.File
-	file_sandbox_proto_rawDesc = nil
-	file_sandbox_proto_goTypes = nil
-	file_sandbox_proto_depIdxs = nil
+	File_lib_ipc_proto_starlark_reactor_proto = out.File
+	file_lib_ipc_proto_starlark_reactor_proto_rawDesc = nil
+	file_lib_ipc_proto_starlark_reactor_proto_goTypes = nil
+	file_lib_ipc_proto_starlark_reactor_proto_depIdxs = nil
 }

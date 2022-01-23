@@ -1,0 +1,12 @@
+# Create minimal deployment
+# with just the service binary included
+
+FROM debian:buster-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -q \
+    && apt-get install -y -q "libssl1.1" "tini" \
+    && rm -rf /var/lib/apt/lists/*
+COPY logs/uptime/target/debug/logs-uptime /usr/bin/logs-uptime
+COPY logs/uptime/config.toml /etc/architus/config.toml
+ENV RUST_BACKTRACE=1
+ENTRYPOINT ["/usr/bin/logs-uptime", "/etc/architus/config.toml"]

@@ -1,4 +1,4 @@
-module sandbox
+module starlarkreactor
 
 go 1.16
 
@@ -8,4 +8,4 @@ require (
 	google.golang.org/grpc v1.34.0
 )
 
-replace archit.us/sandbox => ./rpc
+replace archit.us/starlarkreactor => ./rpc

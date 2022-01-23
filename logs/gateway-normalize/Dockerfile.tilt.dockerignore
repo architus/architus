@@ -1,0 +1,6 @@
+# Ignore all files in the context except for the service binary and config
+# Overrides /.dockerignore
+
+*
+!logs/gateway-normalize/target/debug/logs-gateway-normalize
+!logs/gateway-normalize/config.toml

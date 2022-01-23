@@ -1,0 +1,6 @@
+# Ignore all files in the context except for the service binary and config
+# Overrides /.dockerignore
+
+*
+!logs/search/target/debug/logs-search
+!logs/search/config.toml

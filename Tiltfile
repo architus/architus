@@ -29,7 +29,14 @@ features_to_components = {
     'logs': [
         'logs-submission',
         'elasticsearch',
-    ]
+    ],
+    'shard-rs': [
+        'shard-rs',
+        'db',
+        'api',
+        'gateway',
+        'rabbit',
+    ],
 }
 
 config.define_bool("no-core")
@@ -44,6 +51,7 @@ enabled_features = cfg.get('enable', [] if no_core else ["core"])
 
 # Convert the enabled features to components
 enabled = get_enabled_components(features_to_components, enabled_features)
+
 
 
 # Base resources
@@ -159,3 +167,20 @@ if 'logs-submission' in enabled:
         docker_build('logs-submission-image', '.', dockerfile='logs/submission/Dockerfile')
     k8s_yaml('logs/submission/kube/dev/logs-submission.yaml')
     k8s_resource('logs-submission')
+
+if 'shard-rs' in enabled:
+    if rust_hot_reload:
+        copy_example(path='shard-rs/config.toml', example_path='shard-rs/config.default.toml')
+        # Build locally and then use a simplified Dockerfile that just copies the binary into a container
+        binary_path = rust_local_binary(crate_path='shard-rs')
+        rust_hot_reload_docker_build(
+            ref='shard-rs-image',
+            binary_path=binary_path,
+            apt_packages=['libpq-dev', 'libssl1.1', 'ca-certificates'],
+            file_syncs=[file_sync('shard-rs/config.toml', '/etc/architus/config.toml')],
+            arguments=['/etc/architus/config.toml'],
+        )
+    else:
+        docker_build('shard-rs-image', '.', dockerfile='shard-rs/Dockerfile')
+    k8s_yaml('shard-rs/kube/dev/shard-rs.yaml')
+    k8s_resource('shard-rs')
