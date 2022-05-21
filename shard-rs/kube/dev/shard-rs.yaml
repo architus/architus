@@ -26,4 +26,14 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: architus-secret
-                  key: client_secret
+                  key: bot_token
+            - name: SHARD_RS_CONFIG_DATABASE__USER
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: db_user
+            - name: SHARD_RS_CONFIG_DATABASE__PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: architus-secret
+                  key: db_pass

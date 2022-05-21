@@ -2,8 +2,11 @@
 //! and internal behaviors
 
 use anyhow::Context;
+use architus_config_backoff::Backoff;
 use serde::Deserialize;
 use sloggers::terminal::TerminalLoggerConfig;
+use std::num::NonZeroU64;
+use std::time::Duration;
 
 /// Configuration object loaded upon startup
 #[derive(Debug, Deserialize, Clone)]
@@ -11,8 +14,28 @@ pub struct Configuration {
     pub discord_app_id: std::num::NonZeroU64,
     pub discord_token: String,
     pub comic_description: String,
+    pub gulag_description: String,
+    pub architus_user_id: std::num::NonZeroU64,
+
+    pub default_gulag_severity: u64,
+    pub default_gulag_threshold: u64,
+
+    /// The timeout/backoff used to connect to external services during initialization
+    pub initialization: BackoffAndTimeout,
+
+    pub database: deadpool_postgres::Config,
+
+    pub temp_test_guild: NonZeroU64,
 
     pub logging: TerminalLoggerConfig,
+}
+
+/// Combination of backoff and timeout config for a class of RPC's
+#[derive(Debug, Deserialize, Clone)]
+pub struct BackoffAndTimeout {
+    #[serde(with = "humantime_serde")]
+    pub attempt_timeout: Duration,
+    pub backoff: Backoff,
 }
 
 impl Configuration {
