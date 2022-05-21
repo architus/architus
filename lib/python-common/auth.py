@@ -95,7 +95,8 @@ def verify_twitch_event(func):
             timestamp = request.headers['Twitch-Eventsub-Message-Timestamp']
             body = request.data
             signature = request.headers['Twitch-Eventsub-Message-Signature']
-            digest = hmac.new(twitch_hub_secret.encode(), msg=msg_id + timestamp + body, digestmod=hashlib.sha256).hexdigest()
+            hmac_message = msg_id + timestamp + body.decode()
+            digest = 'sha256=' + hmac.new(bytes(twitch_hub_secret, 'utf-8'), msg=bytes(hmac_message, 'utf-8'), digestmod=hashlib.sha256).hexdigest().lower()
             if not hmac.compare_digest(digest, signature):
                 logger.info("Request had invalid signature")
                 return ({'message': "Invalid Signature"}, StatusCodes.FORBIDDEN_403)

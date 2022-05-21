@@ -38,7 +38,7 @@ COPY ./shard/requirements.txt /app
 ENV GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS 16
 RUN python3.8 -m pip install --upgrade pip
 RUN python3.8 -m pip install wheel
-RUN python3.8 -m pip install --trusted-host pypi.python.org -r requirements.txt
+RUN python3.8 -m pip install --trusted-host pypi.python.org --use-deprecated=legacy-resolver -r requirements.txt
 #RUN apk del libpng-dev jpeg-dev libffi-dev libxml2-dev python3-dev libxslt-dev freetype-dev
 
 ENV PYTHONIOENCODING UTF-8

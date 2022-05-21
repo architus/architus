@@ -2,7 +2,7 @@ ARG REPO_ROOT=/opt/architus
 ARG SERVICE=shard-rs
 
 # Build service
-FROM rust:1.58 as builder
+FROM rust:1.58-bullseye as builder
 RUN rustup component add rustfmt
 ARG REPO_ROOT
 ARG SERVICE
@@ -15,7 +15,7 @@ RUN cargo build --release
 RUN cp $REPO_ROOT/$SERVICE/target/release/shard-rs /opt/shard-rs
 
 # Create minimal deployment
-FROM debian:buster-slim as deployment
+FROM debian:bullseye-slim as deployment
 ARG SERVICE
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -q \

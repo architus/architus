@@ -21,28 +21,44 @@ class Twitch(commands.Cog, name="Twitch Notification"):
         headers = {
             'client-id': twitch_client_id,
             'Authorization': f'Bearer {token_stuff}',
+            'Content-Type': 'application/json',
         }
         return headers
 
     async def sub_by_id(self, user_id, username=''):
-        url = "https://api.twitch.tv/helix/webhooks/hub"
+        url = "https://api.twitch.tv/helix/eventsub/subscriptions"
         data = {
-            "hub.callback": f"https://api.{domain_name}/twitch",
-            "hub.mode": "subscribe",
-            "hub.topic": f"https://api.twitch.tv/helix/streams?user_id={user_id}",
-            "hub.lease_seconds": 864000,
-            "hub.secret": twitch_hub_secret,
+            "type": "stream.online",
+            "version": "1",
+            "condition": {
+                "broadcaster_user_id": str(user_id)
+            },
+            "transport": {
+                "method": "webhook",
+                "callback": f"https://api.{domain_name}/twitch",
+                "secret": twitch_hub_secret
+            }
         }
+
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=data, headers=await self.get_headers()) as resp:
+            async with session.post(url, json=data, headers=await self.get_headers()) as resp:
                 logger.info(f"attempted to subscribe to {username}({user_id}), received {resp.status}")
-                return resp.status == 202
+                if resp.status != 202:
+                    logger.debug(await resp.text())
+
+    async def log_subs(self):
+        url = 'https://api.twitch.tv/helix/eventsub/subscriptions'
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=await self.get_headers()) as resp:
+                logger.debug(f'twitch subs: {await resp.text()}')
+
 
     @commands.Cog.listener()
     async def on_ready(self):
         while self.bot.shard_id == 0:
             await self.refresh_token()
             subscribed_ids = await self.twitch_stream.select_distinct_stream_id()
+            await self.log_subs()
             for row in subscribed_ids:
                 try:
                     await self.sub_by_id(row['stream_user_id'])
@@ -128,10 +144,13 @@ class Twitch(commands.Cog, name="Twitch Notification"):
 
         await ctx.send(embed=em)
 
-    async def update(self, stream):
-        rows = await self.twitch_stream.select_distinct_by_stream_id(int(stream['user_id']))
+    async def update(self, data):
+        rows = await self.twitch_stream.select_distinct_by_stream_id(int(data['broadcaster_user_id']))
         guilds = {self.bot.get_guild(r['guild_id']) for r in rows}
-        users = await self.get_users((str(stream['user_id']),))
+        users = await self.get_users((str(data['broadcaster_user_id']),))
+        
+        stream = (await self.get_streams((data['broadcaster_user_id'],)))[0]
+
         for guild in guilds:
             if guild is None:
                 continue
@@ -139,8 +158,7 @@ class Twitch(commands.Cog, name="Twitch Notification"):
             channel = guild.get_channel(channel_id)
 
             if channel is not None:
-                game = await self.get_game(stream["game_id"])
-                await channel.send(embed=self.embed_helper(stream, game, users[0]))
+                await channel.send(embed=self.embed_helper(stream, users[0]))
                 logger.debug(stream["type"])
 
     async def get_users(self, stream_user_ids):
@@ -155,8 +173,10 @@ class Twitch(commands.Cog, name="Twitch Notification"):
         peepee = "&user_id=".join(stream_user_ids)
         async with aiohttp.ClientSession() as session:
             url = f"https://api.twitch.tv/helix/streams?user_id={peepee}"
+            logger.debug(f'url: {url}')
             async with session.get(url, headers=await self.get_headers()) as resp:
                 info = await resp.json()
+                logger.debug(f'info: {info}')
         return info["data"]
 
     async def get_game(self, game_id: str):
@@ -166,16 +186,16 @@ class Twitch(commands.Cog, name="Twitch Notification"):
                 games = await resp.json()
         return games["data"][0]
 
-    def embed_helper(self, stream, game, user):
+    def embed_helper(self, stream, user):
         timestamp = datetime.fromisoformat(stream["started_at"][:-1])
         em = discord.Embed(
             title=stream["title"],
             url=f"https://twitch.tv/{stream['user_name']}",
-            description=f"{stream['user_name']} is playing {game['name']}!",
+            description=f"{stream['user_name']} is playing {stream['game_name']}!",
             colour=0x6441A4, timestamp=timestamp)
 
         em.set_author(name=stream["user_name"], icon_url=user["profile_image_url"])
-        em.set_thumbnail(url=game["box_art_url"].format(width=130, height=180))
+        em.set_thumbnail(url=stream["thumbnail_url"].format(width=130, height=180))
 
         return em
 

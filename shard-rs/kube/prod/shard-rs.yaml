@@ -27,7 +27,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: architus-secret
-                  key: client_secret
+                  key: bot_token
           volumeMounts:
             - name: config
               mountPath: "/etc/architus/config.d"

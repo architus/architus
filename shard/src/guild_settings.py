@@ -45,6 +45,7 @@ class Setting:
     @twitch_channel_id.setter
     def twitch_channel_id(self, new_twitch_channel_id: int):
         self._settings_dict['twitch_channel_id'] = new_twitch_channel_id
+        self._update_db()
 
     @property
     def music_role(self) -> Optional[discord.Role]:

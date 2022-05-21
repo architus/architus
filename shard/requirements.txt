@@ -51,12 +51,11 @@ uWSGI
 websockets
 Werkzeug
 yarl
-youtube-dlc
-pyyaml
-pika
-aio-pika
-asyncpg
+pyyaml==6.0
+pika==1.2.0
+aio-pika==6.8.1
+asyncpg==0.25.0
 grpcio==1.29.0
 protobuf
-discord.py[voice]
+discord.py
 lavalink

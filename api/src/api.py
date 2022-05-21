@@ -229,29 +229,32 @@ class Twitch(CustomResource):
 
     @verify_twitch_event
     def post(self):
-        if request.json is None or 'data' not in request.json:
+        logger.debug(f'twitch event: {request.json}')
+
+        if 'challenge' in request.json:
+            return make_response(request.json['challenge'], StatusCodes.OK_200)
+        if 'event' not in request.json:
             return StatusCodes.BAD_REQUEST_400
 
         # twitch can send the same event more than once.
-        id = request.headers['Twitch-Notification-Id']
+        id = request.headers['Twitch-Eventsub-Message-Id']
         seen_before = self.redis.getset(id, '1') is not None
         self.redis.expire(id, 60)
         if seen_before:
             return StatusCodes.NO_CONTENT_204
-
         # send update to all the relevant shards
-        for stream in request.json['data']:
-            user_id = stream["user_id"]
-            result = self.session.execute(
-                '''SELECT guild_id FROM tb_twitch_subs WHERE stream_user_id = :stream_user_id''',
-                {'stream_user_id': int(user_id)}).fetchall()
-            ids = {which_shard(row['guild_id']) for row in result}
+        event = request.json['event']
+        user_id = event["broadcaster_user_id"]
+        result = self.session.execute(
+            '''SELECT guild_id FROM tb_twitch_subs WHERE stream_user_id = :stream_user_id''',
+            {'stream_user_id': int(user_id)}).fetchall()
+        ids = {which_shard(row['guild_id']) for row in result}
 
-            for shard_id in ids:
-                try:
-                    self.shard.client.call('twitch_update', stream, routing_key=f'shard_rpc_{shard_id}')
-                except Exception:
-                    logger.exception(f"Error forwarding twitch update to shard {shard_id}")
+        for shard_id in ids:
+            try:
+                self.shard.client.call('twitch_update', event, routing_key=f'shard_rpc_{shard_id}')
+            except Exception:
+                logger.exception(f"Error forwarding twitch update to shard {shard_id}")
 
 
 @app.route('/status')
