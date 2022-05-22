@@ -1,4 +1,4 @@
-FROM alpine:edge
+FROM alpine:3.10
 RUN mkdir -p /var/www
 # Set the working directory to /app
 WORKDIR /app

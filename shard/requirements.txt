@@ -57,5 +57,5 @@ aio-pika==6.8.1
 asyncpg==0.25.0
 grpcio==1.29.0
 protobuf
-discord.py
+discord.py==1.7.3
 lavalink
