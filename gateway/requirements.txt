@@ -2,7 +2,7 @@ Flask>=1.0.3
 aio_pika
 websockets==6.0
 pyyaml
-aiohttp==3.5.4
+aiohttp==3.7.4
 python-socketio==4.6.1
 python-engineio==3.13.2
 requests>=2.21.0
